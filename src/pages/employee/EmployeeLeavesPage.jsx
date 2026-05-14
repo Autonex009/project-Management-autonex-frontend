@@ -1,7 +1,7 @@
 import { useState } from 'react';
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import { leaveApi, wfhApi } from '../../services/api';
-import { Calendar, Plus, X, CheckCircle, XCircle, Clock, Home, AlertTriangle } from 'lucide-react';
+import { Calendar, Plus, X, CheckCircle, XCircle, Clock, Home, AlertTriangle, Pencil, Trash2 } from 'lucide-react';
 import { format, parseISO } from 'date-fns';
 import toast from 'react-hot-toast';
 import { getEndDateValidationMessage, isEndDateBeforeStartDate } from '../../utils/dateValidation';
@@ -26,6 +26,12 @@ const EmployeeLeavesPage = () => {
     const [showWfhForm, setShowWfhForm] = useState(false);
     const [leaveForm, setLeaveForm] = useState({ leave_type: 'paid', start_date: '', end_date: '', reason: '' });
     const [wfhForm, setWfhForm] = useState({ wfh_date: '', reason: '' });
+    const [editingLeave, setEditingLeave] = useState(null);
+    const [editForm, setEditForm] = useState({ leave_type: 'paid', start_date: '', end_date: '', reason: '' });
+
+    // A leave can be edited/deleted only if its start date is strictly in the future
+    const today = new Date().toISOString().slice(0, 10);
+    const canModify = (leave) => leave.start_date > today;
 
     const { data: allLeaves = [], isLoading } = useQuery({
         queryKey: ['my-leaves', employeeId],
@@ -71,6 +77,31 @@ const EmployeeLeavesPage = () => {
         onError: (err) => toast.error(err?.response?.data?.detail || 'Failed to submit WFH request'),
     });
 
+    const updateLeaveMutation = useMutation({
+        mutationFn: ({ id, data }) => leaveApi.update(id, { ...data, employee_id: employeeId }),
+        onSuccess: () => {
+            queryClient.invalidateQueries({ queryKey: ['my-leaves'] });
+            queryClient.invalidateQueries(['leave-calendar']);
+            setEditingLeave(null);
+            toast.success('Leave request updated');
+        },
+        onError: (err) => toast.error(
+            err?.response?.data?.detail || 'Failed to update leave'
+        ),
+    });
+
+    const deleteLeaveMutation = useMutation({
+        mutationFn: (id) => leaveApi.delete(id),
+        onSuccess: () => {
+            queryClient.invalidateQueries({ queryKey: ['my-leaves'] });
+            queryClient.invalidateQueries(['leave-calendar']);
+            toast.success('Leave request deleted');
+        },
+        onError: (err) => toast.error(
+            err?.response?.data?.detail || 'Failed to delete leave'
+        ),
+    });
+
     const handleLeaveSubmit = (e) => {
         e.preventDefault();
         if (isEndDateBeforeStartDate(leaveForm.start_date, leaveForm.end_date)) {
@@ -84,6 +115,26 @@ const EmployeeLeavesPage = () => {
         e.preventDefault();
         if (!wfhForm.wfh_date) { toast.error('Please select a date'); return; }
         createWfhMutation.mutate(wfhForm);
+    };
+
+    const handleEditOpen = (leave) => {
+        setEditingLeave(leave);
+        setEditForm({ leave_type: leave.leave_type, start_date: leave.start_date, end_date: leave.end_date, reason: leave.reason || '' });
+        setShowLeaveForm(false);
+    };
+
+    const handleEditSubmit = (e) => {
+        e.preventDefault();
+        if (isEndDateBeforeStartDate(editForm.start_date, editForm.end_date)) {
+            toast.error(getEndDateValidationMessage());
+            return;
+        }
+        updateLeaveMutation.mutate({ id: editingLeave.leave_id, data: editForm });
+    };
+
+    const handleDelete = (leave) => {
+        if (!window.confirm(`Delete this ${getLeaveTypeLabel(leave.leave_type)} request (${leave.start_date} — ${leave.end_date})?`)) return;
+        deleteLeaveMutation.mutate(leave.leave_id);
     };
 
     const myEmployeeIdSet = employeeId ? new Set([employeeId]) : null;
@@ -127,7 +178,7 @@ const EmployeeLeavesPage = () => {
             {/* ── My Leaves ── */}
             {activeTab === 'My Leaves' && (
                 <>
-                    {/* Leave request form */}
+                    {/* New leave request form */}
                     {showLeaveForm && (
                         <div className="bg-white rounded-2xl border border-slate-200 shadow-sm p-6">
                             <div className="flex items-center justify-between mb-4">
@@ -170,6 +221,53 @@ const EmployeeLeavesPage = () => {
                         </div>
                     )}
 
+                    {/* Edit leave form */}
+                    {editingLeave && (
+                        <div className="bg-white rounded-2xl border border-blue-200 shadow-sm p-6">
+                            <div className="flex items-center justify-between mb-4">
+                                <h3 className="font-semibold text-slate-800">Edit Leave Request</h3>
+                                <button onClick={() => setEditingLeave(null)} className="p-1 text-slate-400 hover:text-slate-600"><X className="w-5 h-5"/></button>
+                            </div>
+                            <form onSubmit={handleEditSubmit} className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                                <div>
+                                    <label className="block text-sm font-medium text-slate-700 mb-1">Type</label>
+                                    <select value={editForm.leave_type} onChange={e => setEditForm({ ...editForm, leave_type: e.target.value })}
+                                        className="w-full px-3 py-2 border border-slate-200 rounded-lg text-sm">
+                                        {LEAVE_TYPE_OPTIONS.map(o => <option key={o.value} value={o.value}>{o.label}</option>)}
+                                    </select>
+                                </div>
+                                <div>
+                                    <label className="block text-sm font-medium text-slate-700 mb-1">Reason</label>
+                                    <input type="text" value={editForm.reason} onChange={e => setEditForm({ ...editForm, reason: e.target.value })}
+                                        className="w-full px-3 py-2 border border-slate-200 rounded-lg text-sm" placeholder="Optional reason"/>
+                                </div>
+                                <div>
+                                    <label className="block text-sm font-medium text-slate-700 mb-1">Start Date</label>
+                                    <input type="date" value={editForm.start_date} onChange={e => setEditForm({ ...editForm, start_date: e.target.value })}
+                                        className="w-full px-3 py-2 border border-slate-200 rounded-lg text-sm" required/>
+                                </div>
+                                <div>
+                                    <label className="block text-sm font-medium text-slate-700 mb-1">End Date</label>
+                                    <input type="date" value={editForm.end_date} onChange={e => setEditForm({ ...editForm, end_date: e.target.value })}
+                                        className="w-full px-3 py-2 border border-slate-200 rounded-lg text-sm" required/>
+                                </div>
+                                <div className="md:col-span-2 rounded-lg border border-blue-100 bg-blue-50 px-3 py-2 text-sm text-blue-700">
+                                    Editing will reset the approval status back to <strong>pending</strong> so your manager can re-review.
+                                </div>
+                                <div className="md:col-span-2 flex justify-end gap-2">
+                                    <button type="button" onClick={() => setEditingLeave(null)}
+                                        className="px-4 py-2 border border-slate-200 text-slate-600 rounded-lg text-sm font-medium hover:bg-slate-50">
+                                        Cancel
+                                    </button>
+                                    <button type="submit" disabled={updateLeaveMutation.isPending}
+                                        className="px-4 py-2 bg-blue-600 text-white rounded-lg text-sm font-medium hover:bg-blue-700 disabled:opacity-50">
+                                        {updateLeaveMutation.isPending ? 'Saving...' : 'Save Changes'}
+                                    </button>
+                                </div>
+                            </form>
+                        </div>
+                    )}
+
                     {isLoading ? (
                         <div className="text-center py-12 text-slate-400 animate-pulse">Loading...</div>
                     ) : allLeaves.length === 0 ? (
@@ -182,8 +280,10 @@ const EmployeeLeavesPage = () => {
                         <div className="space-y-3">
                             {allLeaves.map(leave => {
                                 const status = leave.status || 'pending';
+                                const modifiable = canModify(leave);
+                                const isEditing = editingLeave?.leave_id === leave.leave_id;
                                 return (
-                                    <div key={leave.leave_id} className="bg-white rounded-xl border border-slate-200/60 shadow-sm p-4">
+                                    <div key={leave.leave_id} className={`bg-white rounded-xl border shadow-sm p-4 transition-colors ${isEditing ? 'border-blue-300' : 'border-slate-200/60'}`}>
                                         <div className="flex items-center justify-between">
                                             <div className="flex items-center gap-4">
                                                 <div className={`p-2 rounded-lg ${status === 'approved' ? 'bg-emerald-50' : status === 'rejected' ? 'bg-red-50' : 'bg-amber-50'}`}>
@@ -209,7 +309,28 @@ const EmployeeLeavesPage = () => {
                                                     )}
                                                 </div>
                                             </div>
-                                            <span className={`px-2.5 py-0.5 rounded-full text-xs font-medium border capitalize ${STATUS_STYLES[status]}`}>{status}</span>
+                                            <div className="flex items-center gap-2">
+                                                <span className={`px-2.5 py-0.5 rounded-full text-xs font-medium border capitalize ${STATUS_STYLES[status]}`}>{status}</span>
+                                                {modifiable && (
+                                                    <>
+                                                        <button
+                                                            onClick={() => isEditing ? setEditingLeave(null) : handleEditOpen(leave)}
+                                                            className="p-1.5 rounded-lg text-slate-400 hover:bg-blue-50 hover:text-blue-600 transition-colors"
+                                                            title="Edit leave request"
+                                                        >
+                                                            <Pencil className="w-4 h-4"/>
+                                                        </button>
+                                                        <button
+                                                            onClick={() => handleDelete(leave)}
+                                                            disabled={deleteLeaveMutation.isPending}
+                                                            className="p-1.5 rounded-lg text-slate-400 hover:bg-red-50 hover:text-red-500 transition-colors disabled:opacity-50"
+                                                            title="Delete leave request"
+                                                        >
+                                                            <Trash2 className="w-4 h-4"/>
+                                                        </button>
+                                                    </>
+                                                )}
+                                            </div>
                                         </div>
                                     </div>
                                 );
