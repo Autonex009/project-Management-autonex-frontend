@@ -28,10 +28,13 @@ const EmployeeLeavesPage = () => {
     const [wfhForm, setWfhForm] = useState({ wfh_date: '', reason: '' });
     const [editingLeave, setEditingLeave] = useState(null);
     const [editForm, setEditForm] = useState({ leave_type: 'paid', start_date: '', end_date: '', reason: '' });
+    const [editingWfh, setEditingWfh] = useState(null);
+    const [editWfhForm, setEditWfhForm] = useState({ wfh_date: '', reason: '' });
 
-    // A leave can be edited/deleted only if its start date is strictly in the future
+    // Edit/delete only allowed when the date is strictly in the future
     const today = new Date().toISOString().slice(0, 10);
     const canModify = (leave) => leave.start_date > today;
+    const canModifyWfh = (wfh) => wfh.wfh_date > today;
 
     const { data: allLeaves = [], isLoading } = useQuery({
         queryKey: ['my-leaves', employeeId],
@@ -102,6 +105,27 @@ const EmployeeLeavesPage = () => {
         ),
     });
 
+    const updateWfhMutation = useMutation({
+        mutationFn: ({ id, data }) => wfhApi.update(id, { ...data, employee_id: employeeId }),
+        onSuccess: () => {
+            queryClient.invalidateQueries({ queryKey: ['my-wfh'] });
+            queryClient.invalidateQueries(['leave-calendar']);
+            setEditingWfh(null);
+            toast.success('WFH request updated');
+        },
+        onError: (err) => toast.error(err?.response?.data?.detail || 'Failed to update WFH request'),
+    });
+
+    const deleteWfhMutation = useMutation({
+        mutationFn: (id) => wfhApi.delete(id),
+        onSuccess: () => {
+            queryClient.invalidateQueries({ queryKey: ['my-wfh'] });
+            queryClient.invalidateQueries(['leave-calendar']);
+            toast.success('WFH request deleted');
+        },
+        onError: (err) => toast.error(err?.response?.data?.detail || 'Failed to delete WFH request'),
+    });
+
     const handleLeaveSubmit = (e) => {
         e.preventDefault();
         if (isEndDateBeforeStartDate(leaveForm.start_date, leaveForm.end_date)) {
@@ -135,6 +159,23 @@ const EmployeeLeavesPage = () => {
     const handleDelete = (leave) => {
         if (!window.confirm(`Delete this ${getLeaveTypeLabel(leave.leave_type)} request (${leave.start_date} — ${leave.end_date})?`)) return;
         deleteLeaveMutation.mutate(leave.leave_id);
+    };
+
+    const handleWfhEditOpen = (wfh) => {
+        setEditingWfh(wfh);
+        setEditWfhForm({ wfh_date: wfh.wfh_date, reason: wfh.reason || '' });
+        setShowWfhForm(false);
+    };
+
+    const handleWfhEditSubmit = (e) => {
+        e.preventDefault();
+        if (!editWfhForm.wfh_date) { toast.error('Please select a date'); return; }
+        updateWfhMutation.mutate({ id: editingWfh.id, data: editWfhForm });
+    };
+
+    const handleWfhDelete = (wfh) => {
+        if (!window.confirm(`Delete WFH request for ${wfh.wfh_date}?`)) return;
+        deleteWfhMutation.mutate(wfh.id);
     };
 
     const myEmployeeIdSet = employeeId ? new Set([employeeId]) : null;
@@ -348,6 +389,7 @@ const EmployeeLeavesPage = () => {
             {/* ── Work From Home ── */}
             {activeTab === 'Work From Home' && (
                 <>
+                    {/* New WFH request form */}
                     {showWfhForm && (
                         <div className="bg-white rounded-2xl border border-slate-200 shadow-sm p-6">
                             <div className="flex items-center justify-between mb-4">
@@ -375,6 +417,41 @@ const EmployeeLeavesPage = () => {
                         </div>
                     )}
 
+                    {/* Edit WFH form */}
+                    {editingWfh && (
+                        <div className="bg-white rounded-2xl border border-blue-200 shadow-sm p-6">
+                            <div className="flex items-center justify-between mb-4">
+                                <h3 className="font-semibold text-slate-800">Edit WFH Request</h3>
+                                <button onClick={() => setEditingWfh(null)} className="p-1 text-slate-400 hover:text-slate-600"><X className="w-5 h-5"/></button>
+                            </div>
+                            <form onSubmit={handleWfhEditSubmit} className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                                <div>
+                                    <label className="block text-sm font-medium text-slate-700 mb-1">Date</label>
+                                    <input type="date" value={editWfhForm.wfh_date} onChange={e => setEditWfhForm({ ...editWfhForm, wfh_date: e.target.value })}
+                                        className="w-full px-3 py-2 border border-slate-200 rounded-lg text-sm" required/>
+                                </div>
+                                <div>
+                                    <label className="block text-sm font-medium text-slate-700 mb-1">Reason</label>
+                                    <input type="text" value={editWfhForm.reason} onChange={e => setEditWfhForm({ ...editWfhForm, reason: e.target.value })}
+                                        className="w-full px-3 py-2 border border-slate-200 rounded-lg text-sm" placeholder="Optional reason"/>
+                                </div>
+                                <div className="md:col-span-2 rounded-lg border border-blue-100 bg-blue-50 px-3 py-2 text-sm text-blue-700">
+                                    Editing will reset the approval status back to <strong>pending</strong> so your manager can re-review.
+                                </div>
+                                <div className="md:col-span-2 flex justify-end gap-2">
+                                    <button type="button" onClick={() => setEditingWfh(null)}
+                                        className="px-4 py-2 border border-slate-200 text-slate-600 rounded-lg text-sm font-medium hover:bg-slate-50">
+                                        Cancel
+                                    </button>
+                                    <button type="submit" disabled={updateWfhMutation.isPending}
+                                        className="px-4 py-2 bg-blue-600 text-white rounded-lg text-sm font-medium hover:bg-blue-700 disabled:opacity-50">
+                                        {updateWfhMutation.isPending ? 'Saving...' : 'Save Changes'}
+                                    </button>
+                                </div>
+                            </form>
+                        </div>
+                    )}
+
                     {myWfh.length === 0 ? (
                         <div className="bg-white rounded-2xl border border-slate-200 p-12 text-center">
                             <Home className="w-12 h-12 text-slate-300 mx-auto mb-4"/>
@@ -385,8 +462,10 @@ const EmployeeLeavesPage = () => {
                         <div className="space-y-3">
                             {myWfh.map(w => {
                                 const status = w.status || 'pending';
+                                const modifiable = canModifyWfh(w);
+                                const isEditing = editingWfh?.id === w.id;
                                 return (
-                                    <div key={w.id} className="bg-white rounded-xl border border-slate-200/60 shadow-sm p-4 flex items-center justify-between">
+                                    <div key={w.id} className={`bg-white rounded-xl border shadow-sm p-4 flex items-center justify-between transition-colors ${isEditing ? 'border-blue-300' : 'border-slate-200/60'}`}>
                                         <div className="flex items-center gap-4">
                                             <div className={`p-2 rounded-lg ${status === 'approved' ? 'bg-purple-50' : status === 'rejected' ? 'bg-red-50' : 'bg-amber-50'}`}>
                                                 {status === 'approved' && <CheckCircle className="w-5 h-5 text-purple-600"/>}
@@ -402,7 +481,28 @@ const EmployeeLeavesPage = () => {
                                                 {w.remark && <p className="text-xs text-slate-500 mt-0.5">Remark: {w.remark}</p>}
                                             </div>
                                         </div>
-                                        <span className={`px-2.5 py-0.5 rounded-full text-xs font-medium border capitalize ${STATUS_STYLES[status]}`}>{status}</span>
+                                        <div className="flex items-center gap-2">
+                                            <span className={`px-2.5 py-0.5 rounded-full text-xs font-medium border capitalize ${STATUS_STYLES[status]}`}>{status}</span>
+                                            {modifiable && (
+                                                <>
+                                                    <button
+                                                        onClick={() => isEditing ? setEditingWfh(null) : handleWfhEditOpen(w)}
+                                                        className="p-1.5 rounded-lg text-slate-400 hover:bg-blue-50 hover:text-blue-600 transition-colors"
+                                                        title="Edit WFH request"
+                                                    >
+                                                        <Pencil className="w-4 h-4"/>
+                                                    </button>
+                                                    <button
+                                                        onClick={() => handleWfhDelete(w)}
+                                                        disabled={deleteWfhMutation.isPending}
+                                                        className="p-1.5 rounded-lg text-slate-400 hover:bg-red-50 hover:text-red-500 transition-colors disabled:opacity-50"
+                                                        title="Delete WFH request"
+                                                    >
+                                                        <Trash2 className="w-4 h-4"/>
+                                                    </button>
+                                                </>
+                                            )}
+                                        </div>
                                     </div>
                                 );
                             })}

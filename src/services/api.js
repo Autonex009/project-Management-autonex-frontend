@@ -118,6 +118,7 @@ export const signupRequestApi = {
 export const wfhApi = {
     getAll: (params) => api.get('/wfh', { params }).then(res => res.data),
     create: (data) => api.post('/wfh', data).then(res => res.data),
+    update: (id, data) => api.put(`/wfh/${id}`, data).then(res => res.data),
     approve: (id, approvedBy, remark) => api.patch(`/wfh/${id}/approve`, { remark: remark || null }, { params: { approved_by: approvedBy } }).then(res => res.data),
     reject: (id, approvedBy, remark) => api.patch(`/wfh/${id}/reject`, { remark: remark || null }, { params: { approved_by: approvedBy } }).then(res => res.data),
     delete: (id) => api.delete(`/wfh/${id}`).then(res => res.data),
