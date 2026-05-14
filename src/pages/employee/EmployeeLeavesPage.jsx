@@ -25,11 +25,11 @@ const EmployeeLeavesPage = () => {
     const [showLeaveForm, setShowLeaveForm] = useState(false);
     const [showWfhForm, setShowWfhForm] = useState(false);
     const [leaveForm, setLeaveForm] = useState({ leave_type: 'paid', start_date: '', end_date: '', reason: '' });
-    const [wfhForm, setWfhForm] = useState({ wfh_date: '', reason: '' });
+    const [wfhForm, setWfhForm] = useState({ wfh_date: '', end_date: '', reason: '' });
     const [editingLeave, setEditingLeave] = useState(null);
     const [editForm, setEditForm] = useState({ leave_type: 'paid', start_date: '', end_date: '', reason: '' });
     const [editingWfh, setEditingWfh] = useState(null);
-    const [editWfhForm, setEditWfhForm] = useState({ wfh_date: '', reason: '' });
+    const [editWfhForm, setEditWfhForm] = useState({ wfh_date: '', end_date: '', reason: '' });
 
     // Edit/delete only allowed when the date is strictly in the future
     const today = new Date().toISOString().slice(0, 10);
@@ -74,7 +74,7 @@ const EmployeeLeavesPage = () => {
             queryClient.invalidateQueries({ queryKey: ['my-wfh'] });
             queryClient.invalidateQueries(['leave-calendar']);
             setShowWfhForm(false);
-            setWfhForm({ wfh_date: '', reason: '' });
+            setWfhForm({ wfh_date: '', end_date: '', reason: '' });
             toast.success('WFH request submitted successfully');
         },
         onError: (err) => toast.error(err?.response?.data?.detail || 'Failed to submit WFH request'),
@@ -137,8 +137,12 @@ const EmployeeLeavesPage = () => {
 
     const handleWfhSubmit = (e) => {
         e.preventDefault();
-        if (!wfhForm.wfh_date) { toast.error('Please select a date'); return; }
-        createWfhMutation.mutate(wfhForm);
+        if (!wfhForm.wfh_date) { toast.error('Please select a start date'); return; }
+        if (wfhForm.end_date && wfhForm.end_date < wfhForm.wfh_date) {
+            toast.error('End date cannot be before start date');
+            return;
+        }
+        createWfhMutation.mutate({ ...wfhForm, end_date: wfhForm.end_date || wfhForm.wfh_date });
     };
 
     const handleEditOpen = (leave) => {
@@ -163,14 +167,18 @@ const EmployeeLeavesPage = () => {
 
     const handleWfhEditOpen = (wfh) => {
         setEditingWfh(wfh);
-        setEditWfhForm({ wfh_date: wfh.wfh_date, reason: wfh.reason || '' });
+        setEditWfhForm({ wfh_date: wfh.wfh_date, end_date: wfh.end_date || wfh.wfh_date, reason: wfh.reason || '' });
         setShowWfhForm(false);
     };
 
     const handleWfhEditSubmit = (e) => {
         e.preventDefault();
-        if (!editWfhForm.wfh_date) { toast.error('Please select a date'); return; }
-        updateWfhMutation.mutate({ id: editingWfh.id, data: editWfhForm });
+        if (!editWfhForm.wfh_date) { toast.error('Please select a start date'); return; }
+        if (editWfhForm.end_date && editWfhForm.end_date < editWfhForm.wfh_date) {
+            toast.error('End date cannot be before start date');
+            return;
+        }
+        updateWfhMutation.mutate({ id: editingWfh.id, data: { ...editWfhForm, end_date: editWfhForm.end_date || editWfhForm.wfh_date } });
     };
 
     const handleWfhDelete = (wfh) => {
@@ -398,11 +406,18 @@ const EmployeeLeavesPage = () => {
                             </div>
                             <form onSubmit={handleWfhSubmit} className="grid grid-cols-1 md:grid-cols-2 gap-4">
                                 <div>
-                                    <label className="block text-sm font-medium text-slate-700 mb-1">Date</label>
+                                    <label className="block text-sm font-medium text-slate-700 mb-1">Start Date</label>
                                     <input type="date" value={wfhForm.wfh_date} onChange={e => setWfhForm({ ...wfhForm, wfh_date: e.target.value })}
                                         className="w-full px-3 py-2 border border-slate-200 rounded-lg text-sm" required/>
                                 </div>
                                 <div>
+                                    <label className="block text-sm font-medium text-slate-700 mb-1">End Date</label>
+                                    <input type="date" value={wfhForm.end_date} onChange={e => setWfhForm({ ...wfhForm, end_date: e.target.value })}
+                                        min={wfhForm.wfh_date || undefined}
+                                        className="w-full px-3 py-2 border border-slate-200 rounded-lg text-sm"/>
+                                    <p className="mt-1 text-xs text-slate-400">Leave blank for a single day</p>
+                                </div>
+                                <div className="md:col-span-2">
                                     <label className="block text-sm font-medium text-slate-700 mb-1">Reason</label>
                                     <input type="text" value={wfhForm.reason} onChange={e => setWfhForm({ ...wfhForm, reason: e.target.value })}
                                         className="w-full px-3 py-2 border border-slate-200 rounded-lg text-sm" placeholder="Optional reason"/>
@@ -426,11 +441,17 @@ const EmployeeLeavesPage = () => {
                             </div>
                             <form onSubmit={handleWfhEditSubmit} className="grid grid-cols-1 md:grid-cols-2 gap-4">
                                 <div>
-                                    <label className="block text-sm font-medium text-slate-700 mb-1">Date</label>
+                                    <label className="block text-sm font-medium text-slate-700 mb-1">Start Date</label>
                                     <input type="date" value={editWfhForm.wfh_date} onChange={e => setEditWfhForm({ ...editWfhForm, wfh_date: e.target.value })}
                                         className="w-full px-3 py-2 border border-slate-200 rounded-lg text-sm" required/>
                                 </div>
                                 <div>
+                                    <label className="block text-sm font-medium text-slate-700 mb-1">End Date</label>
+                                    <input type="date" value={editWfhForm.end_date} onChange={e => setEditWfhForm({ ...editWfhForm, end_date: e.target.value })}
+                                        min={editWfhForm.wfh_date || undefined}
+                                        className="w-full px-3 py-2 border border-slate-200 rounded-lg text-sm"/>
+                                </div>
+                                <div className="md:col-span-2">
                                     <label className="block text-sm font-medium text-slate-700 mb-1">Reason</label>
                                     <input type="text" value={editWfhForm.reason} onChange={e => setEditWfhForm({ ...editWfhForm, reason: e.target.value })}
                                         className="w-full px-3 py-2 border border-slate-200 rounded-lg text-sm" placeholder="Optional reason"/>
@@ -475,7 +496,10 @@ const EmployeeLeavesPage = () => {
                                             <div>
                                                 <p className="font-medium text-slate-800">Work From Home</p>
                                                 <p className="text-xs text-slate-400">
-                                                    {format(new Date(w.wfh_date + 'T00:00:00'), 'MMM dd, yyyy')}
+                                                    {w.end_date && w.end_date !== w.wfh_date
+                                                        ? `${format(new Date(w.wfh_date + 'T00:00:00'), 'MMM dd')} — ${format(new Date(w.end_date + 'T00:00:00'), 'MMM dd, yyyy')}`
+                                                        : format(new Date(w.wfh_date + 'T00:00:00'), 'MMM dd, yyyy')
+                                                    }
                                                     {w.reason && ` • ${w.reason}`}
                                                 </p>
                                                 {w.remark && <p className="text-xs text-slate-500 mt-0.5">Remark: {w.remark}</p>}
