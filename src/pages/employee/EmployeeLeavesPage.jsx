@@ -5,10 +5,60 @@ import { Calendar, Plus, X, CheckCircle, XCircle, Clock, Home, AlertTriangle, Pe
 import { format, parseISO } from 'date-fns';
 import toast from 'react-hot-toast';
 import { getEndDateValidationMessage, isEndDateBeforeStartDate } from '../../utils/dateValidation';
-import { getLeaveTypeLabel, LEAVE_TYPE_OPTIONS, RAZORPAY_NEGATIVE_BALANCE_NOTE } from '../../utils/leaveTypes';
+import { getLeaveTypeLabel, LEAVE_TYPE_OPTIONS, RAZORPAY_NEGATIVE_BALANCE_NOTE, FLOATER_DATES_2026, isValidFloaterDate, getFloaterDateLabel } from '../../utils/leaveTypes';
 import LeaveCalendar from '../../components/LeaveCalendar';
 
 const TABS = ['My Leaves', 'Calendar', 'Work From Home'];
+
+const today = new Date().toISOString().slice(0, 10);
+
+const upcomingFloaterDates = FLOATER_DATES_2026.filter((d) => d.date >= today);
+
+function FloaterDatePicker({ value, onChange, label = 'Date', required = false }) {
+    const isInvalid = value && !isValidFloaterDate(value);
+    const matchedLabel = value ? getFloaterDateLabel(value) : null;
+    return (
+        <div className="md:col-span-2 space-y-2">
+            <label className="block text-sm font-medium text-slate-700">{label}</label>
+            <input
+                type="date"
+                value={value}
+                onChange={onChange}
+                className={`w-full px-3 py-2 border rounded-lg text-sm ${isInvalid ? 'border-red-400 bg-red-50' : 'border-slate-200'}`}
+                required={required}
+            />
+            {isInvalid && (
+                <p className="text-xs text-red-600 flex items-center gap-1">
+                    <AlertTriangle className="w-3 h-3 inline-block"/> This date is not an approved floater holiday date.
+                </p>
+            )}
+            {matchedLabel && !isInvalid && (
+                <p className="text-xs text-emerald-700">Approved: {matchedLabel}</p>
+            )}
+            <div className="rounded-lg border border-amber-200 bg-amber-50 px-3 py-2">
+                <p className="text-xs font-medium text-amber-800 mb-1.5">Floater Leave can only be taken on these approved dates:</p>
+                <div className="flex flex-wrap gap-1.5">
+                    {upcomingFloaterDates.length > 0 ? upcomingFloaterDates.map((d) => (
+                        <button
+                            key={d.date}
+                            type="button"
+                            onClick={() => onChange({ target: { value: d.date } })}
+                            className={`px-2 py-0.5 rounded text-xs font-medium transition-colors ${
+                                value === d.date
+                                    ? 'bg-amber-600 text-white'
+                                    : 'bg-white border border-amber-300 text-amber-800 hover:bg-amber-100'
+                            }`}
+                        >
+                            {d.date.slice(5)} — {d.label}
+                        </button>
+                    )) : (
+                        <span className="text-xs text-amber-700">No upcoming floater dates for this year.</span>
+                    )}
+                </div>
+            </div>
+        </div>
+    );
+}
 
 const STATUS_STYLES = {
     pending:  'bg-amber-50 text-amber-700 border-amber-200',
@@ -32,7 +82,6 @@ const EmployeeLeavesPage = () => {
     const [editWfhForm, setEditWfhForm] = useState({ wfh_date: '', end_date: '', reason: '' });
 
     // Edit/delete only allowed when the date is strictly in the future
-    const today = new Date().toISOString().slice(0, 10);
     const canModify = (leave) => leave.start_date > today;
     const canModifyWfh = (wfh) => wfh.wfh_date > today;
 
@@ -132,6 +181,16 @@ const EmployeeLeavesPage = () => {
             toast.error(getEndDateValidationMessage());
             return;
         }
+        if (leaveForm.leave_type === 'floater') {
+            if (!isValidFloaterDate(leaveForm.start_date)) {
+                toast.error('Start date is not an approved floater holiday date.');
+                return;
+            }
+            if (leaveForm.end_date !== leaveForm.start_date && !isValidFloaterDate(leaveForm.end_date)) {
+                toast.error('End date is not an approved floater holiday date.');
+                return;
+            }
+        }
         createLeaveMutation.mutate(leaveForm);
     };
 
@@ -156,6 +215,16 @@ const EmployeeLeavesPage = () => {
         if (isEndDateBeforeStartDate(editForm.start_date, editForm.end_date)) {
             toast.error(getEndDateValidationMessage());
             return;
+        }
+        if (editForm.leave_type === 'floater') {
+            if (!isValidFloaterDate(editForm.start_date)) {
+                toast.error('Start date is not an approved floater holiday date.');
+                return;
+            }
+            if (editForm.end_date !== editForm.start_date && !isValidFloaterDate(editForm.end_date)) {
+                toast.error('End date is not an approved floater holiday date.');
+                return;
+            }
         }
         updateLeaveMutation.mutate({ id: editingLeave.leave_id, data: editForm });
     };
@@ -237,7 +306,7 @@ const EmployeeLeavesPage = () => {
                             <form onSubmit={handleLeaveSubmit} className="grid grid-cols-1 md:grid-cols-2 gap-4">
                                 <div>
                                     <label className="block text-sm font-medium text-slate-700 mb-1">Type</label>
-                                    <select value={leaveForm.leave_type} onChange={e => setLeaveForm({ ...leaveForm, leave_type: e.target.value })}
+                                    <select value={leaveForm.leave_type} onChange={e => setLeaveForm({ ...leaveForm, leave_type: e.target.value, start_date: '', end_date: '' })}
                                         className="w-full px-3 py-2 border border-slate-200 rounded-lg text-sm">
                                         {LEAVE_TYPE_OPTIONS.map(o => <option key={o.value} value={o.value}>{o.label}</option>)}
                                     </select>
@@ -247,16 +316,27 @@ const EmployeeLeavesPage = () => {
                                     <input type="text" value={leaveForm.reason} onChange={e => setLeaveForm({ ...leaveForm, reason: e.target.value })}
                                         className="w-full px-3 py-2 border border-slate-200 rounded-lg text-sm" placeholder="Optional reason"/>
                                 </div>
-                                <div>
-                                    <label className="block text-sm font-medium text-slate-700 mb-1">Start Date</label>
-                                    <input type="date" value={leaveForm.start_date} onChange={e => setLeaveForm({ ...leaveForm, start_date: e.target.value })}
-                                        className="w-full px-3 py-2 border border-slate-200 rounded-lg text-sm" required/>
-                                </div>
-                                <div>
-                                    <label className="block text-sm font-medium text-slate-700 mb-1">End Date</label>
-                                    <input type="date" value={leaveForm.end_date} onChange={e => setLeaveForm({ ...leaveForm, end_date: e.target.value })}
-                                        className="w-full px-3 py-2 border border-slate-200 rounded-lg text-sm" required/>
-                                </div>
+                                {leaveForm.leave_type === 'floater' ? (
+                                    <FloaterDatePicker
+                                        label="Floater Date"
+                                        value={leaveForm.start_date}
+                                        onChange={e => setLeaveForm({ ...leaveForm, start_date: e.target.value, end_date: e.target.value })}
+                                        required
+                                    />
+                                ) : (
+                                    <>
+                                        <div>
+                                            <label className="block text-sm font-medium text-slate-700 mb-1">Start Date</label>
+                                            <input type="date" value={leaveForm.start_date} onChange={e => setLeaveForm({ ...leaveForm, start_date: e.target.value })}
+                                                className="w-full px-3 py-2 border border-slate-200 rounded-lg text-sm" required/>
+                                        </div>
+                                        <div>
+                                            <label className="block text-sm font-medium text-slate-700 mb-1">End Date</label>
+                                            <input type="date" value={leaveForm.end_date} onChange={e => setLeaveForm({ ...leaveForm, end_date: e.target.value })}
+                                                className="w-full px-3 py-2 border border-slate-200 rounded-lg text-sm" required/>
+                                        </div>
+                                    </>
+                                )}
                                 <div className="md:col-span-2 rounded-lg border border-amber-200 bg-amber-50 px-3 py-2 text-sm text-amber-800">
                                     {RAZORPAY_NEGATIVE_BALANCE_NOTE}
                                 </div>
@@ -280,7 +360,7 @@ const EmployeeLeavesPage = () => {
                             <form onSubmit={handleEditSubmit} className="grid grid-cols-1 md:grid-cols-2 gap-4">
                                 <div>
                                     <label className="block text-sm font-medium text-slate-700 mb-1">Type</label>
-                                    <select value={editForm.leave_type} onChange={e => setEditForm({ ...editForm, leave_type: e.target.value })}
+                                    <select value={editForm.leave_type} onChange={e => setEditForm({ ...editForm, leave_type: e.target.value, start_date: '', end_date: '' })}
                                         className="w-full px-3 py-2 border border-slate-200 rounded-lg text-sm">
                                         {LEAVE_TYPE_OPTIONS.map(o => <option key={o.value} value={o.value}>{o.label}</option>)}
                                     </select>
@@ -290,16 +370,27 @@ const EmployeeLeavesPage = () => {
                                     <input type="text" value={editForm.reason} onChange={e => setEditForm({ ...editForm, reason: e.target.value })}
                                         className="w-full px-3 py-2 border border-slate-200 rounded-lg text-sm" placeholder="Optional reason"/>
                                 </div>
-                                <div>
-                                    <label className="block text-sm font-medium text-slate-700 mb-1">Start Date</label>
-                                    <input type="date" value={editForm.start_date} onChange={e => setEditForm({ ...editForm, start_date: e.target.value })}
-                                        className="w-full px-3 py-2 border border-slate-200 rounded-lg text-sm" required/>
-                                </div>
-                                <div>
-                                    <label className="block text-sm font-medium text-slate-700 mb-1">End Date</label>
-                                    <input type="date" value={editForm.end_date} onChange={e => setEditForm({ ...editForm, end_date: e.target.value })}
-                                        className="w-full px-3 py-2 border border-slate-200 rounded-lg text-sm" required/>
-                                </div>
+                                {editForm.leave_type === 'floater' ? (
+                                    <FloaterDatePicker
+                                        label="Floater Date"
+                                        value={editForm.start_date}
+                                        onChange={e => setEditForm({ ...editForm, start_date: e.target.value, end_date: e.target.value })}
+                                        required
+                                    />
+                                ) : (
+                                    <>
+                                        <div>
+                                            <label className="block text-sm font-medium text-slate-700 mb-1">Start Date</label>
+                                            <input type="date" value={editForm.start_date} onChange={e => setEditForm({ ...editForm, start_date: e.target.value })}
+                                                className="w-full px-3 py-2 border border-slate-200 rounded-lg text-sm" required/>
+                                        </div>
+                                        <div>
+                                            <label className="block text-sm font-medium text-slate-700 mb-1">End Date</label>
+                                            <input type="date" value={editForm.end_date} onChange={e => setEditForm({ ...editForm, end_date: e.target.value })}
+                                                className="w-full px-3 py-2 border border-slate-200 rounded-lg text-sm" required/>
+                                        </div>
+                                    </>
+                                )}
                                 <div className="md:col-span-2 rounded-lg border border-blue-100 bg-blue-50 px-3 py-2 text-sm text-blue-700">
                                     Editing will reset the approval status back to <strong>pending</strong> so your manager can re-review.
                                 </div>
