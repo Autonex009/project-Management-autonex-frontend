@@ -27,6 +27,7 @@ const EmployeeDashboard = lazy(() => import('./pages/employee/EmployeeDashboard'
 const PMDashboard = lazy(() => import('./pages/pm/PMDashboard'));
 const GuidelinesPage = lazy(() => import('./pages/guidelines/GuidelinesPage'));
 const MyTeamPage = lazy(() => import('./pages/pm/MyTeamPage'));
+const PerformanceReviewsPage = lazy(() => import('./pages/pm/PerformanceReviewsPage'));
 
 // Scoped Pages
 const PMLeavesPage = lazy(() => import('./pages/pm/PMLeavesPage'));
@@ -116,6 +117,7 @@ function App() {
               <Route path="sub-projects" element={<SubProjectsPage />} />
               <Route path="allocations" element={<AllocationsPage />} />
               <Route path="my-team" element={<MyTeamPage />} />
+              <Route path="performance" element={<PerformanceReviewsPage />} />
               <Route path="leaves" element={<PMLeavesPage />} />
               <Route path="side-projects" element={<SideProjectsPage />} />
               <Route path="guidelines" element={<GuidelinesPage />} />

@@ -182,6 +182,15 @@ export const referralApi = {
     delete: (id) => api.delete(`/referrals/${id}`).then(res => res.data),
 };
 
+// === Performance Reviews API ===
+export const performanceReviewApi = {
+    getAll: (params) => api.get('/performance-reviews', { params }).then(res => res.data),
+    getOne: (id) => api.get(`/performance-reviews/${id}`).then(res => res.data),
+    create: (data) => api.post('/performance-reviews', data).then(res => res.data),
+    update: (id, data) => api.put(`/performance-reviews/${id}`, data).then(res => res.data),
+    delete: (id) => api.delete(`/performance-reviews/${id}`).then(res => res.data),
+};
+
 // === Notifications API ===
 export const notificationApi = {
     getAll: (userId) => api.get('/notifications', { params: { user_id: userId } }).then(res => res.data),
