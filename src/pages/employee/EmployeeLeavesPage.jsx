@@ -5,7 +5,7 @@ import { Calendar, Plus, X, CheckCircle, XCircle, Clock, Home, AlertTriangle, Pe
 import { format, parseISO } from 'date-fns';
 import toast from 'react-hot-toast';
 import { getEndDateValidationMessage, isEndDateBeforeStartDate } from '../../utils/dateValidation';
-import { getLeaveTypeLabel, LEAVE_TYPE_OPTIONS, RAZORPAY_NEGATIVE_BALANCE_NOTE, FLOATER_DATES_2026, isValidFloaterDate, getFloaterDateLabel } from '../../utils/leaveTypes';
+import { getLeaveTypeLabel, LEAVE_TYPE_OPTIONS, RAZORPAY_NEGATIVE_BALANCE_NOTE, FLOATER_DATES_2026, isValidFloaterDate, getFloaterDateLabel, findNonWorkingDayInRange, getNonWorkingDayLabel } from '../../utils/leaveTypes';
 import LeaveCalendar from '../../components/LeaveCalendar';
 
 const TABS = ['My Leaves', 'Calendar', 'Work From Home'];
@@ -181,6 +181,12 @@ const EmployeeLeavesPage = () => {
             toast.error(getEndDateValidationMessage());
             return;
         }
+        const badDay = findNonWorkingDayInRange(leaveForm.start_date, leaveForm.end_date);
+        if (badDay) {
+            const label = getNonWorkingDayLabel(badDay);
+            toast.error(`${badDay} is a ${label} — leave cannot be applied on weekends or fixed public holidays.`);
+            return;
+        }
         if (leaveForm.leave_type === 'floater') {
             if (!isValidFloaterDate(leaveForm.start_date)) {
                 toast.error('Start date is not an approved floater holiday date.');
@@ -214,6 +220,12 @@ const EmployeeLeavesPage = () => {
         e.preventDefault();
         if (isEndDateBeforeStartDate(editForm.start_date, editForm.end_date)) {
             toast.error(getEndDateValidationMessage());
+            return;
+        }
+        const badDay = findNonWorkingDayInRange(editForm.start_date, editForm.end_date);
+        if (badDay) {
+            const label = getNonWorkingDayLabel(badDay);
+            toast.error(`${badDay} is a ${label} — leave cannot be applied on weekends or fixed public holidays.`);
             return;
         }
         if (editForm.leave_type === 'floater') {

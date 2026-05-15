@@ -56,6 +56,62 @@ export function getFloaterDateLabel(dateStr) {
   return FLOATER_DATES_2026.find((d) => d.date === dateStr)?.label || null;
 }
 
+export const FIXED_HOLIDAYS_2026 = [
+  { date: '2026-01-01', label: "New Year's Day" },
+  { date: '2026-01-26', label: 'Republic Day' },
+  { date: '2026-03-04', label: 'Holi' },
+  { date: '2026-05-01', label: 'Maharashtra Day' },
+  { date: '2026-09-14', label: 'Ganesh Chaturthi' },
+  { date: '2026-10-02', label: 'Mahatma Gandhi Jayanti' },
+  { date: '2026-11-09', label: 'Govardhan Puja' },
+  { date: '2026-12-25', label: 'Christmas' },
+];
+
+const FIXED_HOLIDAY_SET = new Set(FIXED_HOLIDAYS_2026.map((d) => d.date));
+
+export function isFixedHoliday(dateStr) {
+  return FIXED_HOLIDAY_SET.has(dateStr);
+}
+
+export function getFixedHolidayLabel(dateStr) {
+  return FIXED_HOLIDAYS_2026.find((d) => d.date === dateStr)?.label || null;
+}
+
+export function isWeekend(dateStr) {
+  if (!dateStr) return false;
+  const day = new Date(dateStr + 'T00:00:00').getDay(); // 0=Sun, 6=Sat
+  return day === 0 || day === 6;
+}
+
+export function isNonWorkingDay(dateStr) {
+  return isWeekend(dateStr) || isFixedHoliday(dateStr);
+}
+
+export function getNonWorkingDayLabel(dateStr) {
+  if (isWeekend(dateStr)) {
+    const day = new Date(dateStr + 'T00:00:00').getDay();
+    return day === 6 ? 'Saturday' : 'Sunday';
+  }
+  return getFixedHolidayLabel(dateStr) || null;
+}
+
+/**
+ * Returns the first non-working day found in [startDateStr, endDateStr],
+ * or null if all days are working days.
+ */
+export function findNonWorkingDayInRange(startDateStr, endDateStr) {
+  if (!startDateStr || !endDateStr) return null;
+  const start = new Date(startDateStr + 'T00:00:00');
+  const end = new Date(endDateStr + 'T00:00:00');
+  const cur = new Date(start);
+  while (cur <= end) {
+    const ds = cur.toISOString().slice(0, 10);
+    if (isNonWorkingDay(ds)) return ds;
+    cur.setDate(cur.getDate() + 1);
+  }
+  return null;
+}
+
 export const RAZORPAY_NEGATIVE_BALANCE_NOTE =
   'If your leave balance is exhausted, Razorpay may automatically convert this request to unpaid leave, which can affect payroll.';
 
