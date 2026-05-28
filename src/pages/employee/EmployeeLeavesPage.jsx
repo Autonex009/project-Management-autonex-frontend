@@ -66,6 +66,16 @@ function DateRangeSummary({ startDate, endDate }) {
     const skipped = countNonWorkingDaysInRange(startDate, endDate);
     const startNonWorking = isNonWorkingDay(startDate);
     const endNonWorking = isNonWorkingDay(endDate);
+    if (workingDays === 0) {
+        return (
+            <div className="md:col-span-2">
+                <div className="flex items-start gap-2 rounded-lg border border-red-200 bg-red-50 px-3 py-2 text-sm text-red-700">
+                    <AlertTriangle className="w-4 h-4 mt-0.5 flex-shrink-0"/>
+                    <span>No working days in this range — all selected dates are weekends or public holidays. Please adjust your dates.</span>
+                </div>
+            </div>
+        );
+    }
     return (
         <div className="md:col-span-2 space-y-2">
             {(startNonWorking || endNonWorking) && (
@@ -209,6 +219,10 @@ const EmployeeLeavesPage = () => {
             toast.error(getEndDateValidationMessage());
             return;
         }
+        if (getWorkingDayCount(leaveForm.start_date, leaveForm.end_date) === 0) {
+            toast.error('No working days in the selected range. Please choose dates that include at least one working day.');
+            return;
+        }
         if (leaveForm.leave_type === 'floater') {
             if (!isValidFloaterDate(leaveForm.start_date)) {
                 toast.error('Start date is not an approved floater holiday date.');
@@ -242,6 +256,10 @@ const EmployeeLeavesPage = () => {
         e.preventDefault();
         if (isEndDateBeforeStartDate(editForm.start_date, editForm.end_date)) {
             toast.error(getEndDateValidationMessage());
+            return;
+        }
+        if (getWorkingDayCount(editForm.start_date, editForm.end_date) === 0) {
+            toast.error('No working days in the selected range. Please choose dates that include at least one working day.');
             return;
         }
         if (editForm.leave_type === 'floater') {
