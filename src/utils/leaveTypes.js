@@ -112,6 +112,34 @@ export function findNonWorkingDayInRange(startDateStr, endDateStr) {
   return null;
 }
 
+export function getWorkingDayCount(startDateStr, endDateStr) {
+  if (!startDateStr || !endDateStr) return 0;
+  const start = new Date(startDateStr + 'T00:00:00');
+  const end = new Date(endDateStr + 'T00:00:00');
+  if (end < start) return 0;
+  let count = 0;
+  const cur = new Date(start);
+  while (cur <= end) {
+    if (!isNonWorkingDay(cur.toISOString().slice(0, 10))) count++;
+    cur.setDate(cur.getDate() + 1);
+  }
+  return count;
+}
+
+export function countNonWorkingDaysInRange(startDateStr, endDateStr) {
+  if (!startDateStr || !endDateStr) return 0;
+  const start = new Date(startDateStr + 'T00:00:00');
+  const end = new Date(endDateStr + 'T00:00:00');
+  if (end < start) return 0;
+  let count = 0;
+  const cur = new Date(start);
+  while (cur <= end) {
+    if (isNonWorkingDay(cur.toISOString().slice(0, 10))) count++;
+    cur.setDate(cur.getDate() + 1);
+  }
+  return count;
+}
+
 export const RAZORPAY_NEGATIVE_BALANCE_NOTE =
   'If your leave balance is exhausted, Razorpay may automatically convert this request to unpaid leave, which can affect payroll.';
 

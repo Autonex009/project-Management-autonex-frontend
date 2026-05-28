@@ -5,7 +5,7 @@ import { Calendar, Plus, X, CheckCircle, XCircle, Clock, Home, AlertTriangle, Pe
 import { format, parseISO } from 'date-fns';
 import toast from 'react-hot-toast';
 import { getEndDateValidationMessage, isEndDateBeforeStartDate } from '../../utils/dateValidation';
-import { getLeaveTypeLabel, LEAVE_TYPE_OPTIONS, RAZORPAY_NEGATIVE_BALANCE_NOTE, FLOATER_DATES_2026, isValidFloaterDate, getFloaterDateLabel, findNonWorkingDayInRange, getNonWorkingDayLabel } from '../../utils/leaveTypes';
+import { getLeaveTypeLabel, LEAVE_TYPE_OPTIONS, RAZORPAY_NEGATIVE_BALANCE_NOTE, FLOATER_DATES_2026, isValidFloaterDate, getFloaterDateLabel, isNonWorkingDay, getNonWorkingDayLabel, getWorkingDayCount, countNonWorkingDaysInRange } from '../../utils/leaveTypes';
 import LeaveCalendar from '../../components/LeaveCalendar';
 
 const TABS = ['My Leaves', 'Calendar', 'Work From Home'];
@@ -55,6 +55,34 @@ function FloaterDatePicker({ value, onChange, label = 'Date', required = false }
                         <span className="text-xs text-amber-700">No upcoming floater dates for this year.</span>
                     )}
                 </div>
+            </div>
+        </div>
+    );
+}
+
+function DateRangeSummary({ startDate, endDate }) {
+    if (!startDate || !endDate || endDate < startDate) return null;
+    const workingDays = getWorkingDayCount(startDate, endDate);
+    const skipped = countNonWorkingDaysInRange(startDate, endDate);
+    const startNonWorking = isNonWorkingDay(startDate);
+    const endNonWorking = isNonWorkingDay(endDate);
+    return (
+        <div className="md:col-span-2 space-y-2">
+            {(startNonWorking || endNonWorking) && (
+                <div className="flex items-start gap-2 rounded-lg border border-amber-200 bg-amber-50 px-3 py-2 text-sm text-amber-800">
+                    <AlertTriangle className="w-4 h-4 mt-0.5 flex-shrink-0"/>
+                    <span>
+                        {startNonWorking && <>Start date falls on a <strong>{getNonWorkingDayLabel(startDate)}</strong>. </>}
+                        {endNonWorking && <>End date falls on a <strong>{getNonWorkingDayLabel(endDate)}</strong>. </>}
+                        Weekends and public holidays are not counted as leave days.
+                    </span>
+                </div>
+            )}
+            <div className="flex items-center gap-2 rounded-lg border border-slate-200 bg-slate-50 px-3 py-2 text-sm text-slate-700">
+                <span className="font-medium">{workingDays} working day{workingDays !== 1 ? 's' : ''}</span>
+                {skipped > 0 && (
+                    <span className="text-slate-400">— {skipped} weekend{skipped !== 1 ? 's' : ''}/holiday{skipped !== 1 ? 's' : ''} will be automatically skipped</span>
+                )}
             </div>
         </div>
     );
@@ -181,12 +209,6 @@ const EmployeeLeavesPage = () => {
             toast.error(getEndDateValidationMessage());
             return;
         }
-        const badDay = findNonWorkingDayInRange(leaveForm.start_date, leaveForm.end_date);
-        if (badDay) {
-            const label = getNonWorkingDayLabel(badDay);
-            toast.error(`${badDay} is a ${label} — leave cannot be applied on weekends or fixed public holidays.`);
-            return;
-        }
         if (leaveForm.leave_type === 'floater') {
             if (!isValidFloaterDate(leaveForm.start_date)) {
                 toast.error('Start date is not an approved floater holiday date.');
@@ -220,12 +242,6 @@ const EmployeeLeavesPage = () => {
         e.preventDefault();
         if (isEndDateBeforeStartDate(editForm.start_date, editForm.end_date)) {
             toast.error(getEndDateValidationMessage());
-            return;
-        }
-        const badDay = findNonWorkingDayInRange(editForm.start_date, editForm.end_date);
-        if (badDay) {
-            const label = getNonWorkingDayLabel(badDay);
-            toast.error(`${badDay} is a ${label} — leave cannot be applied on weekends or fixed public holidays.`);
             return;
         }
         if (editForm.leave_type === 'floater') {
@@ -347,6 +363,7 @@ const EmployeeLeavesPage = () => {
                                             <input type="date" value={leaveForm.end_date} onChange={e => setLeaveForm({ ...leaveForm, end_date: e.target.value })}
                                                 className="w-full px-3 py-2 border border-slate-200 rounded-lg text-sm" required/>
                                         </div>
+                                        <DateRangeSummary startDate={leaveForm.start_date} endDate={leaveForm.end_date} />
                                     </>
                                 )}
                                 <div className="md:col-span-2 rounded-lg border border-amber-200 bg-amber-50 px-3 py-2 text-sm text-amber-800">
@@ -401,6 +418,7 @@ const EmployeeLeavesPage = () => {
                                             <input type="date" value={editForm.end_date} onChange={e => setEditForm({ ...editForm, end_date: e.target.value })}
                                                 className="w-full px-3 py-2 border border-slate-200 rounded-lg text-sm" required/>
                                         </div>
+                                        <DateRangeSummary startDate={editForm.start_date} endDate={editForm.end_date} />
                                     </>
                                 )}
                                 <div className="md:col-span-2 rounded-lg border border-blue-100 bg-blue-50 px-3 py-2 text-sm text-blue-700">
