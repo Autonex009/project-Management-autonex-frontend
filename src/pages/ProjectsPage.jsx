@@ -473,10 +473,12 @@ const ProjectsPage = () => {
     return Math.round(project.total_tasks / manpower);
   };
 
-  // Helper: count working days (exclude weekends) between two dates
+  // Helper: count working days (exclude weekends) between two dates.
+  // Parse date-only strings as LOCAL midnight (never via Date.toISOString) so
+  // counts don't shift by a day in timezones offset from UTC (e.g. IST).
   const getWorkingDays = (startStr, endStr) => {
-    const start = new Date(startStr);
-    const end = new Date(endStr);
+    const start = new Date(startStr + 'T00:00:00');
+    const end = new Date(endStr + 'T00:00:00');
     let count = 0;
     const current = new Date(start);
     while (current <= end) {
@@ -487,16 +489,18 @@ const ProjectsPage = () => {
     return count || 1; // at least 1 to avoid division by zero
   };
 
-  // Helper: count leave working days for an employee during a project period
+  // Helper: count leave working days for an employee during a project period.
+  // Clamp the overlap on the YYYY-MM-DD strings directly (lexicographic order =
+  // chronological) to avoid UTC round-trips.
   const getEmployeeLeaveDays = (employeeId, projectStart, projectEnd) => {
     const empLeaves = leaves.filter(l => l.employee_id === employeeId);
     let totalLeaveDays = 0;
     for (const leave of empLeaves) {
       if (!leave.start_date || !leave.end_date) continue;
-      const leaveStart = new Date(Math.max(new Date(leave.start_date), new Date(projectStart)));
-      const leaveEnd = new Date(Math.min(new Date(leave.end_date), new Date(projectEnd)));
+      const leaveStart = leave.start_date > projectStart ? leave.start_date : projectStart;
+      const leaveEnd = leave.end_date < projectEnd ? leave.end_date : projectEnd;
       if (leaveStart <= leaveEnd) {
-        totalLeaveDays += getWorkingDays(leaveStart.toISOString().split('T')[0], leaveEnd.toISOString().split('T')[0]);
+        totalLeaveDays += getWorkingDays(leaveStart, leaveEnd);
       }
     }
     return totalLeaveDays;

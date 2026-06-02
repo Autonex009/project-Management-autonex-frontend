@@ -5,7 +5,7 @@ import { Plus, X, Calendar, Trash2, CheckCircle, XCircle, Clock, AlertTriangle, 
 import { format } from 'date-fns';
 import toast from 'react-hot-toast';
 import { getEndDateValidationMessage, isEndDateBeforeStartDate } from '../utils/dateValidation';
-import { getLeaveTypeBadgeClass, getLeaveTypeLabel, LEAVE_TYPE_OPTIONS } from '../utils/leaveTypes';
+import { getLeaveTypeBadgeClass, getLeaveTypeLabel, LEAVE_TYPE_OPTIONS, getWorkingDayCount } from '../utils/leaveTypes';
 import LeaveCalendar from '../components/LeaveCalendar';
 
 const TABS = ['Leave List', 'Calendar', 'WFH Requests'];
@@ -174,9 +174,11 @@ const LeavesPage = () => {
                   {leaves.length === 0 ? (
                     <tr><td colSpan="7" className="px-5 py-16 text-center text-slate-400">No leaves recorded yet</td></tr>
                   ) : paginatedLeaves.map((leave) => {
-                    const start = new Date(leave.start_date);
-                    const end = new Date(leave.end_date);
-                    const duration = Math.round((end - start) / (1000*60*60*24)) + 1;
+                    const start = new Date(leave.start_date + 'T00:00:00');
+                    const end = new Date(leave.end_date + 'T00:00:00');
+                    // Working days only (excl. weekends & fixed holidays) — matches the
+                    // employee form and payroll deduction logic.
+                    const duration = getWorkingDayCount(leave.start_date, leave.end_date);
                     const isPending = !leave.status || leave.status === 'pending';
                     return (
                       <tr key={leave.leave_id} className="hover:bg-slate-50 transition-colors">
