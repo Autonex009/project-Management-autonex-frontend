@@ -66,19 +66,21 @@ const PayrollPage = () => {
         refetch().then(({ data }) => {
             if (!data) return;
             setGenerated(true);
-            // Initialize adjustments from saved run or default all to deduct=true
+            // Seed per-leave UNPAID-day counts from the backend's auto classification
+            // (annual paid-leave entitlement applied) or a finalized run's snapshot.
             const initial = {};
             data.employees?.forEach(emp => {
                 emp.leaves.forEach(l => {
-                    initial[l.leave_id] = l.deduct ?? true;
+                    initial[l.leave_id] = l.unpaid_days ?? (l.deduct ? l.days_in_month : 0);
                 });
             });
             setAdjustments(initial);
         });
     };
 
-    const toggleDeduct = (leaveId) => {
-        setAdjustments(prev => ({ ...prev, [leaveId]: !prev[leaveId] }));
+    // Admin override: set how many of a leave's days are unpaid (deducted).
+    const setLeaveUnpaid = (leaveId, unpaidDays) => {
+        setAdjustments(prev => ({ ...prev, [leaveId]: unpaidDays }));
     };
 
     // Recompute rows with current adjustments applied
@@ -87,11 +89,17 @@ const PayrollPage = () => {
         return preview.employees.map(emp => {
             const perDay = emp.base_salary ? emp.base_salary / (preview.working_days || 22) : 0;
             let totalDeductedDays = 0;
+            let totalPaidDays = 0;
             const leaves = emp.leaves.map(l => {
-                const deduct = adjustments[l.leave_id] ?? l.deduct ?? true;
-                const deductionAmount = deduct ? l.days_in_month * perDay : 0;
-                if (deduct) totalDeductedDays += l.days_in_month;
-                return { ...l, deduct, deductionAmount };
+                const unpaidDays = Math.max(0, Math.min(adjustments[l.leave_id] ?? l.unpaid_days ?? 0, l.days_in_month));
+                const paidDays = Math.max(l.days_in_month - unpaidDays, 0);
+                const deductionAmount = unpaidDays * perDay;
+                totalDeductedDays += unpaidDays;
+                totalPaidDays += paidDays;
+                const classification = unpaidDays <= 0
+                    ? 'paid'
+                    : (unpaidDays >= l.days_in_month ? 'unpaid' : 'partial');
+                return { ...l, unpaidDays, paidDays, classification, deduct: unpaidDays > 0, deductionAmount };
             });
             const totalDeduction = totalDeductedDays * perDay;
             const finalSalary = Math.max((emp.base_salary || 0) - totalDeduction, 0);
@@ -99,6 +107,7 @@ const PayrollPage = () => {
                 ...emp,
                 leaves,
                 per_day_rate: perDay,
+                total_paid_days: totalPaidDays,
                 total_deducted_days: totalDeductedDays,
                 total_deduction: totalDeduction,
                 final_salary: finalSalary,
@@ -119,6 +128,7 @@ const PayrollPage = () => {
                 employee_id: emp.employee_id,
                 leave_id: l.leave_id,
                 deduct: l.deduct,
+                unpaid_days: l.unpaidDays,
             }))
         );
 
@@ -134,8 +144,8 @@ const PayrollPage = () => {
     const handleExportCSV = () => {
         const headers = [
             'Employee', 'Designation', 'Type',
-            'Base Salary (₹)', `Per Day (₹, ÷22)`,
-            'Leave Days', 'Deducted Days', 'Deduction (₹)', 'Final Salary (₹)', 'Notes'
+            'Base Salary (₹)', `Per Day (₹, ÷${preview?.working_days || 22})`,
+            'Leave Days', 'Paid Days', 'Unpaid (Deducted) Days', 'Deduction (₹)', 'Final Salary (₹)', 'Notes'
         ];
         const csvRows = [
             headers.join(','),
@@ -146,6 +156,7 @@ const PayrollPage = () => {
                 r.base_salary || 0,
                 r.per_day_rate.toFixed(2),
                 r.total_leave_days,
+                r.total_paid_days,
                 r.total_deducted_days,
                 r.total_deduction.toFixed(2),
                 r.final_salary.toFixed(2),
@@ -177,7 +188,7 @@ const PayrollPage = () => {
                 <div>
                     <h1 className="text-2xl font-bold text-slate-800">Salary Calculation</h1>
                     <p className="mt-1 text-sm text-slate-500">
-                        22 working-day payroll — review leaves, adjust deductions, export to Excel.
+                        {generated && preview ? `${preview.working_days} working-day` : 'Working-day'} payroll — review leaves, adjust deductions, export to Excel.
                     </p>
                 </div>
                 <div className="flex items-center gap-3">
@@ -418,10 +429,31 @@ const PayrollPage = () => {
                             </button>
                         </div>
 
+                        {/* Annual paid-leave balances (computed locally; Razorpay has no balance API) */}
+                        {modalRow.leave_balances && (
+                            <div className="px-6 py-3 bg-slate-50/70 border-b border-slate-100 flex flex-wrap gap-2">
+                                {Object.entries(modalRow.leave_balances).map(([type, b]) => (
+                                    <span key={type} className="text-xs px-2.5 py-1 rounded-lg bg-white border border-slate-200 text-slate-600">
+                                        {LEAVE_LABELS[type] || type}:{' '}
+                                        <span className={`font-semibold ${b.remaining > 0 ? 'text-emerald-700' : 'text-red-600'}`}>
+                                            {b.remaining}
+                                        </span>
+                                        <span className="text-slate-400"> left of {b.quota} (yr)</span>
+                                    </span>
+                                ))}
+                            </div>
+                        )}
+
                         {/* Leave list */}
                         <div className="divide-y divide-slate-100 max-h-80 overflow-y-auto">
                             {modalRow.leaves.map(l => {
-                                const deduct = adjustments[l.leave_id] ?? l.deduct ?? true;
+                                const badge = l.classification === 'paid'
+                                    ? { txt: 'Paid', cls: 'bg-emerald-100 text-emerald-700' }
+                                    : l.classification === 'unpaid'
+                                        ? { txt: 'Unpaid', cls: 'bg-red-100 text-red-700' }
+                                        : { txt: 'Partly unpaid', cls: 'bg-amber-100 text-amber-700' };
+                                const auto = l.unpaid_days ?? 0;   // backend auto suggestion
+                                const isAuto = l.unpaidDays === auto;
                                 return (
                                     <div key={l.leave_id} className="px-6 py-4 flex items-center justify-between gap-4">
                                         <div className="min-w-0">
@@ -432,38 +464,47 @@ const PayrollPage = () => {
                                                 <span className="text-xs bg-slate-100 text-slate-600 px-2 py-0.5 rounded-full">
                                                     {l.days_in_month}d
                                                 </span>
+                                                <span className={`text-xs px-2 py-0.5 rounded-full font-semibold ${badge.cls}`}>
+                                                    {badge.txt}
+                                                </span>
                                             </div>
                                             <p className="text-xs text-slate-400 mt-0.5">
                                                 {l.start_date} → {l.end_date}
                                                 {l.reason && ` · ${l.reason}`}
                                             </p>
-                                            <p className={`text-xs font-medium mt-0.5 ${deduct ? 'text-red-600' : 'text-emerald-600'}`}>
-                                                {deduct
-                                                    ? `Deduct: −${fmtCurrency(l.days_in_month * modalRow.per_day_rate)}`
-                                                    : 'Paid — no deduction'}
+                                            <p className="text-xs font-medium mt-0.5 text-slate-600">
+                                                {l.paidDays > 0 && <span className="text-emerald-600">{l.paidDays}d paid</span>}
+                                                {l.paidDays > 0 && l.unpaidDays > 0 && ' · '}
+                                                {l.unpaidDays > 0 && <span className="text-red-600">{l.unpaidDays}d unpaid −{fmtCurrency(l.deductionAmount)}</span>}
+                                                {l.unpaidDays <= 0 && l.paidDays === l.days_in_month && <span className="text-emerald-600"> — no deduction</span>}
                                             </p>
                                         </div>
-                                        {/* Toggle */}
-                                        <div className="flex gap-2 shrink-0">
+                                        {/* Override: Auto / All unpaid / All paid */}
+                                        <div className="flex gap-1.5 shrink-0">
                                             <button
-                                                onClick={() => { if (!deduct) toggleDeduct(l.leave_id); }}
-                                                className={`px-3 py-1.5 text-xs font-semibold rounded-lg transition-colors ${
-                                                    deduct
-                                                        ? 'bg-red-100 text-red-700'
-                                                        : 'bg-slate-100 text-slate-400 hover:bg-red-50 hover:text-red-600'
+                                                onClick={() => setLeaveUnpaid(l.leave_id, auto)}
+                                                title={`Auto (balance-based): ${auto}d unpaid`}
+                                                className={`px-2.5 py-1.5 text-xs font-semibold rounded-lg transition-colors ${
+                                                    isAuto ? 'bg-indigo-100 text-indigo-700' : 'bg-slate-100 text-slate-400 hover:bg-indigo-50 hover:text-indigo-600'
                                                 }`}
                                             >
-                                                Deduct
+                                                Auto
                                             </button>
                                             <button
-                                                onClick={() => { if (deduct) toggleDeduct(l.leave_id); }}
-                                                className={`px-3 py-1.5 text-xs font-semibold rounded-lg transition-colors ${
-                                                    !deduct
-                                                        ? 'bg-emerald-100 text-emerald-700'
-                                                        : 'bg-slate-100 text-slate-400 hover:bg-emerald-50 hover:text-emerald-600'
+                                                onClick={() => setLeaveUnpaid(l.leave_id, l.days_in_month)}
+                                                className={`px-2.5 py-1.5 text-xs font-semibold rounded-lg transition-colors ${
+                                                    !isAuto && l.unpaidDays >= l.days_in_month ? 'bg-red-100 text-red-700' : 'bg-slate-100 text-slate-400 hover:bg-red-50 hover:text-red-600'
                                                 }`}
                                             >
-                                                No Deduction
+                                                All unpaid
+                                            </button>
+                                            <button
+                                                onClick={() => setLeaveUnpaid(l.leave_id, 0)}
+                                                className={`px-2.5 py-1.5 text-xs font-semibold rounded-lg transition-colors ${
+                                                    !isAuto && l.unpaidDays <= 0 ? 'bg-emerald-100 text-emerald-700' : 'bg-slate-100 text-slate-400 hover:bg-emerald-50 hover:text-emerald-600'
+                                                }`}
+                                            >
+                                                All paid
                                             </button>
                                         </div>
                                     </div>
