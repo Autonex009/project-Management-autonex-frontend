@@ -96,6 +96,21 @@ export function getNonWorkingDayLabel(dateStr) {
 }
 
 /**
+ * Format a Date to a YYYY-MM-DD string using LOCAL calendar components.
+ *
+ * IMPORTANT: do not use Date.toISOString() for this — it converts to UTC, so in
+ * any timezone ahead of UTC (e.g. IST, UTC+5:30) a local midnight rolls back to
+ * the previous calendar day, shifting every day in a range by one and producing
+ * wrong working-day counts (and wrongly blocking valid single-day leaves).
+ */
+export function toLocalISODate(d) {
+  const year = d.getFullYear();
+  const month = String(d.getMonth() + 1).padStart(2, '0');
+  const day = String(d.getDate()).padStart(2, '0');
+  return `${year}-${month}-${day}`;
+}
+
+/**
  * Returns the first non-working day found in [startDateStr, endDateStr],
  * or null if all days are working days.
  */
@@ -105,7 +120,7 @@ export function findNonWorkingDayInRange(startDateStr, endDateStr) {
   const end = new Date(endDateStr + 'T00:00:00');
   const cur = new Date(start);
   while (cur <= end) {
-    const ds = cur.toISOString().slice(0, 10);
+    const ds = toLocalISODate(cur);
     if (isNonWorkingDay(ds)) return ds;
     cur.setDate(cur.getDate() + 1);
   }
@@ -120,7 +135,7 @@ export function getWorkingDayCount(startDateStr, endDateStr) {
   let count = 0;
   const cur = new Date(start);
   while (cur <= end) {
-    if (!isNonWorkingDay(cur.toISOString().slice(0, 10))) count++;
+    if (!isNonWorkingDay(toLocalISODate(cur))) count++;
     cur.setDate(cur.getDate() + 1);
   }
   return count;
@@ -134,7 +149,7 @@ export function countNonWorkingDaysInRange(startDateStr, endDateStr) {
   let count = 0;
   const cur = new Date(start);
   while (cur <= end) {
-    if (isNonWorkingDay(cur.toISOString().slice(0, 10))) count++;
+    if (isNonWorkingDay(toLocalISODate(cur))) count++;
     cur.setDate(cur.getDate() + 1);
   }
   return count;

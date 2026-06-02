@@ -5,12 +5,12 @@ import { Calendar, Plus, X, CheckCircle, XCircle, Clock, Home, AlertTriangle, Pe
 import { format, parseISO } from 'date-fns';
 import toast from 'react-hot-toast';
 import { getEndDateValidationMessage, isEndDateBeforeStartDate } from '../../utils/dateValidation';
-import { getLeaveTypeLabel, LEAVE_TYPE_OPTIONS, RAZORPAY_NEGATIVE_BALANCE_NOTE, FLOATER_DATES_2026, isValidFloaterDate, getFloaterDateLabel, isNonWorkingDay, getNonWorkingDayLabel, getWorkingDayCount, countNonWorkingDaysInRange } from '../../utils/leaveTypes';
+import { getLeaveTypeLabel, LEAVE_TYPE_OPTIONS, RAZORPAY_NEGATIVE_BALANCE_NOTE, FLOATER_DATES_2026, isValidFloaterDate, getFloaterDateLabel, isNonWorkingDay, getNonWorkingDayLabel, getWorkingDayCount, countNonWorkingDaysInRange, toLocalISODate } from '../../utils/leaveTypes';
 import LeaveCalendar from '../../components/LeaveCalendar';
 
 const TABS = ['My Leaves', 'Calendar', 'Work From Home'];
 
-const today = new Date().toISOString().slice(0, 10);
+const today = toLocalISODate(new Date());
 
 const upcomingFloaterDates = FLOATER_DATES_2026.filter((d) => d.date >= today);
 
