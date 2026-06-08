@@ -62,6 +62,19 @@ export const subProjectApi = {
     delete: (id) => api.delete(`/sub-projects/${id}`).then(res => res.data),
 };
 
+// === Project Groups API (intermediate hierarchy level: MainProject → ProjectGroup → Sub-Project) ===
+// Backed by the SubProject model at /api/sub-projects-new. Distinct from subProjectApi above,
+// which actually serves daily sheets (the child level).
+export const projectGroupApi = {
+    getAll: (mainProjectId) =>
+        api.get('/sub-projects-new', { params: mainProjectId ? { main_project_id: mainProjectId } : {} })
+            .then(res => res.data),
+    getOne: (id) => api.get(`/sub-projects-new/${id}`).then(res => res.data),
+    create: (data) => api.post('/sub-projects-new', data).then(res => res.data),
+    update: (id, data) => api.put(`/sub-projects-new/${id}`, data).then(res => res.data),
+    delete: (id) => api.delete(`/sub-projects-new/${id}`).then(res => res.data),
+};
+
 // === Recommendations API ===
 export const recommendationsApi = {
     getByProject: (projectId) => api.get(`/recommendations/project/${projectId}`).then(res => res.data),
