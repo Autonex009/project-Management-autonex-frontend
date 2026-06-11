@@ -1023,12 +1023,11 @@ const ProjectsPage = () => {
                   </div>
                   <div>
                     <label className="block text-sm font-medium text-gray-700 mb-1">
-                      End Date <span className="text-red-500">*</span>
+                      End Date <span className="text-gray-400 font-normal">(optional)</span>
                     </label>
                     <input
                       type="date"
                       name="end_date"
-                      required
                       defaultValue={(editingProject || copyingProject)?.end_date}
                       className="input"
                     />
