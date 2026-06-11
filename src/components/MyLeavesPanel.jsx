@@ -5,7 +5,7 @@ import { Calendar, Plus, X, CheckCircle, XCircle, Clock, Home, AlertTriangle, Pe
 import { format, parseISO } from 'date-fns';
 import toast from 'react-hot-toast';
 import { getEndDateValidationMessage, isEndDateBeforeStartDate } from '../utils/dateValidation';
-import { getLeaveTypeLabel, LEAVE_TYPE_OPTIONS, RAZORPAY_NEGATIVE_BALANCE_NOTE, FLOATER_DATES_2026, isValidFloaterDate, getFloaterDateLabel, isNonWorkingDay, getNonWorkingDayLabel, getWorkingDayCount, countNonWorkingDaysInRange, toLocalISODate, ANNUAL_LEAVE_QUOTA, normalizeLeaveType } from '../utils/leaveTypes';
+import { getLeaveTypeLabel, LEAVE_TYPE_OPTIONS, RAZORPAY_NEGATIVE_BALANCE_NOTE, FLOATER_DATES_2026, isValidFloaterDate, getFloaterDateLabel, isNonWorkingDay, getNonWorkingDayLabel, getWorkingDayCount, countNonWorkingDaysInRange, toLocalISODate, ANNUAL_LEAVE_QUOTA, INTERN_MONTHLY_PAID_QUOTA, isIntern, normalizeLeaveType } from '../utils/leaveTypes';
 import LeaveCalendar from './LeaveCalendar';
 
 const TABS = ['My Leaves', 'Calendar', 'Work From Home'];
@@ -151,27 +151,59 @@ const MyLeavesPanel = ({
         enabled: !!employeeId,
     });
 
-    // ── Leave balances (computed locally from approved leaves this year) ──
-    // Mirrors the backend annual-quota model: remaining = quota − approved
-    // working-days used this calendar year. Days beyond quota become unpaid.
-    const currentYear = new Date().getFullYear();
+    // ── Leave balances (computed locally from approved leaves) ──
+    // Mirrors the backend entitlement model: remaining = quota − approved
+    // working-days used. Employees use annual quotas; interns accrue PAID leave
+    // monthly (1/month, resets each month). Days beyond quota become unpaid.
+    const intern = isIntern(user.employee_type);
+    const now = new Date();
+    const currentYear = now.getFullYear();
+    const currentMonth = now.getMonth(); // 0-based
     const balances = useMemo(() => {
-        const used = {};
-        Object.keys(ANNUAL_LEAVE_QUOTA).forEach((t) => { used[t] = 0; });
+        const usedYear = {};
+        Object.keys(ANNUAL_LEAVE_QUOTA).forEach((t) => { usedYear[t] = 0; });
+        let paidUsedThisMonth = 0;
         allLeaves.forEach((leave) => {
             if ((leave.status || 'pending') !== 'approved') return;
             const type = normalizeLeaveType(leave.leave_type);
-            if (!(type in used)) return;
-            if (new Date(leave.start_date + 'T00:00:00').getFullYear() !== currentYear) return;
-            used[type] += getWorkingDayCount(leave.start_date, leave.end_date);
+            const d = new Date(leave.start_date + 'T00:00:00');
+            const days = getWorkingDayCount(leave.start_date, leave.end_date);
+            if (intern && type === 'paid') {
+                if (d.getFullYear() === currentYear && d.getMonth() === currentMonth) paidUsedThisMonth += days;
+                return;
+            }
+            if (!(type in usedYear)) return;
+            if (d.getFullYear() !== currentYear) return;
+            usedYear[type] += days;
         });
-        return Object.entries(ANNUAL_LEAVE_QUOTA).map(([type, quota]) => ({
-            type,
-            quota,
-            used: used[type],
-            remaining: Math.max(quota - used[type], 0),
+
+        const cards = [];
+        if (intern) {
+            cards.push({
+                type: 'paid',
+                quota: INTERN_MONTHLY_PAID_QUOTA,
+                used: paidUsedThisMonth,
+                remaining: Math.max(INTERN_MONTHLY_PAID_QUOTA - paidUsedThisMonth, 0),
+                period: 'month',
+            });
+        } else {
+            cards.push({
+                type: 'paid',
+                quota: ANNUAL_LEAVE_QUOTA.paid,
+                used: usedYear.paid,
+                remaining: Math.max(ANNUAL_LEAVE_QUOTA.paid - usedYear.paid, 0),
+                period: 'year',
+            });
+        }
+        ['casual_sick', 'floater'].forEach((t) => cards.push({
+            type: t,
+            quota: ANNUAL_LEAVE_QUOTA[t],
+            used: usedYear[t],
+            remaining: Math.max(ANNUAL_LEAVE_QUOTA[t] - usedYear[t], 0),
+            period: 'year',
         }));
-    }, [allLeaves, currentYear]);
+        return cards;
+    }, [allLeaves, intern, currentYear, currentMonth]);
 
     const createLeaveMutation = useMutation({
         mutationFn: (data) => leaveApi.create({ ...data, employee_id: employeeId }),
@@ -382,14 +414,19 @@ const MyLeavesPanel = ({
                 <>
                     {/* Leave balances */}
                     <div className="grid grid-cols-1 sm:grid-cols-3 gap-3">
-                        {balances.map(({ type, quota, used, remaining }) => (
+                        {balances.map(({ type, quota, used, remaining, period }) => (
                             <div key={type} className={`rounded-2xl border p-4 ${BALANCE_ACCENTS[type] || 'border-slate-200 bg-slate-50/60'}`}>
-                                <p className="text-sm font-medium text-slate-600">{getLeaveTypeLabel(type)}</p>
+                                <p className="text-sm font-medium text-slate-600">
+                                    {getLeaveTypeLabel(type)}
+                                    {period === 'month' && <span className="ml-1 text-[10px] font-semibold uppercase tracking-wide text-blue-600">monthly</span>}
+                                </p>
                                 <div className="mt-1 flex items-baseline gap-1">
                                     <span className="text-2xl font-bold text-slate-900">{remaining}</span>
-                                    <span className="text-sm text-slate-400">/ {quota} days left</span>
+                                    <span className="text-sm text-slate-400">/ {quota} {period === 'month' ? 'this month' : 'days left'}</span>
                                 </div>
-                                <p className="mt-0.5 text-xs text-slate-400">{used} used in {currentYear}</p>
+                                <p className="mt-0.5 text-xs text-slate-400">
+                                    {used} used {period === 'month' ? 'this month' : `in ${currentYear}`}
+                                </p>
                             </div>
                         ))}
                     </div>

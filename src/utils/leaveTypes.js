@@ -31,6 +31,14 @@ export const ANNUAL_LEAVE_QUOTA = {
   floater: 2,
 };
 
+// Interns accrue paid leave monthly (1/month, resets each month) instead of the
+// annual quota above. Mirrors INTERN_MONTHLY_PAID_QUOTA in the backend.
+export const INTERN_MONTHLY_PAID_QUOTA = 1;
+
+export function isIntern(employeeType) {
+  return (employeeType || '').trim().toLowerCase() === 'intern';
+}
+
 export const FLOATER_DATES_2026 = [
   { date: '2026-01-14', label: 'Pongal / Makar Sankranti' },
   { date: '2026-01-23', label: 'Vasant Panchami' },

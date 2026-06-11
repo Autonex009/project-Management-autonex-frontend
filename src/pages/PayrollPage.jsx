@@ -438,7 +438,7 @@ const PayrollPage = () => {
                                         <span className={`font-semibold ${b.remaining > 0 ? 'text-emerald-700' : 'text-red-600'}`}>
                                             {b.remaining}
                                         </span>
-                                        <span className="text-slate-400"> left of {b.quota} (yr)</span>
+                                        <span className="text-slate-400"> left of {b.quota} ({b.period === 'month' ? 'mo' : 'yr'})</span>
                                     </span>
                                 ))}
                             </div>
