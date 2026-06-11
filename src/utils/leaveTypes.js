@@ -22,6 +22,15 @@ const LEAVE_TYPE_BADGES = {
   floater: 'bg-amber-50 text-amber-700',
 };
 
+// Annual paid-leave entitlement (working days/year), mirrors the backend
+// ANNUAL_LEAVE_QUOTA in app/constants/leave_types.py. Used to show remaining
+// balances; once a type's quota is exhausted further days become unpaid leave.
+export const ANNUAL_LEAVE_QUOTA = {
+  paid: 12,
+  casual_sick: 6,
+  floater: 2,
+};
+
 export const FLOATER_DATES_2026 = [
   { date: '2026-01-14', label: 'Pongal / Makar Sankranti' },
   { date: '2026-01-23', label: 'Vasant Panchami' },
