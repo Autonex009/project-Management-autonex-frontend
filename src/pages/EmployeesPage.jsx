@@ -443,7 +443,7 @@ import { useState, useRef, useEffect } from 'react';
 import { createPortal } from 'react-dom';
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import { employeeApi, skillApi, allocationApi } from '../services/api';
-import { Plus, Edit, Trash2, X, User, ChevronDown, Search, CheckCircle, AlertCircle, Clock } from 'lucide-react';
+import { Plus, Edit, Trash2, X, User, ChevronDown, Search, CheckCircle, AlertCircle, Clock, ArrowUpCircle } from 'lucide-react';
 import toast from 'react-hot-toast';
 
 const LEAVE_TYPE_LABELS = {
@@ -922,6 +922,27 @@ const EmployeesPage = () => {
     }
   });
 
+  const convertMutation = useMutation({
+    mutationFn: ({ id, converted_by }) => employeeApi.convertToFulltime(id, { converted_by }),
+    onSuccess: (emp) => {
+      queryClient.invalidateQueries(['employees']);
+      toast.success(`${emp.name} converted to Full-time`);
+    },
+    onError: (err) => {
+      toast.error(err.response?.data?.detail || 'Failed to convert employee');
+    },
+  });
+
+  const handleConvertToFulltime = (employee) => {
+    if (!window.confirm(
+      `Convert ${employee.name} from Intern to Full-time employee?\n\n` +
+      `This updates the existing record in place — all leave, payroll, performance and ` +
+      `other history is preserved. Full-time leave entitlements will apply going forward.`
+    )) return;
+    const currentUser = JSON.parse(localStorage.getItem('user') || '{}');
+    convertMutation.mutate({ id: employee.id, converted_by: currentUser.id || null });
+  };
+
   const handleSubmit = (e) => {
     e.preventDefault();
     const formData = new FormData(e.target);
@@ -1127,6 +1148,14 @@ const EmployeesPage = () => {
                           }`}>
                           {employee.employee_type}
                         </span>
+                        {employee.converted_to_fulltime_at && (
+                          <p
+                            className="mt-1 text-[10px] text-slate-400"
+                            title={`Promoted from ${employee.previous_employee_type || 'Intern'} on ${new Date(employee.converted_to_fulltime_at).toLocaleDateString()}`}
+                          >
+                            promoted {new Date(employee.converted_to_fulltime_at).toLocaleDateString()}
+                          </p>
+                        )}
                       </td>
 
                       {/* Hours */}
@@ -1197,6 +1226,16 @@ const EmployeesPage = () => {
                       {/* Actions */}
                       <td className="px-5 py-4 text-right">
                         <div className="flex items-center justify-end gap-1">
+                          {employee.employee_type === 'Intern' && (
+                            <button
+                              onClick={() => handleConvertToFulltime(employee)}
+                              disabled={convertMutation.isPending}
+                              className="p-2 text-slate-500 hover:text-emerald-600 hover:bg-emerald-50 rounded-lg transition-colors disabled:opacity-50"
+                              title="Convert to Full-time employee"
+                            >
+                              <ArrowUpCircle className="w-4 h-4" />
+                            </button>
+                          )}
                           <button
                             onClick={() => {
                               setEditingEmployee(employee);

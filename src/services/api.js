@@ -94,6 +94,7 @@ export const employeeApi = {
     update: (id, data) => api.put(`/employees/${id}`, data).then(res => res.data),
     delete: (id) => api.delete(`/employees/${id}`).then(res => res.data),
     getAvailability: (id) => api.get(`/employees/${id}/availability`).then(res => res.data),
+    convertToFulltime: (id, data) => api.post(`/employees/${id}/convert-to-fulltime`, data).then(res => res.data),
 };
 
 export const allocationApi = {
