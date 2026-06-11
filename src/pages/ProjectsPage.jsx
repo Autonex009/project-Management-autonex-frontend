@@ -437,7 +437,19 @@ const ProjectsPage = () => {
       );
       resetModalState();
     } catch (error) {
-      const message = error.response?.data?.detail || 'Failed to save sub-project';
+      const detail = error.response?.data?.detail;
+      let message = 'Failed to save sub-project';
+      if (typeof detail === 'string') {
+        message = detail;
+      } else if (Array.isArray(detail)) {
+        // FastAPI 422 returns an array of {loc, msg}; surface the field + reason
+        message = detail
+          .map((e) => {
+            const field = Array.isArray(e.loc) ? e.loc[e.loc.length - 1] : '';
+            return field ? `${field}: ${e.msg}` : e.msg;
+          })
+          .join('; ');
+      }
       toast.error(message);
     }
   };
@@ -1011,11 +1023,12 @@ const ProjectsPage = () => {
                   </div>
                   <div>
                     <label className="block text-sm font-medium text-gray-700 mb-1">
-                      End Date <span className="text-gray-400 font-normal">(optional)</span>
+                      End Date <span className="text-red-500">*</span>
                     </label>
                     <input
                       type="date"
                       name="end_date"
+                      required
                       defaultValue={(editingProject || copyingProject)?.end_date}
                       className="input"
                     />
