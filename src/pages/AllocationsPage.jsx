@@ -883,27 +883,29 @@ const AllocationsPage = () => {
                           <UserPlus className="w-4 h-4" />
                         </button>
                         {(() => {
-                          const activeCount = projectAllocs.filter(a => {
-                            const empLeaves = leaves.filter(l => l.employee_id === a.employee_id && l.status === 'approved');
-                            // Check active overlap
-                            const hasOverlap = empLeaves.some(l =>
-                              new Date(l.start_date) <= new Date(project.end_date) &&
-                              new Date(l.end_date) >= new Date(project.start_date)
-                            );
-                            return !hasOverlap;
-                          }).length;
+                          const assignedCount = projectAllocs.length;
+                          // Count employees currently on approved leave (today)
+                          const todayStr = new Date().toISOString().slice(0, 10);
+                          const onLeaveToday = projectAllocs.filter(a =>
+                            leaves.some(l =>
+                              l.employee_id === a.employee_id &&
+                              l.status === 'approved' &&
+                              String(l.start_date).slice(0, 10) <= todayStr &&
+                              String(l.end_date).slice(0, 10) >= todayStr
+                            )
+                          ).length;
 
                           return (
                             <div className="flex flex-col items-end">
-                              <span className={`text-sm font-medium px-2 py-0.5 rounded ${activeCount >= requiredManpower
+                              <span className={`text-sm font-medium px-2 py-0.5 rounded ${assignedCount >= requiredManpower
                                 ? 'bg-emerald-50 text-emerald-700'
                                 : 'bg-amber-50 text-amber-700'
                                 }`}>
-                                {activeCount}/{requiredManpower}
+                                {assignedCount}/{requiredManpower}
                               </span>
-                              {activeCount < projectAllocs.length && (
-                                <span className="text-xs text-red-500 font-medium scale-90 origin-right">
-                                  ({projectAllocs.length} assigned) !
+                              {onLeaveToday > 0 && (
+                                <span className="text-xs text-amber-600 font-medium scale-90 origin-right">
+                                  ({onLeaveToday} on leave today)
                                 </span>
                               )}
                             </div>
