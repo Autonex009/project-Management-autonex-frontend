@@ -332,7 +332,7 @@ const ParentProjectsPage = () => {
                                 <div className="bg-slate-50 rounded-lg p-2 text-center">
                                     <Calendar className="w-4 h-4 mx-auto text-slate-400 mb-1" />
                                     <p className="text-sm font-semibold text-slate-800">
-                                        {program.global_start_date ? format(new Date(program.global_start_date), 'MMM yy') : '-'}
+                                        {program.global_start_date ? format(new Date(program.global_start_date), 'dd-MMM-yy') : '-'}
                                     </p>
                                     <p className="text-xs text-slate-500">Start</p>
                                 </div>
