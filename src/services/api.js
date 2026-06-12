@@ -180,11 +180,18 @@ export const guidelineApi = {
 };
 
 // === Payroll API ===
+// The payroll passcode (entered on the Payroll page) is sent with every payroll
+// request; the backend rejects payroll calls without it when PAYROLL_PASSCODE is set.
+const payrollHeaders = () => {
+    const pc = sessionStorage.getItem('payroll_passcode');
+    return pc ? { 'X-Payroll-Passcode': pc } : {};
+};
+
 export const payrollApi = {
-    getPreview: (month) => api.get('/payroll/preview', { params: { month } }).then(res => res.data),
-    save: (data) => api.post('/payroll/save', data).then(res => res.data),
-    getSaved: (month) => api.get('/payroll/saved', { params: { month } }).then(res => res.data),
-    exportCsvUrl: (month) => `${apiBaseUrl}/payroll/export.csv?month=${month}`,
+    getPreview: (month) => api.get('/payroll/preview', { params: { month }, headers: payrollHeaders() }).then(res => res.data),
+    save: (data) => api.post('/payroll/save', data, { headers: payrollHeaders() }).then(res => res.data),
+    getSaved: (month) => api.get('/payroll/saved', { params: { month }, headers: payrollHeaders() }).then(res => res.data),
+    exportCsvUrl: (month) => `${apiBaseUrl}/payroll/export.csv?month=${month}&passcode=${encodeURIComponent(sessionStorage.getItem('payroll_passcode') || '')}`,
 };
 
 // === Referrals API ===

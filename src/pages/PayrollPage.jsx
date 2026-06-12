@@ -4,7 +4,7 @@ import { employeeApi, payrollApi } from '../services/api';
 import toast from 'react-hot-toast';
 import {
     Download, CheckCircle2, XCircle, AlertTriangle, IndianRupee,
-    Users, TrendingDown, Wallet, X, ChevronDown, ChevronRight, Edit2, Save
+    Users, TrendingDown, Wallet, X, ChevronDown, ChevronRight, Edit2, Save, Lock
 } from 'lucide-react';
 
 const LEAVE_LABELS = {
@@ -35,6 +35,41 @@ const PayrollPage = () => {
 
     // Which employee's leave modal is open
     const [reviewModal, setReviewModal] = useState(null); // employee row object
+
+    // ── Payroll passcode gate ──────────────────────────────────────────
+    const [unlocked, setUnlocked] = useState(!!sessionStorage.getItem('payroll_passcode'));
+    const [passcodeInput, setPasscodeInput] = useState('');
+    const [unlocking, setUnlocking] = useState(false);
+    const [unlockError, setUnlockError] = useState('');
+
+    const handleUnlock = async (e) => {
+        e.preventDefault();
+        setUnlocking(true);
+        setUnlockError('');
+        sessionStorage.setItem('payroll_passcode', passcodeInput);
+        try {
+            // Validate the passcode against the server (also no-op if the gate is disabled).
+            await payrollApi.getPreview(currentMonthStr());
+            setUnlocked(true);
+            setPasscodeInput('');
+        } catch (err) {
+            if (err.response?.status === 401) {
+                sessionStorage.removeItem('payroll_passcode');
+                setUnlockError('Incorrect payroll passcode.');
+            } else {
+                // Non-auth error (e.g. network) — passcode itself was accepted.
+                setUnlocked(true);
+                setPasscodeInput('');
+            }
+        } finally {
+            setUnlocking(false);
+        }
+    };
+
+    const handleLock = () => {
+        sessionStorage.removeItem('payroll_passcode');
+        setUnlocked(false);
+    };
 
     const { data: preview, isLoading, refetch } = useQuery({
         queryKey: ['payroll-preview', month],
@@ -181,6 +216,39 @@ const PayrollPage = () => {
 
     const modalRow = reviewModal ? rows.find(r => r.employee_id === reviewModal) : null;
 
+    // ── Locked: require the payroll passcode before showing anything ──
+    if (!unlocked) {
+        return (
+            <div className="flex items-center justify-center min-h-[60vh]">
+                <form onSubmit={handleUnlock} className="w-full max-w-sm bg-white rounded-2xl border border-slate-200 shadow-sm p-6 space-y-4">
+                    <div className="flex items-center gap-3">
+                        <div className="p-2 rounded-lg bg-indigo-50"><Lock className="w-5 h-5 text-indigo-600" /></div>
+                        <div>
+                            <h2 className="text-lg font-semibold text-slate-800">Payroll is protected</h2>
+                            <p className="text-sm text-slate-500">Enter the payroll passcode to continue.</p>
+                        </div>
+                    </div>
+                    <input
+                        type="password"
+                        autoFocus
+                        value={passcodeInput}
+                        onChange={(e) => setPasscodeInput(e.target.value)}
+                        placeholder="Payroll passcode"
+                        className="w-full px-3 py-2 border border-slate-200 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-indigo-500"
+                    />
+                    {unlockError && <p className="text-sm text-red-600">{unlockError}</p>}
+                    <button
+                        type="submit"
+                        disabled={unlocking || !passcodeInput}
+                        className="w-full px-4 py-2 bg-indigo-600 text-white rounded-lg text-sm font-medium hover:bg-indigo-700 disabled:opacity-50"
+                    >
+                        {unlocking ? 'Checking…' : 'Unlock'}
+                    </button>
+                </form>
+            </div>
+        );
+    }
+
     return (
         <div className="space-y-6">
             {/* Header */}
@@ -204,6 +272,13 @@ const PayrollPage = () => {
                         className="px-4 py-2 bg-indigo-600 text-white text-sm font-semibold rounded-xl hover:bg-indigo-700 transition-colors disabled:opacity-60"
                     >
                         {isLoading ? 'Loading...' : 'Generate'}
+                    </button>
+                    <button
+                        onClick={handleLock}
+                        title="Lock payroll"
+                        className="p-2 text-slate-400 hover:text-slate-700 hover:bg-slate-100 rounded-xl transition-colors"
+                    >
+                        <Lock className="w-4 h-4" />
                     </button>
                 </div>
             </div>
