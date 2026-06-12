@@ -1,8 +1,8 @@
 /* eslint-disable react/prop-types */
-import { useState } from 'react';
+import { useState, useEffect } from 'react';
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import { parentProjectApi, employeeApi, subProjectApi, allocationApi } from '../services/api';
-import { Plus, X, Edit, Trash2, FolderTree, Users, Calendar, Clock, ChevronRight, Layers, Search } from 'lucide-react';
+import { Plus, X, Edit, Trash2, FolderTree, Users, Calendar, Clock, ChevronRight, Layers, Search, Building2 } from 'lucide-react';
 import { Link } from 'react-router-dom';
 import { format } from 'date-fns';
 import toast from 'react-hot-toast';
@@ -11,6 +11,7 @@ import { getPmEmployeeId, getPmProjects } from '../utils/pmScope';
 const ParentProjectsPage = () => {
     const [isModalOpen, setIsModalOpen] = useState(false);
     const [editingProject, setEditingProject] = useState(null);
+    const [selectedPmIds, setSelectedPmIds] = useState([]);
     const queryClient = useQueryClient();
     const user = JSON.parse(localStorage.getItem('user') || '{}');
     const role = localStorage.getItem('role') || 'admin';
@@ -60,8 +61,35 @@ const ParentProjectsPage = () => {
     const [searchQuery, setSearchQuery] = useState('');
 
     const visibleParentProjects = (isPm ? getPmProjects(parentProjects, pmEmployeeId) : parentProjects)
-        .filter(p => p.name.toLowerCase().includes(searchQuery.toLowerCase()))
+        .filter(p =>
+            p.name.toLowerCase().includes(searchQuery.toLowerCase()) ||
+            (p.client || '').toLowerCase().includes(searchQuery.toLowerCase())
+        )
         .sort((a, b) => a.name.localeCompare(b.name));
+
+    // Existing organization names (from the client field) for the dropdown
+    const organizations = [...new Set(parentProjects.map(p => p.client).filter(Boolean))].sort((a, b) => a.localeCompare(b));
+
+    // Group visible projects by organization
+    const projectsByOrg = visibleParentProjects.reduce((acc, p) => {
+        const org = p.client || 'No Organization';
+        (acc[org] = acc[org] || []).push(p);
+        return acc;
+    }, {});
+    const orgNames = Object.keys(projectsByOrg).sort((a, b) =>
+        a === 'No Organization' ? 1 : b === 'No Organization' ? -1 : a.localeCompare(b)
+    );
+
+    // Initialize selected PMs when the modal opens
+    useEffect(() => {
+        if (!isModalOpen) return;
+        const ids = editingProject?.program_manager_ids?.length
+            ? editingProject.program_manager_ids
+            : editingProject?.program_manager_id
+                ? [editingProject.program_manager_id]
+                : [];
+        setSelectedPmIds(ids);
+    }, [isModalOpen, editingProject]);
 
     // Mutations
     const createMutation = useMutation({
@@ -98,15 +126,21 @@ const ParentProjectsPage = () => {
         e.preventDefault();
         const formData = new FormData(e.target);
 
+        const pmIds = isPm
+            ? [...new Set([pmEmployeeId, ...selectedPmIds])].filter(Boolean)
+            : selectedPmIds;
+
+        if (pmIds.length === 0) {
+            toast.error('Select at least one Program Manager');
+            return;
+        }
+
         const data = {
             name: formData.get('name'),
             client: formData.get('client') || null,
             project_type: formData.get('project_type') || 'Full',
-            program_manager_id: isPm
-                ? pmEmployeeId
-                : formData.get('program_manager_id')
-                    ? parseInt(formData.get('program_manager_id'))
-                    : null,
+            program_manager_id: pmIds[0],
+            program_manager_ids: pmIds,
             description: formData.get('description') || null,
             global_start_date: formData.get('global_start_date'),
             tentative_duration_months: formData.get('tentative_duration_months') ? parseInt(formData.get('tentative_duration_months')) : null,
@@ -240,8 +274,18 @@ const ParentProjectsPage = () => {
                     </button>
                 </div>
             ) : (
-                <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
-                    {visibleParentProjects.map((program) => (
+                <div className="space-y-8">
+                    {orgNames.map((orgName) => (
+                        <div key={orgName}>
+                            <div className="flex items-center gap-2 mb-4">
+                                <Building2 className="w-5 h-5 text-slate-400" />
+                                <h2 className="text-lg font-bold text-slate-800">{orgName}</h2>
+                                <span className="px-2 py-0.5 bg-slate-100 text-slate-500 rounded-full text-xs font-medium">
+                                    {projectsByOrg[orgName].length} {projectsByOrg[orgName].length === 1 ? 'project' : 'projects'}
+                                </span>
+                            </div>
+                            <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
+                    {projectsByOrg[orgName].map((program) => (
                         <div
                             key={program.id}
                             className="bg-white rounded-2xl border border-slate-200 p-6 hover:shadow-xl hover:shadow-slate-200/50 transition-all duration-300 hover:-translate-y-1 group"
@@ -306,11 +350,11 @@ const ParentProjectsPage = () => {
                             </div>
 
                             {/* PM Info */}
-                            {program.program_manager_name && (
+                            {(program.program_manager_names?.length > 0 || program.program_manager_name) && (
                                 <div className="flex items-center gap-2 mb-4 p-2 bg-indigo-50 rounded-lg">
-                                    <Users className="w-4 h-4 text-indigo-500" />
-                                    <span className="text-sm text-indigo-700 font-medium">
-                                        PM: {program.program_manager_name}
+                                    <Users className="w-4 h-4 text-indigo-500 flex-shrink-0" />
+                                    <span className="text-sm text-indigo-700 font-medium truncate" title={(program.program_manager_names?.length ? program.program_manager_names : [program.program_manager_name]).join(', ')}>
+                                        PM: {(program.program_manager_names?.length ? program.program_manager_names : [program.program_manager_name]).join(', ')}
                                     </span>
                                 </div>
                             )}
@@ -347,6 +391,9 @@ const ParentProjectsPage = () => {
                                     View Sub-Projects
                                     <ChevronRight className="w-4 h-4" />
                                 </Link>
+                            </div>
+                        </div>
+                    ))}
                             </div>
                         </div>
                     ))}
@@ -394,16 +441,25 @@ const ParentProjectsPage = () => {
 
                             <div>
                                 <label className="block text-sm font-medium text-slate-700 mb-1">
-                                    Client
+                                    Organization *
                                 </label>
                                 <input
                                     type="text"
                                     name="client"
                                     required
+                                    list="organization-options"
                                     defaultValue={editingProject?.client || ''}
                                     className="w-full px-4 py-2.5 border border-slate-200 rounded-xl focus:ring-2 focus:ring-indigo-100 focus:border-indigo-500 outline-none transition-all"
-                                    placeholder="Client organization name"
+                                    placeholder="Select existing or type a new organization"
                                 />
+                                <datalist id="organization-options">
+                                    {organizations.map((org) => (
+                                        <option key={org} value={org} />
+                                    ))}
+                                </datalist>
+                                <p className="mt-1 text-xs text-slate-400">
+                                    Pick an existing organization or type a new name to create one.
+                                </p>
                             </div>
 
                             <div>
@@ -450,38 +506,61 @@ const ParentProjectsPage = () => {
                                 </div>
                             )}
 
-                            {isPm ? (
-                                <div>
-                                    <label className="block text-sm font-medium text-slate-700 mb-1">
-                                        Program Manager
-                                    </label>
-                                    <input
-                                        type="text"
-                                        value={user.name || 'Current PM'}
-                                        disabled
-                                        className="w-full px-4 py-2.5 border border-slate-200 rounded-xl bg-slate-50 text-slate-500 outline-none"
-                                    />
-                                </div>
-                            ) : (
-                                <div>
-                                    <label className="block text-sm font-medium text-slate-700 mb-1">
-                                        Program Manager *
-                                    </label>
-                                    <select
-                                        name="program_manager_id"
-                                        required
-                                        defaultValue={editingProject?.program_manager_id || ''}
-                                        className="w-full px-4 py-2.5 border border-slate-200 rounded-xl focus:ring-2 focus:ring-indigo-100 focus:border-indigo-500 outline-none transition-all"
-                                    >
-                                        <option value="">Select PM</option>
-                                        {employees.filter(e => e.status === 'active').map((emp) => (
+                            <div>
+                                <label className="block text-sm font-medium text-slate-700 mb-1">
+                                    Program Manager(s) *
+                                </label>
+                                {isPm && (
+                                    <p className="mb-2 text-xs text-slate-400">
+                                        You ({user.name || 'Current PM'}) are included automatically. You can add a co-manager below.
+                                    </p>
+                                )}
+                                {/* Selected PM chips */}
+                                {selectedPmIds.length > 0 && (
+                                    <div className="flex flex-wrap gap-2 mb-2">
+                                        {selectedPmIds.map((id) => {
+                                            const emp = employees.find(e => e.id === id);
+                                            if (!emp) return null;
+                                            return (
+                                                <span key={id} className="inline-flex items-center gap-1.5 pl-3 pr-1.5 py-1 bg-indigo-50 text-indigo-700 rounded-full text-sm font-medium">
+                                                    {emp.name}
+                                                    {selectedPmIds[0] === id && (
+                                                        <span className="text-[10px] uppercase tracking-wide text-indigo-400">primary</span>
+                                                    )}
+                                                    {!(isPm && id === pmEmployeeId) && (
+                                                        <button
+                                                            type="button"
+                                                            onClick={() => setSelectedPmIds(prev => prev.filter(p => p !== id))}
+                                                            className="p-0.5 hover:bg-indigo-100 rounded-full transition-colors"
+                                                        >
+                                                            <X className="w-3.5 h-3.5" />
+                                                        </button>
+                                                    )}
+                                                </span>
+                                            );
+                                        })}
+                                    </div>
+                                )}
+                                <select
+                                    value=""
+                                    onChange={(e) => {
+                                        const id = parseInt(e.target.value);
+                                        if (id && !selectedPmIds.includes(id)) {
+                                            setSelectedPmIds(prev => [...prev, id]);
+                                        }
+                                    }}
+                                    className="w-full px-4 py-2.5 border border-slate-200 rounded-xl focus:ring-2 focus:ring-indigo-100 focus:border-indigo-500 outline-none transition-all"
+                                >
+                                    <option value="">+ Add Program Manager</option>
+                                    {employees
+                                        .filter(e => e.status === 'active' && !selectedPmIds.includes(e.id))
+                                        .map((emp) => (
                                             <option key={emp.id} value={emp.id}>
                                                 {emp.name}
                                             </option>
                                         ))}
-                                    </select>
-                                </div>
-                            )}
+                                </select>
+                            </div>
 
                             <div>
                                 <label className="block text-sm font-medium text-slate-700 mb-1">

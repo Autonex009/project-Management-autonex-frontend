@@ -358,10 +358,10 @@ const ProjectsPage = () => {
     );
   };
 
-  const uploadGuidelinesForProject = async (projectId, mainProjectId) => {
-    if (guidelineFiles.length === 0) return;
+  const uploadGuidelinesForProject = async (projectId, mainProjectId, files = guidelineFiles) => {
+    if (files.length === 0) return;
 
-    await Promise.all(guidelineFiles.map((file) => {
+    await Promise.all(files.map((file) => {
       const formData = new FormData();
       formData.append('file', file);
       formData.append('title', file.name.replace(/\.[^.]+$/, ''));
@@ -376,6 +376,8 @@ const ProjectsPage = () => {
 
   const handleSubmit = async (e) => {
     e.preventDefault();
+    // Guard against double-submission (e.g. rapid double-clicks on Save)
+    if (createMutation.isPending || updateMutation.isPending) return;
     const formData = new FormData(e.target);
     const selectedMainProjectId = parseInt(formData.get('main_project_id') || filterMainProjectId || '', 10) || null;
 
@@ -416,26 +418,13 @@ const ProjectsPage = () => {
       project_status: formData.get('project_status') || 'active',
     };
 
+    let savedProject;
     try {
-      let savedProject;
       if (editingProject) {
         savedProject = await updateMutation.mutateAsync({ id: editingProject.id, data });
       } else {
         savedProject = await createMutation.mutateAsync(data);
       }
-
-      await uploadGuidelinesForProject(savedProject.id, selectedMainProjectId);
-      await Promise.all([
-        queryClient.invalidateQueries({ queryKey: ['sub-projects'] }),
-        queryClient.invalidateQueries({ queryKey: ['guidelines'] }),
-      ]);
-
-      toast.success(
-        editingProject
-          ? 'Sub-project updated successfully'
-          : 'Sub-project created successfully'
-      );
-      resetModalState();
     } catch (error) {
       const detail = error.response?.data?.detail;
       let message = 'Failed to save sub-project';
@@ -451,7 +440,28 @@ const ProjectsPage = () => {
           .join('; ');
       }
       toast.error(message);
+      return;
     }
+
+    // Save succeeded — close the modal NOW so a failed follow-up step
+    // (e.g. guideline upload) can't lead to duplicate re-submissions.
+    const wasEditing = Boolean(editingProject);
+    const filesToUpload = guidelineFiles;
+    resetModalState();
+    toast.success(wasEditing ? 'Sub-project updated successfully' : 'Sub-project created successfully');
+
+    try {
+      if (filesToUpload.length > 0) {
+        await uploadGuidelinesForProject(savedProject.id, selectedMainProjectId, filesToUpload);
+      }
+    } catch (error) {
+      toast.error('Sub-project saved, but guideline upload failed. You can re-upload from the Guidelines page.');
+    }
+
+    await Promise.all([
+      queryClient.invalidateQueries({ queryKey: ['sub-projects'] }),
+      queryClient.invalidateQueries({ queryKey: ['guidelines'] }),
+    ]);
   };
 
   const getMatchingEmployees = (project) => {
@@ -648,7 +658,7 @@ const ProjectsPage = () => {
                 <th className="px-5 py-4 text-center text-xs font-bold text-slate-800 uppercase tracking-wider">Avg Time</th>
                 <th className="px-5 py-4 text-left text-xs font-bold text-slate-800 uppercase tracking-wider">Recommendation</th>
                 <th className="px-5 py-4 text-center text-xs font-bold text-slate-800 uppercase tracking-wider">Status</th>
-                <th className="px-5 py-4 text-right text-xs font-bold text-slate-800 uppercase tracking-wider">Actions</th>
+                <th className="px-5 py-4 text-right text-xs font-bold text-slate-800 uppercase tracking-wider sticky right-0 bg-slate-50 shadow-[-8px_0_8px_-8px_rgba(0,0,0,0.1)]">Actions</th>
               </tr>
             </thead>
             <tbody className="divide-y divide-slate-100">
@@ -684,9 +694,16 @@ const ProjectsPage = () => {
                         <span className="text-sm text-slate-600">
                           {(() => {
                             const mainProject = visibleMainProjects.find(p => p.id === project.main_project_id);
-                            if (!mainProject?.program_manager_id) return '—';
-                            const pm = employees.find(e => e.id === mainProject.program_manager_id);
-                            return pm?.name || '—';
+                            const pmIds = mainProject?.program_manager_ids?.length
+                              ? mainProject.program_manager_ids
+                              : mainProject?.program_manager_id
+                                ? [mainProject.program_manager_id]
+                                : [];
+                            if (pmIds.length === 0) return '—';
+                            const names = pmIds
+                              .map(id => employees.find(e => e.id === id)?.name)
+                              .filter(Boolean);
+                            return names.length ? names.join(', ') : '—';
                           })()}
                         </span>
                       </td>
@@ -773,7 +790,7 @@ const ProjectsPage = () => {
                           <span className="text-sm text-slate-600 capitalize">{project.project_status}</span>
                         </div>
                       </td>
-                      <td className="px-5 py-4 text-right">
+                      <td className="px-5 py-4 text-right sticky right-0 bg-white shadow-[-8px_0_8px_-8px_rgba(0,0,0,0.1)]">
                         <div className="flex items-center justify-end gap-1">
                           <button
                             onClick={() => {

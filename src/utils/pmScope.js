@@ -8,7 +8,12 @@ export function getPmProjectIds(parentProjects = [], pmEmployeeId) {
 
   return new Set(
     parentProjects
-      .filter((project) => project.program_manager_id === pmEmployeeId)
+      .filter(
+        (project) =>
+          project.program_manager_id === pmEmployeeId ||
+          (Array.isArray(project.program_manager_ids) &&
+            project.program_manager_ids.includes(pmEmployeeId))
+      )
       .map((project) => project.id)
   );
 }
