@@ -15,6 +15,8 @@ const ModuleView = () => {
     const [quizSubmitted, setQuizSubmitted] = useState({});
     const [loading, setLoading] = useState(true);
     const [error, setError] = useState(null);
+    const [showScoreModal, setShowScoreModal] = useState(false);
+    const [modalData, setModalData] = useState(null);
 
     const user = JSON.parse(localStorage.getItem('user') || '{}');
     const userId = user.id;
@@ -35,7 +37,11 @@ const ModuleView = () => {
             })
             .catch((err) => {
                 console.error('Failed to load module details:', err);
-                setError('Could not load module training content.');
+                if (err.response && err.response.status === 403) {
+                    setError('This module is locked. You must complete the previous module and pass its quizzes before accessing this level.');
+                } else {
+                    setError('Could not load module training content.');
+                }
             })
             .finally(() => setLoading(false));
     }, [userId, moduleId]);
@@ -92,6 +98,23 @@ const ModuleView = () => {
         }
     };
 
+    const handleAdvance = () => {
+        const nextIdx = moduleData.sections.findIndex((s, idx) => idx > activeSectionIndex && !completedSections.has(s.id));
+        if (nextIdx !== -1) {
+            setLoading(true);
+            onboardingApi.getModule(moduleId)
+                .then(res => {
+                    setModuleData(res);
+                    setActiveTab('content');
+                    setSelectedAnswers({});
+                    setQuizSubmitted({});
+                })
+                .finally(() => setLoading(false));
+        } else {
+            navigate('/employee/onboarding');
+        }
+    };
+
     const handleQuizSubmit = async (sectionId) => {
         if (!currentSection || !currentSection.questions || currentSection.questions.length === 0) return;
         
@@ -102,7 +125,7 @@ const ModuleView = () => {
 
         try {
             const result = await onboardingApi.submitQuiz(sectionId, answers, userId);
-            const passingScore = Math.max(0, Math.min(100, Number(currentSection.quizPassingScore) || 0));
+            const passingScore = Math.max(0, Math.min(100, Number(currentSection.quiz_passing_score ?? currentSection.quizPassingScore) || 0));
             const passed = result.score >= passingScore;
             
             setQuizSubmitted({
@@ -114,11 +137,19 @@ const ModuleView = () => {
                 }
             });
 
+            setModalData({
+                score: result.score,
+                correctCount: result.correctCount,
+                totalQuestions: result.totalQuestions || answers.length,
+                passingScore,
+                passed,
+                sectionId
+            });
+            setShowScoreModal(true);
+
             if (passed) {
-                toast.success(`Congratulations! Passed with ${result.score}%`);
-                handleMarkComplete(sectionId);
-            } else {
-                toast.error(`Did not pass. Score: ${result.score}% (Required: ${passingScore}%)`);
+                await onboardingApi.recordProgress(moduleId, sectionId, userId);
+                setCompletedSections(new Set([...completedSections, sectionId]));
             }
         } catch (e) {
             console.error('Quiz submit failed:', e);
@@ -141,7 +172,7 @@ const ModuleView = () => {
     const totalSections = moduleData.sections.length;
     const totalCompleted = completedSections.size;
     const overallProgress = totalSections === 0 ? 0 : Math.round((totalCompleted / totalSections) * 100);
-    const currentPassingScore = Math.max(0, Math.min(100, Number(currentSection?.quizPassingScore) || 0));
+    const currentPassingScore = Math.max(0, Math.min(100, Number(currentSection?.quiz_passing_score ?? currentSection?.quizPassingScore) || 0));
     const answeredCurrentQuestions = currentSection?.questions?.filter((q) => selectedAnswers[q.id] !== undefined).length || 0;
 
     return (
@@ -370,18 +401,7 @@ const ModuleView = () => {
                             
                             {completedSections.has(currentSection.id) && (
                                 <button 
-                                    onClick={() => {
-                                        const nextIdx = moduleData.sections.findIndex((s, idx) => idx > activeSectionIndex && !completedSections.has(s.id));
-                                        if (nextIdx !== -1) {
-                                            // Trigger reload state of component
-                                            setLoading(true);
-                                            onboardingApi.getModule(moduleId)
-                                                .then(res => setModuleData(res))
-                                                .finally(() => setLoading(false));
-                                        } else {
-                                            navigate('/employee/onboarding');
-                                        }
-                                    }} 
+                                    onClick={handleAdvance} 
                                     className="px-6 py-3 rounded-xl font-bold text-white bg-emerald-600 hover:bg-emerald-700 transition-colors text-xs uppercase tracking-wider flex items-center gap-1.5 cursor-pointer shadow-md hover:shadow-lg"
                                 >
                                     <span>{activeSectionIndex === moduleData.sections.length - 1 ? 'Finish Module' : 'Next Lesson'}</span>
@@ -440,6 +460,89 @@ const ModuleView = () => {
                     </div>
                 </div>
             </aside>
+
+            {showScoreModal && modalData && (
+                <div className="fixed inset-0 bg-slate-900/60 backdrop-blur-sm z-50 flex items-center justify-center p-4">
+                    <div className="bg-white rounded-3xl max-w-md w-full overflow-hidden shadow-2xl border border-slate-100 animate-in zoom-in-95 duration-200 p-8 text-center flex flex-col items-center">
+                        <div className={`h-20 w-20 rounded-full flex items-center justify-center mb-6 ${
+                            modalData.passed 
+                                ? 'bg-emerald-50 text-emerald-600 border-2 border-emerald-100/50 animate-pulse' 
+                                : 'bg-amber-50 text-amber-600 border-2 border-amber-100/50'
+                        }`}>
+                            {modalData.passed ? (
+                                <Award className="w-10 h-10" />
+                            ) : (
+                                <HelpCircle className="w-10 h-10" />
+                            )}
+                        </div>
+
+                        <h3 className="text-2xl font-extrabold text-slate-900 tracking-tight mb-2">
+                            {modalData.passed ? 'Congratulations!' : 'Score Not Met'}
+                        </h3>
+                        
+                        <p className="text-slate-500 text-sm mb-6 max-w-xs">
+                            {modalData.passed 
+                                ? 'You have successfully passed the section assessment check!' 
+                                : 'You did not meet the minimum score required to pass this lesson.'}
+                        </p>
+
+                        <div className={`w-full rounded-2xl p-6 mb-6 ${
+                            modalData.passed ? 'bg-emerald-50/50 border border-emerald-100/30' : 'bg-amber-50/50 border border-amber-100/30'
+                        }`}>
+                            <div className="text-[10px] font-bold uppercase tracking-widest text-slate-400 mb-1">
+                                Your Performance Score
+                            </div>
+                            <div className={`text-5xl font-extrabold tracking-tight ${
+                                modalData.passed ? 'text-emerald-600' : 'text-amber-600'
+                            }`}>
+                                {modalData.score}%
+                            </div>
+                            <div className="text-xs font-semibold text-slate-500 mt-2">
+                                {modalData.correctCount} of {modalData.totalQuestions} Correct
+                            </div>
+                            <div className="h-px bg-slate-200/60 my-3" />
+                            <div className="text-[10px] font-bold text-slate-400 uppercase tracking-wide">
+                                Required Passing score: {modalData.passingScore}%
+                            </div>
+                        </div>
+
+                        <div className="w-full space-y-2">
+                            {modalData.passed ? (
+                                <button
+                                    onClick={() => {
+                                        setShowScoreModal(false);
+                                        handleAdvance();
+                                    }}
+                                    className="w-full py-3.5 bg-emerald-600 hover:bg-emerald-700 text-white rounded-2xl font-bold text-sm tracking-wide transition-all shadow-md shadow-emerald-600/10 cursor-pointer uppercase"
+                                >
+                                    {activeSectionIndex === moduleData.sections.length - 1 ? 'Finish Module' : 'Next Lesson'}
+                                </button>
+                            ) : (
+                                <>
+                                    <button
+                                        onClick={() => {
+                                            setShowScoreModal(false);
+                                            handleRetakeQuiz(modalData.sectionId);
+                                        }}
+                                        className="w-full py-3.5 bg-amber-600 hover:bg-amber-700 text-white rounded-2xl font-bold text-sm tracking-wide transition-all shadow-md shadow-amber-600/10 cursor-pointer uppercase"
+                                    >
+                                        Retry Quiz
+                                    </button>
+                                    <button
+                                        onClick={() => {
+                                            setShowScoreModal(false);
+                                            setActiveTab('content');
+                                        }}
+                                        className="w-full py-3.5 bg-slate-100 hover:bg-slate-200 text-slate-700 rounded-2xl font-bold text-sm tracking-wide transition-all cursor-pointer uppercase"
+                                    >
+                                        Study Material
+                                    </button>
+                                </>
+                            )}
+                        </div>
+                    </div>
+                </div>
+            )}
         </div>
     );
 };

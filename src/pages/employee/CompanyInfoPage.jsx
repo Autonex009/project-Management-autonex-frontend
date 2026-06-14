@@ -84,34 +84,83 @@ const CompanyInfoPage = () => {
             case 'leaves':
                 return (
                     <div className="space-y-6 animate-in fade-in duration-300">
-                        <div className="bg-slate-50 border border-slate-100 rounded-2xl p-6">
+                        {/* 1. Allotments Grid */}
+                        <div>
                             <h3 className="text-lg font-bold text-slate-800 mb-4 flex items-center gap-2">
                                 <Calendar className="w-5 h-5 text-emerald-500" />
-                                Standard Leave Allotments
+                                Leave Entitlements & Allotments
                             </h3>
-                            <div className="grid grid-cols-1 sm:grid-cols-3 gap-4 mb-6">
-                                <div className="bg-white border border-slate-100 rounded-xl p-4 text-center">
-                                    <p className="text-xs text-slate-400 font-bold uppercase tracking-wider">Sick Leave</p>
-                                    <p className="text-3xl font-extrabold text-slate-800 mt-1">12 Days</p>
-                                    <p className="text-xs text-slate-500 mt-1">Annual allotment</p>
+                            <div className="grid grid-cols-1 sm:grid-cols-4 gap-4 mb-6">
+                                <div className="bg-slate-50 border border-slate-100 rounded-2xl p-4 text-center shadow-[0_1px_2px_rgba(0,0,0,0.02)] hover:border-emerald-250 transition-colors">
+                                    <p className="text-xs text-slate-400 font-bold uppercase tracking-wider">Annual Paid Leave (APL)</p>
+                                    <p className="text-3xl font-extrabold text-emerald-600 mt-1">12 Days</p>
+                                    <p className="text-xs text-slate-500 mt-1">Granted per calendar year</p>
                                 </div>
-                                <div className="bg-white border border-slate-100 rounded-xl p-4 text-center">
-                                    <p className="text-xs text-slate-400 font-bold uppercase tracking-wider">Casual Leave</p>
-                                    <p className="text-3xl font-extrabold text-slate-800 mt-1">12 Days</p>
-                                    <p className="text-xs text-slate-500 mt-1">For personal matters</p>
+                                <div className="bg-slate-50 border border-slate-100 rounded-2xl p-4 text-center shadow-[0_1px_2px_rgba(0,0,0,0.02)] hover:border-emerald-250 transition-colors">
+                                    <p className="text-xs text-slate-400 font-bold uppercase tracking-wider">National Holidays</p>
+                                    <p className="text-3xl font-extrabold text-indigo-600 mt-1">8 Days</p>
+                                    <p className="text-xs text-slate-500 mt-1">Fixed cultural & religious days</p>
                                 </div>
-                                <div className="bg-white border border-slate-100 rounded-xl p-4 text-center">
-                                    <p className="text-xs text-slate-400 font-bold uppercase tracking-wider">Holidays</p>
-                                    <p className="text-3xl font-extrabold text-slate-800 mt-1">10 Days</p>
-                                    <p className="text-xs text-slate-500 mt-1">Declared calendar holidays</p>
+                                <div className="bg-slate-50 border border-slate-100 rounded-2xl p-4 text-center shadow-[0_1px_2px_rgba(0,0,0,0.02)] hover:border-emerald-250 transition-colors">
+                                    <p className="text-xs text-slate-400 font-bold uppercase tracking-wider">Floater Leave</p>
+                                    <p className="text-3xl font-extrabold text-amber-600 mt-1">2 Days</p>
+                                    <p className="text-xs text-slate-500 mt-1">For personal observances</p>
+                                </div>
+                                <div className="bg-slate-50 border border-slate-100 rounded-2xl p-4 text-center shadow-[0_1px_2px_rgba(0,0,0,0.02)] hover:border-emerald-250 transition-colors">
+                                    <p className="text-xs text-slate-400 font-bold uppercase tracking-wider">Earned Leave Accrual</p>
+                                    <p className="text-3xl font-extrabold text-rose-650 mt-1">1 / 20</p>
+                                    <p className="text-xs text-slate-500 mt-1">1 day per 20 completed workdays</p>
                                 </div>
                             </div>
-                            <h4 className="font-bold text-slate-800 text-sm mb-2">Policy Highlights:</h4>
-                            <ul className="list-disc list-inside text-sm text-slate-600 space-y-2">
-                                <li>All leaves should be requested at least <strong>48 hours in advance</strong> via the Leaves portal.</li>
-                                <li>Emergency medical leaves must be accompanied by doctor certifications if exceeding 3 consecutive days.</li>
-                                <li>Unused leaves expire at the end of the calendar year and do not carry forward.</li>
+                        </div>
+
+                        {/* 2. Leave Application Process callout */}
+                        <div className="bg-amber-50/50 border border-amber-200/60 rounded-2xl p-5 space-y-3">
+                            <h4 className="font-bold text-amber-800 text-sm flex items-center gap-2">
+                                <ShieldCheck className="w-4 h-4 text-amber-600" />
+                                NOTE: Leave Application & Approval Process
+                            </h4>
+                            <ul className="list-disc list-inside text-sm text-amber-900/80 space-y-1.5 pl-1">
+                                <li>All leave and Work From Home (WFH) requests must be applied and tracked through the <strong>PM Portal</strong>.</li>
+                                <li>Leave shall be considered approved only after <strong>prior approval</strong> from the reporting manager.</li>
+                                <li>Employees are required to apply for leave <strong>1 week in advance</strong>, except in cases of unforeseen emergencies.</li>
                             </ul>
+                        </div>
+
+                        {/* 3. Intern and Clubbing Policies */}
+                        <div className="grid grid-cols-1 sm:grid-cols-2 gap-6 pt-2">
+                            <div className="bg-white border border-slate-200/80 rounded-2xl p-5 shadow-sm space-y-3">
+                                <h4 className="font-bold text-slate-800 text-sm border-b border-slate-100 pb-2">Leave Policy for Interns 🎓</h4>
+                                <ul className="list-disc list-inside text-sm text-slate-600 space-y-1.5">
+                                    <li>Interns are eligible to avail <strong>1 leave per month</strong>.</li>
+                                    <li>Any leave exceeding <strong>1 leave per month</strong> will be considered as <strong>unpaid leave</strong>.</li>
+                                    <li>Additional leave requests may be considered only under exceptional circumstances and subject to management approval.</li>
+                                </ul>
+                            </div>
+                            <div className="bg-white border border-slate-200/80 rounded-2xl p-5 shadow-sm space-y-3">
+                                <h4 className="font-bold text-slate-800 text-sm border-b border-slate-100 pb-2">Leave Clubbing Policy 🤝</h4>
+                                <ul className="list-disc list-inside text-sm text-slate-600 space-y-1.5">
+                                    <li>Full-time employees may choose to <strong>club or combine</strong> their leaves together if required.</li>
+                                    <li>Employees cannot avail more than <strong>5 consecutive leaves</strong> at a time without special management approval.</li>
+                                    <li>Employees are encouraged to utilize leaves responsibly and avoid planning that impacts workflow and team operations.</li>
+                                </ul>
+                            </div>
+                        </div>
+
+                        {/* 4. Core Availability and Commitment */}
+                        <div className="bg-indigo-50/40 border border-indigo-100/60 rounded-2xl p-5 space-y-3">
+                            <h4 className="font-bold text-indigo-850 text-sm">Working Hours & Weekend Support 🕒</h4>
+                            <div className="text-sm text-indigo-900/80 space-y-2.5">
+                                <p>
+                                    <strong>Core Working Hours:</strong> Employees are expected to be available between <strong>9:00 AM and 8:00 PM IST</strong>. While continuous online presence throughout these hours is not required, you are expected to remain responsive, attend team calls, and actively collaborate during this window.
+                                </p>
+                                <p>
+                                    <strong>Weekend Contributions:</strong> From time to time, the organization may require support on weekends for business needs. While weekend availability is not mandatory, your willingness to contribute during such times is highly appreciated. Any such contributions will be duly compensated in accordance with company policy.
+                                </p>
+                                <p className="text-xs text-indigo-800/70 italic">
+                                    Proactive participation and flexibility, including occasional weekend contributions, demonstrate ownership and commitment. Such efforts are recognized and contribute positively to individual growth, increased responsibilities, and future opportunities within the organization.
+                                </p>
+                            </div>
                         </div>
                     </div>
                 );
