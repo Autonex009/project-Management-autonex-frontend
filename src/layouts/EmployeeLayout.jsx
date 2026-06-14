@@ -61,9 +61,9 @@ const EmployeeLayout = () => {
 
     return (
         <div className={`min-h-screen flex ${isPm ? 'bg-[linear-gradient(180deg,#f8fbff_0%,#f8fafc_35%,#f1f5f9_100%)]' : 'bg-[linear-gradient(180deg,#f3fffb_0%,#f8fafc_35%,#eefbf6_100%)]'}`}>
-            <aside className={`fixed inset-y-0 left-0 z-50 w-72 border-r border-slate-200 bg-white/95 shadow-xl backdrop-blur transition-transform duration-300 lg:static lg:translate-x-0 ${sidebarOpen ? 'translate-x-0' : '-translate-x-full'}`}>
+            <aside className={`fixed inset-y-0 left-0 z-50 w-72 border-r border-slate-200 bg-white/95 shadow-xl backdrop-blur transition-transform duration-300 lg:sticky lg:top-0 lg:h-screen lg:self-start lg:translate-x-0 ${sidebarOpen ? 'translate-x-0' : '-translate-x-full'}`}>
                 <div className="flex h-full flex-col">
-                    <div className="relative overflow-hidden border-b border-slate-100 px-5 py-5">
+                    <div className="relative overflow-hidden border-b border-slate-100 px-5 py-5 bg-white/95 shrink-0">
                         <div className={`absolute inset-0 ${isPm ? 'bg-[radial-gradient(circle_at_top_right,_rgba(18,63,169,0.18),_transparent_95%)]' : 'bg-[radial-gradient(circle_at_top_right,_rgba(16,185,129,0.16),_transparent_99%)]'}`} />
                         <div className="relative flex items-start justify-between gap-3">
                             <BrandLockup subtitle={portalLabel} tone="light" compact />
@@ -73,7 +73,7 @@ const EmployeeLayout = () => {
                         </div>
                     </div>
 
-                    <nav className="flex-1 p-4 space-y-1">
+                    <nav className="flex-1 overflow-y-auto p-4 space-y-1">
                         {navItems.map(item => (
                             <NavLink
                                 key={item.to}

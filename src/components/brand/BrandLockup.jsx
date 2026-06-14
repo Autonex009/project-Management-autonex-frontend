@@ -2,10 +2,14 @@ const toneStyles = {
   dark: {
     frame: 'border-white/10 bg-white/5',
     subtitle: 'text-slate-400',
+    wordmarkFilter: undefined,
   },
   light: {
     frame: 'border-slate-200 bg-white',
     subtitle: 'text-slate-500',
+    // Tints a white/light wordmark to dark blue (~ Tailwind blue-900 / indigo-900)
+    wordmarkFilter:
+      'brightness(0) saturate(100%) invert(13%) sepia(98%) saturate(2476%) hue-rotate(225deg) brightness(94%) contrast(101%)',
   },
 };
 
@@ -27,6 +31,7 @@ const BrandLockup = ({
           src="/logo.png"
           alt="Autonex wordmark"
           className={`${compact ? 'h-6' : 'h-8'} w-auto object-contain`}
+          style={styles.wordmarkFilter ? { filter: styles.wordmarkFilter } : undefined}
         />
         <p className={`mt-1 text-xs ${styles.subtitle}`}>{subtitle}</p>
       </div>
