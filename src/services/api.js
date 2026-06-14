@@ -220,4 +220,37 @@ export const notificationApi = {
     markAllRead: (userId) => api.patch('/notifications/read-all', null, { params: { user_id: userId } }).then(res => res.data),
 };
 
+// === Onboarding API ===
+export const onboardingApi = {
+    getModules: (includeDrafts = false) => api.get('/onboarding/modules', { params: { include_drafts: includeDrafts } }).then(res => res.data),
+    getModule: (id) => api.get(`/onboarding/modules/${id}`).then(res => res.data),
+    createModule: (data) => api.post('/onboarding/modules', data).then(res => res.data),
+    updateModule: (id, data) => api.put(`/onboarding/modules/${id}`, data).then(res => res.data),
+    deleteModule: (id) => api.delete(`/onboarding/modules/${id}`).then(res => res.data),
+    createSection: (moduleId, data) => api.post(`/onboarding/modules/${moduleId}/sections`, data).then(res => res.data),
+    deleteSection: (id) => api.delete(`/onboarding/sections/${id}`).then(res => res.data),
+    importQuestions: (moduleId, sectionId, formData) => api.post(`/onboarding/modules/${moduleId}/sections/${sectionId}/import-questions`, formData, {
+        headers: { 'Content-Type': 'multipart/form-data' },
+    }).then(res => res.data),
+    getQuizSampleUrl: () => `${apiBaseUrl}/onboarding/modules/quiz-sample-excel`,
+    recordProgress: (moduleId, sectionId, userId = null) => api.post('/onboarding/progress/section', { module_id: moduleId, section_id: sectionId, user_id: userId }).then(res => res.data),
+    getProgress: (userId) => api.get(`/onboarding/progress/${userId}`).then(res => res.data),
+    submitQuiz: (sectionId, answers, userId = null) => api.post('/onboarding/quiz/submit', { section_id: sectionId, answers, user_id: userId }).then(res => res.data),
+    getTeam: () => api.get('/onboarding/team').then(res => res.data),
+    createTeamMember: (data) => api.post('/onboarding/team', data).then(res => res.data),
+    updateTeamMember: (id, data) => api.put(`/onboarding/team/${id}`, data).then(res => res.data),
+    deleteTeamMember: (id) => api.delete(`/onboarding/team/${id}`).then(res => res.data),
+    importTeam: (formData) => api.post('/onboarding/team/bulk-import', formData, {
+        headers: { 'Content-Type': 'multipart/form-data' },
+    }).then(res => res.data),
+    getTeamSampleUrl: () => `${apiBaseUrl}/onboarding/team/sample-excel`,
+    getCandidateDashboard: (userId) => api.get(`/onboarding/candidates/${userId}/dashboard`).then(res => res.data),
+    getAnalyticsDashboard: () => api.get('/onboarding/analytics/dashboard').then(res => res.data),
+    getFullAnalytics: () => api.get('/onboarding/analytics/full').then(res => res.data),
+    getMentees: (mentorId) => api.get(`/onboarding/mentors/${mentorId}/mentees`).then(res => res.data),
+    getReports: () => api.get('/onboarding/reports').then(res => res.data),
+    getReportsExportUrl: () => `${apiBaseUrl}/onboarding/reports/export`,
+};
+
 export default api;
+

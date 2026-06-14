@@ -1,12 +1,20 @@
 import { Link, useLocation, Outlet, useNavigate } from 'react-router-dom';
-import { LogOut, Menu, Search, X } from 'lucide-react';
+import { LogOut, Menu, Search, X, GraduationCap, Users, FileSpreadsheet, BarChart3 } from 'lucide-react';
 import { navigation } from '../config/navigation';
+
 import api, { signupRequestApi } from '../services/api';
 import { useState } from 'react';
 import { useQuery, useQueryClient } from '@tanstack/react-query';
 import { subProjectApi, employeeApi } from '../services/api';
 import BrandLockup from '../components/brand/BrandLockup';
 import NotificationBell from '../components/NotificationBell';
+
+const onboardingNavigation = [
+  { name: 'Training Modules', href: '/admin/modules', icon: GraduationCap },
+  { name: 'Onboarding Team', href: '/admin/onboarding-team', icon: Users },
+  { name: 'Progress Reports', href: '/admin/onboarding-reports', icon: FileSpreadsheet },
+  { name: 'Training Analytics', href: '/admin/onboarding-analytics', icon: BarChart3 },
+];
 
 const AdminLayout = () => {
   const location = useLocation();
@@ -119,7 +127,37 @@ const AdminLayout = () => {
               </Link>
             );
           })}
+
+          <p className="px-4 text-xs font-semibold text-slate-500 uppercase tracking-wider mb-2 mt-4">
+            Onboarding Portal
+          </p>
+          {onboardingNavigation.map((item) => {
+            const isActive = location.pathname === item.href || location.pathname.startsWith(item.href + '/');
+            const Icon = item.icon;
+
+            return (
+              <Link
+                key={item.name}
+                to={item.href}
+                onClick={() => setSidebarOpen(false)}
+                className={`
+                  flex items-center gap-3 px-4 py-3 rounded-xl text-sm font-medium transition-all duration-200 group
+                  ${isActive
+                    ? 'bg-gradient-to-r from-blue-600 to-indigo-600 text-white shadow-lg shadow-blue-900/20'
+                    : 'text-slate-400 hover:text-white hover:bg-slate-800/50'
+                  }
+                `}
+              >
+                <Icon className={`w-5 h-5 transition-colors ${isActive ? 'text-white' : 'text-slate-500 group-hover:text-white'}`} />
+                {item.name}
+                {isActive && (
+                  <div className="ml-auto w-1.5 h-1.5 rounded-full bg-white animate-pulse" />
+                )}
+              </Link>
+            );
+          })}
         </nav>
+
 
         {/* User Profile Section (Sidebar Bottom) */}
         <div className="p-4 border-t border-slate-800/50 bg-slate-950/30">

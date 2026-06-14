@@ -416,6 +416,7 @@ const ProjectsPage = () => {
       project_duration_weeks: durationWeeks,
       project_duration_days: durationDays,
       project_status: formData.get('project_status') || 'active',
+      is_annotation: formData.get('is_annotation') === 'true',
     };
 
     let savedProject;
@@ -687,7 +688,14 @@ const ProjectsPage = () => {
                         <div className="font-semibold text-slate-800">{parentProject?.name || '—'}</div>
                       </td>
                       <td className="px-5 py-4">
-                        <div className="text-sm text-slate-600">{project.name}</div>
+                        <div className="flex items-center gap-2">
+                          <span className="text-sm text-slate-600 font-semibold">{project.name}</span>
+                          {project.is_annotation && (
+                            <span className="px-1.5 py-0.5 rounded-full text-[9px] font-bold bg-indigo-50 text-indigo-700 border border-indigo-200 uppercase tracking-wider">
+                              Annotation
+                            </span>
+                          )}
+                        </div>
                         <div className="text-xs text-slate-400">{parentProject?.project_type || '—'}</div>
                       </td>
                       <td className="px-5 py-4">
@@ -978,6 +986,20 @@ const ProjectsPage = () => {
                       <option value="cancelled">Cancelled</option>
                     </select>
                   </div>
+                </div>
+
+                <div className="flex items-center gap-2 bg-indigo-50/40 border border-indigo-100/60 rounded-xl p-3">
+                  <input
+                    type="checkbox"
+                    name="is_annotation"
+                    id="is_annotation"
+                    value="true"
+                    defaultChecked={(editingProject || copyingProject)?.is_annotation || false}
+                    className="h-4.5 w-4.5 text-indigo-650 border-slate-300 rounded focus:ring-indigo-500 accent-indigo-600 cursor-pointer"
+                  />
+                  <label htmlFor="is_annotation" className="text-sm font-semibold text-slate-700 select-none cursor-pointer">
+                    Is Annotation Project (links allocated candidates to PM for Onboarding tracking)
+                  </label>
                 </div>
 
                 <div className="grid grid-cols-1 sm:grid-cols-3 gap-4">

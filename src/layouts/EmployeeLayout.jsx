@@ -1,6 +1,6 @@
 import React, { useState } from 'react';
 import { Outlet, NavLink, useNavigate } from 'react-router-dom';
-import { LayoutDashboard, FolderKanban, Calendar, CalendarCheck, Rocket, LogOut, Menu, X, FileText, Layers, UserCog, UserRound, Users, Users2, TrendingUp } from 'lucide-react';
+import { LayoutDashboard, FolderKanban, Calendar, CalendarCheck, Rocket, LogOut, Menu, X, FileText, Layers, UserCog, UserRound, Users, Users2, TrendingUp, GraduationCap, Info } from 'lucide-react';
 import BrandLockup from '../components/brand/BrandLockup';
 import NotificationBell from '../components/NotificationBell';
 
@@ -29,6 +29,11 @@ const EmployeeLayout = () => {
     const portalLabel = isPm ? 'PM Portal' : 'Employee Portal';
     const theme = isPm ? accentTheme.pm : accentTheme.employee;
 
+    const isAnnotator = user.designation && (
+        user.designation.toLowerCase().includes('annotator') ||
+        user.designation.toLowerCase().includes('reviewer')
+    );
+
     const navItems = isPm
         ? [
             { to: `${prefix}/dashboard`, label: 'Dashboard', icon: LayoutDashboard },
@@ -41,6 +46,7 @@ const EmployeeLayout = () => {
             { to: `${prefix}/my-leaves`, label: 'My Leaves', icon: CalendarCheck },
             { to: `${prefix}/side-projects`, label: 'Side Projects', icon: Rocket },
             { to: `${prefix}/guidelines`, label: 'Guidelines', icon: FileText },
+            { to: `${prefix}/onboarding-mentor`, label: 'Mentorship', icon: GraduationCap },
         ]
         : [
             { to: `${prefix}/dashboard`, label: 'Dashboard', icon: LayoutDashboard },
@@ -49,6 +55,8 @@ const EmployeeLayout = () => {
             { to: `${prefix}/side-projects`, label: 'Side Projects', icon: Rocket },
             { to: `${prefix}/guidelines`, label: 'Guidelines', icon: FileText },
             { to: `${prefix}/referrals`, label: 'Referrals', icon: Users2 },
+            { to: `${prefix}/company-info`, label: 'Company Info', icon: Info },
+            ...(isAnnotator ? [{ to: `${prefix}/onboarding`, label: 'Onboarding', icon: GraduationCap }] : []),
             { to: `${prefix}/profile`, label: 'Profile', icon: UserRound },
         ];
 
