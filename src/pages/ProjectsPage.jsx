@@ -8,6 +8,7 @@ import { format } from 'date-fns';
 import toast from 'react-hot-toast';
 import { getPmEmployeeId, getPmProjects, getPmSubProjects } from '../utils/pmScope';
 import { getEndDateValidationMessage, isEndDateBeforeStartDate } from '../utils/dateValidation';
+import AllocationPopover from '../components/AllocationPopover';
 
 const SkillMultiSelect = ({ options, value, onChange }) => {
   const [isOpen, setIsOpen] = useState(false);
@@ -725,14 +726,18 @@ const ProjectsPage = () => {
                       </td>
                       <td className="px-5 py-4 text-center">
                         {allocatedManpower > 0 ? (
-                          <button
-                            onClick={() => navigate(`${prefix}/allocations`, { state: { projectId: project.id } })}
-                            className="inline-flex items-center gap-1.5 px-3 py-1.5 bg-emerald-50 hover:bg-emerald-100 text-emerald-700 rounded-lg font-medium text-sm transition-colors border border-emerald-200"
-                            title="View/Manage Allocations"
-                          >
-                            <span>Allocated</span>
-                            <span className="font-bold">{allocatedManpower}</span>
-                          </button>
+                          <AllocationPopover
+                            project={project}
+                            allocations={allocations}
+                            employees={employees}
+                            badgeContent={(
+                              <>
+                                <span>Allocated</span>
+                                <span className="font-bold">{allocatedManpower}</span>
+                              </>
+                            )}
+                            onOpenAllocations={() => navigate(`${prefix}/allocations`, { state: { projectId: project.id } })}
+                          />
                         ) : (
                           <button
                             onClick={() => navigate(`${prefix}/allocations`, { state: { projectId: project.id } })}
