@@ -309,6 +309,7 @@ const ParentProjectsPage = () => {
                                     <span className={`px-2 py-1 rounded-full text-xs font-semibold ${getProjectTypeBadge(program.project_type)}`}>
                                         {program.project_type || 'Full'}
                                     </span>
+                                    {/* is_annotation badge removed and moved to sub-projects page */}
                                     <span className={`px-2 py-1 rounded-full text-xs font-medium ${getStatusBadge(program.status)}`}>
                                         {program.status}
                                     </span>
@@ -478,6 +479,8 @@ const ParentProjectsPage = () => {
                                     <option value="Side">Side</option>
                                 </select>
                             </div>
+
+                            {/* is_annotation checkbox removed and moved to sub-projects page */}
 
                             {editingProject?.project_type === 'POC' && (
                                 <div className="rounded-xl border border-amber-200 bg-amber-50 p-4 space-y-3">
