@@ -1,4 +1,5 @@
 // import { useState } from 'react';
+import AllocationPopover from '../components/AllocationPopover';
 // import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 // import { allocationApi, projectApi, employeeApi } from '../services/api';
 // import { Plus, X, Edit, Trash2 } from 'lucide-react';
@@ -500,7 +501,6 @@ const AllocationsPage = () => {
   const [selectedEmployees, setSelectedEmployees] = useState([]);
   const [availableEmployees, setAvailableEmployees] = useState([]);
   const [allocatedEmployeesOther, setAllocatedEmployeesOther] = useState([]);
-  const [employeesOnLeave, setEmployeesOnLeave] = useState([]);
   const [filterTab, setFilterTab] = useState('unallocated');
   const [editingAllocation, setEditingAllocation] = useState(null);
 
@@ -600,30 +600,7 @@ const AllocationsPage = () => {
         .filter(a => a.sub_project_id === selectedProject.id)
         .map(a => a.employee_id);
 
-      // Helper function to check if date ranges overlap
-      const datesOverlap = (startA, endA, startB, endB) => {
-        const a1 = new Date(startA);
-        const a2 = new Date(endA);
-        const b1 = new Date(startB);
-        const b2 = new Date(endB);
-        return a1 <= b2 && b1 <= a2;
-      };
 
-      // Find employees on leave during project dates
-      const employeesOnLeaveList = employees.filter(emp => {
-        const empLeaves = leaves.filter(l => l.employee_id === emp.id && l.status === 'approved');
-        return empLeaves.some(leave =>
-          datesOverlap(
-            selectedProject.start_date,
-            selectedProject.end_date,
-            leave.start_date,
-            leave.end_date
-          )
-        );
-      });
-      setEmployeesOnLeave(employeesOnLeaveList);
-
-      const onLeaveIds = employeesOnLeaveList.map(e => e.id);
 
       // Find which employees are allocated to OTHER projects (not current)
       const allocatedToOtherProjects = {};
@@ -655,13 +632,11 @@ const AllocationsPage = () => {
             )
           );
           const alreadyInProject = allocatedToCurrentProject.includes(emp.id);
-          const onLeave = onLeaveIds.includes(emp.id);
-          return { ...emp, skillMatch, alreadyInProject, onLeave };
+          return { ...emp, skillMatch, alreadyInProject };
         })
         .sort((a, b) => {
-          // Sort: skill-matched first, then unallocated, then already-in-project, then on-leave
+          // Sort: skill-matched first, then unallocated, then already-in-project
           if (a.alreadyInProject !== b.alreadyInProject) return a.alreadyInProject ? 1 : -1;
-          if (a.onLeave !== b.onLeave) return a.onLeave ? 1 : -1;
           return b.skillMatch - a.skillMatch;
         });
 
@@ -897,12 +872,20 @@ const AllocationsPage = () => {
 
                           return (
                             <div className="flex flex-col items-end">
-                              <span className={`text-sm font-medium px-2 py-0.5 rounded ${assignedCount >= requiredManpower
-                                ? 'bg-emerald-50 text-emerald-700'
-                                : 'bg-amber-50 text-amber-700'
-                                }`}>
-                                {assignedCount}/{requiredManpower}
-                              </span>
+                              <AllocationPopover
+                                project={project}
+                                allocations={projectAllocs}
+                                employees={employees}
+                                badgeContent={(
+                                  <span className={`text-sm font-medium px-2 py-0.5 rounded ${assignedCount >= requiredManpower
+                                    ? 'bg-emerald-50 text-emerald-700'
+                                    : 'bg-amber-50 text-amber-700'
+                                    }`}>
+                                    {assignedCount}/{requiredManpower}
+                                  </span>
+                                )}
+                                onOpenAllocations={() => { setSelectedProject(project); setIsModalOpen(true); }}
+                              />
                               {onLeaveToday > 0 && (
                                 <span className="text-xs text-amber-600 font-medium scale-90 origin-right">
                                   ({onLeaveToday} on leave today)
@@ -1026,25 +1009,105 @@ const AllocationsPage = () => {
 
               {selectedProject && (
                 <>
-                  {/* Required Employees (read-only display) */}
-                  <div className="bg-blue-50 border border-blue-200 rounded-md p-4">
-                    <div className="flex items-center justify-between">
-                      <div>
-                        <p className="text-sm font-medium text-blue-900">Required Manpower</p>
-                        <p className="text-2xl font-bold text-blue-700">{selectedProject.required_manpower || 0}</p>
-                      </div>
-                      <div>
-                        <p className="text-sm font-medium text-blue-900">Required Skills</p>
-                        <div className="flex flex-wrap gap-1 mt-1">
-                          {selectedProject.required_expertise?.map((skill, idx) => (
-                            <span key={idx} className="px-2 py-0.5 text-xs bg-blue-200 text-blue-800 rounded">
-                              {skill}
+                  {/* Compact project summary */}
+                  {(() => {
+                    const projectAllocs = allocations.filter(a => a.sub_project_id === selectedProject.id);
+                    const allocatedEmps = projectAllocs
+                      .map(a => ({ alloc: a, emp: employees.find(e => e.id === a.employee_id) }))
+                      .filter(x => x.emp);
+                    const required = selectedProject.required_manpower || 0;
+                    const filled = projectAllocs.length;
+                    const skills = selectedProject.required_expertise || [];
+
+                    return (
+                      <div className="bg-blue-50/60 border border-blue-100 rounded-lg p-3 space-y-3">
+                        {/* Compact stats row */}
+                        <div className="flex items-center justify-between gap-3 flex-wrap">
+                          <div className="flex items-center gap-4">
+                            <div className="flex items-center gap-2">
+                              <span className="text-xs font-medium text-blue-900/70 uppercase tracking-wide">Required</span>
+                              <span className="text-sm font-bold text-blue-700 bg-white border border-blue-200 rounded-md px-2 py-0.5">{required}</span>
+                            </div>
+                            <div className="flex items-center gap-2">
+                              <span className="text-xs font-medium text-blue-900/70 uppercase tracking-wide">Allocated</span>
+                              <span className={`text-sm font-bold rounded-md px-2 py-0.5 border ${
+                                filled >= required
+                                  ? 'bg-emerald-50 text-emerald-700 border-emerald-200'
+                                  : 'bg-amber-50 text-amber-700 border-amber-200'
+                              }`}>{filled}/{required}</span>
+                            </div>
+                          </div>
+                          {skills.length > 0 && (
+                            <div className="flex items-center gap-2 min-w-0">
+                              <span className="text-xs font-medium text-blue-900/70 uppercase tracking-wide shrink-0">Skills</span>
+                              <div className="flex flex-wrap gap-1">
+                                {skills.slice(0, 4).map((skill, idx) => (
+                                  <span key={idx} className="px-1.5 py-0.5 text-[11px] font-medium bg-white text-blue-700 border border-blue-200 rounded">
+                                    {skill}
+                                  </span>
+                                ))}
+                                {skills.length > 4 && (
+                                  <span className="text-[11px] text-blue-700/70">+{skills.length - 4}</span>
+                                )}
+                              </div>
+                            </div>
+                          )}
+                        </div>
+
+                        {/* Employees on this project */}
+                        <div className="pt-2 border-t border-blue-100">
+                          <div className="flex items-center justify-between mb-2">
+                            <span className="text-xs font-semibold text-blue-900/80 uppercase tracking-wide">
+                              On this project
                             </span>
-                          ))}
+                            <span className="text-[11px] text-blue-900/60">{allocatedEmps.length} employee{allocatedEmps.length === 1 ? '' : 's'}</span>
+                          </div>
+                          {allocatedEmps.length === 0 ? (
+                            <p className="text-xs text-slate-500 italic">No one allocated yet</p>
+                          ) : (
+                            <div className="flex flex-wrap gap-1.5">
+                              {allocatedEmps.map(({ alloc, emp }) => {
+                                const initials = (emp.name || '')
+                                  .trim()
+                                  .split(/\s+/)
+                                  .map(p => p.charAt(0).toUpperCase())
+                                  .slice(0, 2)
+                                  .join('') || '?';
+                                const isRemoving = deleteMutation.isPending && deleteMutation.variables === alloc.id;
+                                return (
+                                  <div
+                                    key={alloc.id}
+                                    title={`${emp.name}${alloc.total_daily_hours ? ` · ${alloc.total_daily_hours}h/day` : ''}`}
+                                    className={`group inline-flex items-center gap-1.5 pl-1 pr-1 py-0.5 bg-white border border-slate-200 rounded-full shadow-sm transition-opacity ${isRemoving ? 'opacity-50' : ''}`}
+                                  >
+                                    <span className="w-5 h-5 rounded-full bg-indigo-500 text-white text-[10px] font-semibold flex items-center justify-center">
+                                      {initials}
+                                    </span>
+                                    <span className="text-xs text-slate-700 max-w-[120px] truncate">{emp.name}</span>
+                                    <button
+                                      type="button"
+                                      disabled={isRemoving}
+                                      onClick={(e) => {
+                                        e.preventDefault();
+                                        e.stopPropagation();
+                                        if (window.confirm(`Remove ${emp.name} from "${selectedProject.name}"?`)) {
+                                          deleteMutation.mutate(alloc.id);
+                                        }
+                                      }}
+                                      className="ml-0.5 w-4 h-4 rounded-full text-slate-400 hover:text-white hover:bg-rose-500 flex items-center justify-center transition-colors disabled:cursor-not-allowed"
+                                      title={`Remove ${emp.name}`}
+                                    >
+                                      <X className="w-3 h-3" />
+                                    </button>
+                                  </div>
+                                );
+                              })}
+                            </div>
+                          )}
                         </div>
                       </div>
-                    </div>
-                  </div>
+                    );
+                  })()}
 
                   {/* Employee Selection */}
                   <div>
@@ -1107,35 +1170,7 @@ const AllocationsPage = () => {
                       />
                     </div>
 
-                    {/* Warning for employees on leave */}
-                    {(() => {
-                      const skilledEmployeesOnLeave = employeesOnLeave.filter(emp => {
-                        const requiredSkills = selectedProject.required_expertise || [];
-                        if (requiredSkills.length === 0) return true;
-                        const empSkills = emp.skills || [];
-                        return requiredSkills.some(skill =>
-                          empSkills.some(empSkill => empSkill.toLowerCase().includes(skill.toLowerCase()))
-                        );
-                      });
 
-                      if (skilledEmployeesOnLeave.length === 0) return null;
-
-                      return (
-                        <div className="mb-4 p-3 bg-amber-50 border border-amber-200 rounded-lg">
-                          <div className="flex items-center gap-2 text-amber-700 font-medium mb-2">
-                            <AlertTriangle className="w-4 h-4" />
-                            <span>{skilledEmployeesOnLeave.length} employee(s) on leave during project dates:</span>
-                          </div>
-                          <div className="flex flex-wrap gap-2">
-                            {skilledEmployeesOnLeave.map(emp => (
-                              <span key={emp.id} className="text-xs bg-amber-100 text-amber-800 px-2 py-1 rounded">
-                                {emp.name}
-                              </span>
-                            ))}
-                          </div>
-                        </div>
-                      );
-                    })()}
 
                     {/* Employee List */}
                     {(() => {
@@ -1194,11 +1229,6 @@ const AllocationsPage = () => {
                                     {employee.alreadyInProject && (
                                       <span className="px-2 py-0.5 text-xs bg-blue-100 text-blue-700 rounded-full font-medium">
                                         In This Project
-                                      </span>
-                                    )}
-                                    {employee.onLeave && (
-                                      <span className="px-2 py-0.5 text-xs bg-amber-100 text-amber-700 rounded-full font-medium">
-                                        On Leave
                                       </span>
                                     )}
                                     {employee.currentProjects && !employee.alreadyInProject && (
