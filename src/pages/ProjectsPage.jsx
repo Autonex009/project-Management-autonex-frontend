@@ -567,8 +567,10 @@ const ProjectsPage = () => {
     return { label, dailyHours: avgDailyHoursPerEmployee, workingDays, effectiveDays: totalEffectiveEmployeeDays };
   };
 
-  const [searchParams] = useSearchParams();
+  const [searchParams, setSearchParams] = useSearchParams();
   const filterMainProjectId = searchParams.get('project');
+  const statusParam = searchParams.get('status');
+  const recommendationParam = searchParams.get('recommendation');
   const [subProjectSearch, setSubProjectSearch] = useState('');
   const [currentPage, setCurrentPage] = useState(1);
   const PAGE_SIZE = 10;
@@ -577,13 +579,20 @@ const ProjectsPage = () => {
     ? visibleProjects.filter(p => p.main_project_id === parseInt(filterMainProjectId))
     : visibleProjects
   )
-    .filter(p => p.name.toLowerCase().includes(subProjectSearch.toLowerCase()))
+    .filter(p => {
+      if (statusParam && p.project_status !== statusParam) return false;
+      if (recommendationParam) {
+        const recResult = getSystemRecommendation(p);
+        if (recResult.label.toLowerCase() !== recommendationParam.toLowerCase()) return false;
+      }
+      return p.name.toLowerCase().includes(subProjectSearch.toLowerCase());
+    })
     .sort((a, b) => a.name.localeCompare(b.name));
 
   // Reset to page 1 when filters change
   useEffect(() => {
     setCurrentPage(1);
-  }, [subProjectSearch, filterMainProjectId]);
+  }, [subProjectSearch, filterMainProjectId, statusParam, recommendationParam]);
 
   const totalPages = Math.ceil(filteredProjects.length / PAGE_SIZE);
   const paginatedProjects = filteredProjects.slice((currentPage - 1) * PAGE_SIZE, currentPage * PAGE_SIZE);
@@ -643,6 +652,54 @@ const ProjectsPage = () => {
           </button>
         </div>
       </div>
+
+      {/* Active Filters Bar */}
+      {(statusParam || recommendationParam) && (
+        <div className="flex items-center gap-2 flex-wrap bg-slate-50 border border-slate-200/60 rounded-xl px-4 py-2.5">
+          <span className="text-xs font-semibold text-slate-500 uppercase tracking-wider">Active Filters:</span>
+          {statusParam && (
+            <span className="inline-flex items-center gap-1.5 px-2.5 py-1 rounded-full text-xs font-medium bg-indigo-50 text-indigo-700 border border-indigo-200">
+              Status: {statusParam}
+              <button 
+                onClick={() => {
+                  const params = new URLSearchParams(searchParams);
+                  params.delete('status');
+                  setSearchParams(params);
+                }} 
+                className="hover:bg-indigo-100 rounded-full p-0.5"
+              >
+                <X className="w-3 h-3" />
+              </button>
+            </span>
+          )}
+          {recommendationParam && (
+            <span className="inline-flex items-center gap-1.5 px-2.5 py-1 rounded-full text-xs font-medium bg-red-50 text-red-700 border border-red-200">
+              Recommendation: {recommendationParam}
+              <button 
+                onClick={() => {
+                  const params = new URLSearchParams(searchParams);
+                  params.delete('recommendation');
+                  setSearchParams(params);
+                }} 
+                className="hover:bg-red-100 rounded-full p-0.5"
+              >
+                <X className="w-3 h-3" />
+              </button>
+            </span>
+          )}
+          <button
+            onClick={() => {
+              const params = new URLSearchParams(searchParams);
+              params.delete('status');
+              params.delete('recommendation');
+              setSearchParams(params);
+            }}
+            className="text-xs font-medium text-slate-500 hover:text-slate-800 transition-colors ml-auto"
+          >
+            Clear all
+          </button>
+        </div>
+      )}
 
       <div className="bg-white rounded-2xl border border-slate-200/60 shadow-[0_1px_3px_rgba(0,0,0,0.04)] overflow-hidden">
         <div className="overflow-x-auto">

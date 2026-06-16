@@ -442,6 +442,7 @@
 import { useState, useRef, useEffect } from 'react';
 import { createPortal } from 'react-dom';
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
+import { useSearchParams } from 'react-router-dom';
 import { employeeApi, skillApi, allocationApi } from '../services/api';
 import { Plus, Edit, Trash2, X, User, ChevronDown, Search, CheckCircle, AlertCircle, Clock, ArrowUpCircle } from 'lucide-react';
 import toast from 'react-hot-toast';
@@ -844,13 +845,15 @@ const DesignationMultiSelect = ({ options, value, onChange }) => {
 
 const EmployeesPage = () => {
   const queryClient = useQueryClient();
+  const [searchParams, setSearchParams] = useSearchParams();
+  const idleOnly = searchParams.get('idleOnly') === 'true';
+  const statusParam = searchParams.get('status');
   const [isModalOpen, setIsModalOpen] = useState(false);
   const [editingEmployee, setEditingEmployee] = useState(null);
   const [availabilityEmployee, setAvailabilityEmployee] = useState(null);
   const [searchQuery, setSearchQuery] = useState('');
   const [skillFilter, setSkillFilter] = useState('');
   const [designationFilter, setDesignationFilter] = useState([]);
-  const [idleOnly, setIdleOnly] = useState(false);
   const [currentPage, setCurrentPage] = useState(1);
   const PAGE_SIZE = 10;
 
@@ -1005,8 +1008,13 @@ const EmployeesPage = () => {
     const matchesDesignation = designationFilter.length === 0 || designationFilter.includes(employee.designation);
     const isIdle = !employeeProjectsMap[employee.id];
     const matchesIdle = !idleOnly || isIdle;
-    return matchesSearch && matchesSkill && matchesDesignation && matchesIdle;
+    const matchesStatus = !statusParam || employee.status?.toLowerCase() === statusParam.toLowerCase();
+    return matchesSearch && matchesSkill && matchesDesignation && matchesIdle && matchesStatus;
   });
+
+  useEffect(() => {
+    setCurrentPage(1);
+  }, [searchQuery, skillFilter, designationFilter, idleOnly, statusParam]);
 
   const totalPages = Math.ceil(filteredEmployees.length / PAGE_SIZE);
   const paginatedEmployees = filteredEmployees.slice((currentPage - 1) * PAGE_SIZE, currentPage * PAGE_SIZE);
@@ -1053,7 +1061,15 @@ const EmployeesPage = () => {
           />
 
           <button
-            onClick={() => { setIdleOnly(v => !v); setCurrentPage(1); }}
+            onClick={() => {
+              const params = new URLSearchParams(searchParams);
+              if (idleOnly) {
+                params.delete('idleOnly');
+              } else {
+                params.set('idleOnly', 'true');
+              }
+              setSearchParams(params);
+            }}
             className={`px-3 py-2 rounded-lg text-sm font-medium border transition-colors ${
               idleOnly
                 ? 'bg-amber-50 border-amber-300 text-amber-700'
@@ -1087,6 +1103,54 @@ const EmployeesPage = () => {
           </button>
         </div>
       </div>
+
+      {/* Active Filters Bar */}
+      {(idleOnly || statusParam) && (
+        <div className="flex items-center gap-2 flex-wrap bg-slate-50 border border-slate-200/60 rounded-xl px-4 py-2.5">
+          <span className="text-xs font-semibold text-slate-500 uppercase tracking-wider">Active Filters:</span>
+          {idleOnly && (
+            <span className="inline-flex items-center gap-1.5 px-2.5 py-1 rounded-full text-xs font-medium bg-amber-50 text-amber-700 border border-amber-200">
+              Idle Only
+              <button 
+                onClick={() => {
+                  const params = new URLSearchParams(searchParams);
+                  params.delete('idleOnly');
+                  setSearchParams(params);
+                }} 
+                className="hover:bg-amber-100 rounded-full p-0.5"
+              >
+                <X className="w-3 h-3" />
+              </button>
+            </span>
+          )}
+          {statusParam && (
+            <span className="inline-flex items-center gap-1.5 px-2.5 py-1 rounded-full text-xs font-medium bg-indigo-50 text-indigo-700 border border-indigo-200">
+              Status: {statusParam}
+              <button 
+                onClick={() => {
+                  const params = new URLSearchParams(searchParams);
+                  params.delete('status');
+                  setSearchParams(params);
+                }} 
+                className="hover:bg-indigo-100 rounded-full p-0.5"
+              >
+                <X className="w-3 h-3" />
+              </button>
+            </span>
+          )}
+          <button
+            onClick={() => {
+              const params = new URLSearchParams(searchParams);
+              params.delete('idleOnly');
+              params.delete('status');
+              setSearchParams(params);
+            }}
+            className="text-xs font-medium text-slate-500 hover:text-slate-800 transition-colors ml-auto"
+          >
+            Clear all
+          </button>
+        </div>
+      )}
 
       {/* Modern Card Container */}
       <div className="bg-white rounded-2xl border border-slate-200/60 shadow-[0_1px_3px_rgba(0,0,0,0.04)] overflow-hidden">
