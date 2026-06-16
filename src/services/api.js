@@ -218,6 +218,7 @@ export const notificationApi = {
     getAll: (userId) => api.get('/notifications', { params: { user_id: userId } }).then(res => res.data),
     markRead: (id, userId) => api.patch(`/notifications/${id}/read`, null, { params: { user_id: userId } }).then(res => res.data),
     markAllRead: (userId) => api.patch('/notifications/read-all', null, { params: { user_id: userId } }).then(res => res.data),
+    clearRead: (userId) => api.delete('/notifications/clear-read', { params: { user_id: userId } }).then(res => res.data),
 };
 
 // === Onboarding API ===
