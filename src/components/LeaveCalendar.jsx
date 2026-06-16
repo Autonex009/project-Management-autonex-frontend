@@ -8,6 +8,8 @@ const LEAVE_COLORS = {
     paid:        { bg: 'bg-blue-100', text: 'text-blue-800', dot: 'bg-blue-500', label: 'Paid Leave' },
     casual_sick: { bg: 'bg-emerald-100', text: 'text-emerald-800', dot: 'bg-emerald-500', label: 'Casual/Sick' },
     floater:     { bg: 'bg-amber-100', text: 'text-amber-800', dot: 'bg-amber-500', label: 'Floater' },
+    first_half:  { bg: 'bg-indigo-100', text: 'text-indigo-800', dot: 'bg-indigo-500', label: 'First Half-day' },
+    second_half: { bg: 'bg-violet-100', text: 'text-violet-800', dot: 'bg-violet-500', label: 'Second Half-day' },
     default:     { bg: 'bg-slate-100', text: 'text-slate-700', dot: 'bg-slate-400', label: 'Leave' },
 };
 const WFH_COLOR = { bg: 'bg-purple-100', text: 'text-purple-800', dot: 'bg-purple-500', label: 'WFH' };
@@ -71,12 +73,13 @@ function OverflowPopover({ events }) {
                     );
                 }
                 const c = LEAVE_COLORS[ev.leave_type] || LEAVE_COLORS.default;
+                const displayName = ev.is_half_day ? `${ev.employee_name} (0.5d)` : ev.employee_name;
                 return (
                     <div key={i}
                         className={`rounded px-1.5 py-1 text-[10px] font-medium leading-tight truncate
                             ${c.bg} ${c.text} ${isPending ? PENDING_OPACITY : ''}`}
-                        title={`${c.label}: ${ev.employee_name}${isPending ? ' (pending)' : ''}`}>
-                        {ev.employee_name}
+                        title={`${c.label}: ${ev.employee_name}${isPending ? ' (pending)' : ''}${ev.is_half_day ? ` (${ev.half_day_slot === 'first_half' ? 'First Half' : 'Second Half'})` : ''}`}>
+                        {displayName}
                     </div>
                 );
             })}
@@ -238,12 +241,14 @@ export default function LeaveCalendar({ filterEmployeeIds = null }) {
                                                 );
                                             }
                                             const c = LEAVE_COLORS[ev.leave_type] || LEAVE_COLORS.default;
+                                            const name = ev.employee_name?.split(' ')[0] || '';
+                                            const displayName = ev.is_half_day ? `${name} (0.5d)` : name;
                                             return (
                                                 <div key={ei}
                                                     className={`rounded px-1 py-0.5 truncate text-[10px] font-medium leading-tight
                                                         ${c.bg} ${c.text} ${isPending ? PENDING_OPACITY : ''}`}
-                                                    title={`${c.label}: ${ev.employee_name}${isPending ? ' (pending)' : ''}`}>
-                                                    {ev.employee_name?.split(' ')[0]}
+                                                    title={`${c.label}: ${ev.employee_name}${isPending ? ' (pending)' : ''}${ev.is_half_day ? ` (${ev.half_day_slot === 'first_half' ? 'First Half' : 'Second Half'})` : ''}`}>
+                                                    {displayName}
                                                 </div>
                                             );
                                         })}

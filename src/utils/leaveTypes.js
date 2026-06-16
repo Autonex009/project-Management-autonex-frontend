@@ -2,6 +2,8 @@ export const LEAVE_TYPE_OPTIONS = [
   { value: 'paid', label: 'Paid Leave' },
   { value: 'casual_sick', label: 'Casual/Sick Leave' },
   { value: 'floater', label: 'Floater Leave' },
+  { value: 'first_half', label: 'First Half-day Leave' },
+  { value: 'second_half', label: 'Second Half-day Leave' },
 ];
 
 const LEGACY_LEAVE_TYPE_ALIASES = {
@@ -20,6 +22,8 @@ const LEAVE_TYPE_BADGES = {
   paid: 'bg-blue-50 text-blue-700',
   casual_sick: 'bg-emerald-50 text-emerald-700',
   floater: 'bg-amber-50 text-amber-700',
+  first_half: 'bg-indigo-50 text-indigo-700',
+  second_half: 'bg-violet-50 text-violet-700',
 };
 
 // Annual paid-leave entitlement (working days/year), mirrors the backend
@@ -144,7 +148,7 @@ export function findNonWorkingDayInRange(startDateStr, endDateStr) {
   return null;
 }
 
-export function getWorkingDayCount(startDateStr, endDateStr) {
+export function getWorkingDayCount(startDateStr, endDateStr, isHalfDay = false) {
   if (!startDateStr || !endDateStr) return 0;
   const start = new Date(startDateStr + 'T00:00:00');
   const end = new Date(endDateStr + 'T00:00:00');
@@ -155,7 +159,7 @@ export function getWorkingDayCount(startDateStr, endDateStr) {
     if (!isNonWorkingDay(toLocalISODate(cur))) count++;
     cur.setDate(cur.getDate() + 1);
   }
-  return count;
+  return isHalfDay ? (count > 0 ? 0.5 : 0) : count;
 }
 
 export function countNonWorkingDaysInRange(startDateStr, endDateStr) {
