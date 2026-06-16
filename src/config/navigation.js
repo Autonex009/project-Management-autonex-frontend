@@ -2,8 +2,8 @@ import { Users, FolderKanban, Calendar, LayoutDashboard, UserCog, Layers, FileTe
 
 export const navigation = [
     { name: 'Dashboard', href: '/admin/dashboard', icon: LayoutDashboard },
-    { name: 'Projects', href: '/admin/projects', icon: Layers },
-    { name: 'Sub-Projects', href: '/admin/sub-projects', icon: FolderKanban },
+    { name: 'Organizations', href: '/admin/projects', icon: Layers },
+    { name: 'Projects', href: '/admin/sub-projects', icon: FolderKanban },
     { name: 'Employees', href: '/admin/employees', icon: Users },
     { name: 'Signup Requests', href: '/admin/signup-requests', icon: UserPlus },
     { name: 'Allocations', href: '/admin/allocations', icon: UserCog },
