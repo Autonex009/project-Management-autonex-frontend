@@ -1,8 +1,18 @@
 import { useState, useMemo, useEffect, useRef } from 'react';
 import { createPortal } from 'react-dom';
-import { useQuery } from '@tanstack/react-query';
-import { ChevronLeft, ChevronRight, Calendar } from 'lucide-react';
-import { leaveApi } from '../services/api';
+import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
+import { ChevronLeft, ChevronRight, Calendar, AlertTriangle, Clock, CheckCircle, XCircle, Send } from 'lucide-react';
+import { leaveApi, wfhApi } from '../services/api';
+import toast from 'react-hot-toast';
+import { format, parseISO } from 'date-fns';
+import {
+    isValidFloaterDate,
+    getWorkingDayCount,
+    countNonWorkingDaysInRange,
+    isNonWorkingDay,
+    getNonWorkingDayLabel,
+    RAZORPAY_NEGATIVE_BALANCE_NOTE
+} from '../utils/leaveTypes';
 
 // ─── Leave colour palette ───────────────────────────────────────────────────
 const LEAVE_COLORS = {
@@ -172,6 +182,35 @@ function EventChip({ ev }) {
     );
 }
 
+// ─── Theme palette for dynamic calendar selection highlights ─────────────────
+const SELECTION_THEMES = {
+    paid: {
+        border: '#2563eb',
+        rangeBg: '#f0f7ff',
+        rangeBorder: '#bfdbfe',
+    },
+    casual_sick: {
+        border: '#10b981',
+        rangeBg: '#ecfdf5',
+        rangeBorder: '#a7f3d0',
+    },
+    floater: {
+        border: '#f59e0b',
+        rangeBg: '#fffbeb',
+        rangeBorder: '#fde68a',
+    },
+    wfh: {
+        border: '#8b5cf6',
+        rangeBg: '#faf5ff',
+        rangeBorder: '#e9d5ff',
+    },
+    default: {
+        border: '#2563eb',
+        rangeBg: '#f0f7ff',
+        rangeBorder: '#bfdbfe',
+    }
+};
+
 // ─── Main Calendar ───────────────────────────────────────────────────────────
 export default function LeaveCalendar({ filterEmployeeIds = null }) {
     const today = new Date();
@@ -179,11 +218,62 @@ export default function LeaveCalendar({ filterEmployeeIds = null }) {
     const [month, setMonth] = useState(today.getMonth() + 1);
 
     const monthStr = `${year}-${String(month).padStart(2, '0')}`;
+    const queryClient = useQueryClient();
+
+    // Fetch user details to get employee_id for leave submission
+    const user = JSON.parse(localStorage.getItem('user') || '{}');
+    const employeeId = user?.employee_id;
+    const isEmployee = !!employeeId;
+
+    // Range Selection & Form states
+    const [selectedStart, setSelectedStart] = useState(null);
+    const [selectedEnd, setSelectedEnd] = useState(null);
+    const [leaveType, setLeaveType] = useState('');
+    const [reason, setReason] = useState('');
+
+    const activeSelectionTheme = SELECTION_THEMES[leaveType] || SELECTION_THEMES.default;
+    const sidebarTheme = { bg: '#ffffff', border: '#e2e8f0', text: '#475569', title: '#1e293b', inputBorder: '#cbd5e1' };
 
     const { data, isLoading } = useQuery({
         queryKey: ['leave-calendar', monthStr],
         queryFn: () => leaveApi.getCalendar(monthStr),
         staleTime: 30_000,
+    });
+
+    const createLeaveMutation = useMutation({
+        mutationFn: (data) => leaveApi.create({ ...data, employee_id: employeeId }),
+        onSuccess: (res) => {
+            queryClient.invalidateQueries({ queryKey: ['leave-calendar', monthStr] });
+            queryClient.invalidateQueries({ queryKey: ['my-leaves', employeeId] });
+            setSelectedStart(null);
+            setSelectedEnd(null);
+            setLeaveType('');
+            setReason('');
+            if (res.flagged) {
+                toast.success('Leave request submitted — flagged for exceeding monthly limit, awaiting approval.');
+            } else {
+                toast.success('Leave request submitted successfully');
+            }
+        },
+        onError: (err) => {
+            toast.error(err?.response?.data?.detail?.[0]?.msg || err?.response?.data?.detail || 'Failed to submit leave');
+        }
+    });
+
+    const createWfhMutation = useMutation({
+        mutationFn: (data) => wfhApi.create({ ...data, employee_id: employeeId }),
+        onSuccess: () => {
+            queryClient.invalidateQueries({ queryKey: ['leave-calendar', monthStr] });
+            queryClient.invalidateQueries({ queryKey: ['my-wfh', employeeId] });
+            setSelectedStart(null);
+            setSelectedEnd(null);
+            setLeaveType('');
+            setReason('');
+            toast.success('WFH request submitted successfully');
+        },
+        onError: (err) => {
+            toast.error(err?.response?.data?.detail || 'Failed to submit WFH request');
+        }
     });
 
     const prevMonth = () => { if (month === 1) { setMonth(12); setYear(y => y - 1); } else setMonth(m => m - 1); };
@@ -226,214 +316,539 @@ export default function LeaveCalendar({ filterEmployeeIds = null }) {
 
     const monthLabel = new Date(year, month - 1).toLocaleString('default', { month: 'long', year: 'numeric' });
 
+    // Date range helper details
+    const workingDays = selectedStart && selectedEnd ? getWorkingDayCount(selectedStart, selectedEnd) : 0;
+    const nonWorkingDays = selectedStart && selectedEnd ? countNonWorkingDaysInRange(selectedStart, selectedEnd) : 0;
+
+    // Floater valid date validation
+    const isFloaterType = leaveType === 'floater';
+    const isFloaterInvalid = isFloaterType && (
+        selectedStart !== selectedEnd ||
+        !isValidFloaterDate(selectedStart)
+    );
+
+    // Form errors
+    let validationError = null;
+    if (selectedStart && selectedEnd) {
+        if (workingDays === 0) {
+            validationError = "No working days in this range — weekends and fixed holidays are automatically skipped.";
+        } else if (isFloaterType) {
+            if (selectedStart !== selectedEnd) {
+                validationError = "Floater leave must be taken as a single day.";
+            } else if (!isValidFloaterDate(selectedStart)) {
+                validationError = "Selected date is not an approved floater holiday date.";
+            }
+        }
+    }
+
+    const LEAVE_TYPES = [
+        { value: 'paid', label: 'Paid Leave', color: '#2563eb' },
+        { value: 'casual_sick', label: 'Casual/Sick Leave', color: '#10b981' },
+        { value: 'floater', label: 'Floater Leave', color: '#f59e0b' },
+        { value: 'wfh', label: 'Work From Home (WFH)', color: '#8b5cf6' },
+    ];
+
+    const selectedTypeObj = LEAVE_TYPES.find(t => t.value === leaveType);
+    const buttonBg = selectedTypeObj ? selectedTypeObj.color : '#cbd5e1';
+    const buttonText = selectedTypeObj ? '#fff' : '#94a3b8';
+    const isSubmitDisabled = !leaveType || workingDays === 0 || !!validationError || createLeaveMutation.isPending || createWfhMutation.isPending;
+    const buttonCursor = isSubmitDisabled ? 'not-allowed' : 'pointer';
+
+    const handleApplySubmit = (e) => {
+        e.preventDefault();
+        if (isSubmitDisabled) return;
+
+        if (leaveType === 'wfh') {
+            createWfhMutation.mutate({
+                wfh_date: selectedStart,
+                end_date: selectedEnd,
+                reason: reason,
+            });
+        } else {
+            createLeaveMutation.mutate({
+                leave_type: leaveType,
+                start_date: selectedStart,
+                end_date: selectedEnd,
+                reason: reason,
+            });
+        }
+    };
+
+    const handleDateClick = (dateStr) => {
+        if (!isEmployee) return; // Only allow employees to pick ranges on grid
+        if (!selectedStart) {
+            setSelectedStart(dateStr);
+            setSelectedEnd(dateStr);
+        } else if (selectedStart === selectedEnd) {
+            if (dateStr === selectedStart) {
+                // Clear selection if clicked again
+                setSelectedStart(null);
+                setSelectedEnd(null);
+            } else if (dateStr > selectedStart) {
+                setSelectedEnd(dateStr);
+            } else {
+                setSelectedStart(dateStr);
+                setSelectedEnd(dateStr);
+            }
+        } else {
+            setSelectedStart(dateStr);
+            setSelectedEnd(dateStr);
+        }
+        setLeaveType(''); // Reset selected leave type to make button grey
+    };
+
+    const formattedStart = selectedStart ? format(parseISO(selectedStart), 'MMM dd, yyyy') : '';
+    const formattedEnd = selectedEnd ? format(parseISO(selectedEnd), 'MMM dd, yyyy') : '';
+
     return (
         <div style={{
-            background: '#fff',
-            borderRadius: '16px',
-            border: '1px solid #e2e8f0',
-            boxShadow: '0 4px 24px rgba(0,0,0,0.07)',
-            overflow: 'hidden',
+            display: 'flex',
+            gap: '24px',
+            alignItems: 'stretch',
+            flexWrap: 'wrap',
             fontFamily: 'Inter, system-ui, sans-serif',
-            maxWidth: '820px',
-            margin: '0',
         }}>
-            {/* ── Header ─────────────────────────────────────────────────── */}
+            {/* ── Calendar container ── */}
             <div style={{
-                background: 'linear-gradient(135deg, #1e3a8a 0%, #2563eb 60%, #3b82f6 100%)',
-                padding: '16px 20px',
-                display: 'flex',
-                alignItems: 'center',
-                justifyContent: 'space-between',
+                flex: '1 1 600px',
+                background: '#fff',
+                borderRadius: '16px',
+                border: '1px solid #e2e8f0',
+                boxShadow: '0 4px 24px rgba(0,0,0,0.07)',
+                overflow: 'hidden',
+                maxWidth: '820px',
+                margin: '0',
             }}>
-                <button onClick={prevMonth} style={{
-                    background: 'rgba(255,255,255,0.15)', border: 'none',
-                    borderRadius: '8px', padding: '6px 8px', cursor: 'pointer',
-                    display: 'flex', alignItems: 'center', color: '#fff',
-                    transition: 'background 0.15s',
-                }}
-                    onMouseOver={e => e.currentTarget.style.background = 'rgba(255,255,255,0.25)'}
-                    onMouseOut={e  => e.currentTarget.style.background = 'rgba(255,255,255,0.15)'}
-                >
-                    <ChevronLeft size={18} />
-                </button>
+                {/* ── Header ─────────────────────────────────────────────────── */}
+                <div style={{
+                    background: 'linear-gradient(135deg, #1e3a8a 0%, #2563eb 60%, #3b82f6 100%)',
+                    padding: '16px 20px',
+                    display: 'flex',
+                    alignItems: 'center',
+                    justifyContent: 'space-between',
+                }}>
+                    <button onClick={prevMonth} style={{
+                        background: 'rgba(255,255,255,0.15)', border: 'none',
+                        borderRadius: '8px', padding: '6px 8px', cursor: 'pointer',
+                        display: 'flex', alignItems: 'center', color: '#fff',
+                        transition: 'background 0.15s',
+                    }}
+                        onMouseOver={e => e.currentTarget.style.background = 'rgba(255,255,255,0.25)'}
+                        onMouseOut={e  => e.currentTarget.style.background = 'rgba(255,255,255,0.15)'}
+                    >
+                        <ChevronLeft size={18} />
+                    </button>
 
-                <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
-                    <Calendar size={16} color="rgba(255,255,255,0.8)" />
-                    <h3 style={{ margin: 0, fontSize: '15px', fontWeight: 700, color: '#fff', letterSpacing: '0.01em' }}>
-                        {monthLabel}
-                    </h3>
+                    <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
+                        <Calendar size={16} color="rgba(255,255,255,0.8)" />
+                        <h3 style={{ margin: 0, fontSize: '15px', fontWeight: 700, color: '#fff', letterSpacing: '0.01em' }}>
+                            {monthLabel}
+                        </h3>
+                    </div>
+
+                    <button onClick={nextMonth} style={{
+                        background: 'rgba(255,255,255,0.15)', border: 'none',
+                        borderRadius: '8px', padding: '6px 8px', cursor: 'pointer',
+                        display: 'flex', alignItems: 'center', color: '#fff',
+                        transition: 'background 0.15s',
+                    }}
+                        onMouseOver={e => e.currentTarget.style.background = 'rgba(255,255,255,0.25)'}
+                        onMouseOut={e  => e.currentTarget.style.background = 'rgba(255,255,255,0.15)'}
+                    >
+                        <ChevronRight size={18} />
+                    </button>
                 </div>
 
-                <button onClick={nextMonth} style={{
-                    background: 'rgba(255,255,255,0.15)', border: 'none',
-                    borderRadius: '8px', padding: '6px 8px', cursor: 'pointer',
-                    display: 'flex', alignItems: 'center', color: '#fff',
-                    transition: 'background 0.15s',
-                }}
-                    onMouseOver={e => e.currentTarget.style.background = 'rgba(255,255,255,0.25)'}
-                    onMouseOut={e  => e.currentTarget.style.background = 'rgba(255,255,255,0.15)'}
-                >
-                    <ChevronRight size={18} />
-                </button>
-            </div>
-
-            {/* ── Legend ─────────────────────────────────────────────────── */}
-            <div style={{
-                display: 'flex', flexWrap: 'wrap', gap: '10px',
-                padding: '10px 16px',
-                background: '#f8fafc',
-                borderBottom: '1px solid #e2e8f0',
-            }}>
-                {Object.entries(LEAVE_COLORS).filter(([k]) => k !== 'default').map(([key, c]) => (
-                    <span key={key} style={{ display: 'flex', alignItems: 'center', gap: '5px', fontSize: '11px', color: '#64748b', fontWeight: 500 }}>
-                        <span style={{ width: 8, height: 8, borderRadius: '50%', background: c.dot, display: 'inline-block' }} />
-                        {c.label}
+                {/* ── Legend ─────────────────────────────────────────────────── */}
+                <div style={{
+                    display: 'flex', flexWrap: 'wrap', gap: '10px',
+                    padding: '10px 16px',
+                    background: '#f8fafc',
+                    borderBottom: '1px solid #e2e8f0',
+                }}>
+                    {Object.entries(LEAVE_COLORS).filter(([k]) => k !== 'default').map(([key, c]) => (
+                        <span key={key} style={{ display: 'flex', alignItems: 'center', gap: '5px', fontSize: '11px', color: '#64748b', fontWeight: 500 }}>
+                            <span style={{ width: 8, height: 8, borderRadius: '50%', background: c.dot, display: 'inline-block' }} />
+                            {c.label}
+                        </span>
+                    ))}
+                    <span style={{ display: 'flex', alignItems: 'center', gap: '5px', fontSize: '11px', color: '#64748b', fontWeight: 500 }}>
+                        <span style={{ width: 8, height: 8, borderRadius: '50%', background: WFH_COLOR.dot, display: 'inline-block' }} />
+                        {WFH_COLOR.label}
                     </span>
-                ))}
-                <span style={{ display: 'flex', alignItems: 'center', gap: '5px', fontSize: '11px', color: '#64748b', fontWeight: 500 }}>
-                    <span style={{ width: 8, height: 8, borderRadius: '50%', background: WFH_COLOR.dot, display: 'inline-block' }} />
-                    {WFH_COLOR.label}
-                </span>
-                <span style={{ display: 'flex', alignItems: 'center', gap: '5px', fontSize: '11px', color: '#94a3b8', fontWeight: 500 }}>
-                    <span style={{ width: 8, height: 8, borderRadius: '50%', background: '#fca5a5', display: 'inline-block' }} />
-                    Holiday (Fixed)
-                </span>
-                <span style={{ display: 'flex', alignItems: 'center', gap: '5px', fontSize: '11px', color: '#94a3b8', fontWeight: 500 }}>
-                    <span style={{ width: 8, height: 8, borderRadius: '50%', background: '#fdba74', display: 'inline-block' }} />
-                    Holiday (Floater)
-                </span>
-                <span style={{ display: 'flex', alignItems: 'center', gap: '5px', fontSize: '11px', color: '#94a3b8', fontWeight: 500 }}>
-                    <span style={{ width: 8, height: 8, borderRadius: '50%', background: '#fca5a5', display: 'inline-block', opacity: 0.5 }} />
-                    Weekend
-                </span>
-                <span style={{ display: 'flex', alignItems: 'center', gap: '5px', fontSize: '11px', color: '#94a3b8', fontWeight: 500, marginLeft: '4px' }}>
-                    <span style={{ width: 8, height: 8, borderRadius: '50%', background: '#cbd5e1', display: 'inline-block' }} />
-                    Pending (dimmed)
-                </span>
+                    <span style={{ display: 'flex', alignItems: 'center', gap: '5px', fontSize: '11px', color: '#94a3b8', fontWeight: 500 }}>
+                        <span style={{ width: 8, height: 8, borderRadius: '50%', background: '#fca5a5', display: 'inline-block' }} />
+                        Holiday (Fixed)
+                    </span>
+                    <span style={{ display: 'flex', alignItems: 'center', gap: '5px', fontSize: '11px', color: '#94a3b8', fontWeight: 500 }}>
+                        <span style={{ width: 8, height: 8, borderRadius: '50%', background: '#fdba74', display: 'inline-block' }} />
+                        Holiday (Floater)
+                    </span>
+                    <span style={{ display: 'flex', alignItems: 'center', gap: '5px', fontSize: '11px', color: '#94a3b8', fontWeight: 500 }}>
+                        <span style={{ width: 8, height: 8, borderRadius: '50%', background: '#fca5a5', display: 'inline-block', opacity: 0.5 }} />
+                        Weekend
+                    </span>
+                    <span style={{ display: 'flex', alignItems: 'center', gap: '5px', fontSize: '11px', color: '#94a3b8', fontWeight: 500, marginLeft: '4px' }}>
+                        <span style={{ width: 8, height: 8, borderRadius: '50%', background: '#cbd5e1', display: 'inline-block' }} />
+                        Pending (dimmed)
+                    </span>
+                </div>
+
+                {/* ── Grid ────────────────────────────────────────────────────── */}
+                {isLoading ? (
+                    <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'center', height: '220px', color: '#94a3b8', fontSize: '14px' }}>
+                        <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'center', gap: '10px' }}>
+                            <div style={{ width: 28, height: 28, border: '3px solid #e2e8f0', borderTopColor: '#3b82f6', borderRadius: '50%', animation: 'spin 0.7s linear infinite' }} />
+                            Loading calendar…
+                        </div>
+                    </div>
+                ) : (
+                    <div style={{ padding: '12px 10px 14px' }}>
+                        {/* Day-name header */}
+                        <div style={{ display: 'grid', gridTemplateColumns: 'repeat(7,1fr)', marginBottom: '4px' }}>
+                            {DAY_NAMES.map((d, i) => (
+                                <div key={d} style={{
+                                    textAlign: 'center',
+                                    fontSize: '11px', fontWeight: 700,
+                                    letterSpacing: '0.04em', textTransform: 'uppercase',
+                                    padding: '4px 0',
+                                    color: (i === 0 || i === 6) ? '#ef4444' : '#94a3b8',
+                                }}>{d}</div>
+                            ))}
+                        </div>
+
+                        {/* Day cells */}
+                        <div style={{ display: 'grid', gridTemplateColumns: 'repeat(7,1fr)', gap: '3px' }}>
+                            {cells.map((day, idx) => {
+                                if (!day) return <div key={`empty-${idx}`} />;
+
+                                const dateStr = `${year}-${String(month).padStart(2,'0')}-${String(day).padStart(2,'0')}`;
+                                const events  = eventsByDate[dateStr] || [];
+                                const isToday = dateStr === todayStr;
+
+                                // Day-of-week: 0=Sun, 6=Sat
+                                const dow     = new Date(year, month - 1, day).getDay();
+                                const isWeekend  = dow === 0 || dow === 6;
+                                const holiday    = HOLIDAYS[dateStr];
+                                const isFixed    = holiday?.type === 'fixed';
+                                const isFloater  = holiday?.type === 'floater';
+
+                                // Selection checks
+                                const isSelectedStart = selectedStart && dateStr === selectedStart;
+                                const isSelectedEnd   = selectedEnd && dateStr === selectedEnd;
+                                const isSelectedRange = selectedStart && selectedEnd && dateStr > selectedStart && dateStr < selectedEnd;
+                                const isSelected      = isSelectedStart || isSelectedEnd || isSelectedRange;
+
+                                // Cell background priority: selection > today > fixed holiday > floater holiday > weekend > normal
+                                let cellBg, cellBorder, numberBg, numberColor;
+
+                                if (isToday) {
+                                    cellBg = '#eff6ff'; cellBorder = '#3b82f6';
+                                    numberBg = '#3b82f6'; numberColor = '#fff';
+                                } else if (isFixed) {
+                                    cellBg = '#fef2f2'; cellBorder = '#fca5a5';
+                                    numberBg = '#ef4444'; numberColor = '#fff';
+                                } else if (isFloater) {
+                                    cellBg = '#fff7ed'; cellBorder = '#fdba74';
+                                    numberBg = '#f97316'; numberColor = '#fff';
+                                } else if (isWeekend) {
+                                    cellBg = '#fff5f5'; cellBorder = '#fecaca';
+                                    numberBg = 'transparent'; numberColor = '#ef4444';
+                                } else {
+                                    cellBg = '#fff'; cellBorder = '#e2e8f0';
+                                    numberBg = 'transparent'; numberColor = '#64748b';
+                                }
+
+                                // Selection styling overrides
+                                if (isSelectedStart || isSelectedEnd) {
+                                    cellBorder = activeSelectionTheme.border;
+                                } else if (isSelectedRange) {
+                                    cellBg = activeSelectionTheme.rangeBg;
+                                    cellBorder = activeSelectionTheme.rangeBorder;
+                                }
+
+                                return (
+                                    <div
+                                        key={dateStr}
+                                        title={holiday ? `${holiday.name} (${holiday.type})` : undefined}
+                                        onClick={() => handleDateClick(dateStr)}
+                                        style={{
+                                            minHeight: '88px',
+                                            borderRadius: '8px',
+                                            border: `1.5px solid ${cellBorder}`,
+                                            boxShadow: (isSelectedStart || isSelectedEnd)
+                                                ? `0 0 0 2.5px ${activeSelectionTheme.border}, 0 4px 12px rgba(0,0,0,0.08)`
+                                                : isSelectedRange
+                                                    ? `inset 0 0 0 1px ${activeSelectionTheme.rangeBorder}`
+                                                    : 'none',
+                                            background: cellBg,
+                                            padding: '4px 4px 4px',
+                                            display: 'flex', flexDirection: 'column', gap: '3px',
+                                            transition: 'box-shadow 0.15s, transform 0.15s, border-color 0.15s',
+                                            cursor: isEmployee ? 'pointer' : 'default',
+                                            position: 'relative',
+                                        }}
+                                        onMouseOver={e => {
+                                            e.currentTarget.style.boxShadow = (isSelectedStart || isSelectedEnd)
+                                                ? `0 0 0 2.5px ${activeSelectionTheme.border}, 0 4px 12px rgba(0,0,0,0.12)`
+                                                : '0 2px 12px rgba(0,0,0,0.09)';
+                                            e.currentTarget.style.transform = 'translateY(-1px)';
+                                        }}
+                                        onMouseOut={e => {
+                                            e.currentTarget.style.boxShadow = (isSelectedStart || isSelectedEnd)
+                                                ? `0 0 0 2.5px ${activeSelectionTheme.border}, 0 4px 12px rgba(0,0,0,0.08)`
+                                                : 'none';
+                                            e.currentTarget.style.transform = 'translateY(0)';
+                                        }}
+                                    >
+                                        {/* Date number */}
+                                        <span style={{
+                                            alignSelf: 'flex-end',
+                                            fontSize: '11px', fontWeight: 700,
+                                            background: numberBg, color: numberColor,
+                                            borderRadius: '50%',
+                                            width: '20px', height: '20px',
+                                            display: 'flex', alignItems: 'center', justifyContent: 'center',
+                                            lineHeight: 1,
+                                            flexShrink: 0,
+                                        }}>
+                                            {day}
+                                        </span>
+
+                                        {/* Holiday label (tiny) */}
+                                        {holiday && (
+                                            <span style={{
+                                                fontSize: '9px', fontWeight: 600,
+                                                color: isFixed ? '#b91c1c' : '#c2410c',
+                                                lineHeight: 1.2,
+                                                overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap',
+                                            }} title={holiday.name}>
+                                                {holiday.name}
+                                            </span>
+                                        )}
+
+                                        {/* Events */}
+                                        <div style={{ display: 'flex', flexDirection: 'column', gap: '2px', flex: 1 }}>
+                                            {events.slice(0, 2).map((ev, ei) => (
+                                                <EventChip key={ei} ev={ev} />
+                                            ))}
+                                            {events.length > 2 && (
+                                                <OverflowPopover events={events.slice(2)} />
+                                            )}
+                                        </div>
+                                    </div>
+                                );
+                            })}
+                        </div>
+                    </div>
+                )}
             </div>
 
-            {/* ── Grid ────────────────────────────────────────────────────── */}
-            {isLoading ? (
-                <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'center', height: '220px', color: '#94a3b8', fontSize: '14px' }}>
-                    <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'center', gap: '10px' }}>
-                        <div style={{ width: 28, height: 28, border: '3px solid #e2e8f0', borderTopColor: '#3b82f6', borderRadius: '50%', animation: 'spin 0.7s linear infinite' }} />
-                        Loading calendar…
-                    </div>
-                </div>
-            ) : (
-                <div style={{ padding: '12px 10px 14px' }}>
-                    {/* Day-name header */}
-                    <div style={{ display: 'grid', gridTemplateColumns: 'repeat(7,1fr)', marginBottom: '4px' }}>
-                        {DAY_NAMES.map((d, i) => (
-                            <div key={d} style={{
-                                textAlign: 'center',
-                                fontSize: '11px', fontWeight: 700,
-                                letterSpacing: '0.04em', textTransform: 'uppercase',
-                                padding: '4px 0',
-                                color: (i === 0 || i === 6) ? '#ef4444' : '#94a3b8',
-                            }}>{d}</div>
-                        ))}
-                    </div>
+            {/* ── Right side form panel (rendered inside empty space) ── */}
+            {isEmployee && (
+                <div style={{
+                    flex: '1 1 380px',
+                    minWidth: '340px',
+                    maxWidth: '460px',
+                    background: sidebarTheme.bg,
+                    borderRadius: '16px',
+                    border: `1px solid ${sidebarTheme.border}`,
+                    boxShadow: '0 4px 24px rgba(0,0,0,0.05)',
+                    padding: '24px 20px',
+                    display: 'flex',
+                    flexDirection: 'column',
+                }}>
+                    {!selectedStart ? (
+                        <div style={{
+                            display: 'flex',
+                            flexDirection: 'column',
+                            alignItems: 'center',
+                            justifyContent: 'center',
+                            height: '100%',
+                            minHeight: '280px',
+                            textAlign: 'center',
+                            padding: '20px',
+                            color: '#94a3b8',
+                        }}>
+                            <Calendar size={48} style={{ color: '#cbd5e1', marginBottom: '16px' }} />
+                            <h4 style={{ margin: '0 0 8px 0', fontSize: '15px', fontWeight: 600, color: '#475569' }}>
+                                No Date Selected
+                            </h4>
+                            <p style={{ margin: 0, fontSize: '13px', color: '#64748b', lineHeight: 1.5 }}>
+                                Click any date on the calendar to begin applying for a leave or WFH. Click a second date to select a range.
+                            </p>
+                        </div>
+                    ) : (
+                        <form onSubmit={handleApplySubmit} style={{ display: 'flex', flexDirection: 'column', height: '100%' }}>
+                            <h4 style={{
+                                margin: '0 0 16px 0',
+                                fontSize: '16px',
+                                fontWeight: 700,
+                                color: sidebarTheme.title,
+                                borderBottom: `1px solid ${sidebarTheme.border}`,
+                                paddingBottom: '12px',
+                            }}>
+                                Apply for Time Off
+                            </h4>
 
-                    {/* Day cells */}
-                    <div style={{ display: 'grid', gridTemplateColumns: 'repeat(7,1fr)', gap: '3px' }}>
-                        {cells.map((day, idx) => {
-                            if (!day) return <div key={`empty-${idx}`} />;
+                            {/* Date info card */}
+                            <div style={{
+                                background: '#fff',
+                                border: `1px dashed ${sidebarTheme.border}`,
+                                borderRadius: '10px',
+                                padding: '12px',
+                                marginBottom: '16px',
+                            }}>
+                                <p style={{ margin: '0 0 4px 0', fontSize: '11px', fontWeight: 600, textTransform: 'uppercase', letterSpacing: '0.02em', color: sidebarTheme.text, opacity: 0.8 }}>
+                                    Selected Period
+                                </p>
+                                <p style={{ margin: '0 0 6px 0', fontSize: '13px', fontWeight: 700, color: sidebarTheme.text }}>
+                                    {selectedStart === selectedEnd ? formattedStart : `${formattedStart} — ${formattedEnd}`}
+                                </p>
+                                <p style={{ margin: 0, fontSize: '12px', color: '#475569', fontWeight: 500 }}>
+                                    {workingDays} working day{workingDays !== 1 ? 's' : ''}
+                                    {nonWorkingDays > 0 && <span style={{ color: '#94a3b8' }}> ({nonWorkingDays} holiday/weekend skipped)</span>}
+                                </p>
+                            </div>
 
-                            const dateStr = `${year}-${String(month).padStart(2,'0')}-${String(day).padStart(2,'0')}`;
-                            const events  = eventsByDate[dateStr] || [];
-                            const isToday = dateStr === todayStr;
-
-                            // Day-of-week: 0=Sun, 6=Sat
-                            const dow     = new Date(year, month - 1, day).getDay();
-                            const isWeekend  = dow === 0 || dow === 6;
-                            const holiday    = HOLIDAYS[dateStr];
-                            const isFixed    = holiday?.type === 'fixed';
-                            const isFloater  = holiday?.type === 'floater';
-
-                            // Cell background priority: today > fixed holiday > floater holiday > weekend > normal
-                            let cellBg, cellBorder, numberBg, numberColor;
-
-                            if (isToday) {
-                                cellBg = '#eff6ff'; cellBorder = '#3b82f6';
-                                numberBg = '#3b82f6'; numberColor = '#fff';
-                            } else if (isFixed) {
-                                cellBg = '#fef2f2'; cellBorder = '#fca5a5';
-                                numberBg = '#ef4444'; numberColor = '#fff';
-                            } else if (isFloater) {
-                                cellBg = '#fff7ed'; cellBorder = '#fdba74';
-                                numberBg = '#f97316'; numberColor = '#fff';
-                            } else if (isWeekend) {
-                                cellBg = '#fff5f5'; cellBorder = '#fecaca';
-                                numberBg = 'transparent'; numberColor = '#ef4444';
-                            } else {
-                                cellBg = '#fff'; cellBorder = '#e2e8f0';
-                                numberBg = 'transparent'; numberColor = '#64748b';
-                            }
-
-                            return (
-                                <div
-                                    key={dateStr}
-                                    title={holiday ? `${holiday.name} (${holiday.type})` : undefined}
+                            {/* Dropdown Type Select */}
+                            <div style={{ marginBottom: '16px' }}>
+                                <label style={{ display: 'block', fontSize: '13px', fontWeight: 600, color: sidebarTheme.text, marginBottom: '6px' }}>
+                                    Leave Type
+                                </label>
+                                <select
+                                    value={leaveType}
+                                    onChange={e => setLeaveType(e.target.value)}
+                                    required
                                     style={{
-                                        minHeight: '88px',
+                                        width: '100%',
+                                        padding: '10px 12px',
+                                        border: `1px solid ${sidebarTheme.inputBorder}`,
                                         borderRadius: '8px',
-                                        border: `1.5px solid ${cellBorder}`,
-                                        background: cellBg,
-                                        padding: '4px 4px 4px',
-                                        display: 'flex', flexDirection: 'column', gap: '3px',
-                                        transition: 'box-shadow 0.15s, transform 0.15s',
-                                        cursor: events.length > 0 ? 'default' : undefined,
-                                        position: 'relative',
+                                        fontSize: '14px',
+                                        outline: 'none',
+                                        background: '#fff',
+                                        cursor: 'pointer',
+                                    }}
+                                    onFocus={e => e.target.style.borderColor = '#3b82f6'}
+                                    onBlur={e => e.target.style.borderColor = sidebarTheme.inputBorder}
+                                >
+                                    <option value="">Select leave type...</option>
+                                    {LEAVE_TYPES.map(o => (
+                                        <option key={o.value} value={o.value}>{o.label}</option>
+                                    ))}
+                                </select>
+                            </div>
+
+                            {/* Reason input */}
+                            <div style={{ marginBottom: '16px' }}>
+                                <label style={{ display: 'block', fontSize: '13px', fontWeight: 600, color: sidebarTheme.text, marginBottom: '6px' }}>
+                                    Reason (Optional)
+                                </label>
+                                <textarea
+                                    value={reason}
+                                    onChange={e => setReason(e.target.value)}
+                                    placeholder="Enter reason for this request..."
+                                    rows={3}
+                                    style={{
+                                        width: '100%',
+                                        padding: '10px 12px',
+                                        border: `1px solid ${sidebarTheme.inputBorder}`,
+                                        borderRadius: '8px',
+                                        fontSize: '14px',
+                                        outline: 'none',
+                                        resize: 'none',
+                                    }}
+                                    onFocus={e => e.target.style.borderColor = '#3b82f6'}
+                                    onBlur={e => e.target.style.borderColor = sidebarTheme.inputBorder}
+                                />
+                            </div>
+
+                            {/* Error alerts */}
+                            {validationError && (
+                                <div style={{
+                                    display: 'flex', gap: '8px', padding: '10px 12px',
+                                    background: '#fef2f2', border: '1px solid #fee2e2',
+                                    borderRadius: '8px', color: '#b91c1c', fontSize: '12px',
+                                    lineHeight: 1.4, marginBottom: '16px', fontWeight: 500,
+                                    alignItems: 'flex-start'
+                                }}>
+                                    <AlertTriangle size={16} style={{ flexShrink: 0, marginTop: '2px' }} />
+                                    <span>{validationError}</span>
+                                </div>
+                            )}
+
+                            {/* Info note */}
+                            {leaveType && leaveType !== 'wfh' && !validationError && (
+                                <div style={{
+                                    padding: '10px 12px', background: '#eff6ff',
+                                    border: '1px solid #dbeafe', borderRadius: '8px',
+                                    color: '#1e40af', fontSize: '11px', lineHeight: 1.4,
+                                    marginBottom: '16px',
+                                }}>
+                                    {RAZORPAY_NEGATIVE_BALANCE_NOTE}
+                                </div>
+                            )}
+
+                            {/* Submit buttons */}
+                            <div style={{ marginTop: 'auto', display: 'flex', gap: '8px' }}>
+                                <button
+                                    type="button"
+                                    onClick={() => {
+                                        setSelectedStart(null);
+                                        setSelectedEnd(null);
+                                        setLeaveType('');
+                                        setReason('');
+                                    }}
+                                    style={{
+                                        flex: 1,
+                                        padding: '10px',
+                                        border: `1px solid ${sidebarTheme.border}`,
+                                        borderRadius: '8px',
+                                        background: 'transparent',
+                                        color: sidebarTheme.text,
+                                        fontSize: '14px',
+                                        fontWeight: 600,
+                                        cursor: 'pointer',
+                                        transition: 'background-color 0.25s, color 0.25s, border-color 0.25s',
                                     }}
                                     onMouseOver={e => {
-                                        e.currentTarget.style.boxShadow = '0 2px 12px rgba(0,0,0,0.09)';
-                                        e.currentTarget.style.transform = 'translateY(-1px)';
+                                        e.currentTarget.style.background = '#fff';
+                                        e.currentTarget.style.boxShadow = '0 2px 8px rgba(0,0,0,0.05)';
                                     }}
                                     onMouseOut={e => {
+                                        e.currentTarget.style.background = 'transparent';
                                         e.currentTarget.style.boxShadow = 'none';
-                                        e.currentTarget.style.transform = 'translateY(0)';
                                     }}
                                 >
-                                    {/* Date number */}
-                                    <span style={{
-                                        alignSelf: 'flex-end',
-                                        fontSize: '11px', fontWeight: 700,
-                                        background: numberBg, color: numberColor,
-                                        borderRadius: '50%',
-                                        width: '20px', height: '20px',
-                                        display: 'flex', alignItems: 'center', justifyContent: 'center',
-                                        lineHeight: 1,
-                                        flexShrink: 0,
-                                    }}>
-                                        {day}
-                                    </span>
-
-                                    {/* Holiday label (tiny) */}
-                                    {holiday && (
-                                        <span style={{
-                                            fontSize: '9px', fontWeight: 600,
-                                            color: isFixed ? '#b91c1c' : '#c2410c',
-                                            lineHeight: 1.2,
-                                            overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap',
-                                        }} title={holiday.name}>
-                                            {holiday.name}
-                                        </span>
-                                    )}
-
-                                    {/* Events */}
-                                    <div style={{ display: 'flex', flexDirection: 'column', gap: '2px', flex: 1 }}>
-                                        {events.slice(0, 2).map((ev, ei) => (
-                                            <EventChip key={ei} ev={ev} />
-                                        ))}
-                                        {events.length > 2 && (
-                                            <OverflowPopover events={events.slice(2)} />
-                                        )}
-                                    </div>
-                                </div>
-                            );
-                        })}
-                    </div>
+                                    Cancel
+                                </button>
+                                <button
+                                    type="submit"
+                                    disabled={isSubmitDisabled}
+                                    style={{
+                                        flex: 2,
+                                        padding: '10px',
+                                        border: 'none',
+                                        borderRadius: '8px',
+                                        background: buttonBg,
+                                        color: buttonText,
+                                        fontSize: '14px',
+                                        fontWeight: 600,
+                                        cursor: buttonCursor,
+                                        transition: 'background-color 0.25s, color 0.25s',
+                                        display: 'flex',
+                                        alignItems: 'center',
+                                        justifyContent: 'center',
+                                        gap: '6px',
+                                    }}
+                                >
+                                    <Send size={14} />
+                                    {createLeaveMutation.isPending || createWfhMutation.isPending ? 'Applying...' : 'Apply'}
+                                </button>
+                            </div>
+                        </form>
+                    )}
                 </div>
             )}
 
