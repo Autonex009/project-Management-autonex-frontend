@@ -254,5 +254,13 @@ export const onboardingApi = {
     exportReports: () => api.get('/onboarding/reports/export', { responseType: 'blob' }).then(res => res.data),
 };
 
+// === Company Settings API ===
+export const companySettingsApi = {
+    getAll: () => api.get('/company-settings').then(res => res.data),
+    get: (key) => api.get(`/company-settings/${key}`).then(res => res.data),
+    upsert: (key, data) => api.put(`/company-settings/${key}`, data).then(res => res.data),
+    delete: (key) => api.delete(`/company-settings/${key}`).then(res => res.data),
+};
+
 export default api;
 
