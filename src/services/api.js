@@ -88,13 +88,14 @@ export const recommendationsApi = {
 export const parentProjectApi = projectApi;
 
 export const employeeApi = {
-    getAll: () => api.get('/employees').then(res => res.data),
+    getAll: (params) => api.get('/employees', { params }).then(res => res.data),
     getOne: (id) => api.get(`/employees/${id}`).then(res => res.data),
     create: (data) => api.post('/employees', data).then(res => res.data),
     update: (id, data) => api.put(`/employees/${id}`, data).then(res => res.data),
     delete: (id) => api.delete(`/employees/${id}`).then(res => res.data),
     getAvailability: (id) => api.get(`/employees/${id}/availability`).then(res => res.data),
     convertToFulltime: (id, data) => api.post(`/employees/${id}/convert-to-fulltime`, data).then(res => res.data),
+    restore: (id) => api.post(`/employees/${id}/restore`).then(res => res.data),
 };
 
 export const allocationApi = {
