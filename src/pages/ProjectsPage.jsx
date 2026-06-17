@@ -328,9 +328,9 @@ const ProjectsPage = () => {
     mutationFn: subProjectApi.delete,
     onSuccess: () => {
       queryClient.invalidateQueries(['sub-projects']);
-      toast.success('Sub-project deleted successfully');
+      toast.success('Project deleted successfully');
     },
-    onError: (err) => toast.error(err.response?.data?.detail || 'Failed to delete sub-project'),
+    onError: (err) => toast.error(err.response?.data?.detail || 'Failed to delete project'),
   });
 
   const resetModalState = () => {
@@ -429,7 +429,7 @@ const ProjectsPage = () => {
       }
     } catch (error) {
       const detail = error.response?.data?.detail;
-      let message = 'Failed to save sub-project';
+      let message = 'Failed to save project';
       if (typeof detail === 'string') {
         message = detail;
       } else if (Array.isArray(detail)) {
@@ -450,14 +450,14 @@ const ProjectsPage = () => {
     const wasEditing = Boolean(editingProject);
     const filesToUpload = guidelineFiles;
     resetModalState();
-    toast.success(wasEditing ? 'Sub-project updated successfully' : 'Sub-project created successfully');
+toast.success(wasEditing ? 'Project updated successfully' : 'Project created successfully');
 
     try {
       if (filesToUpload.length > 0) {
         await uploadGuidelinesForProject(savedProject.id, selectedMainProjectId, filesToUpload);
       }
     } catch (error) {
-      toast.error('Sub-project saved, but guideline upload failed. You can re-upload from the Guidelines page.');
+      toast.error('Project saved, but guideline upload failed. You can re-upload from the Guidelines page.');
     }
 
     await Promise.all([
@@ -603,7 +603,7 @@ const ProjectsPage = () => {
       <div className="flex items-center justify-between">
         <div>
           <h1 className="text-2xl font-bold text-slate-900">
-            {currentMainProject ? `Sub-Projects for ${currentMainProject.name}` : 'All Sub-Projects'}
+            {currentMainProject ? `Projects for ${currentMainProject.name}` : 'All Projects'}
           </h1>
           <p className="text-slate-500 text-sm mt-1">
             {currentMainProject
@@ -616,7 +616,7 @@ const ProjectsPage = () => {
             <Search className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-slate-400 pointer-events-none" />
             <input
               type="text"
-              placeholder="Search sub-projects..."
+              placeholder="Search projects..."
               value={subProjectSearch}
               onChange={e => setSubProjectSearch(e.target.value)}
               className="pl-9 pr-4 py-2 text-sm bg-white border border-slate-200 rounded-xl focus:outline-none focus:ring-2 focus:ring-indigo-100 focus:border-indigo-300 w-52 placeholder:text-slate-400"
@@ -627,7 +627,7 @@ const ProjectsPage = () => {
             className="inline-flex items-center gap-2 px-4 py-2.5 bg-white border border-slate-200 text-slate-700 font-medium text-sm rounded-xl shadow-sm hover:bg-slate-50 transition-colors"
           >
             <Settings className="w-4 h-4" />
-            Projects
+            Organizations
           </Link>
           <button
             onClick={() => {
@@ -639,7 +639,7 @@ const ProjectsPage = () => {
             className="inline-flex items-center gap-2 px-4 py-2.5 bg-indigo-600 hover:bg-indigo-700 text-white font-medium text-sm rounded-xl shadow-sm transition-colors"
           >
             <Plus className="w-4 h-4" />
-            Add Sub-Project
+            Add Project
           </button>
         </div>
       </div>
@@ -649,8 +649,8 @@ const ProjectsPage = () => {
           <table className="w-full text-sm">
             <thead className="bg-slate-50/80 border-b border-slate-100">
               <tr>
-                <th className="px-5 py-4 text-left text-xs font-bold text-slate-800 uppercase tracking-wider">Parent</th>
-                <th className="px-5 py-4 text-left text-xs font-bold text-slate-800 uppercase tracking-wider">Sub-Project</th>
+                <th className="px-5 py-4 text-left text-xs font-bold text-slate-800 uppercase tracking-wider">Organization</th>
+                <th className="px-5 py-4 text-left text-xs font-bold text-slate-800 uppercase tracking-wider">Project</th>
                 <th className="px-5 py-4 text-left text-xs font-bold text-slate-800 uppercase tracking-wider">Project Manager</th>
                 <th className="px-5 py-4 text-left text-xs font-bold text-slate-800 uppercase tracking-wider">Skills</th>
                 <th className="px-5 py-4 text-center text-xs font-bold text-slate-800 uppercase tracking-wider">Required</th>
@@ -668,9 +668,9 @@ const ProjectsPage = () => {
                 <tr>
                   <td colSpan="15" className="text-center py-16 text-slate-400">
                     <div className="text-lg font-medium">
-                      {filterMainProjectId ? 'No sub-projects for this project' : 'No sub-projects yet'}
+                      {filterMainProjectId ? 'No projects under this organization' : 'No projects yet'}
                     </div>
-                    <p className="text-sm mt-1">Create your first sub-project to get started</p>
+                    <p className="text-sm mt-1">Create your first project to get started</p>
                   </td>
                 </tr>
               ) : (
@@ -907,7 +907,7 @@ const ProjectsPage = () => {
             <div className="px-6 py-4 border-b border-gray-200 flex-shrink-0">
               <div className="flex justify-between items-center">
                 <h2 className="text-xl font-semibold text-gray-900">
-                  {editingProject ? 'Edit Sub-Project' : copyingProject ? 'Copy Sub-Project' : 'Create New Sub-Project'}
+                  {editingProject ? 'Edit Project' : copyingProject ? 'Copy Project' : 'Create New Project'}
                 </h2>
                 <button
                   onClick={resetModalState}
@@ -923,7 +923,7 @@ const ProjectsPage = () => {
                 <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
                   <div>
                     <label className="block text-sm font-medium text-gray-700 mb-1">
-                      Sub-Project Name <span className="text-red-500">*</span>
+                      Project Name <span className="text-red-500">*</span>
                     </label>
                     <input
                       type="text"
@@ -931,12 +931,12 @@ const ProjectsPage = () => {
                       required
                       defaultValue={(editingProject || copyingProject)?.name}
                       className="input"
-                      placeholder="Enter sub-project name"
+                      placeholder="Enter project name"
                     />
                   </div>
                   <div>
                     <label className="block text-sm font-medium text-gray-700 mb-1">
-                      Parent Project <span className="text-red-500">*</span>
+                      Organization <span className="text-red-500">*</span>
                     </label>
                     {filterMainProjectId && !editingProject && !copyingProject && (
                       <input type="hidden" name="main_project_id" value={filterMainProjectId} />
