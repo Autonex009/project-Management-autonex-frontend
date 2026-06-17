@@ -125,18 +125,18 @@ function OverflowPopover({ events }) {
                         fontSize: '11px', fontWeight: 600,
                     }}>🏠 {ev.employee_name}</div>
                 );
+                
                 const c = LEAVE_COLORS[ev.leave_type] || LEAVE_COLORS.default;
                 const displayName = ev.is_half_day ? `${ev.employee_name} (0.5d)` : ev.employee_name;
+                
                 return (
-                    <div key={i} style={{
-                        background: c.bg, color: c.text,
-                        opacity: isPending ? PENDING_OPACITY : 1,
-                        borderRadius: '6px', padding: '3px 8px',
-                        fontSize: '11px', fontWeight: 600,
-                    }}>{ev.employee_name}</div>
                     <div key={i}
-                        className={`rounded px-1.5 py-1 text-[10px] font-medium leading-tight truncate
-                            ${c.bg} ${c.text} ${isPending ? PENDING_OPACITY : ''}`}
+                        className={`rounded px-1.5 py-1 text-[10px] font-medium leading-tight truncate`}
+                        style={{
+                            background: c.bg, 
+                            color: c.text,
+                            opacity: isPending ? PENDING_OPACITY : 1
+                        }}
                         title={`${c.label}: ${ev.employee_name}${isPending ? ' (pending)' : ''}${ev.is_half_day ? ` (${ev.half_day_slot === 'first_half' ? 'First Half' : 'Second Half'})` : ''}`}>
                         {displayName}
                     </div>
@@ -197,31 +197,11 @@ function EventChip({ ev }) {
 
 // ─── Theme palette for dynamic calendar selection highlights ─────────────────
 const SELECTION_THEMES = {
-    paid: {
-        border: '#2563eb',
-        rangeBg: '#f0f7ff',
-        rangeBorder: '#bfdbfe',
-    },
-    casual_sick: {
-        border: '#10b981',
-        rangeBg: '#ecfdf5',
-        rangeBorder: '#a7f3d0',
-    },
-    floater: {
-        border: '#f59e0b',
-        rangeBg: '#fffbeb',
-        rangeBorder: '#fde68a',
-    },
-    wfh: {
-        border: '#8b5cf6',
-        rangeBg: '#faf5ff',
-        rangeBorder: '#e9d5ff',
-    },
-    default: {
-        border: '#2563eb',
-        rangeBg: '#f0f7ff',
-        rangeBorder: '#bfdbfe',
-    }
+    paid: { border: '#2563eb', rangeBg: '#f0f7ff', rangeBorder: '#bfdbfe' },
+    casual_sick: { border: '#10b981', rangeBg: '#ecfdf5', rangeBorder: '#a7f3d0' },
+    floater: { border: '#f59e0b', rangeBg: '#fffbeb', rangeBorder: '#fde68a' },
+    wfh: { border: '#8b5cf6', rangeBg: '#faf5ff', rangeBorder: '#e9d5ff' },
+    default: { border: '#2563eb', rangeBg: '#f0f7ff', rangeBorder: '#bfdbfe' }
 };
 
 // ─── Main Calendar ───────────────────────────────────────────────────────────
@@ -550,7 +530,6 @@ export default function LeaveCalendar({ filterEmployeeIds = null }) {
                                 const isSelectedStart = selectedStart && dateStr === selectedStart;
                                 const isSelectedEnd   = selectedEnd && dateStr === selectedEnd;
                                 const isSelectedRange = selectedStart && selectedEnd && dateStr > selectedStart && dateStr < selectedEnd;
-                                const isSelected      = isSelectedStart || isSelectedEnd || isSelectedRange;
 
                                 // Cell background priority: selection > today > fixed holiday > floater holiday > weekend > normal
                                 let cellBg, cellBorder, numberBg, numberColor;
@@ -638,55 +617,10 @@ export default function LeaveCalendar({ filterEmployeeIds = null }) {
                                             }} title={holiday.name}>
                                                 {holiday.name}
                                             </span>
-                    {/* Day cells */}
-                    <div className="grid grid-cols-7 gap-0.5 sm:gap-1">
-                        {cells.map((day, idx) => {
-                            if (!day) return <div key={`empty-${idx}`} />;
-                            const dateStr = `${year}-${String(month).padStart(2,'0')}-${String(day).padStart(2,'0')}`;
-                            const events = eventsByDate[dateStr] || [];
-                            const isToday = dateStr === todayStr;
-
-                            return (
-                                <div
-                                    key={dateStr}
-                                    className={`min-h-[56px] sm:min-h-[80px] rounded-lg sm:rounded-xl border p-1 sm:p-1.5 flex flex-col gap-1 transition-colors
-                                        ${isToday ? 'border-blue-400 bg-blue-50' : 'border-slate-100 bg-white hover:bg-slate-50'}`}
-                                >
-                                    <span className={`text-xs font-semibold self-end px-1 rounded-full
-                                        ${isToday ? 'bg-blue-500 text-white' : 'text-slate-500'}`}>
-                                        {day}
-                                    </span>
-                                    <div className="flex flex-col gap-0.5">
-                                        {events.slice(0, 3).map((ev, ei) => {
-                                            const isPending = ev.status === 'pending';
-                                            if (ev.kind === 'wfh') {
-                                                return (
-                                                    <div key={ei}
-                                                        className={`rounded px-1 py-0.5 truncate text-[10px] font-medium leading-tight
-                                                            ${WFH_COLOR.bg} ${WFH_COLOR.text} ${isPending ? PENDING_OPACITY : ''}`}
-                                                        title={`WFH: ${ev.employee_name}${isPending ? ' (pending)' : ''}`}>
-                                                        🏠 {ev.employee_name?.split(' ')[0]}
-                                                    </div>
-                                                );
-                                            }
-                                            const c = LEAVE_COLORS[ev.leave_type] || LEAVE_COLORS.default;
-                                            const name = ev.employee_name?.split(' ')[0] || '';
-                                            const displayName = ev.is_half_day ? `${name} (0.5d)` : name;
-                                            return (
-                                                <div key={ei}
-                                                    className={`rounded px-1 py-0.5 truncate text-[10px] font-medium leading-tight
-                                                        ${c.bg} ${c.text} ${isPending ? PENDING_OPACITY : ''}`}
-                                                    title={`${c.label}: ${ev.employee_name}${isPending ? ' (pending)' : ''}${ev.is_half_day ? ` (${ev.half_day_slot === 'first_half' ? 'First Half' : 'Second Half'})` : ''}`}>
-                                                    {displayName}
-                                                </div>
-                                            );
-                                        })}
-                                        {events.length > 3 && (
-                                            <OverflowPopover events={events.slice(3)} />
                                         )}
 
                                         {/* Events */}
-                                        <div style={{ display: 'flex', flexDirection: 'column', gap: '2px', flex: 1 }}>
+                                        <div style={{ display: 'flex', flexDirection: 'column', gap: '2px', flex: 1, marginTop: '4px' }}>
                                             {events.slice(0, 2).map((ev, ei) => (
                                                 <EventChip key={ei} ev={ev} />
                                             ))}
@@ -702,7 +636,7 @@ export default function LeaveCalendar({ filterEmployeeIds = null }) {
                 )}
             </div>
 
-            {/* ── Right side form panel (rendered inside empty space) ── */}
+            {/* ── Right side form panel ── */}
             {isEmployee && (
                 <div style={{
                     flex: '1 1 380px',
