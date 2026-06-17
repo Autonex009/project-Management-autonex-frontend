@@ -37,8 +37,8 @@ const EmployeeLayout = () => {
     const navItems = isPm
         ? [
             { to: `${prefix}/dashboard`, label: 'Dashboard', icon: LayoutDashboard },
-            { to: `${prefix}/projects`, label: 'Projects', icon: Layers },
-            { to: `${prefix}/sub-projects`, label: 'Sub-Projects', icon: FolderKanban },
+            { to: `${prefix}/projects`, label: 'Organizations', icon: Layers },
+            { to: `${prefix}/sub-projects`, label: 'Projects', icon: FolderKanban },
             { to: `${prefix}/allocations`, label: 'Allocations', icon: UserCog },
             { to: `${prefix}/my-team`, label: 'My Team', icon: Users },
             { to: `${prefix}/performance`, label: 'Performance', icon: TrendingUp },

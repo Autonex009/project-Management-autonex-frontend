@@ -57,6 +57,12 @@ const HOLIDAYS = {
     '2026-11-11': { name: 'Bhai Duj',               type: 'floater' },
     '2026-11-24': { name: 'Guru Nanak Jayanti',     type: 'floater' },
     '2026-12-23': { name: 'Hazarat Ali\'s Birthday', type: 'floater' },
+    paid:        { bg: 'bg-blue-100', text: 'text-blue-800', dot: 'bg-blue-500', label: 'Paid Leave' },
+    casual_sick: { bg: 'bg-emerald-100', text: 'text-emerald-800', dot: 'bg-emerald-500', label: 'Casual/Sick' },
+    floater:     { bg: 'bg-amber-100', text: 'text-amber-800', dot: 'bg-amber-500', label: 'Floater' },
+    first_half:  { bg: 'bg-indigo-100', text: 'text-indigo-800', dot: 'bg-indigo-500', label: 'First Half-day' },
+    second_half: { bg: 'bg-violet-100', text: 'text-violet-800', dot: 'bg-violet-500', label: 'Second Half-day' },
+    default:     { bg: 'bg-slate-100', text: 'text-slate-700', dot: 'bg-slate-400', label: 'Leave' },
 };
 
 const DAY_NAMES = ['Sun', 'Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat'];
@@ -120,6 +126,7 @@ function OverflowPopover({ events }) {
                     }}>🏠 {ev.employee_name}</div>
                 );
                 const c = LEAVE_COLORS[ev.leave_type] || LEAVE_COLORS.default;
+                const displayName = ev.is_half_day ? `${ev.employee_name} (0.5d)` : ev.employee_name;
                 return (
                     <div key={i} style={{
                         background: c.bg, color: c.text,
@@ -127,6 +134,12 @@ function OverflowPopover({ events }) {
                         borderRadius: '6px', padding: '3px 8px',
                         fontSize: '11px', fontWeight: 600,
                     }}>{ev.employee_name}</div>
+                    <div key={i}
+                        className={`rounded px-1.5 py-1 text-[10px] font-medium leading-tight truncate
+                            ${c.bg} ${c.text} ${isPending ? PENDING_OPACITY : ''}`}
+                        title={`${c.label}: ${ev.employee_name}${isPending ? ' (pending)' : ''}${ev.is_half_day ? ` (${ev.half_day_slot === 'first_half' ? 'First Half' : 'Second Half'})` : ''}`}>
+                        {displayName}
+                    </div>
                 );
             })}
         </div>,
@@ -625,6 +638,51 @@ export default function LeaveCalendar({ filterEmployeeIds = null }) {
                                             }} title={holiday.name}>
                                                 {holiday.name}
                                             </span>
+                    {/* Day cells */}
+                    <div className="grid grid-cols-7 gap-0.5 sm:gap-1">
+                        {cells.map((day, idx) => {
+                            if (!day) return <div key={`empty-${idx}`} />;
+                            const dateStr = `${year}-${String(month).padStart(2,'0')}-${String(day).padStart(2,'0')}`;
+                            const events = eventsByDate[dateStr] || [];
+                            const isToday = dateStr === todayStr;
+
+                            return (
+                                <div
+                                    key={dateStr}
+                                    className={`min-h-[56px] sm:min-h-[80px] rounded-lg sm:rounded-xl border p-1 sm:p-1.5 flex flex-col gap-1 transition-colors
+                                        ${isToday ? 'border-blue-400 bg-blue-50' : 'border-slate-100 bg-white hover:bg-slate-50'}`}
+                                >
+                                    <span className={`text-xs font-semibold self-end px-1 rounded-full
+                                        ${isToday ? 'bg-blue-500 text-white' : 'text-slate-500'}`}>
+                                        {day}
+                                    </span>
+                                    <div className="flex flex-col gap-0.5">
+                                        {events.slice(0, 3).map((ev, ei) => {
+                                            const isPending = ev.status === 'pending';
+                                            if (ev.kind === 'wfh') {
+                                                return (
+                                                    <div key={ei}
+                                                        className={`rounded px-1 py-0.5 truncate text-[10px] font-medium leading-tight
+                                                            ${WFH_COLOR.bg} ${WFH_COLOR.text} ${isPending ? PENDING_OPACITY : ''}`}
+                                                        title={`WFH: ${ev.employee_name}${isPending ? ' (pending)' : ''}`}>
+                                                        🏠 {ev.employee_name?.split(' ')[0]}
+                                                    </div>
+                                                );
+                                            }
+                                            const c = LEAVE_COLORS[ev.leave_type] || LEAVE_COLORS.default;
+                                            const name = ev.employee_name?.split(' ')[0] || '';
+                                            const displayName = ev.is_half_day ? `${name} (0.5d)` : name;
+                                            return (
+                                                <div key={ei}
+                                                    className={`rounded px-1 py-0.5 truncate text-[10px] font-medium leading-tight
+                                                        ${c.bg} ${c.text} ${isPending ? PENDING_OPACITY : ''}`}
+                                                    title={`${c.label}: ${ev.employee_name}${isPending ? ' (pending)' : ''}${ev.is_half_day ? ` (${ev.half_day_slot === 'first_half' ? 'First Half' : 'Second Half'})` : ''}`}>
+                                                    {displayName}
+                                                </div>
+                                            );
+                                        })}
+                                        {events.length > 3 && (
+                                            <OverflowPopover events={events.slice(3)} />
                                         )}
 
                                         {/* Events */}

@@ -328,9 +328,9 @@ const ProjectsPage = () => {
     mutationFn: subProjectApi.delete,
     onSuccess: () => {
       queryClient.invalidateQueries(['sub-projects']);
-      toast.success('Sub-project deleted successfully');
+      toast.success('Project deleted successfully');
     },
-    onError: (err) => toast.error(err.response?.data?.detail || 'Failed to delete sub-project'),
+    onError: (err) => toast.error(err.response?.data?.detail || 'Failed to delete project'),
   });
 
   const resetModalState = () => {
@@ -429,7 +429,7 @@ const ProjectsPage = () => {
       }
     } catch (error) {
       const detail = error.response?.data?.detail;
-      let message = 'Failed to save sub-project';
+      let message = 'Failed to save project';
       if (typeof detail === 'string') {
         message = detail;
       } else if (Array.isArray(detail)) {
@@ -450,14 +450,14 @@ const ProjectsPage = () => {
     const wasEditing = Boolean(editingProject);
     const filesToUpload = guidelineFiles;
     resetModalState();
-    toast.success(wasEditing ? 'Sub-project updated successfully' : 'Sub-project created successfully');
+toast.success(wasEditing ? 'Project updated successfully' : 'Project created successfully');
 
     try {
       if (filesToUpload.length > 0) {
         await uploadGuidelinesForProject(savedProject.id, selectedMainProjectId, filesToUpload);
       }
     } catch (error) {
-      toast.error('Sub-project saved, but guideline upload failed. You can re-upload from the Guidelines page.');
+      toast.error('Project saved, but guideline upload failed. You can re-upload from the Guidelines page.');
     }
 
     await Promise.all([
@@ -567,8 +567,10 @@ const ProjectsPage = () => {
     return { label, dailyHours: avgDailyHoursPerEmployee, workingDays, effectiveDays: totalEffectiveEmployeeDays };
   };
 
-  const [searchParams] = useSearchParams();
+  const [searchParams, setSearchParams] = useSearchParams();
   const filterMainProjectId = searchParams.get('project');
+  const statusParam = searchParams.get('status');
+  const recommendationParam = searchParams.get('recommendation');
   const [subProjectSearch, setSubProjectSearch] = useState('');
   const [currentPage, setCurrentPage] = useState(1);
   const PAGE_SIZE = 10;
@@ -577,13 +579,20 @@ const ProjectsPage = () => {
     ? visibleProjects.filter(p => p.main_project_id === parseInt(filterMainProjectId))
     : visibleProjects
   )
-    .filter(p => p.name.toLowerCase().includes(subProjectSearch.toLowerCase()))
+    .filter(p => {
+      if (statusParam && p.project_status !== statusParam) return false;
+      if (recommendationParam) {
+        const recResult = getSystemRecommendation(p);
+        if (recResult.label.toLowerCase() !== recommendationParam.toLowerCase()) return false;
+      }
+      return p.name.toLowerCase().includes(subProjectSearch.toLowerCase());
+    })
     .sort((a, b) => a.name.localeCompare(b.name));
 
   // Reset to page 1 when filters change
   useEffect(() => {
     setCurrentPage(1);
-  }, [subProjectSearch, filterMainProjectId]);
+  }, [subProjectSearch, filterMainProjectId, statusParam, recommendationParam]);
 
   const totalPages = Math.ceil(filteredProjects.length / PAGE_SIZE);
   const paginatedProjects = filteredProjects.slice((currentPage - 1) * PAGE_SIZE, currentPage * PAGE_SIZE);
@@ -603,7 +612,7 @@ const ProjectsPage = () => {
       <div className="flex items-center justify-between">
         <div>
           <h1 className="text-2xl font-bold text-slate-900">
-            {currentMainProject ? `Sub-Projects for ${currentMainProject.name}` : 'All Sub-Projects'}
+            {currentMainProject ? `Projects for ${currentMainProject.name}` : 'All Projects'}
           </h1>
           <p className="text-slate-500 text-sm mt-1">
             {currentMainProject
@@ -616,7 +625,7 @@ const ProjectsPage = () => {
             <Search className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-slate-400 pointer-events-none" />
             <input
               type="text"
-              placeholder="Search sub-projects..."
+              placeholder="Search projects..."
               value={subProjectSearch}
               onChange={e => setSubProjectSearch(e.target.value)}
               className="pl-9 pr-4 py-2 text-sm bg-white border border-slate-200 rounded-xl focus:outline-none focus:ring-2 focus:ring-indigo-100 focus:border-indigo-300 w-52 placeholder:text-slate-400"
@@ -627,7 +636,7 @@ const ProjectsPage = () => {
             className="inline-flex items-center gap-2 px-4 py-2.5 bg-white border border-slate-200 text-slate-700 font-medium text-sm rounded-xl shadow-sm hover:bg-slate-50 transition-colors"
           >
             <Settings className="w-4 h-4" />
-            Projects
+            Organizations
           </Link>
           <button
             onClick={() => {
@@ -639,18 +648,66 @@ const ProjectsPage = () => {
             className="inline-flex items-center gap-2 px-4 py-2.5 bg-indigo-600 hover:bg-indigo-700 text-white font-medium text-sm rounded-xl shadow-sm transition-colors"
           >
             <Plus className="w-4 h-4" />
-            Add Sub-Project
+            Add Project
           </button>
         </div>
       </div>
+
+      {/* Active Filters Bar */}
+      {(statusParam || recommendationParam) && (
+        <div className="flex items-center gap-2 flex-wrap bg-slate-50 border border-slate-200/60 rounded-xl px-4 py-2.5">
+          <span className="text-xs font-semibold text-slate-500 uppercase tracking-wider">Active Filters:</span>
+          {statusParam && (
+            <span className="inline-flex items-center gap-1.5 px-2.5 py-1 rounded-full text-xs font-medium bg-indigo-50 text-indigo-700 border border-indigo-200">
+              Status: {statusParam}
+              <button 
+                onClick={() => {
+                  const params = new URLSearchParams(searchParams);
+                  params.delete('status');
+                  setSearchParams(params);
+                }} 
+                className="hover:bg-indigo-100 rounded-full p-0.5"
+              >
+                <X className="w-3 h-3" />
+              </button>
+            </span>
+          )}
+          {recommendationParam && (
+            <span className="inline-flex items-center gap-1.5 px-2.5 py-1 rounded-full text-xs font-medium bg-red-50 text-red-700 border border-red-200">
+              Recommendation: {recommendationParam}
+              <button 
+                onClick={() => {
+                  const params = new URLSearchParams(searchParams);
+                  params.delete('recommendation');
+                  setSearchParams(params);
+                }} 
+                className="hover:bg-red-100 rounded-full p-0.5"
+              >
+                <X className="w-3 h-3" />
+              </button>
+            </span>
+          )}
+          <button
+            onClick={() => {
+              const params = new URLSearchParams(searchParams);
+              params.delete('status');
+              params.delete('recommendation');
+              setSearchParams(params);
+            }}
+            className="text-xs font-medium text-slate-500 hover:text-slate-800 transition-colors ml-auto"
+          >
+            Clear all
+          </button>
+        </div>
+      )}
 
       <div className="bg-white rounded-2xl border border-slate-200/60 shadow-[0_1px_3px_rgba(0,0,0,0.04)] overflow-hidden">
         <div className="overflow-x-auto">
           <table className="w-full text-sm">
             <thead className="bg-slate-50/80 border-b border-slate-100">
               <tr>
-                <th className="px-5 py-4 text-left text-xs font-bold text-slate-800 uppercase tracking-wider">Parent</th>
-                <th className="px-5 py-4 text-left text-xs font-bold text-slate-800 uppercase tracking-wider">Sub-Project</th>
+                <th className="px-5 py-4 text-left text-xs font-bold text-slate-800 uppercase tracking-wider">Organization</th>
+                <th className="px-5 py-4 text-left text-xs font-bold text-slate-800 uppercase tracking-wider">Project</th>
                 <th className="px-5 py-4 text-left text-xs font-bold text-slate-800 uppercase tracking-wider">Project Manager</th>
                 <th className="px-5 py-4 text-left text-xs font-bold text-slate-800 uppercase tracking-wider">Skills</th>
                 <th className="px-5 py-4 text-center text-xs font-bold text-slate-800 uppercase tracking-wider">Required</th>
@@ -668,9 +725,9 @@ const ProjectsPage = () => {
                 <tr>
                   <td colSpan="15" className="text-center py-16 text-slate-400">
                     <div className="text-lg font-medium">
-                      {filterMainProjectId ? 'No sub-projects for this project' : 'No sub-projects yet'}
+                      {filterMainProjectId ? 'No projects under this organization' : 'No projects yet'}
                     </div>
-                    <p className="text-sm mt-1">Create your first sub-project to get started</p>
+                    <p className="text-sm mt-1">Create your first project to get started</p>
                   </td>
                 </tr>
               ) : (
@@ -907,7 +964,7 @@ const ProjectsPage = () => {
             <div className="px-6 py-4 border-b border-gray-200 flex-shrink-0">
               <div className="flex justify-between items-center">
                 <h2 className="text-xl font-semibold text-gray-900">
-                  {editingProject ? 'Edit Sub-Project' : copyingProject ? 'Copy Sub-Project' : 'Create New Sub-Project'}
+                  {editingProject ? 'Edit Project' : copyingProject ? 'Copy Project' : 'Create New Project'}
                 </h2>
                 <button
                   onClick={resetModalState}
@@ -923,7 +980,7 @@ const ProjectsPage = () => {
                 <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
                   <div>
                     <label className="block text-sm font-medium text-gray-700 mb-1">
-                      Sub-Project Name <span className="text-red-500">*</span>
+                      Project Name <span className="text-red-500">*</span>
                     </label>
                     <input
                       type="text"
@@ -931,12 +988,12 @@ const ProjectsPage = () => {
                       required
                       defaultValue={(editingProject || copyingProject)?.name}
                       className="input"
-                      placeholder="Enter sub-project name"
+                      placeholder="Enter project name"
                     />
                   </div>
                   <div>
                     <label className="block text-sm font-medium text-gray-700 mb-1">
-                      Parent Project <span className="text-red-500">*</span>
+                      Organization <span className="text-red-500">*</span>
                     </label>
                     {filterMainProjectId && !editingProject && !copyingProject && (
                       <input type="hidden" name="main_project_id" value={filterMainProjectId} />

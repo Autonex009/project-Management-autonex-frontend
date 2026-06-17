@@ -10,12 +10,53 @@ import LeaveCalendar from '../components/LeaveCalendar';
 
 const TABS = ['Leave List', 'Calendar', 'WFH Requests'];
 
+const getISTDateTime = () => {
+    const d = new Date();
+    const options = { timeZone: 'Asia/Kolkata', year: 'numeric', month: '2-digit', day: '2-digit', hour: '2-digit', minute: '2-digit', second: '2-digit', hour12: false };
+    const formatter = new Intl.DateTimeFormat('en-US', options);
+    const parts = formatter.formatToParts(d);
+    const partMap = Object.fromEntries(parts.map(p => [p.type, p.value]));
+    
+    const yr = parseInt(partMap.year);
+    const mo = parseInt(partMap.month) - 1;
+    const dy = parseInt(partMap.day);
+    const hr = parseInt(partMap.hour);
+    const min = parseInt(partMap.minute);
+    
+    return {
+        dateStr: `${partMap.year}-${partMap.month}-${partMap.day}`,
+        hour: hr,
+        minute: min
+    };
+};
+
+const checkHalfDayTiming = (startDateStr, slot) => {
+    const ist = getISTDateTime();
+    const todayStr = ist.dateStr;
+    
+    if (slot === 'first_half') {
+        if (todayStr >= startDateStr) {
+            return 'First-half leaves must be applied at least one day in advance.';
+        }
+    } else if (slot === 'second_half') {
+        if (todayStr > startDateStr) {
+            return 'Cannot apply for a second-half leave after the request date has passed.';
+        } else if (todayStr === startDateStr) {
+            if (ist.hour >= 14) {
+                return 'Second-half leaves must be applied before 2:00 PM on the same day.';
+            }
+        }
+    }
+    return null;
+};
+
 const LeavesPage = () => {
   const queryClient = useQueryClient();
   const [activeTab, setActiveTab] = useState('Leave List');
   const [currentPage, setCurrentPage] = useState(1);
   const PAGE_SIZE = 10;
   const [isModalOpen, setIsModalOpen] = useState(false);
+  const [selectedLeaveType, setSelectedLeaveType] = useState('');
   const [remarkModal, setRemarkModal] = useState(null); // { leaveId }
   const [remark, setRemark] = useState('');
   const user = JSON.parse(localStorage.getItem('user') || '{}');
@@ -58,6 +99,7 @@ const LeavesPage = () => {
     onSuccess: () => {
       queryClient.invalidateQueries(['leaves']);
       setIsModalOpen(false);
+      setSelectedLeaveType('');
       toast.success('Leave record created successfully');
     },
     onError: (err) => toast.error(err.response?.data?.detail || err.message || 'Failed to create leave'),
@@ -100,11 +142,32 @@ const LeavesPage = () => {
     const formData = new FormData(e.target);
     const employeeId = formData.get('employee_id');
     const startDate = formData.get('start_date');
-    const endDate = formData.get('end_date');
     const leaveType = formData.get('leave_type');
+    const isHalf = leaveType === 'first_half' || leaveType === 'second_half';
+    const endDate = isHalf ? startDate : formData.get('end_date');
     if (!employeeId) { toast.error('Please select an employee'); return; }
-    if (isEndDateBeforeStartDate(startDate, endDate)) { toast.error(getEndDateValidationMessage()); return; }
-    createMutation.mutate({ employee_id: parseInt(employeeId), start_date: startDate, end_date: endDate, leave_type: leaveType });
+    
+    if (isHalf) {
+      const timingErr = checkHalfDayTiming(startDate, leaveType);
+      if (timingErr) {
+        toast.error(timingErr);
+        return;
+      }
+    } else {
+      if (isEndDateBeforeStartDate(startDate, endDate)) {
+        toast.error(getEndDateValidationMessage());
+        return;
+      }
+    }
+
+    createMutation.mutate({
+      employee_id: parseInt(employeeId),
+      start_date: startDate,
+      end_date: endDate,
+      leave_type: leaveType,
+      is_half_day: isHalf,
+      half_day_slot: isHalf ? leaveType : null,
+    });
   };
 
   const getEmployeeName = (id) => employees.find(e => e.id === id)?.name || `Employee #${id}`;
@@ -178,7 +241,7 @@ const LeavesPage = () => {
                     const end = new Date(leave.end_date + 'T00:00:00');
                     // Working days only (excl. weekends & fixed holidays) — matches the
                     // employee form and payroll deduction logic.
-                    const duration = getWorkingDayCount(leave.start_date, leave.end_date);
+                    const duration = getWorkingDayCount(leave.start_date, leave.end_date, leave.is_half_day);
                     const isPending = !leave.status || leave.status === 'pending';
                     return (
                       <tr key={leave.leave_id} className="hover:bg-slate-50 transition-colors">
@@ -204,7 +267,13 @@ const LeavesPage = () => {
                         <td className="px-5 py-4 text-sm text-slate-700">{format(end, 'MMM d, yyyy')}</td>
                         <td className="px-5 py-4 text-center">
                           <span className="text-lg font-semibold text-slate-800">{duration}</span>
-                          <span className="text-xs text-slate-400 ml-1">{duration === 1 ? 'day' : 'days'}</span>
+                          <span className="text-xs text-slate-400 ml-1">
+                            {leave.is_half_day ? (
+                              <>day ({leave.half_day_slot === 'first_half' ? 'First Half' : 'Second Half'})</>
+                            ) : (
+                              duration === 1 ? 'day' : 'days'
+                            )}
+                          </span>
                         </td>
                         <td className="px-5 py-4 text-center">{STATUS_BADGE[leave.status] || STATUS_BADGE.pending}</td>
                         <td className="px-5 py-4 text-right">
@@ -394,23 +463,46 @@ const LeavesPage = () => {
               </div>
               <div>
                 <label className="block text-sm font-medium text-gray-700 mb-1">Leave Type <span className="text-red-500">*</span></label>
-                <select name="leave_type" required className="input">
+                <select name="leave_type" required value={selectedLeaveType} onChange={e => setSelectedLeaveType(e.target.value)} className="input">
                   <option value="">Select type</option>
                   {LEAVE_TYPE_OPTIONS.map(o => <option key={o.value} value={o.value}>{o.label}</option>)}
                 </select>
               </div>
               <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
-                <div>
-                  <label className="block text-sm font-medium text-gray-700 mb-1">Start Date <span className="text-red-500">*</span></label>
+                <div className={selectedLeaveType === 'first_half' || selectedLeaveType === 'second_half' ? "col-span-2" : ""}>
+                  <label className="block text-sm font-medium text-gray-700 mb-1">
+                    { selectedLeaveType === 'first_half' || selectedLeaveType === 'second_half' ? 'Date' : 'Start Date' } <span className="text-red-500">*</span>
+                  </label>
                   <input type="date" name="start_date" required className="input"/>
                 </div>
-                <div>
-                  <label className="block text-sm font-medium text-gray-700 mb-1">End Date <span className="text-red-500">*</span></label>
-                  <input type="date" name="end_date" required className="input"/>
-                </div>
+                {!(selectedLeaveType === 'first_half' || selectedLeaveType === 'second_half') && (
+                  <div>
+                    <label className="block text-sm font-medium text-gray-700 mb-1">End Date <span className="text-red-500">*</span></label>
+                    <input type="date" name="end_date" required className="input"/>
+                  </div>
+                )}
               </div>
+              {(selectedLeaveType === 'first_half' || selectedLeaveType === 'second_half') && (
+                <div className="rounded-xl border border-indigo-150 bg-indigo-50/50 p-4 text-sm text-indigo-900 space-y-2">
+                  <div className="flex items-center gap-1.5 font-semibold text-indigo-950">
+                    <Clock className="w-4 h-4 text-indigo-600"/> Half-day Leave Policy & Slots
+                  </div>
+                  <div className="grid grid-cols-1 sm:grid-cols-2 gap-3 text-xs">
+                    <div className="p-2.5 bg-white rounded-lg border border-indigo-100/80">
+                      <p className="font-semibold text-indigo-950">First Half-day Leave</p>
+                      <p className="text-slate-600 mt-0.5">🕒 Slot: 9:00 AM – 2:00 PM</p>
+                      <p className="text-slate-500 mt-1 font-medium italic">⚠️ Apply at least one day in advance.</p>
+                    </div>
+                    <div className="p-2.5 bg-white rounded-lg border border-indigo-100/80">
+                      <p className="font-semibold text-indigo-950">Second Half-day Leave</p>
+                      <p className="text-slate-600 mt-0.5">🕒 Slot: 2:00 PM – 7:00 PM</p>
+                      <p className="text-slate-500 mt-1 font-medium italic">⚠️ Apply before 2:00 PM on the same day.</p>
+                    </div>
+                  </div>
+                </div>
+              )}
               <div className="flex justify-end gap-3 pt-4 border-t border-gray-200">
-                <button type="button" onClick={() => setIsModalOpen(false)} className="btn btn-secondary">Cancel</button>
+                <button type="button" onClick={() => { setIsModalOpen(false); setSelectedLeaveType(''); }} className="btn btn-secondary">Cancel</button>
                 <button type="submit" disabled={createMutation.isPending || activeEmployees.length === 0} className="btn btn-primary">
                   {createMutation.isPending ? 'Creating...' : 'Create Leave'}
                 </button>
