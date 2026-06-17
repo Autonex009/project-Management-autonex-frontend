@@ -254,5 +254,21 @@ export const onboardingApi = {
     exportReports: () => api.get('/onboarding/reports/export', { responseType: 'blob' }).then(res => res.data),
 };
 
+// === Company Settings API ===
+export const companySettingsApi = {
+    getAll: () => api.get('/company-settings').then(res => res.data),
+    get: (key) => api.get(`/company-settings/${key}`).then(res => res.data),
+    upsert: (key, data) => api.put(`/company-settings/${key}`, data).then(res => res.data),
+    delete: (key) => api.delete(`/company-settings/${key}`).then(res => res.data),
+};
+
+// === WiFi Networks API ===
+export const wifiNetworksApi = {
+    getAll: () => api.get('/wifi-networks').then(res => res.data),
+    create: (data) => api.post('/wifi-networks', data).then(res => res.data),
+    update: (id, data) => api.put(`/wifi-networks/${id}`, data).then(res => res.data),
+    delete: (id) => api.delete(`/wifi-networks/${id}`).then(res => res.data),
+};
+
 export default api;
 
