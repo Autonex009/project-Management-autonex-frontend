@@ -1,31 +1,42 @@
 import React, { useState, useEffect } from 'react';
 import { Send, Calendar, Building2, ShieldCheck, Sparkles, MapPin, Wifi, Copy, Check, Globe, Cpu, Bot, Layers } from 'lucide-react';
-import { companySettingsApi } from '../../services/api';
+import { wifiNetworksApi, companySettingsApi } from '../../services/api';
 import toast from 'react-hot-toast';
 
 const CompanyInfoPage = () => {
     const [activeTab, setActiveTab] = useState('about');
-    const [wifiInfo, setWifiInfo] = useState({ wifi_name: '', wifi_password: '' });
-    const [copied, setCopied] = useState(false);
+    const [wifiNetworks, setWifiNetworks] = useState([]);
+    const [generalSettings, setGeneralSettings] = useState({
+        office_address: '',
+        google_maps_link: '',
+        company_perks: ''
+    });
+    const [copiedId, setCopiedId] = useState(null);
     const [wifiLoading, setWifiLoading] = useState(true);
 
     useEffect(() => {
-        companySettingsApi.getAll()
-            .then(settings => {
-                const map = {};
-                settings.forEach(s => { map[s.key] = s.value || ''; });
-                setWifiInfo({ wifi_name: map.wifi_name || '', wifi_password: map.wifi_password || '' });
-            })
-            .catch(() => {})
-            .finally(() => setWifiLoading(false));
+        Promise.all([
+            wifiNetworksApi.getAll(),
+            companySettingsApi.getAll()
+        ]).then(([networksData, settingsData]) => {
+            setWifiNetworks(networksData);
+            const map = {};
+            settingsData.forEach(s => { map[s.key] = s.value || ''; });
+            setGeneralSettings({
+                office_address: map.office_address || '',
+                google_maps_link: map.google_maps_link || '',
+                company_perks: map.company_perks || ''
+            });
+        }).catch(() => {})
+          .finally(() => setWifiLoading(false));
     }, []);
 
-    const handleCopyPassword = () => {
-        if (!wifiInfo.wifi_password) return;
-        navigator.clipboard.writeText(wifiInfo.wifi_password);
-        setCopied(true);
-        toast.success('WiFi password copied!');
-        setTimeout(() => setCopied(false), 2000);
+    const handleCopyPassword = (network) => {
+        if (!network.password) return;
+        navigator.clipboard.writeText(network.password);
+        setCopiedId(network.id);
+        toast.success(`${network.name} password copied!`);
+        setTimeout(() => setCopiedId(null), 2000);
     };
 
     const tabs = [
@@ -90,21 +101,24 @@ const CompanyInfoPage = () => {
                                 Office Address
                             </h3>
                             <div className="text-sm text-slate-600 space-y-2">
-                                <p className="leading-relaxed">
-                                    <strong className="text-slate-800">703, Lodha Supremus</strong><br />
-                                    Saki Vihar Road, Opposite L&T Gate No. 6<br />
-                                    Powai, Mumbai, Maharashtra – 400072<br />
-                                    India
-                                </p>
-                                <a
-                                    href="https://maps.google.com/?q=703+Lodha+Supremus+Saki+Vihar+Road+Powai+Mumbai"
-                                    target="_blank"
-                                    rel="noopener noreferrer"
-                                    className="inline-flex items-center gap-1.5 mt-2 text-indigo-600 hover:text-indigo-700 text-xs font-semibold transition-colors"
-                                >
-                                    <MapPin className="w-3.5 h-3.5" />
-                                    View on Google Maps →
-                                </a>
+                                {generalSettings.office_address ? (
+                                    <p className="leading-relaxed whitespace-pre-wrap">
+                                        {generalSettings.office_address}
+                                    </p>
+                                ) : (
+                                    <p className="leading-relaxed italic text-slate-400">Office address not configured.</p>
+                                )}
+                                {generalSettings.google_maps_link && (
+                                    <a
+                                        href={generalSettings.google_maps_link}
+                                        target="_blank"
+                                        rel="noopener noreferrer"
+                                        className="inline-flex items-center gap-1.5 mt-2 text-indigo-600 hover:text-indigo-700 text-xs font-semibold transition-colors"
+                                    >
+                                        <MapPin className="w-3.5 h-3.5" />
+                                        View on Google Maps →
+                                    </a>
+                                )}
                             </div>
                         </div>
                     </div>
@@ -295,23 +309,35 @@ const CompanyInfoPage = () => {
                                     <div className="w-4 h-4 border-2 border-blue-300 border-t-transparent rounded-full animate-spin" />
                                     Loading WiFi details...
                                 </div>
-                            ) : wifiInfo.wifi_name ? (
-                                <div className="space-y-3 text-sm">
-                                    <div className="flex items-center gap-3">
-                                        <span className="text-slate-500 font-medium w-32">Network Name:</span>
-                                        <span className="text-slate-800 font-semibold bg-white px-3 py-1.5 rounded-lg border border-slate-200">{wifiInfo.wifi_name}</span>
-                                    </div>
-                                    <div className="flex items-center gap-3">
-                                        <span className="text-slate-500 font-medium w-32">Password:</span>
-                                        <span className="text-slate-800 font-mono bg-white px-3 py-1.5 rounded-lg border border-slate-200">{wifiInfo.wifi_password}</span>
-                                        <button
-                                            onClick={handleCopyPassword}
-                                            className="flex items-center gap-1 px-2.5 py-1.5 text-xs font-semibold rounded-lg bg-blue-600 text-white hover:bg-blue-700 transition-colors cursor-pointer"
-                                        >
-                                            {copied ? <Check className="w-3.5 h-3.5" /> : <Copy className="w-3.5 h-3.5" />}
-                                            {copied ? 'Copied!' : 'Copy'}
-                                        </button>
-                                    </div>
+                            ) : wifiNetworks.length > 0 ? (
+                                <div className="space-y-4">
+                                    {wifiNetworks.map(network => (
+                                        <div key={network.id} className="bg-white rounded-xl border border-blue-100 p-4 shadow-sm flex flex-col sm:flex-row sm:items-center justify-between gap-4">
+                                            <div>
+                                                <div className="text-xs font-semibold text-blue-500 uppercase tracking-wider mb-1">Network Name</div>
+                                                <div className="text-sm font-bold text-slate-800">{network.name}</div>
+                                            </div>
+                                            <div>
+                                                <div className="text-xs font-semibold text-slate-400 uppercase tracking-wider mb-1">Password</div>
+                                                {network.password ? (
+                                                    <div className="flex items-center gap-3">
+                                                        <span className="text-sm font-mono text-slate-800 bg-slate-50 px-2.5 py-1 rounded border border-slate-200">
+                                                            {network.password}
+                                                        </span>
+                                                        <button
+                                                            onClick={() => handleCopyPassword(network)}
+                                                            className="flex items-center gap-1.5 px-3 py-1.5 text-xs font-semibold rounded-lg bg-blue-50 text-blue-600 hover:bg-blue-100 transition-colors cursor-pointer"
+                                                        >
+                                                            {copiedId === network.id ? <Check className="w-3.5 h-3.5" /> : <Copy className="w-3.5 h-3.5" />}
+                                                            {copiedId === network.id ? 'Copied!' : 'Copy'}
+                                                        </button>
+                                                    </div>
+                                                ) : (
+                                                    <span className="text-sm text-slate-500 italic">Open Network (No password)</span>
+                                                )}
+                                            </div>
+                                        </div>
+                                    ))}
                                 </div>
                             ) : (
                                 <p className="text-sm text-slate-400 italic">WiFi information has not been configured yet. Please contact your administrator.</p>
@@ -324,21 +350,18 @@ const CompanyInfoPage = () => {
                                 <Sparkles className="w-5 h-5 text-emerald-500" />
                                 Employee Perks & Benefits
                             </h3>
-                            <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
-                                {[
-                                    'Flexible working hours with remote work options',
-                                    'Health insurance coverage for employees',
-                                    'Professional development & learning budget',
-                                    'Festival and performance-based bonuses',
-                                    'Paid national holidays and floater leaves',
-                                    'Weekend contribution compensation',
-                                ].map((perk, idx) => (
-                                    <div key={idx} className="flex items-center gap-2.5 bg-white border border-emerald-100 rounded-xl px-4 py-3 text-sm text-slate-700">
-                                        <div className="flex-shrink-0 w-2 h-2 rounded-full bg-emerald-400" />
-                                        {perk}
-                                    </div>
-                                ))}
-                            </div>
+                            {generalSettings.company_perks ? (
+                                <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
+                                    {generalSettings.company_perks.split('\n').filter(p => p.trim()).map((perk, idx) => (
+                                        <div key={idx} className="flex items-center gap-2.5 bg-white border border-emerald-100 rounded-xl px-4 py-3 text-sm text-slate-700">
+                                            <div className="flex-shrink-0 w-2 h-2 rounded-full bg-emerald-400" />
+                                            {perk.trim()}
+                                        </div>
+                                    ))}
+                                </div>
+                            ) : (
+                                <p className="text-sm text-slate-400 italic">Company perks not configured yet.</p>
+                            )}
                         </div>
                     </div>
                 );

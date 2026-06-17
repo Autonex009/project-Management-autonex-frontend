@@ -262,5 +262,13 @@ export const companySettingsApi = {
     delete: (key) => api.delete(`/company-settings/${key}`).then(res => res.data),
 };
 
+// === WiFi Networks API ===
+export const wifiNetworksApi = {
+    getAll: () => api.get('/wifi-networks').then(res => res.data),
+    create: (data) => api.post('/wifi-networks', data).then(res => res.data),
+    update: (id, data) => api.put(`/wifi-networks/${id}`, data).then(res => res.data),
+    delete: (id) => api.delete(`/wifi-networks/${id}`).then(res => res.data),
+};
+
 export default api;
 
