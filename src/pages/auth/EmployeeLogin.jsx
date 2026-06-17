@@ -1,6 +1,6 @@
 import React, { useState } from 'react';
 import { useNavigate } from 'react-router-dom';
-import { Lock, Mail, ArrowRight } from 'lucide-react';
+import { Lock, Mail, ArrowRight, UserPlus, KeyRound, Briefcase, Shield } from 'lucide-react';
 import { useMutation } from '@tanstack/react-query';
 import { authApi } from '../../services/api';
 import toast from 'react-hot-toast';
@@ -133,39 +133,49 @@ const EmployeeLogin = () => {
                         </button>
                     </form>
 
-                    <div className="mt-6 space-y-2 text-center">
-                        <p className="text-sm text-slate-500">
-                            New employee?{' '}
-                            <button
-                                type="button"
-                                onClick={() => navigate('/employee-signup')}
-                                className="font-medium text-emerald-600 hover:underline"
-                            >
-                                Request account access
-                            </button>
-                        </p>
-                        <p className="text-sm text-slate-500">
-                            Having trouble?{' '}
-                            <button
-                                type="button"
-                                onClick={() => navigate('/forgot-password?role=employee')}
-                                className="font-medium text-emerald-600 hover:underline"
-                            >
-                                Reset your password
-                            </button>
-                        </p>
-                        <p className="text-sm text-slate-400">
-                            Looking for manager access?{' '}
-                            <button onClick={() => navigate('/login/pm')} className="font-medium text-emerald-600 hover:underline">
-                                PM Login
-                            </button>
-                        </p>
-                        <p className="text-sm text-slate-400">
-                            Need admin access?{' '}
-                            <button onClick={() => navigate('/login/admin')} className="font-medium text-emerald-600 hover:underline">
-                                Admin Login
-                            </button>
-                        </p>
+                    <div className="mt-4 border-t border-slate-100 pt-4">
+                        <div className="flex flex-col gap-4">
+                            {/* Main auxiliary actions: Request Access & Reset Password */}
+                            <div className="grid grid-cols-2 gap-3">
+                                <button
+                                    type="button"
+                                    onClick={() => navigate('/employee-signup')}
+                                    className="flex items-center justify-center gap-2 rounded-xl border border-slate-200 bg-slate-50 px-3 py-2.5 text-xs font-semibold text-slate-700 transition-all hover:bg-slate-100 hover:border-slate-300"
+                                >
+                                    <UserPlus className="h-3.5 w-3.5 text-slate-500" />
+                                    Request Access
+                                </button>
+                                <button
+                                    type="button"
+                                    onClick={() => navigate('/forgot-password?role=employee')}
+                                    className="flex items-center justify-center gap-2 rounded-xl border border-slate-200 bg-slate-50 px-3 py-2.5 text-xs font-semibold text-slate-700 transition-all hover:bg-slate-100 hover:border-slate-300"
+                                >
+                                    <KeyRound className="h-3.5 w-3.5 text-slate-500" />
+                                    Reset Password
+                                </button>
+                            </div>
+
+                            {/* Portal switchers: PM Portal & Admin Portal */}
+                            <div className="flex items-center justify-center gap-2 border-t border-slate-50 pt-3">
+                                <span className="text-[11px] font-semibold uppercase tracking-wider text-slate-400">Switch:</span>
+                                <button
+                                    type="button"
+                                    onClick={() => navigate('/login/pm')}
+                                    className="flex items-center gap-1 rounded-lg bg-emerald-50 px-2.5 py-1 text-xs font-semibold text-emerald-700 transition-all hover:bg-emerald-100"
+                                >
+                                    <Briefcase className="h-3 w-3" />
+                                    PM Login
+                                </button>
+                                <button
+                                    type="button"
+                                    onClick={() => navigate('/login/admin')}
+                                    className="flex items-center gap-1 rounded-lg bg-emerald-50 px-2.5 py-1 text-xs font-semibold text-emerald-700 transition-all hover:bg-emerald-100"
+                                >
+                                    <Shield className="h-3 w-3" />
+                                    Admin Login
+                                </button>
+                            </div>
+                        </div>
                     </div>
                 </div>
 
