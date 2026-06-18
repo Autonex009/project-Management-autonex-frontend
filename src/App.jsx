@@ -51,7 +51,6 @@ const AdminModulesBuilder = lazy(() => import('./pages/admin/AdminModulesBuilder
 const AdminTeamPage = lazy(() => import('./pages/admin/AdminTeamPage'));
 const AdminReportsPage = lazy(() => import('./pages/admin/AdminReportsPage'));
 const AdminAnalyticsPage = lazy(() => import('./pages/admin/AdminAnalyticsPage'));
-const AdminCompanySettingsPage = lazy(() => import('./pages/admin/AdminCompanySettingsPage'));
 
 
 const queryClient = new QueryClient({
@@ -101,7 +100,6 @@ function App() {
               <Route path="onboarding-team" element={<AdminTeamPage />} />
               <Route path="onboarding-reports" element={<AdminReportsPage />} />
               <Route path="onboarding-analytics" element={<AdminAnalyticsPage />} />
-              <Route path="company-settings" element={<AdminCompanySettingsPage />} />
             </Route>
 
 

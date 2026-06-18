@@ -17,7 +17,6 @@ const themeMap = {
         helper: 'text-slate-500',
         border: 'border-white/5',
         link: 'text-blue-300 hover:text-blue-200',
-        backButton: 'border-white/10 bg-slate-900/50 text-blue-300 hover:bg-slate-900 hover:text-blue-200 hover:border-white/20',
         title: 'Recover admin access',
         eyebrow: 'Admin Recovery',
         backTo: '/login/admin',
@@ -32,7 +31,6 @@ const themeMap = {
         helper: 'text-slate-500',
         border: 'border-slate-200',
         link: 'text-blue-600 hover:text-blue-700',
-        backButton: 'border-slate-200 bg-slate-50/50 text-blue-600 hover:bg-slate-100 hover:text-blue-700 hover:border-slate-300',
         title: 'Reset your PM password',
         eyebrow: 'PM Recovery',
         backTo: '/login/pm',
@@ -47,7 +45,6 @@ const themeMap = {
         helper: 'text-slate-500',
         border: 'border-slate-200',
         link: 'text-emerald-600 hover:text-emerald-700',
-        backButton: 'border-slate-200 bg-slate-50/50 text-emerald-600 hover:bg-slate-100 hover:text-emerald-700 hover:border-slate-300',
         title: 'Reset your workspace password',
         eyebrow: 'Employee Recovery',
         backTo: '/login/employee',
@@ -92,11 +89,8 @@ const ForgotPassword = () => {
 
             <div className={`flex flex-1 items-center justify-center p-8 ${theme.shell}`}>
                 <div className={`w-full max-w-md rounded-[28px] border p-8 shadow-[0_25px_80px_rgba(15,23,42,0.12)] backdrop-blur ${theme.card}`}>
-                    <Link
-                        to={theme.backTo}
-                        className={`inline-flex items-center gap-1.5 rounded-xl border px-3 py-1.5 text-xs font-semibold transition-all ${theme.backButton}`}
-                    >
-                        <ArrowLeft className="h-3.5 w-3.5" />
+                    <Link to={theme.backTo} className={`inline-flex items-center gap-2 text-sm font-medium ${theme.link}`}>
+                        <ArrowLeft className="h-4 w-4" />
                         Back to sign in
                     </Link>
 

@@ -137,11 +137,7 @@ const PMLeavesPage = () => {
                                                 </td>
                                                 <td className="px-5 py-3.5 text-sm text-slate-600">{getLeaveTypeLabel(leave.leave_type)}</td>
                                                 <td className="px-5 py-3.5 text-center text-sm text-slate-600 font-mono">
-                                                    {leave.is_half_day ? (
-                                                        <span>{format(parseISO(leave.start_date), 'MMM dd, yyyy')} (0.5d - {leave.half_day_slot === 'first_half' ? 'First Half' : 'Second Half'})</span>
-                                                    ) : (
-                                                        <span>{format(parseISO(leave.start_date), 'MMM dd')} — {format(parseISO(leave.end_date), 'MMM dd')}</span>
-                                                    )}
+                                                    {format(parseISO(leave.start_date), 'MMM dd')} — {format(parseISO(leave.end_date), 'MMM dd')}
                                                 </td>
                                                 <td className="px-5 py-3.5 text-center">
                                                     <span className={`inline-flex items-center gap-1 px-2.5 py-0.5 rounded-full text-xs font-medium border ${STATUS_STYLES[status]}`}>

@@ -1,9 +1,5 @@
-import React, { useState, useRef, useEffect, useMemo, useLayoutEffect, useCallback } from 'react';
-import { createPortal } from 'react-dom';
+import React, { useState, useRef, useEffect, useMemo } from 'react';
 import { UserPlus, Users, Mail, ArrowRight } from 'lucide-react';
-
-const POPOVER_WIDTH = 320;
-const POPOVER_MARGIN = 12;
 
 // Stable color palette for avatars based on the employee name
 const AVATAR_PALETTE = [
@@ -52,10 +48,37 @@ const AllocationPopover = ({
   badgeContent,
 }) => {
   const [open, setOpen] = useState(false);
-  const [position, setPosition] = useState({ top: 0, left: 0, placement: 'bottom', arrowLeft: 0 });
-  const triggerRef = useRef(null);
-  const popoverRef = useRef(null);
+  const containerRef = useRef(null);
   const closeTimerRef = useRef(null);
+
+  useEffect(() => {
+    const handler = (e) => {
+      if (containerRef.current && !containerRef.current.contains(e.target)) {
+        setOpen(false);
+      }
+    };
+    document.addEventListener('mousedown', handler);
+    return () => document.removeEventListener('mousedown', handler);
+  }, []);
+
+  useEffect(
+    () => () => {
+      if (closeTimerRef.current) clearTimeout(closeTimerRef.current);
+    },
+    []
+  );
+
+  const scheduleClose = () => {
+    if (closeTimerRef.current) clearTimeout(closeTimerRef.current);
+    closeTimerRef.current = setTimeout(() => setOpen(false), 140);
+  };
+
+  const cancelClose = () => {
+    if (closeTimerRef.current) {
+      clearTimeout(closeTimerRef.current);
+      closeTimerRef.current = null;
+    }
+  };
 
   // Support either pre-filtered allocations or the full list
   const list = useMemo(() => {
@@ -70,131 +93,46 @@ const AllocationPopover = ({
     }));
   }, [allocations, employees, project]);
 
-  // Position the popover relative to the trigger, flipping above when bottom space is tight
-  const updatePosition = useCallback(() => {
-    const trigger = triggerRef.current;
-    if (!trigger) return;
-
-    const rect = trigger.getBoundingClientRect();
-    const popoverEl = popoverRef.current;
-    const popoverHeight = popoverEl?.offsetHeight || 360;
-
-    const vw = window.innerWidth;
-    const vh = window.innerHeight;
-
-    // Horizontal: center on the trigger, clamp into viewport
-    const triggerCenter = rect.left + rect.width / 2;
-    let left = triggerCenter - POPOVER_WIDTH / 2;
-    left = Math.max(POPOVER_MARGIN, Math.min(left, vw - POPOVER_WIDTH - POPOVER_MARGIN));
-
-    // Vertical: prefer bottom; flip to top if there's more room above
-    const spaceBelow = vh - rect.bottom - POPOVER_MARGIN;
-    const spaceAbove = rect.top - POPOVER_MARGIN;
-    const placeBelow = spaceBelow >= popoverHeight || spaceBelow >= spaceAbove;
-    const top = placeBelow
-      ? rect.bottom + 8
-      : rect.top - popoverHeight - 8;
-
-    const arrowLeft = Math.max(16, Math.min(POPOVER_WIDTH - 16, triggerCenter - left));
-
-    setPosition({ top, left, placement: placeBelow ? 'bottom' : 'top', arrowLeft });
-  }, []);
-
-  useLayoutEffect(() => {
-    if (!open) return;
-    updatePosition();
-    // Re-measure once after content lays out (in case size changed)
-    const id = requestAnimationFrame(updatePosition);
-    return () => cancelAnimationFrame(id);
-  }, [open, list.length, updatePosition]);
-
-  useEffect(() => {
-    if (!open) return;
-    const onScroll = () => updatePosition();
-    const onResize = () => updatePosition();
-    window.addEventListener('scroll', onScroll, true);
-    window.addEventListener('resize', onResize);
-    return () => {
-      window.removeEventListener('scroll', onScroll, true);
-      window.removeEventListener('resize', onResize);
-    };
-  }, [open, updatePosition]);
-
-  // Close on outside click
-  useEffect(() => {
-    if (!open) return;
-    const handler = (e) => {
-      if (
-        triggerRef.current && triggerRef.current.contains(e.target)
-        || popoverRef.current && popoverRef.current.contains(e.target)
-      ) {
-        return;
-      }
-      setOpen(false);
-    };
-    document.addEventListener('mousedown', handler);
-    return () => document.removeEventListener('mousedown', handler);
-  }, [open]);
-
-  // Close on Escape
-  useEffect(() => {
-    if (!open) return;
-    const handler = (e) => { if (e.key === 'Escape') setOpen(false); };
-    document.addEventListener('keydown', handler);
-    return () => document.removeEventListener('keydown', handler);
-  }, [open]);
-
-  useEffect(() => () => {
-    if (closeTimerRef.current) clearTimeout(closeTimerRef.current);
-  }, []);
-
-  const scheduleClose = () => {
-    if (closeTimerRef.current) clearTimeout(closeTimerRef.current);
-    closeTimerRef.current = setTimeout(() => setOpen(false), 140);
-  };
-
-  const cancelClose = () => {
-    if (closeTimerRef.current) {
-      clearTimeout(closeTimerRef.current);
-      closeTimerRef.current = null;
-    }
-  };
-
   const handleAdd = (e) => {
     e.stopPropagation();
     setOpen(false);
     if (onOpenAllocations) onOpenAllocations();
   };
 
-  const popover = open ? createPortal(
+  return (
     <div
-      ref={popoverRef}
-      onMouseEnter={cancelClose}
-      onMouseLeave={scheduleClose}
-      className="z-[100]"
-      style={{
-        position: 'fixed',
-        top: position.top,
-        left: position.left,
-        width: POPOVER_WIDTH,
-        animation: 'allocPopoverIn 140ms ease-out',
+      ref={containerRef}
+      className="relative inline-block"
+      onMouseEnter={() => {
+        cancelClose();
+        setOpen(true);
       }}
-      role="dialog"
+      onMouseLeave={scheduleClose}
     >
-      {/* Arrow */}
-      {position.placement === 'bottom' ? (
-        <div
-          className="absolute -top-1.5 w-3 h-3 bg-white border-l border-t border-slate-200 rotate-45"
-          style={{ left: position.arrowLeft - 6 }}
-        />
-      ) : (
-        <div
-          className="absolute -bottom-1.5 w-3 h-3 bg-white border-r border-b border-slate-200 rotate-45"
-          style={{ left: position.arrowLeft - 6 }}
-        />
-      )}
+      <button
+        type="button"
+        onClick={() => onOpenAllocations && onOpenAllocations()}
+        className="inline-flex items-center gap-1.5 px-3 py-1.5 bg-emerald-50 hover:bg-emerald-100 text-emerald-700 rounded-lg font-medium text-sm transition-colors border border-emerald-200 shadow-sm"
+      >
+        {badgeContent || (
+          <>
+            <span>Allocated</span>
+            <span className="font-bold">{list.length}</span>
+          </>
+        )}
+      </button>
 
-      <div className="relative bg-white border border-slate-200 rounded-2xl shadow-2xl ring-1 ring-slate-900/5 overflow-hidden">
+      {open && (
+        <div
+          onMouseEnter={cancelClose}
+          onMouseLeave={scheduleClose}
+          className="absolute z-50 left-1/2 -translate-x-1/2 mt-2 w-80"
+          style={{ animation: 'allocPopoverIn 140ms ease-out' }}
+        >
+          {/* Arrow */}
+          <div className="absolute -top-1.5 left-1/2 -translate-x-1/2 w-3 h-3 bg-white border-l border-t border-slate-200 rotate-45" />
+
+          <div className="relative bg-white border border-slate-200 rounded-xl shadow-xl overflow-hidden">
             {/* Header */}
             <div className="px-4 py-3 bg-gradient-to-r from-slate-50 to-white border-b border-slate-100 flex items-center justify-between gap-2">
               <div className="flex items-center gap-2 min-w-0">
@@ -299,37 +237,16 @@ const AllocationPopover = ({
             </div>
           </div>
 
-      {/* Local keyframes */}
-      <style>{`
-        @keyframes allocPopoverIn {
-          0% { opacity: 0; transform: translateY(-4px) scale(0.98); }
-          100% { opacity: 1; transform: translateY(0) scale(1); }
-        }
-      `}</style>
-    </div>,
-    document.body
-  ) : null;
-
-  return (
-    <>
-      <button
-        ref={triggerRef}
-        type="button"
-        onClick={() => onOpenAllocations && onOpenAllocations()}
-        onMouseEnter={() => { cancelClose(); setOpen(true); }}
-        onMouseLeave={scheduleClose}
-        className="inline-flex items-center gap-1.5 px-3 py-1.5 bg-emerald-50 hover:bg-emerald-100 text-emerald-700 rounded-lg font-medium text-sm transition-colors border border-emerald-200 shadow-sm"
-        aria-expanded={open}
-      >
-        {badgeContent || (
-          <>
-            <span>Allocated</span>
-            <span className="font-bold">{list.length}</span>
-          </>
-        )}
-      </button>
-      {popover}
-    </>
+          {/* Local keyframes */}
+          <style>{`
+            @keyframes allocPopoverIn {
+              0% { opacity: 0; transform: translate(-50%, -4px) scale(0.98); }
+              100% { opacity: 1; transform: translate(-50%, 0) scale(1); }
+            }
+          `}</style>
+        </div>
+      )}
+    </div>
   );
 };
 
