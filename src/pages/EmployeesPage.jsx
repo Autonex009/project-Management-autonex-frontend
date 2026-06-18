@@ -1099,7 +1099,17 @@ const EmployeesPage = () => {
   // Fetch employees
   const { data: employees = [], isLoading } = useQuery({
     queryKey: ['employees', statusParam],
-    queryFn: () => employeeApi.getAll(statusParam ? { status: statusParam } : {}),
+    queryFn: () => {
+      if (statusParam === 'active') {
+        return employeeApi.getActive();
+      } else if (statusParam === 'inactive') {
+        return employeeApi.getInactive();
+      } else if (statusParam === 'idle') {
+        return employeeApi.getIdle();
+      } else {
+        return employeeApi.getAll(statusParam ? { status: statusParam } : {});
+      }
+    },
   });
 
   // Fetch all allocations so we can show assigned projects per employee
@@ -1252,9 +1262,24 @@ const EmployeesPage = () => {
     const matchesDesignation = designationFilter.length === 0 || designationFilter.includes(employee.designation);
     const isIdle = !employeeProjectsMap[employee.id];
     const matchesIdle = !idleOnly || isIdle;
-    const matchesStatus = statusParam
-      ? employee.status?.toLowerCase() === statusParam.toLowerCase()
-      : employee.status?.toLowerCase() !== 'archived';
+    const matchesStatus = (() => {
+      if (!statusParam) {
+        return employee.status?.toLowerCase() !== 'archived';
+      }
+      if (statusParam === 'archived') {
+        return employee.status?.toLowerCase() === 'archived';
+      }
+      if (statusParam === 'active') {
+        return employee.status?.toLowerCase() === 'active';
+      }
+      if (statusParam === 'inactive') {
+        return employee.status?.toLowerCase() === 'inactive';
+      }
+      if (statusParam === 'idle') {
+        return employee.status?.toLowerCase() === 'active' && isIdle;
+      }
+      return employee.status?.toLowerCase() === statusParam.toLowerCase();
+    })();
     return matchesSearch && matchesSkill && matchesDesignation && matchesIdle && matchesStatus;
   });
 
@@ -1337,25 +1362,36 @@ const EmployeesPage = () => {
             onChange={(val) => { setDesignationFilter(val); setCurrentPage(1); }}
           />
 
-          <button
-            onClick={() => {
-              const params = new URLSearchParams(searchParams);
-              if (idleOnly) {
-                params.delete('idleOnly');
-              } else {
-                params.set('idleOnly', 'true');
-              }
-              setSearchParams(params);
-            }}
-            className={`px-3 py-2 rounded-lg text-sm font-medium border transition-colors ${
-              idleOnly
-                ? 'bg-amber-50 border-amber-300 text-amber-700'
-                : 'bg-white border-slate-200 text-slate-600 hover:border-slate-300'
-            }`}
-            title="Show only employees not assigned to any project"
-          >
-            Idle Only
-          </button>
+          {statusParam !== 'archived' && (
+            <div className="flex bg-slate-100 p-1 rounded-xl gap-1 border border-slate-200/50">
+              {['all', 'active', 'inactive', 'idle'].map((s) => {
+                const label = s.charAt(0).toUpperCase() + s.slice(1);
+                const isActive = (s === 'all' && !statusParam) || statusParam === s;
+                return (
+                  <button
+                    key={s}
+                    type="button"
+                    onClick={() => {
+                      const params = new URLSearchParams(searchParams);
+                      if (s === 'all') {
+                        params.delete('status');
+                      } else {
+                        params.set('status', s);
+                      }
+                      setSearchParams(params);
+                    }}
+                    className={`px-3 py-1.5 text-xs font-semibold rounded-lg transition-all ${
+                      isActive
+                        ? 'bg-white text-indigo-600 shadow-sm'
+                        : 'text-slate-500 hover:text-slate-800 hover:bg-white/50'
+                    }`}
+                  >
+                    {label}
+                  </button>
+                );
+              })}
+            </div>
+          )}
 
           <div className="relative flex-1 sm:flex-none">
             <Search className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-slate-400" />

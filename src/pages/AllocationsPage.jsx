@@ -470,9 +470,29 @@ import { useState, useEffect, useRef } from 'react';
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import { useLocation } from 'react-router-dom';
 import { allocationApi, subProjectApi, employeeApi, leaveApi, parentProjectApi } from '../services/api';
-import { Plus, Edit, Trash2, X, UserPlus, UserMinus, CheckSquare, AlertTriangle } from 'lucide-react';
+import { Plus, Edit, Trash2, X, UserPlus, UserMinus, CheckSquare, AlertTriangle, Users } from 'lucide-react';
 import toast from 'react-hot-toast';
 import { getPmEmployeeId, getPmSubProjects } from '../utils/pmScope';
+
+// Stable color palette for avatars based on the employee name
+const AVATAR_PALETTE = [
+  'from-indigo-500 to-violet-500',
+  'from-emerald-500 to-teal-500',
+  'from-amber-500 to-orange-500',
+  'from-rose-500 to-pink-500',
+  'from-sky-500 to-blue-500',
+  'from-fuchsia-500 to-purple-500',
+  'from-lime-500 to-green-500',
+  'from-cyan-500 to-sky-500',
+];
+
+const getAvatarGradient = (name) => {
+  let hash = 0;
+  for (let i = 0; i < (name || '').length; i++) {
+    hash = (hash << 5) - hash + name.charCodeAt(i);
+  }
+  return AVATAR_PALETTE[Math.abs(hash) % AVATAR_PALETTE.length];
+};
 
 // Role tag constants for time division
 const ROLE_TAGS = [
@@ -827,73 +847,92 @@ const AllocationsPage = () => {
                       </span>
                     </td>
                     <td className="px-5 py-4">
-                      <div className="flex items-center gap-3">
-                        <div className="flex -space-x-2">
-                          {projectAllocs.slice(0, 3).map(alloc => {
-                            const emp = employees.find(e => e.id === alloc.employee_id);
-                            return (
-                              <div
-                                key={alloc.id}
-                                className="w-8 h-8 rounded-full bg-indigo-500 text-white flex items-center justify-center text-xs font-medium border-2 border-white"
-                                title={emp?.name}
-                              >
-                                {emp?.name?.charAt(0).toUpperCase()}
+                      <div className="flex items-center justify-between gap-4">
+                        {/* Left Side: Avatar stack & Add button */}
+                        <div className="flex items-center gap-2">
+                          <div className="flex -space-x-1.5 overflow-hidden">
+                            {projectAllocs.slice(0, 3).map(alloc => {
+                              const emp = employees.find(e => e.id === alloc.employee_id);
+                              const name = emp?.name || 'Unknown';
+                              const initials = name.split(/\s+/).slice(0, 2).map(p => p[0]).join('').toUpperCase();
+                              const gradient = getAvatarGradient(name);
+                              return (
+                                <div
+                                  key={alloc.id}
+                                  className={`w-8 h-8 rounded-full bg-gradient-to-br ${gradient} text-white flex items-center justify-center text-[10px] font-bold border-2 border-white shadow-sm ring-1 ring-slate-100/50 shrink-0`}
+                                  title={name}
+                                >
+                                  {initials}
+                                </div>
+                              );
+                            })}
+                            {projectAllocs.length > 3 && (
+                              <div className="w-8 h-8 rounded-full bg-slate-100 border-2 border-white text-[10px] font-bold text-slate-500 flex items-center justify-center shadow-sm ring-1 ring-slate-100/50 shrink-0">
+                                +{projectAllocs.length - 3}
                               </div>
-                            );
-                          })}
+                            )}
+                          </div>
+                          
+                          <button
+                            onClick={() => {
+                              setSelectedProject(project);
+                              setIsModalOpen(true);
+                            }}
+                            className="w-8 h-8 rounded-full border border-dashed border-slate-300 text-slate-400 hover:text-indigo-600 hover:border-indigo-500 hover:bg-indigo-50/50 flex items-center justify-center transition-all shrink-0"
+                            title="Add employees"
+                          >
+                            <UserPlus className="w-3.5 h-3.5" />
+                          </button>
                         </div>
-                        {projectAllocs.length > 3 && (
-                          <span className="text-xs text-slate-400">
-                            +{projectAllocs.length - 3} more
-                          </span>
-                        )}
-                        <button
-                          onClick={() => {
-                            setSelectedProject(project);
-                            setIsModalOpen(true);
-                          }}
-                          className="p-1.5 text-slate-500 hover:text-emerald-600 hover:bg-emerald-50 rounded-lg transition-colors"
-                          title="Add employees"
-                        >
-                          <UserPlus className="w-4 h-4" />
-                        </button>
-                        {(() => {
-                          const assignedCount = projectAllocs.length;
-                          // Count employees currently on approved leave (today)
-                          const todayStr = new Date().toISOString().slice(0, 10);
-                          const onLeaveToday = projectAllocs.filter(a =>
-                            leaves.some(l =>
-                              l.employee_id === a.employee_id &&
-                              l.status === 'approved' &&
-                              String(l.start_date).slice(0, 10) <= todayStr &&
-                              String(l.end_date).slice(0, 10) >= todayStr
-                            )
-                          ).length;
 
-                          return (
-                            <div className="flex flex-col items-end">
-                              <AllocationPopover
-                                project={project}
-                                allocations={projectAllocs}
-                                employees={employees}
-                                badgeContent={(
-                                  <span className={`text-sm font-medium px-2 py-0.5 rounded ${assignedCount >= requiredManpower
-                                    ? 'bg-emerald-50 text-emerald-700'
-                                    : 'bg-amber-50 text-amber-700'
-                                    }`}>
-                                    {assignedCount}/{requiredManpower}
+                        {/* Right Side: Allocation Popover Badge & Leave Pill */}
+                        <div className="flex items-center gap-2">
+                          {(() => {
+                            const assignedCount = projectAllocs.length;
+                            const todayStr = new Date().toISOString().slice(0, 10);
+                            const onLeaveToday = projectAllocs.filter(a =>
+                              leaves.some(l =>
+                                l.employee_id === a.employee_id &&
+                                l.status === 'approved' &&
+                                String(l.start_date).slice(0, 10) <= todayStr &&
+                                String(l.end_date).slice(0, 10) >= todayStr
+                              )
+                            ).length;
+
+                            return (
+                              <>
+                                {onLeaveToday > 0 && (
+                                  <span 
+                                    className="px-2.5 py-1 bg-amber-50 text-amber-700 border border-amber-200/50 rounded-full text-xs font-semibold flex items-center gap-1 shrink-0"
+                                    title={`${onLeaveToday} employee${onLeaveToday > 1 ? 's' : ''} on approved leave today`}
+                                  >
+                                    <span className="w-1.5 h-1.5 rounded-full bg-amber-500 animate-pulse" />
+                                    <span>{onLeaveToday} Leave</span>
                                   </span>
                                 )}
-                                onOpenAllocations={() => { setSelectedProject(project); setIsModalOpen(true); }}
-                              />
-                              {onLeaveToday > 0 && (
-                                <span className="text-xs text-amber-600 font-medium scale-90 origin-right">
-                                  ({onLeaveToday} on leave today)
-                                </span>
-                              )}
-                            </div>
-                          );
-                        })()}
+
+                                <AllocationPopover
+                                  project={project}
+                                  allocations={projectAllocs}
+                                  employees={employees}
+                                  badgeContent={(
+                                    <span className={`text-xs font-semibold px-2.5 py-1 rounded-lg border transition-all flex items-center gap-1.5 cursor-pointer select-none ${
+                                      assignedCount >= requiredManpower
+                                        ? 'bg-emerald-50/40 text-emerald-700 border-emerald-100/70 hover:bg-emerald-100/40'
+                                        : 'bg-amber-50/40 text-amber-700 border-amber-100/70 hover:bg-amber-100/40'
+                                      }`}>
+                                      <span className={`w-1.5 h-1.5 rounded-full ${
+                                        assignedCount >= requiredManpower ? 'bg-emerald-500' : 'bg-amber-500'
+                                      }`} />
+                                      <span>{assignedCount} / {requiredManpower}</span>
+                                    </span>
+                                  )}
+                                  onOpenAllocations={() => { setSelectedProject(project); setIsModalOpen(true); }}
+                                />
+                              </>
+                            );
+                          })()}
+                        </div>
                       </div>
                     </td>
                     <td className="px-5 py-4 text-right">
@@ -964,7 +1003,7 @@ const AllocationsPage = () => {
 
       {/* Create Allocation Modal */}
       {isModalOpen && (
-        <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50 p-2 sm:p-4">
+        <div className="fixed inset-0 bg-slate-900/40 backdrop-blur-sm flex items-center justify-center z-50 p-2 sm:p-4">
           <div
             className="bg-white rounded-lg shadow-xl w-full max-w-full sm:max-w-3xl max-h-[95vh] sm:max-h-[90vh] overflow-y-auto"
             onClick={(e) => e.stopPropagation()}
@@ -1443,7 +1482,7 @@ const AllocationsPage = () => {
 
       {/* Edit Allocation Modal */}
       {editingAllocation && (
-        <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50 p-2 sm:p-4">
+        <div className="fixed inset-0 bg-slate-900/40 backdrop-blur-sm flex items-center justify-center z-50 p-2 sm:p-4">
           <div className="bg-white rounded-lg shadow-xl w-full max-w-full sm:max-w-2xl max-h-[95vh] sm:max-h-[90vh] overflow-y-auto">
             <div className="sticky top-0 bg-white border-b border-gray-200 px-6 py-4 flex justify-between items-center">
               <h2 className="text-xl font-semibold text-gray-900">

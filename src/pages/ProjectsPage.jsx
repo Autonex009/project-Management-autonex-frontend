@@ -609,7 +609,7 @@ toast.success(wasEditing ? 'Project updated successfully' : 'Project created suc
 
   return (
     <div className="space-y-6 p-2">
-      <div className="flex items-center justify-between">
+      <div className="flex flex-col md:flex-row md:items-center justify-between gap-4">
         <div>
           <h1 className="text-2xl font-bold text-slate-900">
             {currentMainProject ? `Projects for ${currentMainProject.name}` : 'All Projects'}
@@ -620,15 +620,15 @@ toast.success(wasEditing ? 'Project updated successfully' : 'Project created suc
               : 'Manage tasks and resource allocation across all projects'}
           </p>
         </div>
-        <div className="flex items-center gap-3">
-          <div className="relative">
+        <div className="flex flex-wrap items-center gap-2">
+          <div className="relative flex-1 sm:flex-none">
             <Search className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-slate-400 pointer-events-none" />
             <input
               type="text"
               placeholder="Search projects..."
               value={subProjectSearch}
               onChange={e => setSubProjectSearch(e.target.value)}
-              className="pl-9 pr-4 py-2 text-sm bg-white border border-slate-200 rounded-xl focus:outline-none focus:ring-2 focus:ring-indigo-100 focus:border-indigo-300 w-52 placeholder:text-slate-400"
+              className="pl-9 pr-4 py-2 text-sm bg-white border border-slate-200 rounded-xl focus:outline-none focus:ring-2 focus:ring-indigo-100 focus:border-indigo-300 w-full sm:w-52 placeholder:text-slate-400"
             />
           </div>
           <Link
@@ -706,24 +706,22 @@ toast.success(wasEditing ? 'Project updated successfully' : 'Project created suc
           <table className="w-full text-sm">
             <thead className="bg-slate-50/80 border-b border-slate-100">
               <tr>
-                <th className="px-5 py-4 text-left text-xs font-bold text-slate-800 uppercase tracking-wider">Organization</th>
-                <th className="px-5 py-4 text-left text-xs font-bold text-slate-800 uppercase tracking-wider">Project</th>
-                <th className="px-5 py-4 text-left text-xs font-bold text-slate-800 uppercase tracking-wider">Project Manager</th>
-                <th className="px-5 py-4 text-left text-xs font-bold text-slate-800 uppercase tracking-wider">Skills</th>
-                <th className="px-5 py-4 text-center text-xs font-bold text-slate-800 uppercase tracking-wider">Required</th>
-                <th className="px-5 py-4 text-center text-xs font-bold text-slate-800 uppercase tracking-wider">Allocated</th>
-                <th className="px-5 py-4 text-left text-xs font-bold text-slate-800 uppercase tracking-wider">Timeline</th>
-                <th className="px-5 py-4 text-center text-xs font-bold text-slate-800 uppercase tracking-wider">Priority</th>
-                <th className="px-5 py-4 text-center text-xs font-bold text-slate-800 uppercase tracking-wider">Avg Time</th>
-                <th className="px-5 py-4 text-left text-xs font-bold text-slate-800 uppercase tracking-wider">Recommendation</th>
-                <th className="px-5 py-4 text-center text-xs font-bold text-slate-800 uppercase tracking-wider">Status</th>
-                <th className="px-5 py-4 text-right text-xs font-bold text-slate-800 uppercase tracking-wider sticky right-0 bg-slate-50 shadow-[-8px_0_8px_-8px_rgba(0,0,0,0.1)]">Actions</th>
+                <th className="px-5 py-4 text-left text-xs font-bold text-slate-800 uppercase tracking-wider whitespace-nowrap">Project & Org</th>
+                <th className="px-5 py-4 text-left text-xs font-bold text-slate-800 uppercase tracking-wider whitespace-nowrap">Project Manager</th>
+                <th className="px-5 py-4 text-left text-xs font-bold text-slate-800 uppercase tracking-wider whitespace-nowrap">Skills</th>
+                <th className="px-5 py-4 text-center text-xs font-bold text-slate-800 uppercase tracking-wider whitespace-nowrap">Allocated / Req.</th>
+                <th className="px-5 py-4 text-left text-xs font-bold text-slate-800 uppercase tracking-wider whitespace-nowrap">Timeline</th>
+                <th className="px-5 py-4 text-center text-xs font-bold text-slate-800 uppercase tracking-wider whitespace-nowrap">Priority</th>
+                <th className="px-5 py-4 text-center text-xs font-bold text-slate-800 uppercase tracking-wider whitespace-nowrap">Avg Time</th>
+                <th className="px-5 py-4 text-left text-xs font-bold text-slate-800 uppercase tracking-wider whitespace-nowrap">Recommendation</th>
+                <th className="px-5 py-4 text-center text-xs font-bold text-slate-800 uppercase tracking-wider whitespace-nowrap">Status</th>
+                <th className="px-5 py-4 text-right text-xs font-bold text-slate-800 uppercase tracking-wider sticky right-0 bg-slate-50 shadow-[-8px_0_8px_-8px_rgba(0,0,0,0.1)] whitespace-nowrap">Actions</th>
               </tr>
             </thead>
             <tbody className="divide-y divide-slate-100">
               {filteredProjects.length === 0 ? (
                 <tr>
-                  <td colSpan="15" className="text-center py-16 text-slate-400">
+                  <td colSpan="10" className="text-center py-16 text-slate-400">
                     <div className="text-lg font-medium">
                       {filterMainProjectId ? 'No projects under this organization' : 'No projects yet'}
                     </div>
@@ -742,10 +740,7 @@ toast.success(wasEditing ? 'Project updated successfully' : 'Project created suc
 
                   return (
                     <tr key={project.id} className="hover:bg-slate-50 transition-colors">
-                      <td className="px-5 py-4">
-                        <div className="font-semibold text-slate-800">{parentProject?.name || '—'}</div>
-                      </td>
-                      <td className="px-5 py-4">
+                      <td className="px-5 py-4 whitespace-nowrap">
                         <div className="flex items-center gap-2">
                           <span className="text-sm text-slate-600 font-semibold">{project.name}</span>
                           {project.is_annotation && (
@@ -754,9 +749,11 @@ toast.success(wasEditing ? 'Project updated successfully' : 'Project created suc
                             </span>
                           )}
                         </div>
-                        <div className="text-xs text-slate-400">{parentProject?.project_type || '—'}</div>
+                        <div className="text-xs text-slate-400 mt-0.5">
+                          {parentProject?.name || '—'} • {parentProject?.project_type || '—'}
+                        </div>
                       </td>
-                      <td className="px-5 py-4">
+                      <td className="px-5 py-4 whitespace-nowrap">
                         <span className="text-sm text-slate-600">
                           {(() => {
                             const mainProject = visibleMainProjects.find(p => p.id === project.main_project_id);
@@ -773,7 +770,7 @@ toast.success(wasEditing ? 'Project updated successfully' : 'Project created suc
                           })()}
                         </span>
                       </td>
-                      <td className="px-5 py-4">
+                      <td className="px-5 py-4 whitespace-nowrap">
                         <div className="text-xs text-slate-600 font-medium">
                           {project.required_expertise && project.required_expertise.length > 0 ? (
                             <>
@@ -787,37 +784,40 @@ toast.success(wasEditing ? 'Project updated successfully' : 'Project created suc
                           )}
                         </div>
                       </td>
-                      <td className="px-5 py-4 text-center">
-                        <div className="font-semibold text-slate-800">{project.required_manpower || '—'}</div>
-                        <div className="text-xs text-slate-400">needed</div>
-                      </td>
-                      <td className="px-5 py-4 text-center">
+                      <td className="px-5 py-4 text-center whitespace-nowrap">
                         {allocatedManpower > 0 ? (
-                          <AllocationPopover
-                            project={project}
-                            allocations={allocations}
-                            employees={employees}
-                            badgeContent={(
-                              <>
-                                <span>Allocated</span>
-                                <span className="font-bold">{allocatedManpower}</span>
-                              </>
-                            )}
-                            onOpenAllocations={() => navigate(`${prefix}/allocations`, { state: { projectId: project.id } })}
-                          />
+                          <div className="inline-flex items-center justify-center">
+                            <AllocationPopover
+                              project={project}
+                              allocations={allocations}
+                              employees={employees}
+                              badgeContent={(
+                                <div className="flex items-center gap-1 text-slate-600 hover:text-indigo-600 transition-colors">
+                                  <span className="font-bold text-slate-800">{allocatedManpower}</span>
+                                  <span className="text-slate-400">/</span>
+                                  <span className="font-semibold text-slate-500">{project.required_manpower || '0'}</span>
+                                  <span className="text-xs text-slate-400 ml-1 font-normal">allocated</span>
+                                </div>
+                              )}
+                              onOpenAllocations={() => navigate(`${prefix}/allocations`, { state: { projectId: project.id } })}
+                            />
+                          </div>
                         ) : (
-                          <button
-                            onClick={() => navigate(`${prefix}/allocations`, { state: { projectId: project.id } })}
-                            className="inline-flex items-center gap-1.5 px-3 py-1.5 bg-amber-50 hover:bg-amber-100 text-amber-700 rounded-lg font-medium text-sm transition-colors border border-amber-200"
-                            title={`${matchingTotal} employees available with matching skills - Click to allocate`}
-                          >
-                            <span className="font-bold">{matchingTotal}</span>
-                            <span>available</span>
-                            <ArrowRight className="w-3.5 h-3.5" />
-                          </button>
+                          <div className="flex flex-col items-center gap-0.5">
+                            <button
+                              onClick={() => navigate(`${prefix}/allocations`, { state: { projectId: project.id } })}
+                              className="inline-flex items-center gap-1 px-2.5 py-1 bg-amber-50 hover:bg-amber-100 text-amber-700 rounded-lg font-medium text-xs transition-colors border border-amber-200"
+                              title={`${matchingTotal} employees available with matching skills - Click to allocate`}
+                            >
+                              <span className="font-bold">{matchingTotal}</span>
+                              <span>available</span>
+                              <ArrowRight className="w-3 h-3" />
+                            </button>
+                            <span className="text-[10px] text-slate-400 font-medium">Req: {project.required_manpower || '0'}</span>
+                          </div>
                         )}
                       </td>
-                      <td className="px-5 py-4">
+                      <td className="px-5 py-4 whitespace-nowrap">
                         <div className="text-sm text-slate-700">
                           {format(new Date(project.start_date), 'MMM d')} — {format(new Date(project.end_date), 'MMM d')}
                         </div>
@@ -825,7 +825,7 @@ toast.success(wasEditing ? 'Project updated successfully' : 'Project created suc
                           {project.project_duration_days < 7 ? `${project.project_duration_days}d` : `${Math.floor(project.project_duration_days / 7)}w ${project.project_duration_days % 7}d`}
                         </div>
                       </td>
-                      <td className="px-5 py-4 text-center">
+                      <td className="px-5 py-4 text-center whitespace-nowrap">
                         <span className={`inline-flex px-2.5 py-1 rounded-full text-xs font-medium ${project.priority === 'High' ? 'bg-red-50 text-red-700' :
                           project.priority === 'Medium' ? 'bg-amber-50 text-amber-700' :
                             'bg-slate-100 text-slate-600'
@@ -833,10 +833,10 @@ toast.success(wasEditing ? 'Project updated successfully' : 'Project created suc
                           {project.priority}
                         </span>
                       </td>
-                      <td className="px-5 py-4 text-center">
+                      <td className="px-5 py-4 text-center whitespace-nowrap">
                         <div className="font-medium text-slate-700">{parseFloat(((project.estimated_time_per_task || 0) * 60).toFixed(1))}m</div>
                       </td>
-                      <td className="px-5 py-4">
+                      <td className="px-5 py-4 whitespace-nowrap">
                         <div className="space-y-1">
                           <span className={`inline-flex px-2.5 py-1 rounded-full text-xs font-medium ${recommendation === 'Overburdened' ? 'bg-red-50 text-red-700' :
                             recommendation === 'Balanced' ? 'bg-emerald-50 text-emerald-700' :
@@ -853,7 +853,7 @@ toast.success(wasEditing ? 'Project updated successfully' : 'Project created suc
                           )}
                         </div>
                       </td>
-                      <td className="px-5 py-4 text-center">
+                      <td className="px-5 py-4 text-center whitespace-nowrap">
                         <div className="flex items-center justify-center gap-2">
                           <span className={`w-2 h-2 rounded-full ${project.project_status === 'active' ? 'bg-emerald-500' :
                             project.project_status === 'completed' ? 'bg-blue-500' :
@@ -862,7 +862,7 @@ toast.success(wasEditing ? 'Project updated successfully' : 'Project created suc
                           <span className="text-sm text-slate-600 capitalize">{project.project_status}</span>
                         </div>
                       </td>
-                      <td className="px-5 py-4 text-right sticky right-0 bg-white shadow-[-8px_0_8px_-8px_rgba(0,0,0,0.1)]">
+                      <td className="px-5 py-4 text-right sticky right-0 bg-white shadow-[-8px_0_8px_-8px_rgba(0,0,0,0.1)] whitespace-nowrap">
                         <div className="flex items-center justify-end gap-1">
                           <button
                             onClick={() => {
@@ -961,7 +961,7 @@ toast.success(wasEditing ? 'Project updated successfully' : 'Project created suc
       </div>
 
       {isModalOpen && (
-        <div className="fixed inset-0 bg-gray-900 bg-opacity-50 flex items-center justify-center z-50 p-2 sm:p-4">
+        <div className="fixed inset-0 bg-slate-900/40 backdrop-blur-sm flex items-center justify-center z-50 p-2 sm:p-4">
           <div className="bg-white rounded-lg shadow-xl w-full max-w-full sm:max-w-3xl max-h-[95vh] sm:max-h-[90vh] flex flex-col">
             <div className="px-6 py-4 border-b border-gray-200 flex-shrink-0">
               <div className="flex justify-between items-center">
