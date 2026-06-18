@@ -1,6 +1,7 @@
 import React, { useState, useEffect } from 'react';
 import { useNavigate, useSearchParams } from 'react-router-dom';
 import { Save, Plus, ArrowLeft, Link2, Loader2 } from 'lucide-react';
+import toast from 'react-hot-toast';
 import ModuleSectionCard from '../../components/admin/ModuleSectionCard';
 import { onboardingApi } from '../../services/api';
 
@@ -62,7 +63,7 @@ export default function AdminModulesBuilder() {
       })
       .catch(err => {
         console.error('Failed to load module:', err);
-        alert('Failed to load module for editing.');
+        toast.error('Failed to load module for editing.');
       })
       .finally(() => setIsLoading(false));
   }, [editId]);
@@ -89,15 +90,36 @@ export default function AdminModulesBuilder() {
 
   const handleSave = async () => {
     if (!title.trim()) {
-      alert('Please enter a module title.');
+      toast.error('Module title is required.');
       return;
     }
-    
-    // Validate that sections have titles
+    if (!description.trim()) {
+      toast.error('Module description is required.');
+      return;
+    }
+
+    // Validate sections and any quiz questions they contain
     for (let i = 0; i < sections.length; i++) {
-      if (!sections[i].title.trim()) {
-        alert(`Please enter a title for section #${i + 1}.`);
+      const section = sections[i];
+      if (!section.title.trim()) {
+        toast.error(`Section #${i + 1}: a title is required.`);
         return;
+      }
+      if (!section.description.trim()) {
+        toast.error(`Section #${i + 1}: a description is required.`);
+        return;
+      }
+      const questions = section.questions || [];
+      for (let j = 0; j < questions.length; j++) {
+        const q = questions[j];
+        if (!q.question.trim()) {
+          toast.error(`Section #${i + 1}, Question ${j + 1}: question text is required.`);
+          return;
+        }
+        if ((q.options || []).some(opt => !opt.trim())) {
+          toast.error(`Section #${i + 1}, Question ${j + 1}: all four options are required.`);
+          return;
+        }
       }
     }
 
@@ -138,11 +160,11 @@ export default function AdminModulesBuilder() {
         await onboardingApi.createModule(payload);
       }
       
-      alert(editId ? 'Module updated successfully!' : 'Module created successfully!');
+      toast.success(editId ? 'Module updated successfully!' : 'Module created successfully!');
       navigate('/admin/modules');
     } catch (err) {
       console.error('Error saving module:', err);
-      alert('Error saving module. Please make sure the backend is running.');
+      toast.error('Error saving module. Please make sure the backend is running.');
     } finally {
       setIsSaving(false);
     }
@@ -190,13 +212,13 @@ export default function AdminModulesBuilder() {
         <div className="bg-white p-6 rounded-2xl shadow-[0_1px_3px_rgba(0,0,0,0.04)] border border-slate-200/60 p-6 border-t-4 border-t-indigo-650">
           <div className="space-y-4">
             <div>
-              <label className="block text-sm font-bold text-slate-700 mb-1">Module Title</label>
+              <label className="block text-sm font-bold text-slate-700 mb-1">Module Title <span className="text-red-500">*</span></label>
               <input type="text" value={title} onChange={e => setTitle(e.target.value)}
                 className="w-full px-4 py-2 border border-slate-300 rounded-lg focus:ring-2 focus:ring-indigo-500 focus:border-transparent outline-none transition-all font-medium text-slate-900"
                 placeholder="e.g. Welcome to the Company" />
             </div>
             <div>
-              <label className="block text-sm font-bold text-slate-700 mb-1">Description</label>
+              <label className="block text-sm font-bold text-slate-700 mb-1">Description <span className="text-red-500">*</span></label>
               <textarea value={description} onChange={e => setDescription(e.target.value)}
                 className="w-full px-4 py-2 border border-slate-300 rounded-lg focus:ring-2 focus:ring-indigo-500 focus:border-transparent outline-none transition-all text-sm text-slate-900"
                 rows={3} placeholder="Brief overview of what candidates will learn..." />
@@ -211,14 +233,6 @@ export default function AdminModulesBuilder() {
                 className="w-full px-4 py-2 border border-slate-300 rounded-lg focus:ring-2 focus:ring-indigo-500 focus:border-transparent outline-none transition-all text-sm text-slate-900"
                 placeholder="https://your-assessment-portal.com/test/..." />
               <p className="text-xs text-slate-400 mt-1">Candidates will see a "Take Assessment" button that opens this link.</p>
-            </div>
-
-            <div>
-              <label className="block text-sm font-bold text-slate-700 mb-1">Module Sequence Order (Serial Number)</label>
-              <input type="number" value={order} onChange={e => setOrder(Math.max(0, parseInt(e.target.value) || 0))}
-                className="w-full max-w-[200px] px-4 py-2 border border-slate-300 rounded-lg focus:ring-2 focus:ring-indigo-500 focus:border-transparent outline-none transition-all text-sm text-slate-900 font-medium"
-                min={0} placeholder="e.g. 1" />
-              <p className="text-xs text-slate-400 mt-1">Determine the numerical sequence in which this module is displayed (ascending order).</p>
             </div>
 
             <div>
