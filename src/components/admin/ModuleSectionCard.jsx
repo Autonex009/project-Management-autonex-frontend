@@ -12,6 +12,9 @@ export default function ModuleSectionCard({ index, section, onChange, onRemove }
     onChange({ ...section, [field]: value });
   };
 
+  const hasVideo = Boolean(section.videoUrl && section.videoUrl.trim());
+  const hasQuestions = Array.isArray(section.questions) && section.questions.length > 0;
+
   const addQuestion = () => {
     onChange({
       ...section,
@@ -44,9 +47,11 @@ export default function ModuleSectionCard({ index, section, onChange, onRemove }
   };
 
   const removeQuestion = (qId) => {
+    const remaining = section.questions.filter(q => q.id !== qId);
     onChange({
       ...section,
-      questions: section.questions.filter(q => q.id !== qId)
+      questions: remaining,
+      ...(remaining.length === 0 ? { quizPassingScore: 0 } : {})
     });
   };
 
@@ -100,6 +105,7 @@ export default function ModuleSectionCard({ index, section, onChange, onRemove }
           <span className="font-semibold text-slate-700">#{index + 1}</span>
           <input type="text" value={section.title} onChange={e => updateField('title', e.target.value)}
             placeholder="Section Title" className="bg-transparent border-none font-semibold text-slate-900 focus:outline-none focus:ring-0 placeholder-slate-400 w-64" />
+          <span className="text-red-500 font-bold" title="Required">*</span>
         </div>
         <button onClick={onRemove} className="text-red-500 hover:text-red-700 transition-colors p-1">
           <Trash2 className="h-4 w-4" />
@@ -108,7 +114,7 @@ export default function ModuleSectionCard({ index, section, onChange, onRemove }
 
       <div className="p-5 space-y-6">
         <div>
-          <label className="block text-sm font-medium text-slate-700 mb-1">Description</label>
+          <label className="block text-sm font-medium text-slate-700 mb-1">Description <span className="text-red-500">*</span></label>
           <textarea value={section.description} onChange={e => updateField('description', e.target.value)}
             className="w-full px-3 py-2 border border-slate-300 rounded-md text-sm focus:ring-2 focus:border-indigo-500 focus:outline-none placeholder-slate-400"
             rows={2} placeholder="What will candidates learn in this section?" />
@@ -117,30 +123,36 @@ export default function ModuleSectionCard({ index, section, onChange, onRemove }
         <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
           <div>
             <label className="block text-sm font-medium text-slate-700 mb-1 flex items-center gap-1"><Video className="h-4 w-4 text-slate-400"/> Video URL (Google Drive)</label>
-            <input type="text" value={section.videoUrl} onChange={e => updateField('videoUrl', e.target.value)}
+            <input type="text" value={section.videoUrl} onChange={e => onChange({ ...section, videoUrl: e.target.value, ...(e.target.value.trim() ? {} : { videoDuration: '' }) })}
               className="w-full px-3 py-2 border border-slate-300 rounded-md text-sm focus:ring-2 focus:border-indigo-500 focus:outline-none placeholder-slate-400"
               placeholder="https://drive.google.com/file/d/.../view" />
           </div>
           <div>
-            <label className="block text-sm font-medium text-slate-700 mb-1">Duration</label>
+            <label className={`block text-sm font-medium mb-1 ${hasVideo ? 'text-slate-700' : 'text-slate-400'}`}>Duration</label>
             <input type="text" value={section.videoDuration} onChange={e => updateField('videoDuration', e.target.value)}
-              className="w-full px-3 py-2 border border-slate-300 rounded-md text-sm focus:ring-2 focus:border-indigo-500 focus:outline-none placeholder-slate-400"
+              disabled={!hasVideo}
+              title={hasVideo ? '' : 'Add a video URL to set a duration'}
+              className="w-full px-3 py-2 border border-slate-300 rounded-md text-sm focus:ring-2 focus:border-indigo-500 focus:outline-none placeholder-slate-400 disabled:bg-slate-100 disabled:text-slate-400 disabled:opacity-60 disabled:cursor-not-allowed"
               placeholder="e.g. 15 min" />
           </div>
         </div>
 
-        <div>
-          <label className="block text-sm font-medium text-slate-700 mb-1">Quiz Passing Marks (%)</label>
+        <div title={hasQuestions ? '' : 'Add at least one quiz question below to set a passing score'}>
+          <label className={`block text-sm font-medium mb-1 ${hasQuestions ? 'text-slate-700' : 'text-slate-400'}`}>Quiz Passing Marks (%)</label>
           <input
             type="number"
             min={0}
             max={100}
             value={section.quizPassingScore || 0}
             onChange={e => updateField('quizPassingScore', Math.max(0, Math.min(100, Number(e.target.value) || 0)))}
-            className="w-full md:w-56 px-3 py-2 border border-slate-300 rounded-md text-sm focus:ring-2 focus:border-indigo-500 focus:outline-none placeholder-slate-400"
+            disabled={!hasQuestions}
+            title={hasQuestions ? '' : 'Add at least one quiz question below to set a passing score'}
+            className="w-full md:w-56 px-3 py-2 border border-slate-300 rounded-md text-sm focus:ring-2 focus:border-indigo-500 focus:outline-none placeholder-slate-400 disabled:bg-slate-100 disabled:text-slate-400 disabled:opacity-60 disabled:cursor-not-allowed"
             placeholder="0"
           />
-          <p className="text-xs text-slate-400 mt-1">Set `0` if you do not want a minimum passing score for this quiz.</p>
+          <p className="text-xs text-slate-400 mt-1">
+            {hasQuestions ? 'Set `0` if you do not want a minimum passing score for this quiz.' : 'Add quiz questions below to enable a passing score.'}
+          </p>
         </div>
 
         {/* Document Section — Real Inputs */}
@@ -197,7 +209,7 @@ export default function ModuleSectionCard({ index, section, onChange, onRemove }
                 <div className="flex justify-between gap-4 mb-3">
                   <input type="text" value={q.question} onChange={e => updateQuestion(q.id, 'question', e.target.value)}
                     className="flex-1 px-3 py-2 border border-slate-300 rounded-md text-sm focus:ring-2 focus:border-indigo-500 focus:outline-none font-medium placeholder-slate-400"
-                    placeholder={`Question ${qIdx + 1}`} />
+                    placeholder={`Question ${qIdx + 1} *`} />
                   <button type="button" onClick={() => removeQuestion(q.id)} className="text-red-500 hover:text-red-700 text-sm font-medium bg-red-50 hover:bg-red-100 px-3 py-1 rounded-md transition-colors">
                     Remove
                   </button>
@@ -215,7 +227,7 @@ export default function ModuleSectionCard({ index, section, onChange, onRemove }
                       </button>
                       <input type="text" value={opt} onChange={e => updateOption(q.id, optIdx, e.target.value)}
                         className={`flex-1 px-3 py-1.5 border rounded-md text-sm focus:outline-none transition-colors ${q.correctIndex === optIdx ? 'border-green-300 bg-green-50' : 'border-slate-300 focus:border-indigo-500'}`}
-                        placeholder={`Option ${optIdx + 1}`} />
+                        placeholder={`Option ${optIdx + 1} *`} />
                     </div>
                   ))}
                 </div>
