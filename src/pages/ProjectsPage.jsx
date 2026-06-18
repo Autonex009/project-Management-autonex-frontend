@@ -774,14 +774,16 @@ toast.success(wasEditing ? 'Project updated successfully' : 'Project created suc
                         </span>
                       </td>
                       <td className="px-5 py-4">
-                        <div className="flex flex-wrap gap-1">
-                          {project.required_expertise?.slice(0, 2).map((skill, idx) => (
-                            <span key={idx} className="text-xs text-slate-500 bg-slate-100 px-2 py-0.5 rounded">
-                              {skill}
-                            </span>
-                          ))}
-                          {project.required_expertise?.length > 2 && (
-                            <span className="text-xs text-slate-400">+{project.required_expertise.length - 2}</span>
+                        <div className="text-xs text-slate-600 font-medium">
+                          {project.required_expertise && project.required_expertise.length > 0 ? (
+                            <>
+                              <span>{project.required_expertise.slice(0, 2).join(', ')}</span>
+                              {project.required_expertise.length > 2 && (
+                                <span className="text-slate-400"> +{project.required_expertise.length - 2}</span>
+                              )}
+                            </>
+                          ) : (
+                            <span className="text-slate-400">—</span>
                           )}
                         </div>
                       </td>
