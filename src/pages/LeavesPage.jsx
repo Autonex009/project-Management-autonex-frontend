@@ -5,7 +5,7 @@ import { Plus, X, Calendar, Trash2, CheckCircle, XCircle, Clock, AlertTriangle, 
 import { format } from 'date-fns';
 import toast from 'react-hot-toast';
 import { getEndDateValidationMessage, isEndDateBeforeStartDate } from '../utils/dateValidation';
-import { getLeaveTypeBadgeClass, getLeaveTypeLabel, LEAVE_TYPE_OPTIONS, getWorkingDayCount } from '../utils/leaveTypes';
+import { getLeaveTypeBadgeClass, getLeaveTypeLabel, LEAVE_TYPE_OPTIONS, getWorkingDayCount, validateConsecutiveLeaves } from '../utils/leaveTypes';
 import LeaveCalendar from '../components/LeaveCalendar';
 
 const TABS = ['Leave List', 'Calendar', 'WFH Requests'];
@@ -158,6 +158,15 @@ const LeavesPage = () => {
         toast.error(getEndDateValidationMessage());
         return;
       }
+    }
+
+    const empIdInt = parseInt(employeeId);
+    const empLeaves = leaves.filter(l => l.employee_id === empIdInt);
+
+    // Validate consecutive leaves safeguard
+    if (leaveType !== 'wfh' && !validateConsecutiveLeaves(startDate, endDate, empLeaves, null, isHalf)) {
+      toast.error('Safe guard triggered: You cannot apply for 4 or more consecutive leaves.');
+      return;
     }
 
     createMutation.mutate({

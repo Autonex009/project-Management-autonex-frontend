@@ -287,6 +287,9 @@ export default function LeaveCalendar({ filterEmployeeIds = null }) {
             const end   = new Date(leave.end_date   + 'T00:00:00');
             for (let d = new Date(start); d <= end; d.setDate(d.getDate() + 1)) {
                 const key = `${d.getFullYear()}-${String(d.getMonth()+1).padStart(2,'0')}-${String(d.getDate()).padStart(2,'0')}`;
+                if (isNonWorkingDay(key)) {
+                    continue;
+                }
                 if (!map[key]) map[key] = [];
                 map[key].push({ ...leave, kind: 'leave' });
             }
@@ -320,11 +323,70 @@ export default function LeaveCalendar({ filterEmployeeIds = null }) {
         !isValidFloaterDate(selectedStart)
     );
 
+    // Calculate adjacent leaves for the current employee
+    let adjacentBefore = 0;
+    let adjacentAfter = 0;
+    if (selectedStart && selectedEnd && employeeId && leaveType && leaveType !== 'wfh') {
+        // Walk backwards from selectedStart
+        let cur = new Date(selectedStart + 'T00:00:00');
+        cur.setDate(cur.getDate() - 1);
+        let searching = true;
+        while (searching) {
+            const y = cur.getFullYear();
+            const m = String(cur.getMonth() + 1).padStart(2, '0');
+            const d = String(cur.getDate()).padStart(2, '0');
+            const ds = `${y}-${m}-${d}`;
+            
+            if (!isNonWorkingDay(ds)) {
+                const dayEvents = eventsByDate[ds] || [];
+                const hasLeave = dayEvents.some(ev => ev.kind === 'leave' && ev.employee_id === employeeId && ev.status !== 'rejected' && !ev.is_half_day && ev.leave_type !== 'first_half' && ev.leave_type !== 'second_half');
+                if (hasLeave) {
+                    adjacentBefore++;
+                } else {
+                    searching = false;
+                }
+            }
+            cur.setDate(cur.getDate() - 1);
+            if (adjacentBefore >= 4 || (new Date(selectedStart + 'T00:00:00') - cur) / (1000 * 60 * 60 * 24) > 15) {
+                searching = false;
+            }
+        }
+
+        // Walk forwards from selectedEnd
+        cur = new Date(selectedEnd + 'T00:00:00');
+        cur.setDate(cur.getDate() + 1);
+        searching = true;
+        while (searching) {
+            const y = cur.getFullYear();
+            const m = String(cur.getMonth() + 1).padStart(2, '0');
+            const d = String(cur.getDate()).padStart(2, '0');
+            const ds = `${y}-${m}-${d}`;
+            
+            if (!isNonWorkingDay(ds)) {
+                const dayEvents = eventsByDate[ds] || [];
+                const hasLeave = dayEvents.some(ev => ev.kind === 'leave' && ev.employee_id === employeeId && ev.status !== 'rejected' && !ev.is_half_day && ev.leave_type !== 'first_half' && ev.leave_type !== 'second_half');
+                if (hasLeave) {
+                    adjacentAfter++;
+                } else {
+                    searching = false;
+                }
+            }
+            cur.setDate(cur.getDate() + 1);
+            if (adjacentAfter >= 4 || (cur - new Date(selectedEnd + 'T00:00:00')) / (1000 * 60 * 60 * 24) > 15) {
+                searching = false;
+            }
+        }
+    }
+
+    const totalConsecutive = workingDays + adjacentBefore + adjacentAfter;
+
     // Form errors
     let validationError = null;
     if (selectedStart && selectedEnd) {
         if (workingDays === 0) {
             validationError = "No working days in this range — weekends and fixed holidays are automatically skipped.";
+        } else if (leaveType && leaveType !== 'wfh' && totalConsecutive >= 4) {
+            validationError = "Safe guard triggered: You cannot apply for 4 or more consecutive leaves.";
         } else if (isFloaterType) {
             if (selectedStart !== selectedEnd) {
                 validationError = "Floater leave must be taken as a single day.";

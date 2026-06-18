@@ -5,7 +5,7 @@ import { Calendar, Plus, X, CheckCircle, XCircle, Clock, Home, AlertTriangle, Pe
 import { format, parseISO } from 'date-fns';
 import toast from 'react-hot-toast';
 import { getEndDateValidationMessage, isEndDateBeforeStartDate } from '../utils/dateValidation';
-import { getLeaveTypeLabel, LEAVE_TYPE_OPTIONS, RAZORPAY_NEGATIVE_BALANCE_NOTE, FLOATER_DATES_2026, isValidFloaterDate, getFloaterDateLabel, isNonWorkingDay, getNonWorkingDayLabel, getWorkingDayCount, countNonWorkingDaysInRange, toLocalISODate, ANNUAL_LEAVE_QUOTA, INTERN_MONTHLY_PAID_QUOTA, isIntern, normalizeLeaveType } from '../utils/leaveTypes';
+import { getLeaveTypeLabel, LEAVE_TYPE_OPTIONS, RAZORPAY_NEGATIVE_BALANCE_NOTE, FLOATER_DATES_2026, isValidFloaterDate, getFloaterDateLabel, isNonWorkingDay, getNonWorkingDayLabel, getWorkingDayCount, countNonWorkingDaysInRange, toLocalISODate, ANNUAL_LEAVE_QUOTA, INTERN_MONTHLY_PAID_QUOTA, isIntern, normalizeLeaveType, validateConsecutiveLeaves } from '../utils/leaveTypes';
 import LeaveCalendar from './LeaveCalendar';
 
 const TABS = ['My Leaves', 'Calendar', 'Work From Home'];
@@ -360,6 +360,12 @@ const MyLeavesPanel = ({
             }
         }
 
+        // Validate consecutive leaves safeguard
+        if (leaveForm.leave_type !== 'wfh' && !validateConsecutiveLeaves(sDate, eDate, allLeaves, null, isHalf)) {
+            toast.error('Safe guard triggered: You cannot apply for 4 or more consecutive leaves.');
+            return;
+        }
+
         createLeaveMutation.mutate({
             ...leaveForm,
             is_half_day: isHalf,
@@ -424,6 +430,12 @@ const MyLeavesPanel = ({
                 toast.error('End date is not an approved floater holiday date.');
                 return;
             }
+        }
+
+        // Validate consecutive leaves safeguard
+        if (editForm.leave_type !== 'wfh' && !validateConsecutiveLeaves(sDate, eDate, allLeaves, editingLeave.leave_id, isHalf)) {
+            toast.error('Safe guard triggered: You cannot apply for 4 or more consecutive leaves.');
+            return;
         }
 
         updateLeaveMutation.mutate({

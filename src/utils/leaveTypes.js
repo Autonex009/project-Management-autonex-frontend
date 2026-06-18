@@ -192,3 +192,67 @@ export function getLeaveTypeLabel(value) {
 export function getLeaveTypeBadgeClass(value) {
   return LEAVE_TYPE_BADGES[normalizeLeaveType(value)] || 'bg-slate-100 text-slate-600';
 }
+
+export function validateConsecutiveLeaves(startDateStr, endDateStr, leavesList, excludeLeaveId = null, isHalfDay = false) {
+  if (isHalfDay) return true;
+  if (!startDateStr || !endDateStr) return true;
+  
+  const start = new Date(startDateStr + 'T00:00:00');
+  const end = new Date(endDateStr + 'T00:00:00');
+  
+  const windowStart = new Date(start);
+  windowStart.setDate(windowStart.getDate() - 10);
+  const windowEnd = new Date(end);
+  windowEnd.setDate(windowEnd.getDate() + 10);
+
+  const leaveDates = new Set();
+
+  // Add new leave's working days
+  let cur = new Date(start);
+  while (cur <= end) {
+    const ds = toLocalISODate(cur);
+    if (!isNonWorkingDay(ds)) {
+      leaveDates.add(ds);
+    }
+    cur.setDate(cur.getDate() + 1);
+  }
+
+  // Add existing non-rejected leaves' working days
+  leavesList.forEach(l => {
+    if (l.status === 'rejected' || l.leave_id === excludeLeaveId) return;
+    if (l.is_half_day || l.leave_type === 'first_half' || l.leave_type === 'second_half') return;
+    
+    let lStart = new Date(l.start_date + 'T00:00:00');
+    let lEnd = new Date(l.end_date + 'T00:00:00');
+    
+    let c = new Date(lStart < windowStart ? windowStart : lStart);
+    let actualEnd = lEnd > windowEnd ? windowEnd : lEnd;
+    
+    while (c <= actualEnd) {
+      const ds = toLocalISODate(c);
+      if (!isNonWorkingDay(ds)) {
+        leaveDates.add(ds);
+      }
+      c.setDate(c.getDate() + 1);
+    }
+  });
+
+  // Scan the window day-by-day and track consecutive run
+  let consecutiveRun = 0;
+  cur = new Date(windowStart);
+  while (cur <= windowEnd) {
+    const ds = toLocalISODate(cur);
+    if (!isNonWorkingDay(ds)) {
+      if (leaveDates.has(ds)) {
+        consecutiveRun++;
+        if (consecutiveRun >= 4) {
+          return false; // Safely blocked!
+        }
+      } else {
+        consecutiveRun = 0;
+      }
+    }
+    cur.setDate(cur.getDate() + 1);
+  }
+  return true;
+}
