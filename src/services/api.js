@@ -88,13 +88,17 @@ export const recommendationsApi = {
 export const parentProjectApi = projectApi;
 
 export const employeeApi = {
-    getAll: () => api.get('/employees').then(res => res.data),
+    getAll: (params) => api.get('/employees', { params }).then(res => res.data),
     getOne: (id) => api.get(`/employees/${id}`).then(res => res.data),
     create: (data) => api.post('/employees', data).then(res => res.data),
     update: (id, data) => api.put(`/employees/${id}`, data).then(res => res.data),
     delete: (id) => api.delete(`/employees/${id}`).then(res => res.data),
     getAvailability: (id) => api.get(`/employees/${id}/availability`).then(res => res.data),
     convertToFulltime: (id, data) => api.post(`/employees/${id}/convert-to-fulltime`, data).then(res => res.data),
+    restore: (id) => api.post(`/employees/${id}/restore`).then(res => res.data),
+    getActive: () => api.get('/employees/status/active').then(res => res.data),
+    getInactive: () => api.get('/employees/status/inactive').then(res => res.data),
+    getIdle: () => api.get('/employees/status/idle').then(res => res.data),
 };
 
 export const allocationApi = {
@@ -218,6 +222,7 @@ export const notificationApi = {
     getAll: (userId) => api.get('/notifications', { params: { user_id: userId } }).then(res => res.data),
     markRead: (id, userId) => api.patch(`/notifications/${id}/read`, null, { params: { user_id: userId } }).then(res => res.data),
     markAllRead: (userId) => api.patch('/notifications/read-all', null, { params: { user_id: userId } }).then(res => res.data),
+    clearRead: (userId) => api.delete('/notifications/clear-read', { params: { user_id: userId } }).then(res => res.data),
 };
 
 // === Onboarding API ===
@@ -250,6 +255,23 @@ export const onboardingApi = {
     getMentees: (mentorId) => api.get(`/onboarding/mentors/${mentorId}/mentees`).then(res => res.data),
     getReports: () => api.get('/onboarding/reports').then(res => res.data),
     getReportsExportUrl: () => `${apiBaseUrl}/onboarding/reports/export`,
+    exportReports: () => api.get('/onboarding/reports/export', { responseType: 'blob' }).then(res => res.data),
+};
+
+// === Company Settings API ===
+export const companySettingsApi = {
+    getAll: () => api.get('/company-settings').then(res => res.data),
+    get: (key) => api.get(`/company-settings/${key}`).then(res => res.data),
+    upsert: (key, data) => api.put(`/company-settings/${key}`, data).then(res => res.data),
+    delete: (key) => api.delete(`/company-settings/${key}`).then(res => res.data),
+};
+
+// === WiFi Networks API ===
+export const wifiNetworksApi = {
+    getAll: () => api.get('/wifi-networks').then(res => res.data),
+    create: (data) => api.post('/wifi-networks', data).then(res => res.data),
+    update: (id, data) => api.put(`/wifi-networks/${id}`, data).then(res => res.data),
+    delete: (id) => api.delete(`/wifi-networks/${id}`).then(res => res.data),
 };
 
 export default api;

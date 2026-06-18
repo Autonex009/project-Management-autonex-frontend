@@ -16,7 +16,21 @@ export default function AdminReportsPage() {
   }, []);
 
   const handleExportCSV = () => {
-    window.location.href = onboardingApi.getReportsExportUrl();
+    onboardingApi.exportReports()
+      .then(blob => {
+        const url = window.URL.createObjectURL(blob);
+        const a = document.createElement('a');
+        a.href = url;
+        a.download = `autonex_candidates_report.csv`;
+        document.body.appendChild(a);
+        a.click();
+        document.body.removeChild(a);
+        window.URL.revokeObjectURL(url);
+      })
+      .catch(err => {
+        console.error('Export failed:', err);
+        alert('Export failed');
+      });
   };
 
   const filteredReports = reports.filter(r => 

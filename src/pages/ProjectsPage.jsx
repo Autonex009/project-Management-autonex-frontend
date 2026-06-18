@@ -328,9 +328,9 @@ const ProjectsPage = () => {
     mutationFn: subProjectApi.delete,
     onSuccess: () => {
       queryClient.invalidateQueries(['sub-projects']);
-      toast.success('Sub-project deleted successfully');
+      toast.success('Project deleted successfully');
     },
-    onError: (err) => toast.error(err.response?.data?.detail || 'Failed to delete sub-project'),
+    onError: (err) => toast.error(err.response?.data?.detail || 'Failed to delete project'),
   });
 
   const resetModalState = () => {
@@ -429,7 +429,7 @@ const ProjectsPage = () => {
       }
     } catch (error) {
       const detail = error.response?.data?.detail;
-      let message = 'Failed to save sub-project';
+      let message = 'Failed to save project';
       if (typeof detail === 'string') {
         message = detail;
       } else if (Array.isArray(detail)) {
@@ -450,14 +450,14 @@ const ProjectsPage = () => {
     const wasEditing = Boolean(editingProject);
     const filesToUpload = guidelineFiles;
     resetModalState();
-    toast.success(wasEditing ? 'Sub-project updated successfully' : 'Sub-project created successfully');
+toast.success(wasEditing ? 'Project updated successfully' : 'Project created successfully');
 
     try {
       if (filesToUpload.length > 0) {
         await uploadGuidelinesForProject(savedProject.id, selectedMainProjectId, filesToUpload);
       }
     } catch (error) {
-      toast.error('Sub-project saved, but guideline upload failed. You can re-upload from the Guidelines page.');
+      toast.error('Project saved, but guideline upload failed. You can re-upload from the Guidelines page.');
     }
 
     await Promise.all([
@@ -567,8 +567,10 @@ const ProjectsPage = () => {
     return { label, dailyHours: avgDailyHoursPerEmployee, workingDays, effectiveDays: totalEffectiveEmployeeDays };
   };
 
-  const [searchParams] = useSearchParams();
+  const [searchParams, setSearchParams] = useSearchParams();
   const filterMainProjectId = searchParams.get('project');
+  const statusParam = searchParams.get('status');
+  const recommendationParam = searchParams.get('recommendation');
   const [subProjectSearch, setSubProjectSearch] = useState('');
   const [currentPage, setCurrentPage] = useState(1);
   const PAGE_SIZE = 10;
@@ -577,13 +579,20 @@ const ProjectsPage = () => {
     ? visibleProjects.filter(p => p.main_project_id === parseInt(filterMainProjectId))
     : visibleProjects
   )
-    .filter(p => p.name.toLowerCase().includes(subProjectSearch.toLowerCase()))
+    .filter(p => {
+      if (statusParam && p.project_status !== statusParam) return false;
+      if (recommendationParam) {
+        const recResult = getSystemRecommendation(p);
+        if (recResult.label.toLowerCase() !== recommendationParam.toLowerCase()) return false;
+      }
+      return p.name.toLowerCase().includes(subProjectSearch.toLowerCase());
+    })
     .sort((a, b) => a.name.localeCompare(b.name));
 
   // Reset to page 1 when filters change
   useEffect(() => {
     setCurrentPage(1);
-  }, [subProjectSearch, filterMainProjectId]);
+  }, [subProjectSearch, filterMainProjectId, statusParam, recommendationParam]);
 
   const totalPages = Math.ceil(filteredProjects.length / PAGE_SIZE);
   const paginatedProjects = filteredProjects.slice((currentPage - 1) * PAGE_SIZE, currentPage * PAGE_SIZE);
@@ -600,10 +609,10 @@ const ProjectsPage = () => {
 
   return (
     <div className="space-y-6 p-2">
-      <div className="flex items-center justify-between">
+      <div className="flex flex-col md:flex-row md:items-center justify-between gap-4">
         <div>
           <h1 className="text-2xl font-bold text-slate-900">
-            {currentMainProject ? `Sub-Projects for ${currentMainProject.name}` : 'All Sub-Projects'}
+            {currentMainProject ? `Projects for ${currentMainProject.name}` : 'All Projects'}
           </h1>
           <p className="text-slate-500 text-sm mt-1">
             {currentMainProject
@@ -611,15 +620,15 @@ const ProjectsPage = () => {
               : 'Manage tasks and resource allocation across all projects'}
           </p>
         </div>
-        <div className="flex items-center gap-3">
-          <div className="relative">
+        <div className="flex flex-wrap items-center gap-2">
+          <div className="relative flex-1 sm:flex-none">
             <Search className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-slate-400 pointer-events-none" />
             <input
               type="text"
-              placeholder="Search sub-projects..."
+              placeholder="Search projects..."
               value={subProjectSearch}
               onChange={e => setSubProjectSearch(e.target.value)}
-              className="pl-9 pr-4 py-2 text-sm bg-white border border-slate-200 rounded-xl focus:outline-none focus:ring-2 focus:ring-indigo-100 focus:border-indigo-300 w-52 placeholder:text-slate-400"
+              className="pl-9 pr-4 py-2 text-sm bg-white border border-slate-200 rounded-xl focus:outline-none focus:ring-2 focus:ring-indigo-100 focus:border-indigo-300 w-full sm:w-52 placeholder:text-slate-400"
             />
           </div>
           <Link
@@ -627,7 +636,7 @@ const ProjectsPage = () => {
             className="inline-flex items-center gap-2 px-4 py-2.5 bg-white border border-slate-200 text-slate-700 font-medium text-sm rounded-xl shadow-sm hover:bg-slate-50 transition-colors"
           >
             <Settings className="w-4 h-4" />
-            Projects
+            Organizations
           </Link>
           <button
             onClick={() => {
@@ -639,38 +648,84 @@ const ProjectsPage = () => {
             className="inline-flex items-center gap-2 px-4 py-2.5 bg-indigo-600 hover:bg-indigo-700 text-white font-medium text-sm rounded-xl shadow-sm transition-colors"
           >
             <Plus className="w-4 h-4" />
-            Add Sub-Project
+            Add Project
           </button>
         </div>
       </div>
+
+      {/* Active Filters Bar */}
+      {(statusParam || recommendationParam) && (
+        <div className="flex items-center gap-2 flex-wrap bg-slate-50 border border-slate-200/60 rounded-xl px-4 py-2.5">
+          <span className="text-xs font-semibold text-slate-500 uppercase tracking-wider">Active Filters:</span>
+          {statusParam && (
+            <span className="inline-flex items-center gap-1.5 px-2.5 py-1 rounded-full text-xs font-medium bg-indigo-50 text-indigo-700 border border-indigo-200">
+              Status: {statusParam}
+              <button 
+                onClick={() => {
+                  const params = new URLSearchParams(searchParams);
+                  params.delete('status');
+                  setSearchParams(params);
+                }} 
+                className="hover:bg-indigo-100 rounded-full p-0.5"
+              >
+                <X className="w-3 h-3" />
+              </button>
+            </span>
+          )}
+          {recommendationParam && (
+            <span className="inline-flex items-center gap-1.5 px-2.5 py-1 rounded-full text-xs font-medium bg-red-50 text-red-700 border border-red-200">
+              Recommendation: {recommendationParam}
+              <button 
+                onClick={() => {
+                  const params = new URLSearchParams(searchParams);
+                  params.delete('recommendation');
+                  setSearchParams(params);
+                }} 
+                className="hover:bg-red-100 rounded-full p-0.5"
+              >
+                <X className="w-3 h-3" />
+              </button>
+            </span>
+          )}
+          <button
+            onClick={() => {
+              const params = new URLSearchParams(searchParams);
+              params.delete('status');
+              params.delete('recommendation');
+              setSearchParams(params);
+            }}
+            className="text-xs font-medium text-slate-500 hover:text-slate-800 transition-colors ml-auto"
+          >
+            Clear all
+          </button>
+        </div>
+      )}
 
       <div className="bg-white rounded-2xl border border-slate-200/60 shadow-[0_1px_3px_rgba(0,0,0,0.04)] overflow-hidden">
         <div className="overflow-x-auto">
           <table className="w-full text-sm">
             <thead className="bg-slate-50/80 border-b border-slate-100">
               <tr>
-                <th className="px-5 py-4 text-left text-xs font-bold text-slate-800 uppercase tracking-wider">Parent</th>
-                <th className="px-5 py-4 text-left text-xs font-bold text-slate-800 uppercase tracking-wider">Sub-Project</th>
-                <th className="px-5 py-4 text-left text-xs font-bold text-slate-800 uppercase tracking-wider">Project Manager</th>
-                <th className="px-5 py-4 text-left text-xs font-bold text-slate-800 uppercase tracking-wider">Skills</th>
-                <th className="px-5 py-4 text-center text-xs font-bold text-slate-800 uppercase tracking-wider">Required</th>
-                <th className="px-5 py-4 text-center text-xs font-bold text-slate-800 uppercase tracking-wider">Allocated</th>
-                <th className="px-5 py-4 text-left text-xs font-bold text-slate-800 uppercase tracking-wider">Timeline</th>
-                <th className="px-5 py-4 text-center text-xs font-bold text-slate-800 uppercase tracking-wider">Priority</th>
-                <th className="px-5 py-4 text-center text-xs font-bold text-slate-800 uppercase tracking-wider">Avg Time</th>
-                <th className="px-5 py-4 text-left text-xs font-bold text-slate-800 uppercase tracking-wider">Recommendation</th>
-                <th className="px-5 py-4 text-center text-xs font-bold text-slate-800 uppercase tracking-wider">Status</th>
-                <th className="px-5 py-4 text-right text-xs font-bold text-slate-800 uppercase tracking-wider sticky right-0 bg-slate-50 shadow-[-8px_0_8px_-8px_rgba(0,0,0,0.1)]">Actions</th>
+                <th className="px-5 py-4 text-left text-xs font-bold text-slate-800 uppercase tracking-wider whitespace-nowrap">Project & Org</th>
+                <th className="px-5 py-4 text-left text-xs font-bold text-slate-800 uppercase tracking-wider whitespace-nowrap">Project Manager</th>
+                <th className="px-5 py-4 text-left text-xs font-bold text-slate-800 uppercase tracking-wider whitespace-nowrap">Skills</th>
+                <th className="px-5 py-4 text-center text-xs font-bold text-slate-800 uppercase tracking-wider whitespace-nowrap">Allocated / Req.</th>
+                <th className="px-5 py-4 text-left text-xs font-bold text-slate-800 uppercase tracking-wider whitespace-nowrap">Timeline</th>
+                <th className="px-5 py-4 text-center text-xs font-bold text-slate-800 uppercase tracking-wider whitespace-nowrap">Priority</th>
+                <th className="px-5 py-4 text-center text-xs font-bold text-slate-800 uppercase tracking-wider whitespace-nowrap">Avg Time</th>
+                <th className="px-5 py-4 text-left text-xs font-bold text-slate-800 uppercase tracking-wider whitespace-nowrap">Recommendation</th>
+                <th className="px-5 py-4 text-center text-xs font-bold text-slate-800 uppercase tracking-wider whitespace-nowrap">Status</th>
+                <th className="px-5 py-4 text-right text-xs font-bold text-slate-800 uppercase tracking-wider sticky right-0 bg-slate-50 shadow-[-8px_0_8px_-8px_rgba(0,0,0,0.1)] whitespace-nowrap">Actions</th>
               </tr>
             </thead>
             <tbody className="divide-y divide-slate-100">
               {filteredProjects.length === 0 ? (
                 <tr>
-                  <td colSpan="15" className="text-center py-16 text-slate-400">
+                  <td colSpan="10" className="text-center py-16 text-slate-400">
                     <div className="text-lg font-medium">
-                      {filterMainProjectId ? 'No sub-projects for this project' : 'No sub-projects yet'}
+                      {filterMainProjectId ? 'No projects under this organization' : 'No projects yet'}
                     </div>
-                    <p className="text-sm mt-1">Create your first sub-project to get started</p>
+                    <p className="text-sm mt-1">Create your first project to get started</p>
                   </td>
                 </tr>
               ) : (
@@ -685,10 +740,7 @@ const ProjectsPage = () => {
 
                   return (
                     <tr key={project.id} className="hover:bg-slate-50 transition-colors">
-                      <td className="px-5 py-4">
-                        <div className="font-semibold text-slate-800">{parentProject?.name || '—'}</div>
-                      </td>
-                      <td className="px-5 py-4">
+                      <td className="px-5 py-4 whitespace-nowrap">
                         <div className="flex items-center gap-2">
                           <span className="text-sm text-slate-600 font-semibold">{project.name}</span>
                           {project.is_annotation && (
@@ -697,9 +749,11 @@ const ProjectsPage = () => {
                             </span>
                           )}
                         </div>
-                        <div className="text-xs text-slate-400">{parentProject?.project_type || '—'}</div>
+                        <div className="text-xs text-slate-400 mt-0.5">
+                          {parentProject?.name || '—'} • {parentProject?.project_type || '—'}
+                        </div>
                       </td>
-                      <td className="px-5 py-4">
+                      <td className="px-5 py-4 whitespace-nowrap">
                         <span className="text-sm text-slate-600">
                           {(() => {
                             const mainProject = visibleMainProjects.find(p => p.id === project.main_project_id);
@@ -716,49 +770,54 @@ const ProjectsPage = () => {
                           })()}
                         </span>
                       </td>
-                      <td className="px-5 py-4">
-                        <div className="flex flex-wrap gap-1">
-                          {project.required_expertise?.slice(0, 2).map((skill, idx) => (
-                            <span key={idx} className="text-xs text-slate-500 bg-slate-100 px-2 py-0.5 rounded">
-                              {skill}
-                            </span>
-                          ))}
-                          {project.required_expertise?.length > 2 && (
-                            <span className="text-xs text-slate-400">+{project.required_expertise.length - 2}</span>
+                      <td className="px-5 py-4 whitespace-nowrap">
+                        <div className="text-xs text-slate-600 font-medium">
+                          {project.required_expertise && project.required_expertise.length > 0 ? (
+                            <>
+                              <span>{project.required_expertise.slice(0, 2).join(', ')}</span>
+                              {project.required_expertise.length > 2 && (
+                                <span className="text-slate-400"> +{project.required_expertise.length - 2}</span>
+                              )}
+                            </>
+                          ) : (
+                            <span className="text-slate-400">—</span>
                           )}
                         </div>
                       </td>
-                      <td className="px-5 py-4 text-center">
-                        <div className="font-semibold text-slate-800">{project.required_manpower || '—'}</div>
-                        <div className="text-xs text-slate-400">needed</div>
-                      </td>
-                      <td className="px-5 py-4 text-center">
+                      <td className="px-5 py-4 text-center whitespace-nowrap">
                         {allocatedManpower > 0 ? (
-                          <AllocationPopover
-                            project={project}
-                            allocations={allocations}
-                            employees={employees}
-                            badgeContent={(
-                              <>
-                                <span>Allocated</span>
-                                <span className="font-bold">{allocatedManpower}</span>
-                              </>
-                            )}
-                            onOpenAllocations={() => navigate(`${prefix}/allocations`, { state: { projectId: project.id } })}
-                          />
+                          <div className="inline-flex items-center justify-center">
+                            <AllocationPopover
+                              project={project}
+                              allocations={allocations}
+                              employees={employees}
+                              badgeContent={(
+                                <div className="flex items-center gap-1 text-slate-600 hover:text-indigo-600 transition-colors">
+                                  <span className="font-bold text-slate-800">{allocatedManpower}</span>
+                                  <span className="text-slate-400">/</span>
+                                  <span className="font-semibold text-slate-500">{project.required_manpower || '0'}</span>
+                                  <span className="text-xs text-slate-400 ml-1 font-normal">allocated</span>
+                                </div>
+                              )}
+                              onOpenAllocations={() => navigate(`${prefix}/allocations`, { state: { projectId: project.id } })}
+                            />
+                          </div>
                         ) : (
-                          <button
-                            onClick={() => navigate(`${prefix}/allocations`, { state: { projectId: project.id } })}
-                            className="inline-flex items-center gap-1.5 px-3 py-1.5 bg-amber-50 hover:bg-amber-100 text-amber-700 rounded-lg font-medium text-sm transition-colors border border-amber-200"
-                            title={`${matchingTotal} employees available with matching skills - Click to allocate`}
-                          >
-                            <span className="font-bold">{matchingTotal}</span>
-                            <span>available</span>
-                            <ArrowRight className="w-3.5 h-3.5" />
-                          </button>
+                          <div className="flex flex-col items-center gap-0.5">
+                            <button
+                              onClick={() => navigate(`${prefix}/allocations`, { state: { projectId: project.id } })}
+                              className="inline-flex items-center gap-1 px-2.5 py-1 bg-amber-50 hover:bg-amber-100 text-amber-700 rounded-lg font-medium text-xs transition-colors border border-amber-200"
+                              title={`${matchingTotal} employees available with matching skills - Click to allocate`}
+                            >
+                              <span className="font-bold">{matchingTotal}</span>
+                              <span>available</span>
+                              <ArrowRight className="w-3 h-3" />
+                            </button>
+                            <span className="text-[10px] text-slate-400 font-medium">Req: {project.required_manpower || '0'}</span>
+                          </div>
                         )}
                       </td>
-                      <td className="px-5 py-4">
+                      <td className="px-5 py-4 whitespace-nowrap">
                         <div className="text-sm text-slate-700">
                           {format(new Date(project.start_date), 'MMM d')} — {format(new Date(project.end_date), 'MMM d')}
                         </div>
@@ -766,7 +825,7 @@ const ProjectsPage = () => {
                           {project.project_duration_days < 7 ? `${project.project_duration_days}d` : `${Math.floor(project.project_duration_days / 7)}w ${project.project_duration_days % 7}d`}
                         </div>
                       </td>
-                      <td className="px-5 py-4 text-center">
+                      <td className="px-5 py-4 text-center whitespace-nowrap">
                         <span className={`inline-flex px-2.5 py-1 rounded-full text-xs font-medium ${project.priority === 'High' ? 'bg-red-50 text-red-700' :
                           project.priority === 'Medium' ? 'bg-amber-50 text-amber-700' :
                             'bg-slate-100 text-slate-600'
@@ -774,10 +833,10 @@ const ProjectsPage = () => {
                           {project.priority}
                         </span>
                       </td>
-                      <td className="px-5 py-4 text-center">
+                      <td className="px-5 py-4 text-center whitespace-nowrap">
                         <div className="font-medium text-slate-700">{parseFloat(((project.estimated_time_per_task || 0) * 60).toFixed(1))}m</div>
                       </td>
-                      <td className="px-5 py-4">
+                      <td className="px-5 py-4 whitespace-nowrap">
                         <div className="space-y-1">
                           <span className={`inline-flex px-2.5 py-1 rounded-full text-xs font-medium ${recommendation === 'Overburdened' ? 'bg-red-50 text-red-700' :
                             recommendation === 'Balanced' ? 'bg-emerald-50 text-emerald-700' :
@@ -794,7 +853,7 @@ const ProjectsPage = () => {
                           )}
                         </div>
                       </td>
-                      <td className="px-5 py-4 text-center">
+                      <td className="px-5 py-4 text-center whitespace-nowrap">
                         <div className="flex items-center justify-center gap-2">
                           <span className={`w-2 h-2 rounded-full ${project.project_status === 'active' ? 'bg-emerald-500' :
                             project.project_status === 'completed' ? 'bg-blue-500' :
@@ -803,7 +862,7 @@ const ProjectsPage = () => {
                           <span className="text-sm text-slate-600 capitalize">{project.project_status}</span>
                         </div>
                       </td>
-                      <td className="px-5 py-4 text-right sticky right-0 bg-white shadow-[-8px_0_8px_-8px_rgba(0,0,0,0.1)]">
+                      <td className="px-5 py-4 text-right sticky right-0 bg-white shadow-[-8px_0_8px_-8px_rgba(0,0,0,0.1)] whitespace-nowrap">
                         <div className="flex items-center justify-end gap-1">
                           <button
                             onClick={() => {
@@ -902,12 +961,12 @@ const ProjectsPage = () => {
       </div>
 
       {isModalOpen && (
-        <div className="fixed inset-0 bg-gray-900 bg-opacity-50 flex items-center justify-center z-50 p-2 sm:p-4">
+        <div className="fixed inset-0 bg-slate-900/40 backdrop-blur-sm flex items-center justify-center z-50 p-2 sm:p-4">
           <div className="bg-white rounded-lg shadow-xl w-full max-w-full sm:max-w-3xl max-h-[95vh] sm:max-h-[90vh] flex flex-col">
             <div className="px-6 py-4 border-b border-gray-200 flex-shrink-0">
               <div className="flex justify-between items-center">
                 <h2 className="text-xl font-semibold text-gray-900">
-                  {editingProject ? 'Edit Sub-Project' : copyingProject ? 'Copy Sub-Project' : 'Create New Sub-Project'}
+                  {editingProject ? 'Edit Project' : copyingProject ? 'Copy Project' : 'Create New Project'}
                 </h2>
                 <button
                   onClick={resetModalState}
@@ -923,7 +982,7 @@ const ProjectsPage = () => {
                 <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
                   <div>
                     <label className="block text-sm font-medium text-gray-700 mb-1">
-                      Sub-Project Name <span className="text-red-500">*</span>
+                      Project Name <span className="text-red-500">*</span>
                     </label>
                     <input
                       type="text"
@@ -931,12 +990,12 @@ const ProjectsPage = () => {
                       required
                       defaultValue={(editingProject || copyingProject)?.name}
                       className="input"
-                      placeholder="Enter sub-project name"
+                      placeholder="Enter project name"
                     />
                   </div>
                   <div>
                     <label className="block text-sm font-medium text-gray-700 mb-1">
-                      Parent Project <span className="text-red-500">*</span>
+                      Organization <span className="text-red-500">*</span>
                     </label>
                     {filterMainProjectId && !editingProject && !copyingProject && (
                       <input type="hidden" name="main_project_id" value={filterMainProjectId} />

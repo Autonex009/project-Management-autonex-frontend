@@ -14,8 +14,17 @@ export default function AdminAnalyticsPage() {
   const handleExport = async () => {
     setExporting(true);
     try {
-      window.location.href = onboardingApi.getReportsExportUrl();
+      const blob = await onboardingApi.exportReports();
+      const url = window.URL.createObjectURL(blob);
+      const a = document.createElement('a');
+      a.href = url;
+      a.download = `autonex_candidates_report.csv`;
+      document.body.appendChild(a);
+      a.click();
+      document.body.removeChild(a);
+      window.URL.revokeObjectURL(url);
     } catch (err) {
+      console.error('Export failed:', err);
       alert('Export failed');
     } finally {
       setExporting(false);

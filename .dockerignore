@@ -1,0 +1,15 @@
+node_modules/
+dist/
+build/
+.vite/
+.cache/
+.env
+.env.*
+.git/
+.gitignore
+.vscode/
+.idea/
+.DS_Store
+.vercel/
+coverage/
+npm-debug.log*
