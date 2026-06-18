@@ -13,6 +13,7 @@ export default function ModuleSectionCard({ index, section, onChange, onRemove }
   };
 
   const hasVideo = Boolean(section.videoUrl && section.videoUrl.trim());
+  const hasQuestions = Array.isArray(section.questions) && section.questions.length > 0;
 
   const addQuestion = () => {
     onChange({
@@ -46,9 +47,11 @@ export default function ModuleSectionCard({ index, section, onChange, onRemove }
   };
 
   const removeQuestion = (qId) => {
+    const remaining = section.questions.filter(q => q.id !== qId);
     onChange({
       ...section,
-      questions: section.questions.filter(q => q.id !== qId)
+      questions: remaining,
+      ...(remaining.length === 0 ? { quizPassingScore: 0 } : {})
     });
   };
 
@@ -133,18 +136,22 @@ export default function ModuleSectionCard({ index, section, onChange, onRemove }
           </div>
         </div>
 
-        <div>
-          <label className="block text-sm font-medium text-slate-700 mb-1">Quiz Passing Marks (%)</label>
+        <div title={hasQuestions ? '' : 'Add at least one quiz question below to set a passing score'}>
+          <label className={`block text-sm font-medium mb-1 ${hasQuestions ? 'text-slate-700' : 'text-slate-400'}`}>Quiz Passing Marks (%)</label>
           <input
             type="number"
             min={0}
             max={100}
             value={section.quizPassingScore || 0}
             onChange={e => updateField('quizPassingScore', Math.max(0, Math.min(100, Number(e.target.value) || 0)))}
-            className="w-full md:w-56 px-3 py-2 border border-slate-300 rounded-md text-sm focus:ring-2 focus:border-indigo-500 focus:outline-none placeholder-slate-400"
+            disabled={!hasQuestions}
+            title={hasQuestions ? '' : 'Add at least one quiz question below to set a passing score'}
+            className="w-full md:w-56 px-3 py-2 border border-slate-300 rounded-md text-sm focus:ring-2 focus:border-indigo-500 focus:outline-none placeholder-slate-400 disabled:bg-slate-100 disabled:text-slate-400 disabled:opacity-60 disabled:cursor-not-allowed"
             placeholder="0"
           />
-          <p className="text-xs text-slate-400 mt-1">Set `0` if you do not want a minimum passing score for this quiz.</p>
+          <p className="text-xs text-slate-400 mt-1">
+            {hasQuestions ? 'Set `0` if you do not want a minimum passing score for this quiz.' : 'Add quiz questions below to enable a passing score.'}
+          </p>
         </div>
 
         {/* Document Section — Real Inputs */}
