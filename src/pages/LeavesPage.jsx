@@ -7,6 +7,7 @@ import toast from 'react-hot-toast';
 import { getEndDateValidationMessage, isEndDateBeforeStartDate } from '../utils/dateValidation';
 import { getLeaveTypeBadgeClass, getLeaveTypeLabel, LEAVE_TYPE_OPTIONS, getWorkingDayCount, validateConsecutiveLeaves } from '../utils/leaveTypes';
 import LeaveCalendar from '../components/LeaveCalendar';
+import DeleteConfirmModal from '../components/ui/DeleteConfirmModal';
 
 const TABS = ['Leave List', 'Calendar', 'WFH Requests'];
 
@@ -59,6 +60,7 @@ const LeavesPage = () => {
   const [selectedLeaveType, setSelectedLeaveType] = useState('');
   const [remarkModal, setRemarkModal] = useState(null); // { leaveId }
   const [remark, setRemark] = useState('');
+  const [deleteTarget, setDeleteTarget] = useState(null);
   const user = JSON.parse(localStorage.getItem('user') || '{}');
 
   const { data: leaves = [], isLoading } = useQuery({
@@ -299,7 +301,7 @@ const LeavesPage = () => {
                                 </button>
                               </>
                             )}
-                            <button onClick={() => { if (window.confirm('Delete this leave record?')) deleteMutation.mutate(leave.leave_id); }}
+                            <button onClick={() => setDeleteTarget(leave)}
                               className="p-2 text-slate-400 hover:text-red-600 hover:bg-red-50 rounded-lg transition-colors">
                               <Trash2 className="w-4 h-4"/>
                             </button>
@@ -519,6 +521,22 @@ const LeavesPage = () => {
             </form>
           </div>
         </div>
+      )}
+      {deleteTarget && (
+        <DeleteConfirmModal
+          isOpen={!!deleteTarget}
+          onClose={() => setDeleteTarget(null)}
+          onConfirm={() => {
+            if (deleteTarget) {
+              deleteMutation.mutate(deleteTarget.leave_id, {
+                onSuccess: () => setDeleteTarget(null)
+              });
+            }
+          }}
+          isPending={deleteMutation.isPending}
+          title="Delete Leave Record"
+          message={`Are you sure you want to delete the ${getLeaveTypeLabel(deleteTarget.leave_type)} record for ${getEmployeeName(deleteTarget.employee_id)} (${deleteTarget.start_date} — ${deleteTarget.end_date})?`}
+        />
       )}
     </div>
   );

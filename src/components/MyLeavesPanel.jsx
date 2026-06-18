@@ -7,6 +7,7 @@ import toast from 'react-hot-toast';
 import { getEndDateValidationMessage, isEndDateBeforeStartDate } from '../utils/dateValidation';
 import { getLeaveTypeLabel, LEAVE_TYPE_OPTIONS, RAZORPAY_NEGATIVE_BALANCE_NOTE, FLOATER_DATES_2026, isValidFloaterDate, getFloaterDateLabel, isNonWorkingDay, getNonWorkingDayLabel, getWorkingDayCount, countNonWorkingDaysInRange, toLocalISODate, ANNUAL_LEAVE_QUOTA, INTERN_MONTHLY_PAID_QUOTA, isIntern, normalizeLeaveType, validateConsecutiveLeaves } from '../utils/leaveTypes';
 import LeaveCalendar from './LeaveCalendar';
+import DeleteConfirmModal from './ui/DeleteConfirmModal';
 
 const TABS = ['My Leaves', 'Calendar', 'Work From Home'];
 
@@ -175,6 +176,7 @@ const MyLeavesPanel = ({
     const [editForm, setEditForm] = useState({ leave_type: 'paid', start_date: '', end_date: '', reason: '', is_half_day: false, half_day_slot: '' });
     const [editingWfh, setEditingWfh] = useState(null);
     const [editWfhForm, setEditWfhForm] = useState({ wfh_date: '', end_date: '', reason: '' });
+    const [deleteTarget, setDeleteTarget] = useState(null);
 
     // Edit/delete only allowed when the date is strictly in the future
     const canModify = (leave) => leave.start_date > today;
@@ -450,8 +452,7 @@ const MyLeavesPanel = ({
     };
 
     const handleDelete = (leave) => {
-        if (!window.confirm(`Delete this ${getLeaveTypeLabel(leave.leave_type)} request (${leave.start_date} — ${leave.end_date})?`)) return;
-        deleteLeaveMutation.mutate(leave.leave_id);
+        setDeleteTarget(leave);
     };
 
     const handleWfhEditOpen = (wfh) => {
@@ -933,6 +934,22 @@ const MyLeavesPanel = ({
                         </div>
                     )}
                 </>
+            )}
+            {deleteTarget && (
+                <DeleteConfirmModal
+                    isOpen={!!deleteTarget}
+                    onClose={() => setDeleteTarget(null)}
+                    onConfirm={() => {
+                        if (deleteTarget) {
+                            deleteLeaveMutation.mutate(deleteTarget.leave_id, {
+                                onSuccess: () => setDeleteTarget(null)
+                            });
+                        }
+                    }}
+                    isPending={deleteLeaveMutation.isPending}
+                    title="Delete Leave Request"
+                    message={`Are you sure you want to delete this ${getLeaveTypeLabel(deleteTarget.leave_type)} request (${deleteTarget.start_date} — ${deleteTarget.end_date})?`}
+                />
             )}
         </div>
     );
