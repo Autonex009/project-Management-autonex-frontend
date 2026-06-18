@@ -5,8 +5,9 @@ import { Calendar, Plus, X, CheckCircle, XCircle, Clock, Home, AlertTriangle, Pe
 import { format, parseISO } from 'date-fns';
 import toast from 'react-hot-toast';
 import { getEndDateValidationMessage, isEndDateBeforeStartDate } from '../utils/dateValidation';
-import { getLeaveTypeLabel, LEAVE_TYPE_OPTIONS, RAZORPAY_NEGATIVE_BALANCE_NOTE, FLOATER_DATES_2026, isValidFloaterDate, getFloaterDateLabel, isNonWorkingDay, getNonWorkingDayLabel, getWorkingDayCount, countNonWorkingDaysInRange, toLocalISODate, ANNUAL_LEAVE_QUOTA, INTERN_MONTHLY_PAID_QUOTA, isIntern, normalizeLeaveType } from '../utils/leaveTypes';
+import { getLeaveTypeLabel, LEAVE_TYPE_OPTIONS, RAZORPAY_NEGATIVE_BALANCE_NOTE, FLOATER_DATES_2026, isValidFloaterDate, getFloaterDateLabel, isNonWorkingDay, getNonWorkingDayLabel, getWorkingDayCount, countNonWorkingDaysInRange, toLocalISODate, ANNUAL_LEAVE_QUOTA, INTERN_MONTHLY_PAID_QUOTA, isIntern, normalizeLeaveType, validateConsecutiveLeaves } from '../utils/leaveTypes';
 import LeaveCalendar from './LeaveCalendar';
+import DeleteConfirmModal from './ui/DeleteConfirmModal';
 
 const TABS = ['My Leaves', 'Calendar', 'Work From Home'];
 
@@ -175,6 +176,7 @@ const MyLeavesPanel = ({
     const [editForm, setEditForm] = useState({ leave_type: 'paid', start_date: '', end_date: '', reason: '', is_half_day: false, half_day_slot: '' });
     const [editingWfh, setEditingWfh] = useState(null);
     const [editWfhForm, setEditWfhForm] = useState({ wfh_date: '', end_date: '', reason: '' });
+    const [deleteTarget, setDeleteTarget] = useState(null);
 
     // Edit/delete only allowed when the date is strictly in the future
     const canModify = (leave) => leave.start_date > today;
@@ -360,6 +362,12 @@ const MyLeavesPanel = ({
             }
         }
 
+        // Validate consecutive leaves safeguard
+        if (leaveForm.leave_type !== 'wfh' && !validateConsecutiveLeaves(sDate, eDate, allLeaves, null, isHalf)) {
+            toast.error('Safe guard triggered: You cannot apply for 4 or more consecutive leaves.');
+            return;
+        }
+
         createLeaveMutation.mutate({
             ...leaveForm,
             is_half_day: isHalf,
@@ -426,6 +434,12 @@ const MyLeavesPanel = ({
             }
         }
 
+        // Validate consecutive leaves safeguard
+        if (editForm.leave_type !== 'wfh' && !validateConsecutiveLeaves(sDate, eDate, allLeaves, editingLeave.leave_id, isHalf)) {
+            toast.error('Safe guard triggered: You cannot apply for 4 or more consecutive leaves.');
+            return;
+        }
+
         updateLeaveMutation.mutate({
             id: editingLeave.leave_id,
             data: {
@@ -438,8 +452,7 @@ const MyLeavesPanel = ({
     };
 
     const handleDelete = (leave) => {
-        if (!window.confirm(`Delete this ${getLeaveTypeLabel(leave.leave_type)} request (${leave.start_date} — ${leave.end_date})?`)) return;
-        deleteLeaveMutation.mutate(leave.leave_id);
+        setDeleteTarget(leave);
     };
 
     const handleWfhEditOpen = (wfh) => {
@@ -921,6 +934,22 @@ const MyLeavesPanel = ({
                         </div>
                     )}
                 </>
+            )}
+            {deleteTarget && (
+                <DeleteConfirmModal
+                    isOpen={!!deleteTarget}
+                    onClose={() => setDeleteTarget(null)}
+                    onConfirm={() => {
+                        if (deleteTarget) {
+                            deleteLeaveMutation.mutate(deleteTarget.leave_id, {
+                                onSuccess: () => setDeleteTarget(null)
+                            });
+                        }
+                    }}
+                    isPending={deleteLeaveMutation.isPending}
+                    title="Delete Leave Request"
+                    message={`Are you sure you want to delete this ${getLeaveTypeLabel(deleteTarget.leave_type)} request (${deleteTarget.start_date} — ${deleteTarget.end_date})?`}
+                />
             )}
         </div>
     );

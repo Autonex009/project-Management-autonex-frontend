@@ -5,8 +5,9 @@ import { Plus, X, Calendar, Trash2, CheckCircle, XCircle, Clock, AlertTriangle, 
 import { format } from 'date-fns';
 import toast from 'react-hot-toast';
 import { getEndDateValidationMessage, isEndDateBeforeStartDate } from '../utils/dateValidation';
-import { getLeaveTypeBadgeClass, getLeaveTypeLabel, LEAVE_TYPE_OPTIONS, getWorkingDayCount } from '../utils/leaveTypes';
+import { getLeaveTypeBadgeClass, getLeaveTypeLabel, LEAVE_TYPE_OPTIONS, getWorkingDayCount, validateConsecutiveLeaves } from '../utils/leaveTypes';
 import LeaveCalendar from '../components/LeaveCalendar';
+import DeleteConfirmModal from '../components/ui/DeleteConfirmModal';
 
 const TABS = ['Leave List', 'Calendar', 'WFH Requests'];
 
@@ -59,6 +60,7 @@ const LeavesPage = () => {
   const [selectedLeaveType, setSelectedLeaveType] = useState('');
   const [remarkModal, setRemarkModal] = useState(null); // { leaveId }
   const [remark, setRemark] = useState('');
+  const [deleteTarget, setDeleteTarget] = useState(null);
   const user = JSON.parse(localStorage.getItem('user') || '{}');
 
   const { data: leaves = [], isLoading } = useQuery({
@@ -158,6 +160,15 @@ const LeavesPage = () => {
         toast.error(getEndDateValidationMessage());
         return;
       }
+    }
+
+    const empIdInt = parseInt(employeeId);
+    const empLeaves = leaves.filter(l => l.employee_id === empIdInt);
+
+    // Validate consecutive leaves safeguard
+    if (leaveType !== 'wfh' && !validateConsecutiveLeaves(startDate, endDate, empLeaves, null, isHalf)) {
+      toast.error('Safe guard triggered: You cannot apply for 4 or more consecutive leaves.');
+      return;
     }
 
     createMutation.mutate({
@@ -290,7 +301,7 @@ const LeavesPage = () => {
                                 </button>
                               </>
                             )}
-                            <button onClick={() => { if (window.confirm('Delete this leave record?')) deleteMutation.mutate(leave.leave_id); }}
+                            <button onClick={() => setDeleteTarget(leave)}
                               className="p-2 text-slate-400 hover:text-red-600 hover:bg-red-50 rounded-lg transition-colors">
                               <Trash2 className="w-4 h-4"/>
                             </button>
@@ -510,6 +521,22 @@ const LeavesPage = () => {
             </form>
           </div>
         </div>
+      )}
+      {deleteTarget && (
+        <DeleteConfirmModal
+          isOpen={!!deleteTarget}
+          onClose={() => setDeleteTarget(null)}
+          onConfirm={() => {
+            if (deleteTarget) {
+              deleteMutation.mutate(deleteTarget.leave_id, {
+                onSuccess: () => setDeleteTarget(null)
+              });
+            }
+          }}
+          isPending={deleteMutation.isPending}
+          title="Delete Leave Record"
+          message={`Are you sure you want to delete the ${getLeaveTypeLabel(deleteTarget.leave_type)} record for ${getEmployeeName(deleteTarget.employee_id)} (${deleteTarget.start_date} — ${deleteTarget.end_date})?`}
+        />
       )}
     </div>
   );
