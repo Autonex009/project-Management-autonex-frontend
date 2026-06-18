@@ -1,6 +1,7 @@
 import React, { useState, useEffect } from 'react';
 import { useNavigate, useSearchParams } from 'react-router-dom';
 import { Save, Plus, ArrowLeft, Link2, Loader2 } from 'lucide-react';
+import toast from 'react-hot-toast';
 import ModuleSectionCard from '../../components/admin/ModuleSectionCard';
 import { onboardingApi } from '../../services/api';
 
@@ -62,7 +63,7 @@ export default function AdminModulesBuilder() {
       })
       .catch(err => {
         console.error('Failed to load module:', err);
-        alert('Failed to load module for editing.');
+        toast.error('Failed to load module for editing.');
       })
       .finally(() => setIsLoading(false));
   }, [editId]);
@@ -89,11 +90,11 @@ export default function AdminModulesBuilder() {
 
   const handleSave = async () => {
     if (!title.trim()) {
-      alert('Module title is required.');
+      toast.error('Module title is required.');
       return;
     }
     if (!description.trim()) {
-      alert('Module description is required.');
+      toast.error('Module description is required.');
       return;
     }
 
@@ -101,22 +102,22 @@ export default function AdminModulesBuilder() {
     for (let i = 0; i < sections.length; i++) {
       const section = sections[i];
       if (!section.title.trim()) {
-        alert(`Section #${i + 1}: a title is required.`);
+        toast.error(`Section #${i + 1}: a title is required.`);
         return;
       }
       if (!section.description.trim()) {
-        alert(`Section #${i + 1}: a description is required.`);
+        toast.error(`Section #${i + 1}: a description is required.`);
         return;
       }
       const questions = section.questions || [];
       for (let j = 0; j < questions.length; j++) {
         const q = questions[j];
         if (!q.question.trim()) {
-          alert(`Section #${i + 1}, Question ${j + 1}: question text is required.`);
+          toast.error(`Section #${i + 1}, Question ${j + 1}: question text is required.`);
           return;
         }
         if ((q.options || []).some(opt => !opt.trim())) {
-          alert(`Section #${i + 1}, Question ${j + 1}: all four options are required.`);
+          toast.error(`Section #${i + 1}, Question ${j + 1}: all four options are required.`);
           return;
         }
       }
@@ -159,11 +160,11 @@ export default function AdminModulesBuilder() {
         await onboardingApi.createModule(payload);
       }
       
-      alert(editId ? 'Module updated successfully!' : 'Module created successfully!');
+      toast.success(editId ? 'Module updated successfully!' : 'Module created successfully!');
       navigate('/admin/modules');
     } catch (err) {
       console.error('Error saving module:', err);
-      alert('Error saving module. Please make sure the backend is running.');
+      toast.error('Error saving module. Please make sure the backend is running.');
     } finally {
       setIsSaving(false);
     }

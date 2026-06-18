@@ -1,6 +1,7 @@
 import React, { useState, useEffect } from 'react';
 import { Plus, Search, BookOpen, Trash2, Edit, Layers } from 'lucide-react';
 import { useNavigate } from 'react-router-dom';
+import toast from 'react-hot-toast';
 import { onboardingApi } from '../../services/api';
 
 export default function AdminModulesList() {
@@ -31,9 +32,10 @@ export default function AdminModulesList() {
     try {
       await onboardingApi.deleteModule(id);
       setModules(modules.filter(m => m.id !== id));
+      toast.success('Module deleted.');
     } catch (err) {
       console.error('Failed to delete module:', err);
-      alert('Error deleting module.');
+      toast.error('Error deleting module.');
     }
   };
 
