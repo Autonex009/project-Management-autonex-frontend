@@ -21,7 +21,10 @@ const AdminLayout = () => {
   const [sidebarOpen, setSidebarOpen] = useState(false);
   const [searchQuery, setSearchQuery] = useState('');
   const [showResults, setShowResults] = useState(false);
-  const [isCollapsed, setIsCollapsed] = useState(() => localStorage.getItem('sidebar-collapsed') === 'true');
+  const [isCollapsed, setIsCollapsed] = useState(() => {
+    const saved = localStorage.getItem('sidebar-collapsed');
+    return saved === null ? true : saved === 'true';
+  });
   const [isHovered, setIsHovered] = useState(false);
   const [isMobile, setIsMobile] = useState(window.innerWidth < 1024);
 
