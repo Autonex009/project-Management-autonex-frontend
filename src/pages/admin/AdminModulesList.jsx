@@ -1,5 +1,5 @@
 import React, { useState, useEffect } from 'react';
-import { Plus, Search, BookOpen, Trash2, Layers, GripVertical } from 'lucide-react';
+import { Plus, Search, BookOpen, Trash2, Layers, GripVertical, AlertTriangle } from 'lucide-react';
 import { useNavigate } from 'react-router-dom';
 import toast from 'react-hot-toast';
 import { onboardingApi } from '../../services/api';
@@ -10,6 +10,7 @@ export default function AdminModulesList() {
   const [loading, setLoading] = useState(true);
   const [dragIndex, setDragIndex] = useState(null);
   const [dragOverIndex, setDragOverIndex] = useState(null);
+  const [pendingDelete, setPendingDelete] = useState(null);
   const navigate = useNavigate();
 
   const fetchModules = async () => {
@@ -28,9 +29,9 @@ export default function AdminModulesList() {
     fetchModules();
   }, []);
 
-  const handleDelete = async (id, title) => {
-    if (!window.confirm(`Are you sure you want to delete "${title}"? This cannot be undone.`)) return;
-
+  const confirmDelete = async () => {
+    if (!pendingDelete) return;
+    const { id } = pendingDelete;
     try {
       await onboardingApi.deleteModule(id);
       setModules(modules.filter(m => m.id !== id));
@@ -38,6 +39,8 @@ export default function AdminModulesList() {
     } catch (err) {
       console.error('Failed to delete module:', err);
       toast.error('Error deleting module.');
+    } finally {
+      setPendingDelete(null);
     }
   };
 
@@ -167,7 +170,7 @@ export default function AdminModulesList() {
                   {m.status}
                 </span>
                 <button
-                  onClick={(e) => { e.stopPropagation(); handleDelete(m.id, m.title); }}
+                  onClick={(e) => { e.stopPropagation(); setPendingDelete({ id: m.id, title: m.title }); }}
                   className="p-1.5 text-slate-400 hover:text-red-600 hover:bg-red-50 rounded-lg transition-colors shrink-0"
                   title="Delete"
                 >
@@ -178,6 +181,44 @@ export default function AdminModulesList() {
           </div>
         )}
       </div>
+
+      {pendingDelete && (
+        <div
+          className="fixed inset-0 bg-slate-900/60 backdrop-blur-sm z-50 flex items-center justify-center p-4"
+          onClick={() => setPendingDelete(null)}
+        >
+          <div
+            className="bg-white rounded-2xl max-w-md w-full shadow-2xl border border-slate-100 p-6"
+            onClick={(e) => e.stopPropagation()}
+          >
+            <div className="flex items-start gap-4">
+              <div className="h-11 w-11 rounded-xl flex items-center justify-center flex-shrink-0 bg-red-50 text-red-600">
+                <AlertTriangle className="h-5 w-5" />
+              </div>
+              <div className="flex-1">
+                <h3 className="text-lg font-bold text-slate-900">Delete module?</h3>
+                <p className="text-sm text-slate-500 mt-1">
+                  You're about to delete <span className="font-semibold text-slate-700">"{pendingDelete.title}"</span>. This cannot be undone.
+                </p>
+              </div>
+            </div>
+            <div className="flex justify-end gap-3 mt-6">
+              <button
+                onClick={() => setPendingDelete(null)}
+                className="px-4 py-2 rounded-xl text-sm font-semibold text-slate-600 hover:bg-slate-100 transition-colors"
+              >
+                Cancel
+              </button>
+              <button
+                onClick={confirmDelete}
+                className="px-4 py-2 rounded-xl text-sm font-semibold text-white bg-red-600 hover:bg-red-700 transition-colors shadow-sm"
+              >
+                Delete Module
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
     </div>
   );
 }
