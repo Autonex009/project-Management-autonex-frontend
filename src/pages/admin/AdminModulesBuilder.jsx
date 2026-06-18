@@ -236,14 +236,6 @@ export default function AdminModulesBuilder() {
             </div>
 
             <div>
-              <label className="block text-sm font-bold text-slate-700 mb-1">Module Sequence Order (Serial Number)</label>
-              <input type="number" value={order} onChange={e => setOrder(Math.max(0, parseInt(e.target.value) || 0))}
-                className="w-full max-w-[200px] px-4 py-2 border border-slate-300 rounded-lg focus:ring-2 focus:ring-indigo-500 focus:border-transparent outline-none transition-all text-sm text-slate-900 font-medium"
-                min={0} placeholder="e.g. 1" />
-              <p className="text-xs text-slate-400 mt-1">Determine the numerical sequence in which this module is displayed (ascending order).</p>
-            </div>
-
-            <div>
               <label className="block text-sm font-bold text-slate-700 mb-2">Status</label>
               <div className="flex bg-slate-100 p-1 rounded-xl w-fit">
                 <button type="button" onClick={() => setStatus('published')}

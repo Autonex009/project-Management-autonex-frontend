@@ -232,6 +232,7 @@ export const onboardingApi = {
     createModule: (data) => api.post('/onboarding/modules', data).then(res => res.data),
     updateModule: (id, data) => api.put(`/onboarding/modules/${id}`, data).then(res => res.data),
     deleteModule: (id) => api.delete(`/onboarding/modules/${id}`).then(res => res.data),
+    reorderModules: (orderedIds) => api.post('/onboarding/modules/reorder', { ordered_ids: orderedIds }).then(res => res.data),
     createSection: (moduleId, data) => api.post(`/onboarding/modules/${moduleId}/sections`, data).then(res => res.data),
     deleteSection: (id) => api.delete(`/onboarding/sections/${id}`).then(res => res.data),
     importQuestions: (moduleId, sectionId, formData) => api.post(`/onboarding/modules/${moduleId}/sections/${sectionId}/import-questions`, formData, {

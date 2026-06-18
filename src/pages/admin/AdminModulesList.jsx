@@ -1,5 +1,5 @@
 import React, { useState, useEffect } from 'react';
-import { Plus, Search, BookOpen, Trash2, Layers } from 'lucide-react';
+import { Plus, Search, BookOpen, Trash2, Layers, ChevronUp, ChevronDown } from 'lucide-react';
 import { useNavigate } from 'react-router-dom';
 import toast from 'react-hot-toast';
 import { onboardingApi } from '../../services/api';
@@ -39,7 +39,29 @@ export default function AdminModulesList() {
     }
   };
 
-  const filteredModules = modules.filter(m => 
+  const moveModule = async (moduleId, direction) => {
+    const index = modules.findIndex(m => m.id === moduleId);
+    if (index === -1) return;
+    const target = direction === 'up' ? index - 1 : index + 1;
+    if (target < 0 || target >= modules.length) return;
+
+    const reordered = [...modules];
+    [reordered[index], reordered[target]] = [reordered[target], reordered[index]];
+
+    const previous = modules;
+    setModules(reordered); // optimistic update
+    try {
+      await onboardingApi.reorderModules(reordered.map(m => m.id));
+    } catch (err) {
+      console.error('Failed to reorder modules:', err);
+      toast.error('Failed to save the new order.');
+      setModules(previous); // revert on failure
+    }
+  };
+
+  const isSearching = searchQuery.trim().length > 0;
+
+  const filteredModules = modules.filter(m =>
     (m.title || '').toLowerCase().includes(searchQuery.toLowerCase()) ||
     (m.description || '').toLowerCase().includes(searchQuery.toLowerCase())
   );
@@ -87,7 +109,9 @@ export default function AdminModulesList() {
           <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6 p-6 bg-slate-50/50 rounded-b-2xl">
             {filteredModules.length === 0 ? (
               <div className="col-span-full py-12 text-center text-slate-500 italic">No modules found. Start by creating one!</div>
-            ) : filteredModules.map((m) => (
+            ) : filteredModules.map((m) => {
+              const idxInModules = modules.findIndex(x => x.id === m.id);
+              return (
               <div
                 key={m.id}
                 role="button"
@@ -124,6 +148,22 @@ export default function AdminModulesList() {
                   </div>
                   <div className="flex items-center gap-2">
                     <button
+                      onClick={(e) => { e.stopPropagation(); moveModule(m.id, 'up'); }}
+                      disabled={isSearching || idxInModules <= 0}
+                      className="p-1.5 text-slate-400 hover:text-indigo-600 hover:bg-indigo-50 rounded-lg transition-colors disabled:opacity-30 disabled:cursor-not-allowed disabled:hover:bg-transparent disabled:hover:text-slate-400"
+                      title={isSearching ? 'Clear search to reorder' : 'Move up'}
+                    >
+                      <ChevronUp className="h-4 w-4" />
+                    </button>
+                    <button
+                      onClick={(e) => { e.stopPropagation(); moveModule(m.id, 'down'); }}
+                      disabled={isSearching || idxInModules === modules.length - 1}
+                      className="p-1.5 text-slate-400 hover:text-indigo-600 hover:bg-indigo-50 rounded-lg transition-colors disabled:opacity-30 disabled:cursor-not-allowed disabled:hover:bg-transparent disabled:hover:text-slate-400"
+                      title={isSearching ? 'Clear search to reorder' : 'Move down'}
+                    >
+                      <ChevronDown className="h-4 w-4" />
+                    </button>
+                    <button
                       onClick={(e) => { e.stopPropagation(); handleDelete(m.id, m.title); }}
                       className="p-1.5 text-slate-400 hover:text-red-600 hover:bg-red-50 rounded-lg transition-colors"
                       title="Delete"
@@ -133,7 +173,8 @@ export default function AdminModulesList() {
                   </div>
                 </div>
               </div>
-            ))}
+              );
+            })}
           </div>
         )}
       </div>
