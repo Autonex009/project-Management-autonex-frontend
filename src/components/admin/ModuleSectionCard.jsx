@@ -105,6 +105,7 @@ export default function ModuleSectionCard({ index, section, onChange, onRemove }
           <span className="font-semibold text-slate-700">#{index + 1}</span>
           <input type="text" value={section.title} onChange={e => updateField('title', e.target.value)}
             placeholder="Section Title" className="bg-transparent border-none font-semibold text-slate-900 focus:outline-none focus:ring-0 placeholder-slate-400 w-64" />
+          <span className="text-red-500 font-bold" title="Required">*</span>
         </div>
         <button onClick={onRemove} className="text-red-500 hover:text-red-700 transition-colors p-1">
           <Trash2 className="h-4 w-4" />
@@ -113,7 +114,7 @@ export default function ModuleSectionCard({ index, section, onChange, onRemove }
 
       <div className="p-5 space-y-6">
         <div>
-          <label className="block text-sm font-medium text-slate-700 mb-1">Description</label>
+          <label className="block text-sm font-medium text-slate-700 mb-1">Description <span className="text-red-500">*</span></label>
           <textarea value={section.description} onChange={e => updateField('description', e.target.value)}
             className="w-full px-3 py-2 border border-slate-300 rounded-md text-sm focus:ring-2 focus:border-indigo-500 focus:outline-none placeholder-slate-400"
             rows={2} placeholder="What will candidates learn in this section?" />
@@ -208,7 +209,7 @@ export default function ModuleSectionCard({ index, section, onChange, onRemove }
                 <div className="flex justify-between gap-4 mb-3">
                   <input type="text" value={q.question} onChange={e => updateQuestion(q.id, 'question', e.target.value)}
                     className="flex-1 px-3 py-2 border border-slate-300 rounded-md text-sm focus:ring-2 focus:border-indigo-500 focus:outline-none font-medium placeholder-slate-400"
-                    placeholder={`Question ${qIdx + 1}`} />
+                    placeholder={`Question ${qIdx + 1} *`} />
                   <button type="button" onClick={() => removeQuestion(q.id)} className="text-red-500 hover:text-red-700 text-sm font-medium bg-red-50 hover:bg-red-100 px-3 py-1 rounded-md transition-colors">
                     Remove
                   </button>
@@ -226,7 +227,7 @@ export default function ModuleSectionCard({ index, section, onChange, onRemove }
                       </button>
                       <input type="text" value={opt} onChange={e => updateOption(q.id, optIdx, e.target.value)}
                         className={`flex-1 px-3 py-1.5 border rounded-md text-sm focus:outline-none transition-colors ${q.correctIndex === optIdx ? 'border-green-300 bg-green-50' : 'border-slate-300 focus:border-indigo-500'}`}
-                        placeholder={`Option ${optIdx + 1}`} />
+                        placeholder={`Option ${optIdx + 1} *`} />
                     </div>
                   ))}
                 </div>

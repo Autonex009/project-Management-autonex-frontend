@@ -89,15 +89,36 @@ export default function AdminModulesBuilder() {
 
   const handleSave = async () => {
     if (!title.trim()) {
-      alert('Please enter a module title.');
+      alert('Module title is required.');
       return;
     }
-    
-    // Validate that sections have titles
+    if (!description.trim()) {
+      alert('Module description is required.');
+      return;
+    }
+
+    // Validate sections and any quiz questions they contain
     for (let i = 0; i < sections.length; i++) {
-      if (!sections[i].title.trim()) {
-        alert(`Please enter a title for section #${i + 1}.`);
+      const section = sections[i];
+      if (!section.title.trim()) {
+        alert(`Section #${i + 1}: a title is required.`);
         return;
+      }
+      if (!section.description.trim()) {
+        alert(`Section #${i + 1}: a description is required.`);
+        return;
+      }
+      const questions = section.questions || [];
+      for (let j = 0; j < questions.length; j++) {
+        const q = questions[j];
+        if (!q.question.trim()) {
+          alert(`Section #${i + 1}, Question ${j + 1}: question text is required.`);
+          return;
+        }
+        if ((q.options || []).some(opt => !opt.trim())) {
+          alert(`Section #${i + 1}, Question ${j + 1}: all four options are required.`);
+          return;
+        }
       }
     }
 
@@ -190,13 +211,13 @@ export default function AdminModulesBuilder() {
         <div className="bg-white p-6 rounded-2xl shadow-[0_1px_3px_rgba(0,0,0,0.04)] border border-slate-200/60 p-6 border-t-4 border-t-indigo-650">
           <div className="space-y-4">
             <div>
-              <label className="block text-sm font-bold text-slate-700 mb-1">Module Title</label>
+              <label className="block text-sm font-bold text-slate-700 mb-1">Module Title <span className="text-red-500">*</span></label>
               <input type="text" value={title} onChange={e => setTitle(e.target.value)}
                 className="w-full px-4 py-2 border border-slate-300 rounded-lg focus:ring-2 focus:ring-indigo-500 focus:border-transparent outline-none transition-all font-medium text-slate-900"
                 placeholder="e.g. Welcome to the Company" />
             </div>
             <div>
-              <label className="block text-sm font-bold text-slate-700 mb-1">Description</label>
+              <label className="block text-sm font-bold text-slate-700 mb-1">Description <span className="text-red-500">*</span></label>
               <textarea value={description} onChange={e => setDescription(e.target.value)}
                 className="w-full px-4 py-2 border border-slate-300 rounded-lg focus:ring-2 focus:ring-indigo-500 focus:border-transparent outline-none transition-all text-sm text-slate-900"
                 rows={3} placeholder="Brief overview of what candidates will learn..." />
