@@ -101,13 +101,6 @@ const EmployeeLayout = () => {
                     ${isSidebarCollapsed ? 'lg:w-20' : 'w-72'}
                 `}
             >
-                {/* Collapse Toggle Button - Desktop Only */}
-                <button
-                    onClick={toggleCollapse}
-                    className="hidden lg:flex absolute -right-3 top-24 z-50 h-6 w-6 items-center justify-center rounded-full border border-slate-200 bg-white text-slate-400 hover:text-slate-700 hover:bg-slate-50 transition-all shadow-md cursor-pointer"
-                >
-                    {isCollapsed ? <ChevronRight className="h-3.5 w-3.5" /> : <ChevronLeft className="h-3.5 w-3.5" />}
-                </button>
 
                 <div className="flex h-full flex-col">
                     <div className={`relative overflow-hidden border-b border-slate-100 shrink-0 transition-all ${isSidebarCollapsed ? 'px-4 py-6' : 'px-5 py-5'} bg-white/95`}>
