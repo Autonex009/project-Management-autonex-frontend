@@ -1,5 +1,5 @@
 import React, { useState, useEffect } from 'react';
-import { Plus, Search, BookOpen, Trash2, Layers, ChevronUp, ChevronDown } from 'lucide-react';
+import { Plus, Search, BookOpen, Trash2, Layers, GripVertical } from 'lucide-react';
 import { useNavigate } from 'react-router-dom';
 import toast from 'react-hot-toast';
 import { onboardingApi } from '../../services/api';
@@ -8,6 +8,8 @@ export default function AdminModulesList() {
   const [modules, setModules] = useState([]);
   const [searchQuery, setSearchQuery] = useState('');
   const [loading, setLoading] = useState(true);
+  const [dragIndex, setDragIndex] = useState(null);
+  const [dragOverIndex, setDragOverIndex] = useState(null);
   const navigate = useNavigate();
 
   const fetchModules = async () => {
@@ -28,7 +30,7 @@ export default function AdminModulesList() {
 
   const handleDelete = async (id, title) => {
     if (!window.confirm(`Are you sure you want to delete "${title}"? This cannot be undone.`)) return;
-    
+
     try {
       await onboardingApi.deleteModule(id);
       setModules(modules.filter(m => m.id !== id));
@@ -39,24 +41,27 @@ export default function AdminModulesList() {
     }
   };
 
-  const moveModule = async (moduleId, direction) => {
-    const index = modules.findIndex(m => m.id === moduleId);
-    if (index === -1) return;
-    const target = direction === 'up' ? index - 1 : index + 1;
-    if (target < 0 || target >= modules.length) return;
+  const handleDrop = (dropIndex) => {
+    if (dragIndex === null || dragIndex === dropIndex) {
+      setDragIndex(null);
+      setDragOverIndex(null);
+      return;
+    }
 
     const reordered = [...modules];
-    [reordered[index], reordered[target]] = [reordered[target], reordered[index]];
+    const [moved] = reordered.splice(dragIndex, 1);
+    reordered.splice(dropIndex, 0, moved);
 
     const previous = modules;
+    setDragIndex(null);
+    setDragOverIndex(null);
     setModules(reordered); // optimistic update
-    try {
-      await onboardingApi.reorderModules(reordered.map(m => m.id));
-    } catch (err) {
+
+    onboardingApi.reorderModules(reordered.map(m => m.id)).catch(err => {
       console.error('Failed to reorder modules:', err);
       toast.error('Failed to save the new order.');
       setModules(previous); // revert on failure
-    }
+    });
   };
 
   const isSearching = searchQuery.trim().length > 0;
@@ -71,10 +76,10 @@ export default function AdminModulesList() {
       <div className="flex flex-col sm:flex-row items-start sm:items-center justify-between mb-8 gap-4">
         <div>
           <h2 className="text-2xl font-extrabold text-slate-900">Module Management</h2>
-          <p className="text-sm text-slate-500">Create and oversee onboarding training modules.</p>
+          <p className="text-sm text-slate-500">Create and oversee onboarding training modules. Drag rows to reorder.</p>
         </div>
-        <button 
-          onClick={() => navigate('/admin/modules/new')} 
+        <button
+          onClick={() => navigate('/admin/modules/new')}
           className="flex items-center gap-2 px-5 py-2.5 rounded-xl text-white text-sm font-semibold transition-all hover:shadow-lg hover:bg-indigo-700 shadow-md bg-indigo-600"
         >
           <Plus className="h-4 w-4" /> Create Module
@@ -106,14 +111,20 @@ export default function AdminModulesList() {
             Loading modules...
           </div>
         ) : (
-          <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6 p-6 bg-slate-50/50 rounded-b-2xl">
+          <div className="space-y-3 p-6 bg-slate-50/50 rounded-b-2xl">
+            {isSearching && (
+              <p className="text-xs text-slate-400 italic pb-1">Clear the search to drag and reorder modules.</p>
+            )}
             {filteredModules.length === 0 ? (
-              <div className="col-span-full py-12 text-center text-slate-500 italic">No modules found. Start by creating one!</div>
-            ) : filteredModules.map((m) => {
-              const idxInModules = modules.findIndex(x => x.id === m.id);
-              return (
+              <div className="py-12 text-center text-slate-500 italic">No modules found. Start by creating one!</div>
+            ) : filteredModules.map((m, i) => (
               <div
                 key={m.id}
+                draggable={!isSearching}
+                onDragStart={(e) => { setDragIndex(i); e.dataTransfer.effectAllowed = 'move'; }}
+                onDragOver={(e) => { e.preventDefault(); if (dragOverIndex !== i) setDragOverIndex(i); }}
+                onDrop={(e) => { e.preventDefault(); handleDrop(i); }}
+                onDragEnd={() => { setDragIndex(null); setDragOverIndex(null); }}
                 role="button"
                 tabIndex={0}
                 onClick={() => navigate(`/admin/modules/new?edit=${m.id}`)}
@@ -124,57 +135,46 @@ export default function AdminModulesList() {
                   }
                 }}
                 title="Open module to edit"
-                className="bg-white border text-left border-slate-200/80 rounded-2xl p-5 hover:border-indigo-300 hover:shadow-md transition-all flex flex-col h-full hover:-translate-y-1 duration-300 cursor-pointer focus:outline-none focus:ring-2 focus:ring-indigo-500 focus:ring-offset-2"
+                className={`bg-white border rounded-2xl p-4 transition-all flex items-center gap-4 cursor-pointer focus:outline-none focus:ring-2 focus:ring-indigo-500 focus:ring-offset-2 hover:border-indigo-300 hover:shadow-sm ${
+                  dragOverIndex === i && dragIndex !== null && dragIndex !== i ? 'border-indigo-400 border-dashed bg-indigo-50/40' : 'border-slate-200/80'
+                } ${dragIndex === i ? 'opacity-40' : ''}`}
               >
-                <div className="flex justify-between items-start mb-4">
-                  <div className="h-10 w-10 rounded-xl flex items-center justify-center flex-shrink-0 bg-indigo-50 text-indigo-600">
-                    <BookOpen className="h-5 w-5" />
-                  </div>
-                  <span className={`text-[10px] font-bold px-2.5 py-1 rounded-full uppercase tracking-wider ${
-                    (m.status || '').toLowerCase() === 'published' 
-                      ? 'bg-emerald-50 text-emerald-700 border border-emerald-100' 
-                      : 'bg-amber-50 text-amber-700 border border-amber-100'
-                  }`}>
-                    {m.status}
+                {!isSearching && (
+                  <span
+                    className="cursor-grab active:cursor-grabbing text-slate-300 hover:text-slate-500 shrink-0"
+                    title="Drag to reorder"
+                    onClick={(e) => e.stopPropagation()}
+                  >
+                    <GripVertical className="h-5 w-5" />
                   </span>
+                )}
+                <div className="h-10 w-10 rounded-xl flex items-center justify-center flex-shrink-0 bg-indigo-50 text-indigo-600">
+                  <BookOpen className="h-5 w-5" />
                 </div>
-                <h3 className="font-bold text-slate-900 text-lg mb-2 line-clamp-1">{m.title}</h3>
-                <p className="text-sm text-slate-500 mb-6 line-clamp-2 flex-grow">{m.description}</p>
-                
-                <div className="pt-4 border-t border-slate-150 flex items-center justify-between text-xs font-medium text-slate-500">
-                  <div className="flex items-center gap-1.5 font-semibold">
-                    <Layers className="h-4 w-4 text-slate-400" />
-                    {m.sections?.length || 0} Sections
-                  </div>
-                  <div className="flex items-center gap-2">
-                    <button
-                      onClick={(e) => { e.stopPropagation(); moveModule(m.id, 'up'); }}
-                      disabled={isSearching || idxInModules <= 0}
-                      className="p-1.5 text-slate-400 hover:text-indigo-600 hover:bg-indigo-50 rounded-lg transition-colors disabled:opacity-30 disabled:cursor-not-allowed disabled:hover:bg-transparent disabled:hover:text-slate-400"
-                      title={isSearching ? 'Clear search to reorder' : 'Move up'}
-                    >
-                      <ChevronUp className="h-4 w-4" />
-                    </button>
-                    <button
-                      onClick={(e) => { e.stopPropagation(); moveModule(m.id, 'down'); }}
-                      disabled={isSearching || idxInModules === modules.length - 1}
-                      className="p-1.5 text-slate-400 hover:text-indigo-600 hover:bg-indigo-50 rounded-lg transition-colors disabled:opacity-30 disabled:cursor-not-allowed disabled:hover:bg-transparent disabled:hover:text-slate-400"
-                      title={isSearching ? 'Clear search to reorder' : 'Move down'}
-                    >
-                      <ChevronDown className="h-4 w-4" />
-                    </button>
-                    <button
-                      onClick={(e) => { e.stopPropagation(); handleDelete(m.id, m.title); }}
-                      className="p-1.5 text-slate-400 hover:text-red-600 hover:bg-red-50 rounded-lg transition-colors"
-                      title="Delete"
-                    >
-                      <Trash2 className="h-4 w-4" />
-                    </button>
-                  </div>
+                <div className="flex-1 min-w-0">
+                  <h3 className="font-bold text-slate-900 text-base line-clamp-1">{m.title}</h3>
+                  <p className="text-sm text-slate-500 line-clamp-1">{m.description}</p>
                 </div>
+                <div className="hidden sm:flex items-center gap-1.5 text-xs font-semibold text-slate-500 shrink-0">
+                  <Layers className="h-4 w-4 text-slate-400" />
+                  {m.sections?.length || 0} Sections
+                </div>
+                <span className={`text-[10px] font-bold px-2.5 py-1 rounded-full uppercase tracking-wider shrink-0 ${
+                  (m.status || '').toLowerCase() === 'published'
+                    ? 'bg-emerald-50 text-emerald-700 border border-emerald-100'
+                    : 'bg-amber-50 text-amber-700 border border-amber-100'
+                }`}>
+                  {m.status}
+                </span>
+                <button
+                  onClick={(e) => { e.stopPropagation(); handleDelete(m.id, m.title); }}
+                  className="p-1.5 text-slate-400 hover:text-red-600 hover:bg-red-50 rounded-lg transition-colors shrink-0"
+                  title="Delete"
+                >
+                  <Trash2 className="h-4 w-4" />
+                </button>
               </div>
-              );
-            })}
+            ))}
           </div>
         )}
       </div>
