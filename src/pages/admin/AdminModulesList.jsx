@@ -1,5 +1,5 @@
 import React, { useState, useEffect } from 'react';
-import { Plus, Search, BookOpen, Trash2, Edit, Layers } from 'lucide-react';
+import { Plus, Search, BookOpen, Trash2, Layers } from 'lucide-react';
 import { useNavigate } from 'react-router-dom';
 import toast from 'react-hot-toast';
 import { onboardingApi } from '../../services/api';
@@ -90,7 +90,17 @@ export default function AdminModulesList() {
             ) : filteredModules.map((m) => (
               <div
                 key={m.id}
-                className="bg-white border text-left border-slate-200/80 rounded-2xl p-5 hover:border-indigo-300 hover:shadow-md transition-all flex flex-col h-full hover:-translate-y-1 duration-300"
+                role="button"
+                tabIndex={0}
+                onClick={() => navigate(`/admin/modules/new?edit=${m.id}`)}
+                onKeyDown={(e) => {
+                  if (e.key === 'Enter' || e.key === ' ') {
+                    e.preventDefault();
+                    navigate(`/admin/modules/new?edit=${m.id}`);
+                  }
+                }}
+                title="Open module to edit"
+                className="bg-white border text-left border-slate-200/80 rounded-2xl p-5 hover:border-indigo-300 hover:shadow-md transition-all flex flex-col h-full hover:-translate-y-1 duration-300 cursor-pointer focus:outline-none focus:ring-2 focus:ring-indigo-500 focus:ring-offset-2"
               >
                 <div className="flex justify-between items-start mb-4">
                   <div className="h-10 w-10 rounded-xl flex items-center justify-center flex-shrink-0 bg-indigo-50 text-indigo-600">
@@ -113,15 +123,8 @@ export default function AdminModulesList() {
                     {m.sections?.length || 0} Sections
                   </div>
                   <div className="flex items-center gap-2">
-                    <button 
-                      onClick={() => navigate(`/admin/modules/new?edit=${m.id}`)} 
-                      className="p-1.5 text-slate-400 hover:text-indigo-600 hover:bg-indigo-50 rounded-lg transition-colors"
-                      title="Edit"
-                    >
-                      <Edit className="h-4 w-4" />
-                    </button>
-                    <button 
-                      onClick={() => handleDelete(m.id, m.title)} 
+                    <button
+                      onClick={(e) => { e.stopPropagation(); handleDelete(m.id, m.title); }}
                       className="p-1.5 text-slate-400 hover:text-red-600 hover:bg-red-50 rounded-lg transition-colors"
                       title="Delete"
                     >
