@@ -1,7 +1,7 @@
 import { useState } from 'react';
 import { useNavigate, useLocation } from 'react-router-dom';
 import { useMutation } from '@tanstack/react-query';
-import { Lock, Mail, AlertCircle, Briefcase, User } from 'lucide-react';
+import { Lock, Mail, AlertCircle } from 'lucide-react';
 import { authApi } from '../../services/api';
 import toast from 'react-hot-toast';
 import AuthBrandPanel from '../../components/brand/AuthBrandPanel';
@@ -59,20 +59,12 @@ const AdminLogin = () => {
             />
 
             <div className="relative flex flex-1 flex-col items-center justify-center bg-[radial-gradient(circle_at_top,_rgba(30,64,175,0.16),_transparent_30%),linear-gradient(180deg,#020617_0%,#0f172a_100%)] p-8">
-                <div className="absolute right-0 top-0 flex gap-3 p-6 sm:p-8">
-                    <button
-                        onClick={() => navigate('/login/pm')}
-                        className="flex items-center gap-1.5 rounded-full border border-white/10 bg-white/5 px-3 py-1.5 text-xs font-semibold text-slate-300 transition-all hover:bg-white/10 hover:text-white"
-                    >
-                        <Briefcase className="h-3.5 w-3.5 text-slate-400" />
-                        PM Portal
+                <div className="absolute right-0 top-0 flex gap-4 p-8">
+                    <button onClick={() => navigate('/login/pm')} className="text-sm text-slate-400 transition-colors hover:text-white">
+                        PM Portal →
                     </button>
-                    <button
-                        onClick={() => navigate('/login/employee')}
-                        className="flex items-center gap-1.5 rounded-full border border-white/10 bg-white/5 px-3 py-1.5 text-xs font-semibold text-slate-300 transition-all hover:bg-white/10 hover:text-white"
-                    >
-                        <User className="h-3.5 w-3.5 text-slate-400" />
-                        Employee Portal
+                    <button onClick={() => navigate('/login/employee')} className="text-sm text-slate-400 transition-colors hover:text-white">
+                        Employee Portal →
                     </button>
                 </div>
 
@@ -120,7 +112,7 @@ const AdminLogin = () => {
                                 <button
                                     type="button"
                                     onClick={() => navigate('/forgot-password?role=admin')}
-                                    className="text-xs font-medium text-slate-400 transition-colors hover:text-blue-400"
+                                    className="text-xs font-medium text-blue-300 transition-colors hover:text-blue-200 hover:underline"
                                 >
                                     Forgot password?
                                 </button>
@@ -140,7 +132,7 @@ const AdminLogin = () => {
                         </button>
                     </form>
 
-                    <div className="mt-4 border-t border-white/5 pt-4 text-center">
+                    <div className="mt-6 border-t border-white/5 pt-6 text-center">
                         <p className="text-xs text-slate-600">
                             Demo Access:
                             <span className="ml-2 font-mono text-slate-400">admin@autonex.com</span>

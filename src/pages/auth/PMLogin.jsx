@@ -1,7 +1,7 @@
 import React, { useState } from 'react';
 import { useNavigate, useLocation } from 'react-router-dom';
 import { useMutation } from '@tanstack/react-query';
-import { Lock, Mail, User, Shield } from 'lucide-react';
+import { Lock, Mail } from 'lucide-react';
 import { authApi } from '../../services/api';
 import toast from 'react-hot-toast';
 import AuthBrandPanel from '../../components/brand/AuthBrandPanel';
@@ -101,7 +101,7 @@ const PMLogin = () => {
                                 <button
                                     type="button"
                                     onClick={() => navigate('/forgot-password?role=pm')}
-                                    className="text-xs font-medium text-slate-500 transition-colors hover:text-blue-600"
+                                    className="text-xs font-medium text-blue-600 hover:underline"
                                 >
                                     Forgot password?
                                 </button>
@@ -122,28 +122,16 @@ const PMLogin = () => {
                         </button>
                     </form>
 
-                    <div className="mt-4 border-t border-slate-100 pt-4">
-                        <div className="flex flex-col gap-4">
-                            {/* Portal switchers: Employee Portal & Admin Portal */}
-                            <div className="flex items-center justify-center gap-2">
-                                <span className="text-[11px] font-semibold uppercase tracking-wider text-slate-400">Switch:</span>
-                                <button
-                                    type="button"
-                                    onClick={() => navigate('/login/employee')}
-                                    className="flex items-center gap-1 rounded-lg bg-blue-50 px-2.5 py-1 text-xs font-semibold text-blue-700 transition-all hover:bg-blue-100"
-                                >
-                                    <User className="h-3 w-3" />
-                                    Employee Portal
-                                </button>
-                                <button
-                                    type="button"
-                                    onClick={() => navigate('/login/admin')}
-                                    className="flex items-center gap-1 rounded-lg bg-blue-50 px-2.5 py-1 text-xs font-semibold text-blue-700 transition-all hover:bg-blue-100"
-                                >
-                                    <Shield className="h-3 w-3" />
-                                    Admin Login
-                                </button>
-                            </div>
+                    <div className="mt-6 text-center text-sm text-slate-400">
+                        Not a PM?{' '}
+                        <button onClick={() => navigate('/login/employee')} className="font-medium text-blue-600 hover:underline">
+                            Employee Portal
+                        </button>
+                        <div className="mt-2">
+                            Need admin access?{' '}
+                            <button onClick={() => navigate('/login/admin')} className="font-medium text-blue-600 hover:underline">
+                                Admin Login
+                            </button>
                         </div>
                     </div>
                 </div>

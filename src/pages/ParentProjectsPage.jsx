@@ -229,10 +229,10 @@ const ParentProjectsPage = () => {
             <div className="flex justify-between items-center">
                 <div>
                     <h1 className="text-2xl font-bold bg-gradient-to-r from-slate-900 to-slate-700 bg-clip-text text-transparent">
-                        Organizations
+                        Projects
                     </h1>
                     <p className="mt-1 text-sm text-slate-500">
-                        Manage organizations and long-term initiatives
+                        Manage main projects and long-term initiatives
                     </p>
                 </div>
                 <div className="flex items-center gap-3">
@@ -240,7 +240,7 @@ const ParentProjectsPage = () => {
                         <Search className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-slate-400 pointer-events-none" />
                         <input
                             type="text"
-                            placeholder="Search organizations..."
+                            placeholder="Search projects..."
                             value={searchQuery}
                             onChange={e => setSearchQuery(e.target.value)}
                             className="pl-9 pr-4 py-2 text-sm bg-white border border-slate-200 rounded-xl focus:outline-none focus:ring-2 focus:ring-indigo-100 focus:border-indigo-300 w-52 placeholder:text-slate-400"
@@ -254,7 +254,7 @@ const ParentProjectsPage = () => {
                         className="inline-flex items-center gap-2 px-4 py-2.5 bg-gradient-to-r from-indigo-600 to-blue-600 text-white rounded-xl font-semibold text-sm shadow-lg shadow-indigo-200 hover:shadow-xl hover:shadow-indigo-300 transition-all duration-200 hover:-translate-y-0.5"
                     >
                         <Plus className="w-4 h-4" />
-                        New Organization
+                        New Project
                     </button>
                 </div>
             </div>
@@ -263,14 +263,14 @@ const ParentProjectsPage = () => {
             {visibleParentProjects.length === 0 ? (
                 <div className="bg-white rounded-2xl border border-slate-200 p-12 text-center">
                     <Layers className="w-12 h-12 mx-auto text-slate-300 mb-4" />
-                    <h3 className="text-lg font-semibold text-slate-700 mb-2">{searchQuery ? 'No organizations match your search' : 'No Organizations Yet'}</h3>
-                    <p className="text-slate-500 mb-6">{searchQuery ? `No results for "${searchQuery}". Try a different name.` : 'Create your first organization to group related projects.'}</p>
+                    <h3 className="text-lg font-semibold text-slate-700 mb-2">{searchQuery ? 'No projects match your search' : 'No Projects Yet'}</h3>
+                    <p className="text-slate-500 mb-6">{searchQuery ? `No results for "${searchQuery}". Try a different name.` : 'Create your first project to organize related sub-projects.'}</p>
                     <button
                         onClick={() => setIsModalOpen(true)}
                         className="inline-flex items-center gap-2 px-4 py-2 bg-indigo-600 text-white rounded-lg font-medium text-sm hover:bg-indigo-700 transition-colors"
                     >
                         <Plus className="w-4 h-4" />
-                        Create Organization
+                        Create Project
                     </button>
                 </div>
             ) : (
@@ -328,7 +328,7 @@ const ParentProjectsPage = () => {
                                 <div className="bg-slate-50 rounded-lg p-2 text-center">
                                     <FolderTree className="w-4 h-4 mx-auto text-slate-400 mb-1" />
                                     <p className="text-lg font-bold text-slate-800">{program.sub_projects_count || 0}</p>
-                                    <p className="text-xs text-slate-500">Projects</p>
+                                    <p className="text-xs text-slate-500">Sub-Projects</p>
                                 </div>
                                 <div className="bg-slate-50 rounded-lg p-2 text-center">
                                     <Calendar className="w-4 h-4 mx-auto text-slate-400 mb-1" />
@@ -375,7 +375,7 @@ const ParentProjectsPage = () => {
                                     </button>
                                     <button
                                         onClick={() => {
-                                            if (window.confirm(`Delete "${program.name}"? Its projects will be unlinked.`)) {
+                                            if (window.confirm(`Delete "${program.name}"? Sub-projects will be unlinked.`)) {
                                                 deleteMutation.mutate(program.id);
                                             }
                                         }}
@@ -389,7 +389,7 @@ const ParentProjectsPage = () => {
                                     to={`${prefix}/sub-projects?project=${program.id}`}
                                     className="inline-flex items-center gap-1 text-sm font-medium text-indigo-600 hover:text-indigo-800 transition-colors"
                                 >
-                                    View Projects
+                                    View Sub-Projects
                                     <ChevronRight className="w-4 h-4" />
                                 </Link>
                             </div>
