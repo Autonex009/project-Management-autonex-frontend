@@ -80,11 +80,11 @@ const AdminLayout = () => {
         {/* Brand Header */}
         <div className="relative overflow-hidden border-b border-white/10 px-6 py-6">
           <div className="absolute inset-0 bg-[radial-gradient(circle_at_top_right,_rgba(59,130,246,0.18),_transparent_55%)]" />
-          <div className="relative flex items-start justify-between">
+          <div className="relative flex items-center justify-between">
             <BrandLockup subtitle="Admin Control Center" tone="dark" />
             <button
               onClick={() => setSidebarOpen(false)}
-              className="ml-2 mt-1 p-1.5 rounded-lg text-white/50 hover:text-white hover:bg-white/10 transition-colors flex-shrink-0"
+              className="ml-2 p-1.5 rounded-lg text-white/50 hover:text-white hover:bg-white/10 transition-colors flex-shrink-0"
               aria-label="Close menu"
             >
               <X className="w-5 h-5" />
@@ -121,9 +121,6 @@ const AdminLayout = () => {
                     {pendingSignupCount}
                   </span>
                 )}
-                {isActive && item.href !== '/admin/signup-requests' && (
-                  <div className="ml-auto w-1.5 h-1.5 rounded-full bg-white animate-pulse" />
-                )}
               </Link>
             );
           })}
@@ -150,9 +147,6 @@ const AdminLayout = () => {
               >
                 <Icon className={`w-5 h-5 transition-colors ${isActive ? 'text-white' : 'text-slate-500 group-hover:text-white'}`} />
                 {item.name}
-                {isActive && (
-                  <div className="ml-auto w-1.5 h-1.5 rounded-full bg-white animate-pulse" />
-                )}
               </Link>
             );
           })}

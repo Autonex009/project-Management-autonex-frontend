@@ -951,8 +951,8 @@ const MultiSelectDropdown = ({ name, defaultValue = [], predefinedSkills, queryC
 
       {/* Dropdown menu */}
       {isOpen && (
-        <div className="absolute z-50 w-full mt-1 bg-white border border-gray-300 rounded-lg shadow-lg max-h-64 overflow-hidden">
-          <div className="max-h-48 overflow-y-auto">
+        <div className="absolute z-50 w-full mt-1 bg-white border border-gray-350 rounded-lg shadow-xl max-h-80 flex flex-col overflow-hidden">
+          <div className="overflow-y-auto flex-1">
             {allSkills.length === 0 ? (
               <div className="px-4 py-3 text-sm text-gray-500 text-center">
                 No skills available. Add one below!
@@ -1000,7 +1000,7 @@ const MultiSelectDropdown = ({ name, defaultValue = [], predefinedSkills, queryC
           </div>
 
           {/* Add custom skill section */}
-          <div className="border-t border-gray-200 p-3 bg-gray-50">
+          <div className="border-t border-slate-200 p-3 bg-slate-50 flex-shrink-0">
             <div className="flex gap-2">
               <input
                 type="text"
@@ -1008,17 +1008,17 @@ const MultiSelectDropdown = ({ name, defaultValue = [], predefinedSkills, queryC
                 onChange={(e) => setCustomSkill(e.target.value)}
                 onKeyPress={handleKeyPress}
                 placeholder="Add custom skill..."
-                className="flex-1 px-3 py-1.5 text-sm border border-gray-300 rounded focus:ring-2 focus:ring-blue-500 focus:border-blue-500 outline-none"
+                className="flex-1 px-3 py-1.5 text-sm border border-slate-350 rounded-md focus:ring-2 focus:ring-blue-100 focus:border-blue-500 outline-none transition-all"
               />
               <button
                 type="button"
                 onClick={addCustomSkill}
-                className="px-3 py-1.5 text-sm bg-blue-600 text-white rounded hover:bg-blue-700 transition-colors"
+                className="px-3.5 py-1.5 text-sm bg-blue-600 hover:bg-blue-700 active:bg-blue-800 text-white font-medium rounded-md shadow-sm transition-all"
               >
                 Add
               </button>
             </div>
-            <p className="mt-1 text-xs text-gray-500">Press Enter or click Add</p>
+            <p className="mt-1.5 text-[11px] text-slate-400 font-medium">Press Enter or click Add</p>
           </div>
         </div>
       )}
@@ -1461,19 +1461,15 @@ const EmployeesPage = () => {
                     <tr key={employee.id} className="hover:bg-slate-50 transition-colors">
                       {/* Employee Info */}
                       <td className="px-5 py-4">
-                        <button
-                          className="flex items-center gap-3 text-left hover:opacity-80 transition-opacity"
-                          onClick={() => setAvailabilityEmployee(employee)}
-                          title="View availability"
-                        >
+                        <div className="flex items-center gap-3 text-left">
                           <div className="w-10 h-10 rounded-full bg-slate-100 flex items-center justify-center flex-shrink-0">
                             <User className="w-5 h-5 text-slate-500" />
                           </div>
                           <div>
-                            <div className="font-semibold text-slate-800 hover:text-indigo-600 transition-colors">{employee.name}</div>
+                            <div className="font-semibold text-slate-800">{employee.name}</div>
                             <div className="text-sm text-slate-400">{employee.email}</div>
                           </div>
-                        </button>
+                        </div>
                       </td>
 
                       {/* Designation */}
@@ -1483,15 +1479,15 @@ const EmployeesPage = () => {
 
                       {/* Type */}
                       <td className="px-5 py-4 text-center">
-                        <span className={`inline-flex px-2.5 py-1 rounded-full text-xs font-medium ${employee.employee_type === 'Full-time' ? 'bg-emerald-50 text-emerald-700' :
-                          employee.employee_type === 'Part-time' ? 'bg-blue-50 text-blue-700' :
-                            'bg-slate-100 text-slate-600'
+                        <span className={`inline-flex px-3.5 py-1.5 rounded-full text-xs font-semibold tracking-wide min-w-[95px] justify-center ${employee.employee_type === 'Full-time' ? 'bg-emerald-50 text-emerald-700 border border-emerald-200' :
+                          employee.employee_type === 'Part-time' ? 'bg-blue-50 text-blue-700 border border-blue-200' :
+                            'bg-slate-50 text-slate-600 border border-slate-200'
                           }`}>
                           {employee.employee_type}
                         </span>
                         {employee.converted_to_fulltime_at && (
                           <p
-                            className="mt-1 text-[10px] text-slate-400"
+                            className="mt-1 text-[10px] text-slate-400 font-medium"
                             title={`Promoted from ${employee.previous_employee_type || 'Intern'} on ${new Date(employee.converted_to_fulltime_at).toLocaleDateString()}`}
                           >
                             promoted {new Date(employee.converted_to_fulltime_at).toLocaleDateString()}
@@ -1506,20 +1502,16 @@ const EmployeesPage = () => {
 
                       {/* Skills */}
                       <td className="px-5 py-4">
-                        <div className="flex flex-wrap gap-1">
+                        <div className="text-xs text-slate-600 font-medium">
                           {employee.skills && employee.skills.length > 0 ? (
                             <>
-                              {employee.skills.slice(0, 3).map((skill, idx) => (
-                                <span key={idx} className="text-xs text-slate-500 bg-slate-100 px-2 py-0.5 rounded">
-                                  {skill}
-                                </span>
-                              ))}
+                              <span>{employee.skills.slice(0, 3).join(', ')}</span>
                               {employee.skills.length > 3 && (
-                                <span className="text-xs text-slate-400">+{employee.skills.length - 3}</span>
+                                <span className="text-slate-400"> +{employee.skills.length - 3}</span>
                               )}
                             </>
                           ) : (
-                            <span className="text-xs text-slate-400">—</span>
+                            <span className="text-slate-400">—</span>
                           )}
                         </div>
                       </td>
@@ -1719,9 +1711,8 @@ const EmployeesPage = () => {
         />
       )}
 
-      {/* Edit / Create Modal */}
       {isModalOpen && (
-        <div className="fixed inset-0 bg-gray-900 bg-opacity-50 flex items-center justify-center z-50 p-2 sm:p-4">
+        <div className="fixed inset-0 bg-slate-900/40 backdrop-blur-sm flex items-center justify-center z-50 p-2 sm:p-4">
           <div className="bg-white rounded-lg shadow-xl w-full max-w-full sm:max-w-2xl max-h-[95vh] sm:max-h-[90vh] flex flex-col">
             {/* Fixed Header */}
             <div className="px-6 py-4 border-b border-gray-200 flex-shrink-0">
@@ -1878,7 +1869,7 @@ const EmployeesPage = () => {
 
                   <div>
                     <label className="block text-sm font-medium text-gray-700 mb-1">
-                      Skills
+                      Skills <span className="text-red-500">*</span>
                     </label>
                     <MultiSelectDropdown
                       name="skills"

@@ -69,13 +69,13 @@ const EmployeeLayout = () => {
 
     return (
         <div className={`min-h-screen flex ${isPm ? 'bg-[linear-gradient(180deg,#f8fbff_0%,#f8fafc_35%,#f1f5f9_100%)]' : 'bg-[linear-gradient(180deg,#f3fffb_0%,#f8fafc_35%,#eefbf6_100%)]'}`}>
-            <aside className={`fixed inset-y-0 left-0 z-50 w-72 border-r border-slate-200 bg-white/95 shadow-xl backdrop-blur transition-transform duration-300 lg:sticky lg:top-0 lg:h-screen lg:self-start lg:translate-x-0 ${sidebarOpen ? 'translate-x-0' : '-translate-x-full'}`}>
+            <aside className={`fixed inset-y-0 left-0 z-50 w-72 border-r border-slate-200 bg-white/95 shadow-xl backdrop-blur transition-transform duration-300 ease-in-out ${sidebarOpen ? 'translate-x-0' : '-translate-x-full'}`}>
                 <div className="flex h-full flex-col">
                     <div className="relative overflow-hidden border-b border-slate-100 px-5 py-5 bg-white/95 shrink-0">
                         <div className={`absolute inset-0 ${isPm ? 'bg-[radial-gradient(circle_at_top_right,_rgba(18,63,169,0.18),_transparent_95%)]' : 'bg-[radial-gradient(circle_at_top_right,_rgba(16,185,129,0.16),_transparent_99%)]'}`} />
-                        <div className="relative flex items-start justify-between gap-3">
+                        <div className="relative flex items-center justify-between gap-3">
                             <BrandLockup subtitle={portalLabel} tone="light" compact />
-                            <button onClick={() => setSidebarOpen(false)} className="lg:hidden p-1 text-slate-400 hover:text-slate-600">
+                            <button onClick={() => setSidebarOpen(false)} className="p-1.5 rounded-lg text-slate-400 hover:text-slate-600 hover:bg-slate-100 transition-colors flex-shrink-0">
                                 <X className="w-5 h-5" />
                             </button>
                         </div>
@@ -115,11 +115,11 @@ const EmployeeLayout = () => {
                 </div>
             </aside>
 
-            {sidebarOpen && <div className="fixed inset-0 bg-black/30 z-40 lg:hidden" onClick={() => setSidebarOpen(false)} />}
+            {sidebarOpen && <div className="fixed inset-0 bg-black/30 z-40" onClick={() => setSidebarOpen(false)} />}
 
             <div className="flex-1 flex flex-col min-w-0">
                 <header className="sticky top-0 z-30 flex h-16 items-center justify-between border-b border-slate-200/70 bg-white/80 px-6 backdrop-blur-md lg:px-8">
-                    <button onClick={() => setSidebarOpen(true)} className="lg:hidden p-2 text-slate-500 hover:text-slate-700">
+                    <button onClick={() => setSidebarOpen(true)} className="p-2 text-slate-500 hover:text-slate-700 rounded-lg hover:bg-slate-100">
                         <Menu className="w-5 h-5" />
                     </button>
                     <div className="hidden lg:block" />
