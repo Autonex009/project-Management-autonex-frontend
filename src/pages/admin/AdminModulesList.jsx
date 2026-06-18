@@ -1,4 +1,5 @@
 import React, { useState, useEffect } from 'react';
+import { createPortal } from 'react-dom';
 import { Plus, Search, BookOpen, Trash2, Layers, GripVertical, AlertTriangle } from 'lucide-react';
 import { useNavigate } from 'react-router-dom';
 import toast from 'react-hot-toast';
@@ -182,9 +183,9 @@ export default function AdminModulesList() {
         )}
       </div>
 
-      {pendingDelete && (
+      {pendingDelete && createPortal(
         <div
-          className="fixed inset-0 bg-slate-900/60 backdrop-blur-sm z-50 flex items-center justify-center p-4"
+          className="fixed inset-0 bg-slate-900/60 backdrop-blur-sm z-[100] flex items-center justify-center p-4"
           onClick={() => setPendingDelete(null)}
         >
           <div
@@ -217,7 +218,8 @@ export default function AdminModulesList() {
               </button>
             </div>
           </div>
-        </div>
+        </div>,
+        document.body
       )}
     </div>
   );
