@@ -132,6 +132,7 @@ export const signupRequestApi = {
     getAll: (params) => api.get('/signup-requests', { params }).then(res => res.data),
     approve: (id, reviewedBy) => api.patch(`/signup-requests/${id}/approve`, null, { params: { reviewed_by: reviewedBy } }).then(res => res.data),
     reject: (id, reviewedBy, reason) => api.patch(`/signup-requests/${id}/reject`, { reason: reason || null }, { params: { reviewed_by: reviewedBy } }).then(res => res.data),
+    update: (id, data) => api.patch(`/signup-requests/${id}`, data).then(res => res.data),
 };
 
 export const wfhApi = {

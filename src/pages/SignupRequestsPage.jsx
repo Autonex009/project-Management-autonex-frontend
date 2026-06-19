@@ -1,9 +1,11 @@
-import { useState } from 'react';
+import { useState, useRef, useEffect } from 'react';
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import { signupRequestApi } from '../services/api';
-import { CheckCircle, XCircle, Clock, User, Mail, Phone, Briefcase, AlertTriangle, X } from 'lucide-react';
+import { CheckCircle, XCircle, Clock, User, Mail, Phone, Briefcase, AlertTriangle, X, ChevronDown } from 'lucide-react';
 import { format, parseISO } from 'date-fns';
 import toast from 'react-hot-toast';
+
+const EMPLOYEE_TYPES = ['Full-time', 'Part-time', 'Intern', 'Contractor'];
 
 const STATUS_BADGE = {
     pending:  <span className="inline-flex items-center gap-1 px-2.5 py-0.5 rounded-full text-xs font-medium bg-amber-50 text-amber-700 border border-amber-200"><Clock className="w-3 h-3"/>Pending</span>,
@@ -13,6 +15,44 @@ const STATUS_BADGE = {
 
 const TABS = ['All', 'Pending', 'Approved', 'Rejected'];
 
+const EmployeeTypeDropdown = ({ value, onChange }) => {
+    const [open, setOpen] = useState(false);
+    const ref = useRef(null);
+
+    useEffect(() => {
+        const handler = (e) => { if (ref.current && !ref.current.contains(e.target)) setOpen(false); };
+        document.addEventListener('mousedown', handler);
+        return () => document.removeEventListener('mousedown', handler);
+    }, []);
+
+    return (
+        <div ref={ref} className="relative inline-block">
+            <button
+                onClick={() => setOpen(o => !o)}
+                className="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-lg border border-slate-200 bg-white text-sm text-slate-700 hover:bg-slate-50 hover:border-slate-300 transition-colors"
+            >
+                {value || 'Select'}
+                <ChevronDown className={`w-3.5 h-3.5 text-slate-400 transition-transform ${open ? 'rotate-180' : ''}`} />
+            </button>
+            {open && (
+                <div className="absolute left-0 top-full mt-1 z-[9999] min-w-[130px] bg-white border border-slate-200 rounded-xl shadow-lg py-1 overflow-hidden">
+                    {EMPLOYEE_TYPES.map(t => (
+                        <button
+                            key={t}
+                            onClick={() => { onChange(t); setOpen(false); }}
+                            className={`w-full text-left px-3 py-1.5 text-sm transition-colors ${
+                                t === value ? 'bg-indigo-50 text-indigo-700 font-medium' : 'text-slate-700 hover:bg-slate-50'
+                            }`}
+                        >
+                            {t}
+                        </button>
+                    ))}
+                </div>
+            )}
+        </div>
+    );
+};
+
 const SignupRequestsPage = () => {
     const queryClient = useQueryClient();
     const user = JSON.parse(localStorage.getItem('user') || '{}');
@@ -21,6 +61,7 @@ const SignupRequestsPage = () => {
     const [rejectReason, setRejectReason] = useState('');
     const [expandedId, setExpandedId] = useState(null);
     const [currentPage, setCurrentPage] = useState(1);
+    const [localEmployeeTypes, setLocalEmployeeTypes] = useState({});
     const PAGE_SIZE = 10;
 
     const { data: requests = [], isLoading } = useQuery({
@@ -37,6 +78,15 @@ const SignupRequestsPage = () => {
             toast.success(data.message || 'Account created and credentials emailed');
         },
         onError: (err) => toast.error(err.response?.data?.detail || 'Failed to approve request'),
+    });
+
+    const updateMutation = useMutation({
+        mutationFn: ({ id, data }) => signupRequestApi.update(id, data),
+        onSuccess: () => {
+            queryClient.invalidateQueries(['signup-requests']);
+            toast.success('Employment type updated');
+        },
+        onError: (err) => toast.error(err.response?.data?.detail || 'Failed to update employment type'),
     });
 
     const rejectMutation = useMutation({
@@ -99,7 +149,7 @@ const SignupRequestsPage = () => {
             </div>
 
             {/* Table */}
-            <div className="bg-white rounded-2xl border border-slate-200/60 shadow-sm overflow-hidden">
+            <div className="bg-white rounded-2xl border border-slate-200/60 shadow-sm">
                 {isLoading ? (
                     <div className="flex items-center justify-center py-16 text-slate-400">Loading...</div>
                 ) : filtered.length === 0 ? (
@@ -180,7 +230,13 @@ const SignupRequestsPage = () => {
                                             <div className="pt-4 grid grid-cols-1 md:grid-cols-2 gap-4 text-sm">
                                                 <div>
                                                     <p className="text-xs font-semibold text-slate-400 uppercase mb-1">Employment Type</p>
-                                                    <p className="text-slate-700">{req.employee_type}</p>
+                                                    <EmployeeTypeDropdown
+                                                        value={localEmployeeTypes[req.id] ?? req.employee_type ?? ''}
+                                                        onChange={newType => {
+                                                            setLocalEmployeeTypes(prev => ({ ...prev, [req.id]: newType }));
+                                                            updateMutation.mutate({ id: req.id, data: { employee_type: newType } });
+                                                        }}
+                                                    />
                                                 </div>
                                                 <div>
                                                     <p className="text-xs font-semibold text-slate-400 uppercase mb-1">Skills</p>
