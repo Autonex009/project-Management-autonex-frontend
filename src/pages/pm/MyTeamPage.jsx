@@ -1,7 +1,8 @@
-import React from 'react';
+import React, { useState } from 'react';
 import { useQuery } from '@tanstack/react-query';
 import { allocationApi, employeeApi, parentProjectApi, subProjectApi } from '../../services/api';
 import { Briefcase, Clock3, FolderKanban, Mail, Phone, Users } from 'lucide-react';
+import SlackIcon from '../../components/icons/SlackIcon';
 import { getPmEmployeeId, getPmSubProjects } from '../../utils/pmScope';
 
 const badgeTone = {
@@ -12,6 +13,8 @@ const badgeTone = {
 
 const MyTeamPage = () => {
     const user = JSON.parse(localStorage.getItem('user') || '{}');
+    const role = localStorage.getItem('role') || user.role || 'employee';
+    const canMessageOnSlack = role === 'pm' || role === 'admin';
     const pmEmployeeId = getPmEmployeeId(user);
 
     const { data: parentProjects = [] } = useQuery({
@@ -124,9 +127,12 @@ const MyTeamPage = () => {
                                         <p className="mt-1 text-sm text-slate-500">{member.designation || 'Team Member'}</p>
                                     </div>
                                 </div>
-                                <div className="rounded-2xl bg-slate-50 px-4 py-3 text-right">
-                                    <p className="text-xs font-medium uppercase tracking-[0.16em] text-slate-400">Daily Load</p>
-                                    <p className="mt-1 text-lg font-semibold text-slate-900">{member.totalDailyHours}h</p>
+                                <div className="flex flex-col items-end gap-3">
+                                    {canMessageOnSlack && <SlackDmButton employee={member} />}
+                                    <div className="rounded-2xl bg-slate-50 px-4 py-3 text-right">
+                                        <p className="text-xs font-medium uppercase tracking-[0.16em] text-slate-400">Daily Load</p>
+                                        <p className="mt-1 text-lg font-semibold text-slate-900">{member.totalDailyHours}h</p>
+                                    </div>
                                 </div>
                             </div>
 
@@ -175,6 +181,44 @@ const MyTeamPage = () => {
                     ))}
                 </section>
             )}
+        </div>
+    );
+};
+
+const SlackDmButton = ({ employee }) => {
+    const [loading, setLoading] = useState(false);
+    const [error, setError] = useState('');
+
+    const handleClick = async () => {
+        setError('');
+        setLoading(true);
+        try {
+            const { url } = await employeeApi.getSlackLink(employee.id);
+            if (url) {
+                window.open(url, '_blank', 'noopener,noreferrer');
+            } else {
+                setError('Slack account not found');
+            }
+        } catch (err) {
+            const status = err?.response?.status;
+            setError(status === 404 ? 'Slack account not found' : 'Slack unavailable');
+        } finally {
+            setLoading(false);
+        }
+    };
+
+    return (
+        <div className="flex flex-col items-end gap-1">
+            <button
+                type="button"
+                onClick={handleClick}
+                disabled={loading}
+                className="inline-flex items-center gap-2 rounded-xl border border-slate-200 bg-white px-3 py-2 text-xs font-semibold text-slate-700 shadow-sm transition hover:bg-slate-50 disabled:cursor-not-allowed disabled:opacity-60"
+            >
+                <SlackIcon size={16} />
+                {loading ? 'Opening…' : 'Slack DM'}
+            </button>
+            {error && <span className="text-xs font-medium text-amber-600">{error}</span>}
         </div>
     );
 };
