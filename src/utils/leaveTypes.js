@@ -245,7 +245,7 @@ export function validateConsecutiveLeaves(startDateStr, endDateStr, leavesList, 
     if (!isNonWorkingDay(ds)) {
       if (leaveDates.has(ds)) {
         consecutiveRun++;
-        if (consecutiveRun >= 4) {
+        if (consecutiveRun >= 5) {
           return false; // Safely blocked!
         }
       } else {

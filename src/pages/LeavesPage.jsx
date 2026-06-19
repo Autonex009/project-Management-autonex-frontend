@@ -167,7 +167,7 @@ const LeavesPage = () => {
 
     // Validate consecutive leaves safeguard
     if (leaveType !== 'wfh' && !validateConsecutiveLeaves(startDate, endDate, empLeaves, null, isHalf)) {
-      toast.error('Safe guard triggered: You cannot apply for 4 or more consecutive leaves.');
+      toast.error('Safe guard triggered: You cannot apply for 5 or more consecutive leaves.');
       return;
     }
 

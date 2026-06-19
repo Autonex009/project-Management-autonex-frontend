@@ -347,7 +347,7 @@ export default function LeaveCalendar({ filterEmployeeIds = null }) {
                 }
             }
             cur.setDate(cur.getDate() - 1);
-            if (adjacentBefore >= 4 || (new Date(selectedStart + 'T00:00:00') - cur) / (1000 * 60 * 60 * 24) > 15) {
+            if (adjacentBefore >= 5 || (new Date(selectedStart + 'T00:00:00') - cur) / (1000 * 60 * 60 * 24) > 15) {
                 searching = false;
             }
         }
@@ -372,7 +372,7 @@ export default function LeaveCalendar({ filterEmployeeIds = null }) {
                 }
             }
             cur.setDate(cur.getDate() + 1);
-            if (adjacentAfter >= 4 || (cur - new Date(selectedEnd + 'T00:00:00')) / (1000 * 60 * 60 * 24) > 15) {
+            if (adjacentAfter >= 5 || (cur - new Date(selectedEnd + 'T00:00:00')) / (1000 * 60 * 60 * 24) > 15) {
                 searching = false;
             }
         }
@@ -385,8 +385,8 @@ export default function LeaveCalendar({ filterEmployeeIds = null }) {
     if (selectedStart && selectedEnd) {
         if (workingDays === 0) {
             validationError = "No working days in this range — weekends and fixed holidays are automatically skipped.";
-        } else if (leaveType && leaveType !== 'wfh' && totalConsecutive >= 4) {
-            validationError = "Safe guard triggered: You cannot apply for 4 or more consecutive leaves.";
+        } else if (leaveType && leaveType !== 'wfh' && totalConsecutive >= 5) {
+            validationError = "Safe guard triggered: You cannot apply for 5 or more consecutive leaves.";
         } else if (isFloaterType) {
             if (selectedStart !== selectedEnd) {
                 validationError = "Floater leave must be taken as a single day.";

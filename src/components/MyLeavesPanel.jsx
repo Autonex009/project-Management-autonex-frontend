@@ -364,7 +364,7 @@ const MyLeavesPanel = ({
 
         // Validate consecutive leaves safeguard
         if (leaveForm.leave_type !== 'wfh' && !validateConsecutiveLeaves(sDate, eDate, allLeaves, null, isHalf)) {
-            toast.error('Safe guard triggered: You cannot apply for 4 or more consecutive leaves.');
+            toast.error('Safe guard triggered: You cannot apply for 5 or more consecutive leaves.');
             return;
         }
 
@@ -436,7 +436,7 @@ const MyLeavesPanel = ({
 
         // Validate consecutive leaves safeguard
         if (editForm.leave_type !== 'wfh' && !validateConsecutiveLeaves(sDate, eDate, allLeaves, editingLeave.leave_id, isHalf)) {
-            toast.error('Safe guard triggered: You cannot apply for 4 or more consecutive leaves.');
+            toast.error('Safe guard triggered: You cannot apply for 5 or more consecutive leaves.');
             return;
         }
 
