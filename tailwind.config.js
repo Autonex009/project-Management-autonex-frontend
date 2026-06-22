@@ -16,7 +16,16 @@ export default {
           employee: '#059669', // Emerald 600
           employeeBg: '#ecfdf5', // Emerald 50
         }
-      }
+      },
+      animation: {
+        shimmer: 'shimmer 2s infinite',
+      },
+      keyframes: {
+        shimmer: {
+          '0%': { backgroundPosition: '200% 0' },
+          '100%': { backgroundPosition: '-200% 0' },
+        },
+      },
     },
   },
   plugins: [],

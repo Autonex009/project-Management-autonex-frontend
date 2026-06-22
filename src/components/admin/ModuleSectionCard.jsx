@@ -1,12 +1,20 @@
 import React, { useState } from 'react';
 import { GripVertical, Trash2, Video, FileText, CheckCircle2, Circle, Plus, Upload } from 'lucide-react';
 import { onboardingApi } from '../../services/api';
+import Dropdown from '../ui/Dropdown';
 
 export default function ModuleSectionCard({ index, section, onChange, onRemove }) {
   const [showDocForm, setShowDocForm] = useState(false);
   const [docTitle, setDocTitle] = useState('');
   const [docType, setDocType] = useState('PDF');
   const [docUrl, setDocUrl] = useState('');
+  const docTypeOptions = [
+    { value: 'PDF', label: 'PDF' },
+    { value: 'DOCX', label: 'DOCX' },
+    { value: 'PPT', label: 'PPT' },
+    { value: 'XLS', label: 'XLS' },
+    { value: 'Link', label: 'Link' }
+  ];
 
   const updateField = (field, value) => {
     onChange({ ...section, [field]: value });
@@ -174,9 +182,11 @@ export default function ModuleSectionCard({ index, section, onChange, onRemove }
               <input type="url" value={docUrl} onChange={e => setDocUrl(e.target.value)} placeholder="Document URL (e.g. https://drive.google.com/file/d/...)"
                 className="w-full px-3 py-1.5 border border-slate-300 rounded-md text-sm focus:outline-none focus:border-indigo-500" />
               <div className="flex gap-2 items-center">
-                <select value={docType} onChange={e => setDocType(e.target.value)} className="px-3 py-1.5 border border-slate-300 rounded-md text-sm bg-white">
-                  <option>PDF</option><option>DOCX</option><option>PPT</option><option>XLS</option><option>Link</option>
-                </select>
+                <Dropdown
+                  options={docTypeOptions}
+                  value={docType}
+                  onChange={(value) => setDocType(value)}
+                />
                 <button type="button" onClick={handleAddDocument} className="px-3 py-1.5 text-sm font-medium bg-indigo-600 text-white rounded-md hover:bg-indigo-700">Add</button>
                 <button type="button" onClick={() => setShowDocForm(false)} className="px-3 py-1.5 text-sm font-medium text-slate-500 hover:text-slate-700">Cancel</button>
               </div>

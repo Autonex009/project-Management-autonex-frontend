@@ -5,6 +5,7 @@ import { ChevronLeft, ChevronRight, Calendar, AlertTriangle, Clock, CheckCircle,
 import { leaveApi, wfhApi } from '../services/api';
 import toast from 'react-hot-toast';
 import { format, parseISO } from 'date-fns';
+import Dropdown from './ui/Dropdown';
 import {
     isValidFloaterDate,
     getWorkingDayCount,
@@ -770,28 +771,11 @@ export default function LeaveCalendar({ filterEmployeeIds = null }) {
                                 <label style={{ display: 'block', fontSize: '13px', fontWeight: 600, color: sidebarTheme.text, marginBottom: '6px' }}>
                                     Leave Type
                                 </label>
-                                <select
+                                <Dropdown
+                                    options={[{ value: '', label: 'Select leave type...' }, ...LEAVE_TYPES]}
                                     value={leaveType}
-                                    onChange={e => setLeaveType(e.target.value)}
-                                    required
-                                    style={{
-                                        width: '100%',
-                                        padding: '10px 12px',
-                                        border: `1px solid ${sidebarTheme.inputBorder}`,
-                                        borderRadius: '8px',
-                                        fontSize: '14px',
-                                        outline: 'none',
-                                        background: '#fff',
-                                        cursor: 'pointer',
-                                    }}
-                                    onFocus={e => e.target.style.borderColor = '#3b82f6'}
-                                    onBlur={e => e.target.style.borderColor = sidebarTheme.inputBorder}
-                                >
-                                    <option value="">Select leave type...</option>
-                                    {LEAVE_TYPES.map(o => (
-                                        <option key={o.value} value={o.value}>{o.label}</option>
-                                    ))}
-                                </select>
+                                    onChange={e => setLeaveType(e)}
+                                />
                             </div>
 
                             {/* Reason input */}
