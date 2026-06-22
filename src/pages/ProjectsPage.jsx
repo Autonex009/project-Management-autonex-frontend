@@ -6,6 +6,7 @@ import { Plus, Edit, Trash2, X, UserCheck, Users, ChevronDown, ArrowRight, Copy,
 import { Link } from 'react-router-dom';
 import { format } from 'date-fns';
 import toast from 'react-hot-toast';
+import PageSearchBar from '../components/ui/PageSearchBar';
 import { getPmEmployeeId, getPmProjects, getPmSubProjects } from '../utils/pmScope';
 import { getEndDateValidationMessage, isEndDateBeforeStartDate } from '../utils/dateValidation';
 import AllocationPopover from '../components/AllocationPopover';
@@ -621,16 +622,11 @@ toast.success(wasEditing ? 'Project updated successfully' : 'Project created suc
           </p>
         </div>
         <div className="flex flex-wrap items-center gap-2">
-          <div className="relative flex-1 sm:flex-none">
-            <Search className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-slate-400 pointer-events-none" />
-            <input
-              type="text"
-              placeholder="Search projects..."
-              value={subProjectSearch}
-              onChange={e => setSubProjectSearch(e.target.value)}
-              className="pl-9 pr-4 py-2 text-sm bg-white border border-slate-200 rounded-xl focus:outline-none focus:ring-2 focus:ring-indigo-100 focus:border-indigo-300 w-full sm:w-52 placeholder:text-slate-400"
-            />
-          </div>
+          <PageSearchBar
+            value={subProjectSearch}
+            onChange={setSubProjectSearch}
+            placeholder="Search projects..."
+          />
           <Link
             to={`${prefix}/projects`}
             className="inline-flex items-center gap-2 px-4 py-2.5 bg-white border border-slate-200 text-slate-700 font-medium text-sm rounded-xl shadow-sm hover:bg-slate-50 transition-colors"

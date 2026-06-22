@@ -466,13 +466,14 @@ import AllocationPopover from '../components/AllocationPopover';
 // };
 
 // export default AllocationsPage;
-import { useState, useEffect, useRef } from 'react';
+import { useState, useEffect, useRef, useMemo } from 'react';
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import { useLocation } from 'react-router-dom';
 import { allocationApi, subProjectApi, employeeApi, leaveApi, parentProjectApi } from '../services/api';
 import { Plus, Edit, Trash2, X, UserPlus, UserMinus, CheckSquare, AlertTriangle, Users } from 'lucide-react';
 import toast from 'react-hot-toast';
 import { getPmEmployeeId, getPmSubProjects } from '../utils/pmScope';
+import PageSearchBar from '../components/ui/PageSearchBar';
 
 // Stable color palette for avatars based on the employee name
 const AVATAR_PALETTE = [
@@ -777,8 +778,22 @@ const AllocationsPage = () => {
     requiredManpower: project.required_manpower || 0,
   })).filter(pa => pa.allocations.length > 0 || pa.requiredManpower > 0);
 
-  const totalPages = Math.ceil(projectAllocations.length / PAGE_SIZE);
-  const paginatedAllocations = projectAllocations.slice((currentPage - 1) * PAGE_SIZE, currentPage * PAGE_SIZE);
+  const [searchQuery, setSearchQuery] = useState('');
+
+  const filteredProjectAllocations = useMemo(() => {
+    if (!searchQuery.trim()) return projectAllocations;
+    const q = searchQuery.toLowerCase();
+    return projectAllocations.filter(({ project, allocations: projectAllocs }) => {
+      if (project.name.toLowerCase().includes(q)) return true;
+      return projectAllocs.some(a => {
+        const empName = getEmployeeName(a.employee_id).toLowerCase();
+        return empName.includes(q);
+      });
+    });
+  }, [projectAllocations, searchQuery, employees]);
+
+  const totalPages = Math.ceil(filteredProjectAllocations.length / PAGE_SIZE);
+  const paginatedAllocations = filteredProjectAllocations.slice((currentPage - 1) * PAGE_SIZE, currentPage * PAGE_SIZE);
 
   return (
     <div className="space-y-6">
@@ -803,6 +818,15 @@ const AllocationsPage = () => {
 
 
 
+      {/* Search Filter */}
+      <div className="flex justify-between items-center mb-4">
+        <PageSearchBar
+          value={searchQuery}
+          onChange={(val) => { setSearchQuery(val); setCurrentPage(1); }}
+          placeholder="Search allocations by project or employee..."
+        />
+      </div>
+
       {/* Modern Card Container */}
       <div className="bg-white rounded-2xl border border-slate-200/60 shadow-[0_1px_3px_rgba(0,0,0,0.04)] overflow-hidden">
         <div className="overflow-x-auto">
@@ -825,12 +849,16 @@ const AllocationsPage = () => {
                     </div>
                   </td>
                 </tr>
-              ) : projectAllocations.length === 0 ? (
+              ) : filteredProjectAllocations.length === 0 ? (
                 <tr>
                   <td colSpan="4" className="px-5 py-16 text-center">
                     <div className="text-slate-400">
-                      <p className="text-lg font-medium mb-1">No allocations yet</p>
-                      <p className="text-sm">Create your first allocation to get started</p>
+                      <p className="text-lg font-medium mb-1">
+                        {searchQuery ? 'No matching allocations' : 'No allocations yet'}
+                      </p>
+                      <p className="text-sm">
+                        {searchQuery ? 'Try adjusting your search query.' : 'Create your first allocation to get started'}
+                      </p>
                     </div>
                   </td>
                 </tr>
