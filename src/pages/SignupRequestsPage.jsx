@@ -4,6 +4,7 @@ import { signupRequestApi } from '../services/api';
 import { CheckCircle, XCircle, Clock, User, Mail, Phone, Briefcase, AlertTriangle, X, ChevronDown } from 'lucide-react';
 import { format, parseISO } from 'date-fns';
 import toast from 'react-hot-toast';
+import PageSearchBar from '../components/ui/PageSearchBar';
 
 const EMPLOYEE_TYPES = ['Full-time', 'Part-time', 'Intern', 'Contractor'];
 
@@ -61,6 +62,7 @@ const SignupRequestsPage = () => {
     const [rejectReason, setRejectReason] = useState('');
     const [expandedId, setExpandedId] = useState(null);
     const [currentPage, setCurrentPage] = useState(1);
+    const [searchQuery, setSearchQuery] = useState('');
     const [localEmployeeTypes, setLocalEmployeeTypes] = useState({});
     const PAGE_SIZE = 10;
 
@@ -101,8 +103,11 @@ const SignupRequestsPage = () => {
     });
 
     const filtered = requests.filter(r => {
-        if (activeTab === 'All') return true;
-        return r.status === activeTab.toLowerCase();
+        if (activeTab !== 'All' && r.status !== activeTab.toLowerCase()) return false;
+        if (!searchQuery.trim()) return true;
+        const q = searchQuery.toLowerCase();
+        return (r.name || '').toLowerCase().includes(q) ||
+            (r.email || '').toLowerCase().includes(q);
     });
 
     const pendingCount = requests.filter(r => r.status === 'pending').length;
@@ -112,6 +117,7 @@ const SignupRequestsPage = () => {
     const handleTabChange = (tab) => {
         setActiveTab(tab);
         setCurrentPage(1);
+        setSearchQuery('');
     };
 
     return (
@@ -131,21 +137,29 @@ const SignupRequestsPage = () => {
                 </p>
             </div>
 
-            {/* Tabs */}
-            <div className="flex gap-1 bg-slate-100 rounded-xl p-1 w-fit">
-                {TABS.map(tab => (
-                    <button key={tab} onClick={() => handleTabChange(tab)}
-                        className={`px-4 py-2 rounded-lg text-sm font-medium transition-all ${
-                            activeTab === tab ? 'bg-white text-slate-800 shadow-sm' : 'text-slate-500 hover:text-slate-700'
-                        }`}>
-                        {tab}
-                        {tab === 'Pending' && pendingCount > 0 && (
-                            <span className="ml-1.5 inline-flex items-center justify-center h-4 min-w-[16px] px-1 rounded-full text-[10px] font-bold bg-amber-500 text-white">
-                                {pendingCount}
-                            </span>
-                        )}
-                    </button>
-                ))}
+            {/* Tabs & Search */}
+            <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4">
+                <div className="flex gap-1 bg-slate-100 rounded-xl p-1 w-fit">
+                    {TABS.map(tab => (
+                        <button key={tab} onClick={() => handleTabChange(tab)}
+                            className={`px-4 py-2 rounded-lg text-sm font-medium transition-all ${
+                                activeTab === tab ? 'bg-white text-slate-800 shadow-sm' : 'text-slate-500 hover:text-slate-700'
+                            }`}>
+                            {tab}
+                            {tab === 'Pending' && pendingCount > 0 && (
+                                <span className="ml-1.5 inline-flex items-center justify-center h-4 min-w-[16px] px-1 rounded-full text-[10px] font-bold bg-amber-500 text-white">
+                                    {pendingCount}
+                                </span>
+                            )}
+                        </button>
+                    ))}
+                </div>
+
+                <PageSearchBar
+                    value={searchQuery}
+                    onChange={(val) => { setSearchQuery(val); setCurrentPage(1); }}
+                    placeholder="Search requests..."
+                />
             </div>
 
             {/* Table */}
@@ -155,9 +169,9 @@ const SignupRequestsPage = () => {
                 ) : filtered.length === 0 ? (
                     <div className="flex flex-col items-center justify-center py-16 text-slate-400">
                         <User className="w-10 h-10 mb-3 text-slate-300" />
-                        <p className="font-medium">No {activeTab.toLowerCase()} requests</p>
+                        <p className="font-medium">{searchQuery ? 'No matching requests' : `No ${activeTab.toLowerCase()} requests`}</p>
                         <p className="text-sm mt-1">
-                            Share <strong className="text-slate-600">autonex-frontend.vercel.app/employee-signup</strong> with employees to get started.
+                            {searchQuery ? 'Try adjusting your search query.' : 'Share autonex-frontend.vercel.app/employee-signup with employees to get started.'}
                         </p>
                     </div>
                 ) : (

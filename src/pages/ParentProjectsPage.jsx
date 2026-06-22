@@ -7,6 +7,7 @@ import { Link } from 'react-router-dom';
 import { format } from 'date-fns';
 import toast from 'react-hot-toast';
 import { getPmEmployeeId, getPmProjects } from '../utils/pmScope';
+import PageSearchBar from '../components/ui/PageSearchBar';
 
 const ParentProjectsPage = () => {
     const [isModalOpen, setIsModalOpen] = useState(false);
@@ -236,16 +237,11 @@ const ParentProjectsPage = () => {
                     </p>
                 </div>
                 <div className="flex items-center gap-3">
-                    <div className="relative">
-                        <Search className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-slate-400 pointer-events-none" />
-                        <input
-                            type="text"
-                            placeholder="Search organizations..."
-                            value={searchQuery}
-                            onChange={e => setSearchQuery(e.target.value)}
-                            className="pl-9 pr-4 py-2 text-sm bg-white border border-slate-200 rounded-xl focus:outline-none focus:ring-2 focus:ring-indigo-100 focus:border-indigo-300 w-52 placeholder:text-slate-400"
-                        />
-                    </div>
+                    <PageSearchBar
+                        value={searchQuery}
+                        onChange={setSearchQuery}
+                        placeholder="Search organizations..."
+                    />
                     <button
                         onClick={() => {
                             setEditingProject(null);

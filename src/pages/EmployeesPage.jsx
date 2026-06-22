@@ -446,6 +446,7 @@ import { useSearchParams } from 'react-router-dom';
 import { employeeApi, skillApi, allocationApi } from '../services/api';
 import { Plus, Edit, Trash2, X, User, ChevronDown, Search, CheckCircle, AlertCircle, Clock, ArrowUpCircle, RotateCcw } from 'lucide-react';
 import toast from 'react-hot-toast';
+import PageSearchBar from '../components/ui/PageSearchBar';
 
 const LEAVE_TYPE_LABELS = {
   paid: 'Paid Leave',
@@ -1393,16 +1394,11 @@ const EmployeesPage = () => {
             </div>
           )}
 
-          <div className="relative flex-1 sm:flex-none">
-            <Search className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-slate-400" />
-            <input
-              type="text"
-              placeholder="Search employees..."
-              value={searchQuery}
-              onChange={(e) => { setSearchQuery(e.target.value); setCurrentPage(1); }}
-              className="pl-9 pr-4 py-2 border border-slate-200 rounded-lg text-sm focus:ring-2 focus:ring-indigo-100 outline-none w-full sm:w-64"
-            />
-          </div>
+          <PageSearchBar
+            value={searchQuery}
+            onChange={(val) => { setSearchQuery(val); setCurrentPage(1); }}
+            placeholder="Search employees..."
+          />
 
           <button
             onClick={() => {

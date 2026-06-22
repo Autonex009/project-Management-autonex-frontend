@@ -4,6 +4,7 @@ import { guidelineApi, projectApi, subProjectApi } from '../../services/api';
 import { FileText, Plus, Trash2, Edit3, X, Save, ChevronDown, Download, FolderOpen, UploadCloud } from 'lucide-react';
 import toast from 'react-hot-toast';
 import { getPmEmployeeId, getPmProjects, getPmSubProjects } from '../../utils/pmScope';
+import PageSearchBar from '../../components/ui/PageSearchBar';
 
 const GuidelinesPage = () => {
     const queryClient = useQueryClient();
@@ -20,6 +21,7 @@ const GuidelinesPage = () => {
     const [selectedFile, setSelectedFile] = useState(null);
     const [isDragActive, setIsDragActive] = useState(false);
     const fileInputRef = useRef(null);
+    const [searchQuery, setSearchQuery] = useState('');
 
     // Fetch guidelines
     const params = {};
@@ -45,6 +47,14 @@ const GuidelinesPage = () => {
     const visibleSubProjectsForRole = isPm
         ? getPmSubProjects(subProjects, mainProjects, pmEmployeeId, [])
         : subProjects;
+
+    const filteredGuidelines = guidelines.filter(g => {
+        const title = (g.title || '').toLowerCase();
+        const content = (g.content || '').toLowerCase();
+        const fileName = (g.file_name || '').toLowerCase();
+        const q = searchQuery.toLowerCase();
+        return title.includes(q) || content.includes(q) || fileName.includes(q);
+    });
 
     // Mutations
     const createMutation = useMutation({
@@ -146,22 +156,30 @@ const GuidelinesPage = () => {
                 )}
             </div>
 
-            {/* Filter */}
-            <div className="flex items-center gap-3">
-                <div className="relative">
-                    <select
-                        value={filterProject}
-                        onChange={(e) => setFilterProject(e.target.value)}
-                        className="appearance-none pl-3 pr-8 py-2 border border-slate-200 rounded-lg text-sm text-slate-700 bg-white focus:ring-2 focus:ring-blue-500 focus:border-blue-500"
-                    >
-                        <option value="">All Projects</option>
-                        {visibleMainProjects.map(p => (
-                            <option key={p.id} value={p.id}>{p.name}</option>
-                        ))}
-                    </select>
-                    <ChevronDown className="w-4 h-4 absolute right-2 top-1/2 -translate-y-1/2 text-slate-400 pointer-events-none" />
+            {/* Filter and Search Bar */}
+            <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4">
+                <div className="flex items-center gap-3">
+                    <div className="relative">
+                        <select
+                            value={filterProject}
+                            onChange={(e) => { setFilterProject(e.target.value); setSearchQuery(''); }}
+                            className="appearance-none pl-3 pr-8 py-2 border border-slate-200 rounded-lg text-sm text-slate-700 bg-white focus:ring-2 focus:ring-blue-500 focus:border-blue-500"
+                        >
+                            <option value="">All Projects</option>
+                            {visibleMainProjects.map(p => (
+                                <option key={p.id} value={p.id}>{p.name}</option>
+                            ))}
+                        </select>
+                        <ChevronDown className="w-4 h-4 absolute right-2 top-1/2 -translate-y-1/2 text-slate-400 pointer-events-none" />
+                    </div>
+                    <span className="text-sm text-slate-400">{filteredGuidelines.length} guideline{filteredGuidelines.length !== 1 ? 's' : ''}</span>
                 </div>
-                <span className="text-sm text-slate-400">{guidelines.length} guideline{guidelines.length !== 1 ? 's' : ''}</span>
+
+                <PageSearchBar
+                    value={searchQuery}
+                    onChange={setSearchQuery}
+                    placeholder="Search guidelines..."
+                />
             </div>
 
             {/* Create/Edit Form */}
@@ -291,15 +309,15 @@ const GuidelinesPage = () => {
             {/* Guidelines List */}
             {isLoading ? (
                 <div className="text-center py-12 text-slate-400 animate-pulse">Loading guidelines...</div>
-            ) : guidelines.length === 0 ? (
+            ) : filteredGuidelines.length === 0 ? (
                 <div className="bg-white rounded-2xl border border-slate-200 p-12 text-center">
                     <FileText className="w-12 h-12 text-slate-300 mx-auto mb-4" />
-                    <h3 className="font-medium text-slate-600 mb-1">No guidelines yet</h3>
-                    <p className="text-sm text-slate-400">{canEdit ? 'Click "Add Guideline" to create the first one.' : 'No guidelines have been published yet.'}</p>
+                    <h3 className="font-medium text-slate-600 mb-1">No guidelines found</h3>
+                    <p className="text-sm text-slate-400">Try adjusting your search or filters.</p>
                 </div>
             ) : (
                 <div className="space-y-4">
-                    {guidelines.map(g => {
+                    {filteredGuidelines.map(g => {
                         const project = mainProjects.find(p => p.id === g.main_project_id);
                         const subProject = subProjects.find(p => p.id === g.sub_project_id);
                         return (
