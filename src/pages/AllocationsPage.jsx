@@ -472,6 +472,7 @@ import { useLocation } from 'react-router-dom';
 import { allocationApi, subProjectApi, employeeApi, leaveApi, parentProjectApi } from '../services/api';
 import { Plus, Edit, Trash2, X, UserPlus, UserMinus, CheckSquare, AlertTriangle, Users } from 'lucide-react';
 import toast from 'react-hot-toast';
+import ConfirmDialog from '../components/ui/ConfirmDialog';
 import { getPmEmployeeId, getPmSubProjects } from '../utils/pmScope';
 import PageSearchBar from '../components/ui/PageSearchBar';
 
@@ -524,6 +525,7 @@ const AllocationsPage = () => {
   const [allocatedEmployeesOther, setAllocatedEmployeesOther] = useState([]);
   const [filterTab, setFilterTab] = useState('unallocated');
   const [editingAllocation, setEditingAllocation] = useState(null);
+  const [confirmState, setConfirmState] = useState(null);
 
   // Time division state
   const [selectedRoleTags, setSelectedRoleTags] = useState([]);
@@ -690,21 +692,29 @@ const AllocationsPage = () => {
     const required = selectedProject.required_manpower || 0;
 
     if (newTotal > required) {
-      const confirmed = window.confirm(
-        `⚠️ Warning: Over-allocation detected!\n\n` +
-        `Required Manpower: ${required}\n` +
-        `Currently Allocated: ${currentAllocated}\n` +
-        `You're adding: ${selectedEmployees.length}\n` +
-        `Total will be: ${newTotal}\n\n` +
-        `This exceeds the required manpower by ${newTotal - required}.\n\n` +
-        `Do you want to proceed anyway?`
-      );
-
-      if (!confirmed) {
-        return;
-      }
+      setConfirmState({
+        variant: 'warning',
+        title: 'Over-allocation detected',
+        message: `This allocation will exceed the required manpower by ${newTotal - required}. Do you want to proceed anyway?`,
+        details: [
+          { label: 'Required manpower', value: required },
+          { label: 'Currently allocated', value: currentAllocated },
+          { label: "You're adding", value: selectedEmployees.length },
+          { label: 'Total will be', value: newTotal, highlight: true },
+        ],
+        confirmText: 'Proceed anyway',
+        onConfirm: () => {
+          setConfirmState(null);
+          performAllocation();
+        },
+      });
+      return;
     }
 
+    performAllocation();
+  };
+
+  const performAllocation = () => {
     // Create allocations for all selected employees
     selectedEmployees.forEach(emp => {
       const data = {
@@ -1157,9 +1167,16 @@ const AllocationsPage = () => {
                                       onClick={(e) => {
                                         e.preventDefault();
                                         e.stopPropagation();
-                                        if (window.confirm(`Remove ${emp.name} from "${selectedProject.name}"?`)) {
-                                          deleteMutation.mutate(alloc.id);
-                                        }
+                                        setConfirmState({
+                                          variant: 'danger',
+                                          title: 'Remove team member',
+                                          message: `Remove ${emp.name} from "${selectedProject.name}"?`,
+                                          confirmText: 'Remove',
+                                          onConfirm: () => {
+                                            deleteMutation.mutate(alloc.id);
+                                            setConfirmState(null);
+                                          },
+                                        });
                                       }}
                                       className="ml-0.5 w-4 h-4 rounded-full text-slate-400 hover:text-white hover:bg-rose-500 flex items-center justify-center transition-colors disabled:cursor-not-allowed"
                                       title={`Remove ${emp.name}`}
@@ -1540,10 +1557,17 @@ const AllocationsPage = () => {
                     </div>
                     <button
                       onClick={() => {
-                        if (window.confirm(`Remove ${emp?.name} from this project?`)) {
-                          deleteMutation.mutate(alloc.id);
-                          setEditingAllocation(null);
-                        }
+                        setConfirmState({
+                          variant: 'danger',
+                          title: 'Remove team member',
+                          message: `Remove ${emp?.name} from this project?`,
+                          confirmText: 'Remove',
+                          onConfirm: () => {
+                            deleteMutation.mutate(alloc.id);
+                            setEditingAllocation(null);
+                            setConfirmState(null);
+                          },
+                        });
                       }}
                       className="p-2 text-red-600 hover:bg-red-50 rounded"
                       title="Remove"
@@ -1566,7 +1590,17 @@ const AllocationsPage = () => {
           </div>
         </div>
       )}
-    </div>
+
+      <ConfirmDialog
+        isOpen={!!confirmState}
+        onClose={() => setConfirmState(null)}
+        onConfirm={confirmState?.onConfirm}
+        title={confirmState?.title}
+        message={confirmState?.message}
+        details={confirmState?.details}
+        variant={confirmState?.variant}
+        confirmText={confirmState?.confirmText}
+      />    </div>
   );
 };
 
