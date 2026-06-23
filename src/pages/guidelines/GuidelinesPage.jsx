@@ -1,10 +1,11 @@
 import React, { useRef, useState } from 'react';
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import { guidelineApi, projectApi, subProjectApi } from '../../services/api';
-import { FileText, Plus, Trash2, Edit3, X, Save, ChevronDown, Download, FolderOpen, UploadCloud } from 'lucide-react';
+import { FileText, Plus, Trash2, Edit3, X, Save, Download, FolderOpen, UploadCloud } from 'lucide-react';
 import toast from 'react-hot-toast';
 import { getPmEmployeeId, getPmProjects, getPmSubProjects } from '../../utils/pmScope';
 import PageSearchBar from '../../components/ui/PageSearchBar';
+import Dropdown from '../../components/ui/Dropdown';
 
 const GuidelinesPage = () => {
     const queryClient = useQueryClient();
@@ -159,19 +160,12 @@ const GuidelinesPage = () => {
             {/* Filter and Search Bar */}
             <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4">
                 <div className="flex items-center gap-3">
-                    <div className="relative">
-                        <select
-                            value={filterProject}
-                            onChange={(e) => { setFilterProject(e.target.value); setSearchQuery(''); }}
-                            className="appearance-none pl-3 pr-8 py-2 border border-slate-200 rounded-lg text-sm text-slate-700 bg-white focus:ring-2 focus:ring-blue-500 focus:border-blue-500"
-                        >
-                            <option value="">All Projects</option>
-                            {visibleMainProjects.map(p => (
-                                <option key={p.id} value={p.id}>{p.name}</option>
-                            ))}
-                        </select>
-                        <ChevronDown className="w-4 h-4 absolute right-2 top-1/2 -translate-y-1/2 text-slate-400 pointer-events-none" />
-                    </div>
+                    <Dropdown
+                        options={[{ value: '', label: 'All Projects' }, ...visibleMainProjects.map(p => ({ value: String(p.id), label: p.name }))]}
+                        value={filterProject}
+                        onChange={(val) => { setFilterProject(val); setSearchQuery(''); }}
+                        placeholder="All Projects"
+                    />
                     <span className="text-sm text-slate-400">{filteredGuidelines.length} guideline{filteredGuidelines.length !== 1 ? 's' : ''}</span>
                 </div>
 
@@ -205,16 +199,12 @@ const GuidelinesPage = () => {
                             {!editingId && (
                                 <div>
                                     <label className="block text-sm font-medium text-slate-700 mb-1">Main Project</label>
-                                    <select
+                                    <Dropdown
+                                        options={[{ value: '', label: 'None (General)' }, ...visibleMainProjects.map(p => ({ value: String(p.id), label: p.name }))]}
                                         value={form.main_project_id}
-                                        onChange={(e) => setForm({ ...form, main_project_id: e.target.value, sub_project_id: '' })}
-                                        className="w-full px-3 py-2 border border-slate-200 rounded-lg text-sm focus:ring-2 focus:ring-blue-500 focus:border-blue-500"
-                                    >
-                                        <option value="">None (General)</option>
-                                        {visibleMainProjects.map(p => (
-                                            <option key={p.id} value={p.id}>{p.name}</option>
-                                        ))}
-                                    </select>
+                                        onChange={(val) => setForm({ ...form, main_project_id: val, sub_project_id: '' })}
+                                        placeholder="None (General)"
+                                    />
                                 </div>
                             )}
                         </div>
@@ -222,16 +212,12 @@ const GuidelinesPage = () => {
                             <>
                                 <div>
                                     <label className="block text-sm font-medium text-slate-700 mb-1">Sub-Project</label>
-                                    <select
+                                    <Dropdown
+                                        options={[{ value: '', label: 'All Sub-Projects' }, ...visibleSubProjects.map(p => ({ value: String(p.id), label: p.name }))]}
                                         value={form.sub_project_id}
-                                        onChange={(e) => setForm({ ...form, sub_project_id: e.target.value })}
-                                        className="w-full px-3 py-2 border border-slate-200 rounded-lg text-sm focus:ring-2 focus:ring-blue-500 focus:border-blue-500"
-                                    >
-                                        <option value="">All Sub-Projects</option>
-                                        {visibleSubProjects.map((project) => (
-                                            <option key={project.id} value={project.id}>{project.name}</option>
-                                        ))}
-                                    </select>
+                                        onChange={(val) => setForm({ ...form, sub_project_id: val })}
+                                        placeholder="All Sub-Projects"
+                                    />
                                 </div>
                                 <div>
                                     <label className="block text-sm font-medium text-slate-700 mb-2">Guideline File</label>

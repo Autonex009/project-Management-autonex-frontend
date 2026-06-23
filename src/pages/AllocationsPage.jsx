@@ -1,9 +1,11 @@
 // import { useState } from 'react';
 import AllocationPopover from '../components/AllocationPopover';
+import Dropdown from '../components/ui/Dropdown';
 // import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 // import { allocationApi, projectApi, employeeApi } from '../services/api';
 // import { Plus, X, Edit, Trash2 } from 'lucide-react';
 // import { format } from 'date-fns';
+import SearchInput from '../components/ui/SearchInput';
 
 // const AllocationsPage = () => {
 //   const queryClient = useQueryClient();
@@ -1041,7 +1043,7 @@ const AllocationsPage = () => {
 
       {/* Create Allocation Modal */}
       {isModalOpen && (
-        <div className="fixed inset-0 bg-slate-900/40 backdrop-blur-sm flex items-center justify-center z-50 p-2 sm:p-4">
+        <div className="fixed inset-0 bg-slate-900/40 backdrop-blur-sm flex items-center justify-center z-50 px-2 py-4 sm:px-4">
           <div
             className="bg-white rounded-lg shadow-xl w-full max-w-full sm:max-w-3xl max-h-[95vh] sm:max-h-[90vh] overflow-y-auto"
             onClick={(e) => e.stopPropagation()}
@@ -1065,23 +1067,19 @@ const AllocationsPage = () => {
                 <label className="block text-sm font-medium text-gray-700 mb-1">
                   Select Project <span className="text-red-500">*</span>
                 </label>
-                <select
-                  value={selectedProject?.id || ''}
-                  onChange={(e) => {
-                    const project = visibleProjects.find(p => p.id === parseInt(e.target.value));
+                <Dropdown
+                  options={visibleProjects.map(project => ({
+                    value: project.id.toString(),
+                    label: `${project.name} - Required: ${project.required_manpower || 0}`
+                  }))}
+                  value={selectedProject?.id.toString() || ''}
+                  onChange={(val) => {
+                    const project = visibleProjects.find(p => p.id === parseInt(val));
                     setSelectedProject(project);
                     setSelectedEmployees([]);
                   }}
-                  className="input"
-                  required
-                >
-                  <option value="">Choose a project...</option>
-                  {visibleProjects.map(project => (
-                    <option key={project.id} value={project.id}>
-                      {project.name} - Required: {project.required_manpower || 0}
-                    </option>
-                  ))}
-                </select>
+                  placeholder="Choose a project..."
+                />
               </div>
 
               {selectedProject && (
@@ -1245,12 +1243,11 @@ const AllocationsPage = () => {
 
                     {/* Employee Search */}
                     <div className="mb-3">
-                      <input
-                        type="text"
-                        value={employeeSearch}
-                        onChange={(e) => setEmployeeSearch(e.target.value)}
+                      <SearchInput
                         placeholder="Search employees by name or email..."
-                        className="w-full px-3 py-2 border border-gray-300 rounded-md text-sm focus:outline-none focus:ring-2 focus:ring-indigo-500"
+                        value={employeeSearch}
+                        onChange={setEmployeeSearch}
+                        className="w-full"
                       />
                     </div>
 
@@ -1387,10 +1384,13 @@ const AllocationsPage = () => {
                         <label className="block text-sm font-medium text-gray-700 mb-1">
                           Total Daily Hours
                         </label>
-                        <select
-                          value={totalDailyHours}
-                          onChange={(e) => {
-                            const newHours = e.target.value === '' ? '' : parseInt(e.target.value);
+                        <Dropdown
+                          options={['', ...['4 hours', '6 hours', '8 hours', '10 hours', '12 hours']].map((h, i) =>
+                            h ? { value: (4 + i * 2).toString(), label: h } : { value: '', label: 'Not specified' }
+                          )}
+                          value={totalDailyHours.toString()}
+                          onChange={(val) => {
+                            const newHours = val === '' ? '' : parseInt(val);
                             setTotalDailyHours(newHours);
                             if (newHours !== '') {
                               const currentSum = Object.values(timeDistribution).reduce((a, b) => a + b, 0);
@@ -1399,13 +1399,8 @@ const AllocationsPage = () => {
                               }
                             }
                           }}
-                          className="input w-32"
-                        >
-                          <option value="">Not specified</option>
-                          {[4, 6, 8, 10, 12].map(h => (
-                            <option key={h} value={h}>{h} hours</option>
-                          ))}
-                        </select>
+                          placeholder="Not specified"
+                        />
                       </div>
 
                       {/* Role Tags Selection */}
@@ -1527,7 +1522,7 @@ const AllocationsPage = () => {
 
       {/* Edit Allocation Modal */}
       {editingAllocation && (
-        <div className="fixed inset-0 bg-slate-900/40 backdrop-blur-sm flex items-center justify-center z-50 p-2 sm:p-4">
+        <div className="fixed inset-0 bg-slate-900/40 backdrop-blur-sm flex items-center justify-center z-50 px-2 py-4 sm:px-4">
           <div className="bg-white rounded-lg shadow-xl w-full max-w-full sm:max-w-2xl max-h-[95vh] sm:max-h-[90vh] overflow-y-auto">
             <div className="sticky top-0 bg-white border-b border-gray-200 px-6 py-4 flex justify-between items-center">
               <h2 className="text-xl font-semibold text-gray-900">

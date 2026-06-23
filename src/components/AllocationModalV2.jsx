@@ -1,5 +1,6 @@
 import { useState, useEffect } from 'react';
 import { X, Plus, Trash2, AlertCircle } from 'lucide-react';
+import Dropdown from './ui/Dropdown';
 
 const AllocationModalV2 = ({
     isOpen,
@@ -114,7 +115,7 @@ const AllocationModalV2 = ({
     const isBalanced = totalDistributed === formData.total_daily_hours;
 
     return (
-        <div className="fixed inset-0 bg-slate-900/40 backdrop-blur-sm flex items-center justify-center z-50 p-2 sm:p-4">
+        <div className="fixed inset-0 bg-slate-900/40 backdrop-blur-sm flex items-center justify-center z-50 px-2 py-4 sm:px-4">
             <div className="bg-white rounded-lg shadow-xl w-full max-w-full sm:max-w-4xl max-h-[95vh] sm:max-h-[90vh] overflow-y-auto">
                 {/* Header */}
                 <div className="sticky top-0 bg-white border-b border-gray-200 px-6 py-4 flex justify-between items-center">
@@ -153,38 +154,30 @@ const AllocationModalV2 = ({
                             <label className="block text-sm font-medium text-gray-700 mb-1">
                                 Employee <span className="text-red-500">*</span>
                             </label>
-                            <select
-                                value={formData.employee_id}
-                                onChange={(e) => setFormData(prev => ({ ...prev, employee_id: parseInt(e.target.value) }))}
-                                className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500"
-                                required
-                            >
-                                <option value="">Select employee</option>
-                                {employees.filter(e => e.status === 'active').map(emp => (
-                                    <option key={emp.id} value={emp.id}>
-                                        {emp.name} - {emp.employee_type}
-                                    </option>
-                                ))}
-                            </select>
+                            <Dropdown
+                                options={employees.filter(e => e.status === 'active').map(emp => ({
+                                    value: emp.id.toString(),
+                                    label: `${emp.name} - ${emp.employee_type}`
+                                }))}
+                                value={formData.employee_id.toString()}
+                                onChange={(val) => setFormData(prev => ({ ...prev, employee_id: parseInt(val) || '' }))}
+                                placeholder="Select employee"
+                            />
                         </div>
 
                         <div>
                             <label className="block text-sm font-medium text-gray-700 mb-1">
                                 Project <span className="text-red-500">*</span>
                             </label>
-                            <select
-                                value={formData.project_id}
-                                onChange={(e) => setFormData(prev => ({ ...prev, project_id: parseInt(e.target.value) }))}
-                                className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500"
-                                required
-                            >
-                                <option value="">Select project</option>
-                                {projects.filter(p => p.project_status === 'active').map(proj => (
-                                    <option key={proj.id} value={proj.id}>
-                                        {proj.name}
-                                    </option>
-                                ))}
-                            </select>
+                            <Dropdown
+                                options={projects.filter(p => p.project_status === 'active').map(proj => ({
+                                    value: proj.id.toString(),
+                                    label: proj.name
+                                }))}
+                                value={formData.project_id.toString()}
+                                onChange={(val) => setFormData(prev => ({ ...prev, project_id: parseInt(val) || '' }))}
+                                placeholder="Select project"
+                            />
                         </div>
                     </div>
 

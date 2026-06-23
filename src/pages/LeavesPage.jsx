@@ -9,6 +9,7 @@ import { getLeaveTypeBadgeClass, getLeaveTypeLabel, LEAVE_TYPE_OPTIONS, getWorki
 import LeaveCalendar from '../components/LeaveCalendar';
 import DeleteConfirmModal from '../components/ui/DeleteConfirmModal';
 import PageSearchBar from '../components/ui/PageSearchBar';
+import Dropdown from '../components/ui/Dropdown';
 
 const TABS = ['Leave List', 'Calendar', 'WFH Requests'];
 
@@ -63,6 +64,7 @@ const LeavesPage = () => {
   const [remarkModal, setRemarkModal] = useState(null); // { leaveId }
   const [remark, setRemark] = useState('');
   const [deleteTarget, setDeleteTarget] = useState(null);
+  const [formEmployeeId, setFormEmployeeId] = useState('');
   const user = JSON.parse(localStorage.getItem('user') || '{}');
 
   const { data: leaves = [], isLoading } = useQuery({
@@ -104,6 +106,7 @@ const LeavesPage = () => {
       queryClient.invalidateQueries(['leaves']);
       setIsModalOpen(false);
       setSelectedLeaveType('');
+      setFormEmployeeId('');
       toast.success('Leave record created successfully');
     },
     onError: (err) => toast.error(err.response?.data?.detail || err.message || 'Failed to create leave'),
@@ -492,24 +495,31 @@ const LeavesPage = () => {
           <div className="bg-white rounded-2xl shadow-xl w-full max-w-full sm:max-w-md">
             <div className="px-6 py-4 border-b border-gray-200 flex justify-between items-center">
               <h2 className="text-xl font-semibold text-gray-900">Add Leave</h2>
-              <button onClick={() => setIsModalOpen(false)} className="text-gray-400 hover:text-gray-600">
+              <button onClick={() => { setIsModalOpen(false); setFormEmployeeId(''); }} className="text-gray-400 hover:text-gray-600">
                 <X className="w-5 h-5"/>
               </button>
             </div>
             <form onSubmit={handleSubmit} className="p-6 space-y-4">
               <div>
                 <label className="block text-sm font-medium text-gray-700 mb-1">Employee <span className="text-red-500">*</span></label>
-                <select name="employee_id" required className="input" disabled={activeEmployees.length === 0}>
-                  <option value="">Select employee</option>
-                  {activeEmployees.map(e => <option key={e.id} value={e.id}>{e.name} - {e.employee_type}</option>)}
-                </select>
+                <input type="hidden" name="employee_id" value={formEmployeeId} />
+                <Dropdown
+                  options={[{ value: '', label: 'Select employee' }, ...activeEmployees.map(e => ({ value: String(e.id), label: `${e.name} - ${e.employee_type}` }))]}
+                  value={formEmployeeId}
+                  onChange={setFormEmployeeId}
+                  placeholder="Select employee"
+                  disabled={activeEmployees.length === 0}
+                />
               </div>
               <div>
                 <label className="block text-sm font-medium text-gray-700 mb-1">Leave Type <span className="text-red-500">*</span></label>
-                <select name="leave_type" required value={selectedLeaveType} onChange={e => setSelectedLeaveType(e.target.value)} className="input">
-                  <option value="">Select type</option>
-                  {LEAVE_TYPE_OPTIONS.map(o => <option key={o.value} value={o.value}>{o.label}</option>)}
-                </select>
+                <input type="hidden" name="leave_type" value={selectedLeaveType} />
+                <Dropdown
+                  options={[{ value: '', label: 'Select type' }, ...LEAVE_TYPE_OPTIONS]}
+                  value={selectedLeaveType}
+                  onChange={setSelectedLeaveType}
+                  placeholder="Select type"
+                />
               </div>
               <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
                 <div className={selectedLeaveType === 'first_half' || selectedLeaveType === 'second_half' ? "col-span-2" : ""}>
@@ -545,7 +555,7 @@ const LeavesPage = () => {
                 </div>
               )}
               <div className="flex justify-end gap-3 pt-4 border-t border-gray-200">
-                <button type="button" onClick={() => { setIsModalOpen(false); setSelectedLeaveType(''); }} className="btn btn-secondary">Cancel</button>
+                <button type="button" onClick={() => { setIsModalOpen(false); setSelectedLeaveType(''); setFormEmployeeId(''); }} className="btn btn-secondary">Cancel</button>
                 <button type="submit" disabled={createMutation.isPending || activeEmployees.length === 0} className="btn btn-primary">
                   {createMutation.isPending ? 'Creating...' : 'Create Leave'}
                 </button>

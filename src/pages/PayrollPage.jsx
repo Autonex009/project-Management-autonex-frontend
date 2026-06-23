@@ -511,7 +511,7 @@ const PayrollPage = () => {
 
             {/* Leave Review Modal */}
             {reviewModal && modalRow && (
-                <div className="fixed inset-0 bg-black/50 flex items-center justify-center z-50 p-2 sm:p-4 overflow-y-auto">
+                <div className="fixed inset-0 bg-black/50 flex items-center justify-center z-50 px-2 py-4 sm:px-4 overflow-y-auto">
                     <div className="bg-white rounded-2xl shadow-xl w-full max-w-full sm:max-w-lg my-2 sm:my-4">
                         {/* Modal header */}
                         <div className="flex items-start justify-between px-6 py-5 border-b border-slate-100">

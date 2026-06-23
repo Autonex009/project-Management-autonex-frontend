@@ -7,6 +7,7 @@ import {
     Users2, Briefcase, Mail, Phone, Linkedin, ChevronDown, ChevronUp,
     CheckCircle2, Clock, UserCheck, XCircle, TrendingUp, X
 } from 'lucide-react';
+import Dropdown from '../components/ui/Dropdown';
 
 const STATUS_CONFIG = {
     pending:             { label: 'Pending Review',       color: 'bg-amber-50 text-amber-700 border-amber-200',   dot: 'bg-amber-400' },
@@ -318,15 +319,12 @@ const ReferralsPage = () => {
                         <div className="space-y-4">
                             <div>
                                 <label className="block text-sm font-medium text-slate-700 mb-1.5">New Status</label>
-                                <select
+                                <Dropdown
+                                    options={STATUS_OPTIONS}
                                     value={newStatus}
-                                    onChange={e => setNewStatus(e.target.value)}
-                                    className="w-full rounded-xl border border-slate-200 px-3 py-2.5 text-sm outline-none focus:border-indigo-500 focus:ring-2 focus:ring-indigo-100"
-                                >
-                                    {STATUS_OPTIONS.map(o => (
-                                        <option key={o.value} value={o.value}>{o.label}</option>
-                                    ))}
-                                </select>
+                                    onChange={setNewStatus}
+                                    className="w-full"
+                                />
                             </div>
                             <div>
                                 <label className="block text-sm font-medium text-slate-700 mb-1.5">

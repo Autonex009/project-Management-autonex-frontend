@@ -2,17 +2,21 @@
 import { useState, useEffect } from 'react';
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import { parentProjectApi, employeeApi, subProjectApi, allocationApi } from '../services/api';
-import { Plus, X, Edit, Trash2, FolderTree, Users, Calendar, Clock, ChevronRight, Layers, Search, Building2 } from 'lucide-react';
+import Dropdown from '../components/ui/Dropdown';
+import SearchInput from '../components/ui/SearchInput';
+import { Plus, X, Edit, Trash2, FolderTree, Users, Calendar, Clock, ChevronRight, Layers, Building2 } from 'lucide-react';
 import { Link } from 'react-router-dom';
 import { format } from 'date-fns';
 import toast from 'react-hot-toast';
 import { getPmEmployeeId, getPmProjects } from '../utils/pmScope';
-import PageSearchBar from '../components/ui/PageSearchBar';
 
 const ParentProjectsPage = () => {
     const [isModalOpen, setIsModalOpen] = useState(false);
     const [editingProject, setEditingProject] = useState(null);
     const [selectedPmIds, setSelectedPmIds] = useState([]);
+    const [formProjectType, setFormProjectType] = useState('Full');
+    const [formStatus, setFormStatus] = useState('active');
+    const [formClient, setFormClient] = useState('');
     const queryClient = useQueryClient();
     const user = JSON.parse(localStorage.getItem('user') || '{}');
     const role = localStorage.getItem('role') || 'admin';
@@ -81,7 +85,7 @@ const ParentProjectsPage = () => {
         a === 'No Organization' ? 1 : b === 'No Organization' ? -1 : a.localeCompare(b)
     );
 
-    // Initialize selected PMs when the modal opens
+    // Initialize selected PMs and form fields when the modal opens
     useEffect(() => {
         if (!isModalOpen) return;
         const ids = editingProject?.program_manager_ids?.length
@@ -90,6 +94,9 @@ const ParentProjectsPage = () => {
                 ? [editingProject.program_manager_id]
                 : [];
         setSelectedPmIds(ids);
+        setFormProjectType(editingProject?.project_type || 'Full');
+        setFormStatus(editingProject?.status || 'active');
+        setFormClient(editingProject?.client || '');
     }, [isModalOpen, editingProject]);
 
     // Mutations
@@ -138,14 +145,14 @@ const ParentProjectsPage = () => {
 
         const data = {
             name: formData.get('name'),
-            client: formData.get('client') || null,
-            project_type: formData.get('project_type') || 'Full',
+            client: formClient || null,
+            project_type: formProjectType || formData.get('project_type') || 'Full',
             program_manager_id: pmIds[0],
             program_manager_ids: pmIds,
             description: formData.get('description') || null,
             global_start_date: formData.get('global_start_date'),
             tentative_duration_months: formData.get('tentative_duration_months') ? parseInt(formData.get('tentative_duration_months')) : null,
-            status: formData.get('status') || 'active',
+            status: formStatus || formData.get('status') || 'active',
         };
 
         if (editingProject) {
@@ -237,17 +244,18 @@ const ParentProjectsPage = () => {
                     </p>
                 </div>
                 <div className="flex items-center gap-3">
-                    <PageSearchBar
+                    <SearchInput
+                        placeholder="Search organizations..."
                         value={searchQuery}
                         onChange={setSearchQuery}
-                        placeholder="Search organizations..."
+                        className="w-52"
                     />
                     <button
                         onClick={() => {
                             setEditingProject(null);
                             setIsModalOpen(true);
                         }}
-                        className="inline-flex items-center gap-2 px-4 py-2.5 bg-gradient-to-r from-indigo-600 to-blue-600 text-white rounded-xl font-semibold text-sm shadow-lg shadow-indigo-200 hover:shadow-xl hover:shadow-indigo-300 transition-all duration-200 hover:-translate-y-0.5"
+                        className="inline-flex items-center gap-2 px-4 py-2.5 bg-indigo-600 hover:bg-indigo-700 text-white font-medium text-sm rounded-xl shadow-sm transition-colors"
                     >
                         <Plus className="w-4 h-4" />
                         New Organization
@@ -284,7 +292,7 @@ const ParentProjectsPage = () => {
                     {projectsByOrg[orgName].map((program) => (
                         <div
                             key={program.id}
-                            className="bg-white rounded-2xl border border-slate-200 p-6 hover:shadow-xl hover:shadow-slate-200/50 transition-all duration-300 hover:-translate-y-1 group"
+                            className="bg-white rounded-2xl border border-slate-200 p-6 group"
                         >
                             {/* Card Header */}
                             <div className="flex items-start justify-between mb-4">
@@ -399,7 +407,7 @@ const ParentProjectsPage = () => {
 
             {/* Modal */}
             {isModalOpen && (
-                <div className="fixed inset-0 z-50 flex items-center justify-center bg-slate-900/50 backdrop-blur-sm p-2 sm:p-4">
+                <div className="fixed inset-0 z-50 flex items-center justify-center bg-slate-900/50 backdrop-blur-sm px-2 py-4 sm:px-4">
                     <div className="bg-white rounded-2xl shadow-2xl w-full max-w-full sm:max-w-2xl max-h-[95vh] sm:max-h-[90vh] flex flex-col overflow-hidden">
                         {/* Modal Header */}
                         <div className="px-6 py-4 border-b border-slate-100 bg-gradient-to-r from-slate-50 to-white flex-shrink-0">
@@ -440,20 +448,14 @@ const ParentProjectsPage = () => {
                                 <label className="block text-sm font-medium text-slate-700 mb-1">
                                     Organization *
                                 </label>
-                                <input
-                                    type="text"
-                                    name="client"
-                                    required
-                                    list="organization-options"
-                                    defaultValue={editingProject?.client || ''}
-                                    className="w-full px-4 py-2.5 border border-slate-200 rounded-xl focus:ring-2 focus:ring-indigo-100 focus:border-indigo-500 outline-none transition-all"
+                                <Dropdown
+                                    editable={true}
+                                    options={organizations.map(org => ({ value: org, label: org }))}
+                                    value={formClient}
+                                    onChange={setFormClient}
                                     placeholder="Select existing or type a new organization"
+                                    className="w-full"
                                 />
-                                <datalist id="organization-options">
-                                    {organizations.map((org) => (
-                                        <option key={org} value={org} />
-                                    ))}
-                                </datalist>
                                 <p className="mt-1 text-xs text-slate-400">
                                     Pick an existing organization or type a new name to create one.
                                 </p>
@@ -463,17 +465,16 @@ const ParentProjectsPage = () => {
                                 <label className="block text-sm font-medium text-slate-700 mb-1">
                                     Project Type *
                                 </label>
-                                <select
-                                    name="project_type"
-                                    required
-                                    defaultValue={editingProject?.project_type || 'Full'}
-                                    className="w-full px-4 py-2.5 border border-slate-200 rounded-xl focus:ring-2 focus:ring-indigo-100 focus:border-indigo-500 outline-none transition-all"
-                                >
-                                    <option value="Full">Full</option>
-                                    <option value="POC">POC</option>
-                                    <option value="POC Rejected">POC Rejected</option>
-                                    <option value="Side">Side</option>
-                                </select>
+                                <Dropdown
+                                    options={[
+                                        { value: 'Full', label: 'Full' },
+                                        { value: 'POC', label: 'POC' },
+                                        { value: 'POC Rejected', label: 'POC Rejected' },
+                                        { value: 'Side', label: 'Side' }
+                                    ]}
+                                    value={formProjectType || editingProject?.project_type || 'Full'}
+                                    onChange={(value) => setFormProjectType(value)}
+                                />
                             </div>
 
                             {/* is_annotation checkbox removed and moved to sub-projects page */}
@@ -540,25 +541,20 @@ const ParentProjectsPage = () => {
                                         })}
                                     </div>
                                 )}
-                                <select
+                                <Dropdown
                                     value=""
-                                    onChange={(e) => {
-                                        const id = parseInt(e.target.value);
+                                    options={[
+                                        { value: '', label: '+ Add Program Manager' },
+                                        ...employees
+                                            .filter(e => e.status === 'active' && !selectedPmIds.includes(e.id))
+                                            .map((emp) => ({ value: emp.id, label: emp.name }))
+                                    ]}
+                                    onChange={(id) => {
                                         if (id && !selectedPmIds.includes(id)) {
                                             setSelectedPmIds(prev => [...prev, id]);
                                         }
                                     }}
-                                    className="w-full px-4 py-2.5 border border-slate-200 rounded-xl focus:ring-2 focus:ring-indigo-100 focus:border-indigo-500 outline-none transition-all"
-                                >
-                                    <option value="">+ Add Program Manager</option>
-                                    {employees
-                                        .filter(e => e.status === 'active' && !selectedPmIds.includes(e.id))
-                                        .map((emp) => (
-                                            <option key={emp.id} value={emp.id}>
-                                                {emp.name}
-                                            </option>
-                                        ))}
-                                </select>
+                                />
                             </div>
 
                             <div>
@@ -606,15 +602,15 @@ const ParentProjectsPage = () => {
                                 <label className="block text-sm font-medium text-slate-700 mb-1">
                                     Status
                                 </label>
-                                <select
-                                    name="status"
-                                    defaultValue={editingProject?.status || 'active'}
-                                    className="w-full px-4 py-2.5 border border-slate-200 rounded-xl focus:ring-2 focus:ring-indigo-100 focus:border-indigo-500 outline-none transition-all"
-                                >
-                                    <option value="active">Active</option>
-                                    <option value="completed">Completed</option>
-                                    <option value="archived">Archived</option>
-                                </select>
+                                <Dropdown
+                                    options={[
+                                        { value: 'active', label: 'Active' },
+                                        { value: 'completed', label: 'Completed' },
+                                        { value: 'archived', label: 'Archived' }
+                                    ]}
+                                    value={formStatus || editingProject?.status || 'active'}
+                                    onChange={(value) => setFormStatus(value)}
+                                />
                             </div>
 
                             </div>
