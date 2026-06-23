@@ -17,14 +17,24 @@ export default {
           employeeBg: '#ecfdf5', // Emerald 50
         }
       },
-      animation: {
-        shimmer: 'shimmer 2s infinite',
-      },
       keyframes: {
-        shimmer: {
+        'fade-in': {
+          '0%': { opacity: '0' },
+          '100%': { opacity: '1' },
+        },
+        'scale-in': {
+          '0%': { opacity: '0', transform: 'scale(0.96)' },
+          '100%': { opacity: '1', transform: 'scale(1)' },
+        },
+        'shimmer' : {
           '0%': { backgroundPosition: '200% 0' },
           '100%': { backgroundPosition: '-200% 0' },
         },
+      },
+      animation: {
+        'fade-in': 'fade-in 0.15s ease-out',
+        'scale-in': 'scale-in 0.18s ease-out',
+        'shimmer': 'shimmer 2s infinite',
       },
     },
   },
