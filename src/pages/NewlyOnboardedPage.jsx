@@ -1,7 +1,11 @@
-import React, { useState, useEffect, useMemo } from 'react';
-import { Users, Award, Sparkles } from 'lucide-react';
-import { onboardingApi } from '../services/api';
+import React, { useState, useMemo } from 'react';
+import { Users, Award, Sparkles, UserPlus } from 'lucide-react';
+import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
+import toast from 'react-hot-toast';
+import { onboardingApi, allocationApi, subProjectApi, parentProjectApi } from '../services/api';
 import SearchInput from '../components/ui/SearchInput';
+import AllocationModalV2 from '../components/AllocationModalV2';
+import { getPmSubProjects, getPmEmployeeId } from '../utils/pmScope';
 
 const scoreBadgeClass = (score) => {
     if (score >= 80) return 'bg-emerald-50 text-emerald-700 border-emerald-100';
@@ -10,22 +14,58 @@ const scoreBadgeClass = (score) => {
 };
 
 const NewlyOnboardedPage = () => {
-    const [candidates, setCandidates] = useState([]);
-    const [loading, setLoading] = useState(true);
-    const [error, setError] = useState(null);
+    const queryClient = useQueryClient();
     const [search, setSearch] = useState('');
+    const [allocatingCandidate, setAllocatingCandidate] = useState(null);
 
-    useEffect(() => {
-        setLoading(true);
-        setError(null);
-        onboardingApi.getNewlyOnboarded()
-            .then((data) => setCandidates(Array.isArray(data) ? data : []))
-            .catch((err) => {
-                console.error('Failed to load newly onboarded candidates:', err);
-                setError('Could not load the newly onboarded pool.');
-            })
-            .finally(() => setLoading(false));
-    }, []);
+    const user = JSON.parse(localStorage.getItem('user') || '{}');
+    const isPm = (localStorage.getItem('role') || 'employee') === 'pm';
+
+    const { data: candidates = [], isLoading, isError } = useQuery({
+        queryKey: ['newly-onboarded'],
+        queryFn: onboardingApi.getNewlyOnboarded,
+    });
+
+    // Project options for the allocation modal.
+    const { data: subProjects = [] } = useQuery({ queryKey: ['sub-projects'], queryFn: subProjectApi.getAll });
+    const { data: parentProjects = [] } = useQuery({ queryKey: ['parent-projects'], queryFn: parentProjectApi.getAll, enabled: isPm });
+    const { data: allocations = [] } = useQuery({ queryKey: ['allocations'], queryFn: allocationApi.getAll, enabled: isPm });
+
+    const projectOptions = useMemo(() => {
+        if (isPm) {
+            return getPmSubProjects(subProjects, parentProjects, getPmEmployeeId(user), allocations) || [];
+        }
+        return subProjects;
+    }, [isPm, subProjects, parentProjects, allocations, user]);
+
+    const allocateMutation = useMutation({
+        mutationFn: allocationApi.create,
+        onSuccess: () => {
+            queryClient.invalidateQueries({ queryKey: ['newly-onboarded'] });
+            queryClient.invalidateQueries({ queryKey: ['allocations'] });
+            toast.success('Candidate allocated to project.');
+            setAllocatingCandidate(null);
+        },
+        onError: (err) => {
+            const detail = err?.response?.data?.detail;
+            const msg = (detail && (detail.message || (typeof detail === 'string' ? detail : null))) || 'Failed to allocate candidate.';
+            toast.error(msg);
+        },
+    });
+
+    const handleAllocate = (formData) => {
+        allocateMutation.mutate({
+            employee_id: formData.employee_id,
+            sub_project_id: formData.project_id,
+            total_daily_hours: formData.total_daily_hours,
+            active_start_date: formData.active_start_date || null,
+            active_end_date: formData.active_end_date || null,
+            role_tags: formData.role_tags || [],
+            time_distribution: formData.time_distribution || {},
+            override_flag: formData.override_flag || false,
+            override_reason: formData.override_reason || null,
+        });
+    };
 
     const filtered = useMemo(() => {
         const q = search.trim().toLowerCase();
@@ -37,7 +77,7 @@ const NewlyOnboardedPage = () => {
         );
     }, [candidates, search]);
 
-    if (loading) {
+    if (isLoading) {
         return (
             <div className="flex items-center justify-center min-h-[400px] text-slate-500 font-medium">
                 <span className="h-6 w-6 animate-spin rounded-full border-2 border-indigo-500/20 border-t-indigo-600 mr-2" />
@@ -46,10 +86,10 @@ const NewlyOnboardedPage = () => {
         );
     }
 
-    if (error) {
+    if (isError) {
         return (
             <div className="bg-red-50 text-red-700 p-6 rounded-2xl border border-red-100 text-center font-medium">
-                {error}
+                Could not load the newly onboarded pool.
             </div>
         );
     }
@@ -64,7 +104,7 @@ const NewlyOnboardedPage = () => {
                         <Sparkles className="w-7 h-7 text-indigo-500" /> Newly Onboarded
                     </h1>
                     <p className="text-slate-500 text-sm mt-1">
-                        Annotation employees not yet assigned to a project, ranked by assessment performance. Use this to decide who to allocate.
+                        Annotation employees not yet assigned to a project, ranked by assessment performance. Allocate the best fits straight from here.
                     </p>
                 </div>
                 <div className="flex items-center gap-4 bg-white border border-slate-200/60 p-4 px-6 rounded-2xl shadow-sm w-full md:w-auto">
@@ -93,13 +133,14 @@ const NewlyOnboardedPage = () => {
                     </div>
                 ) : (
                     <div className="overflow-x-auto">
-                        <table className="w-full text-left border-collapse min-w-[640px]">
+                        <table className="w-full text-left border-collapse min-w-[720px]">
                             <thead>
                                 <tr className="bg-slate-50/80 border-b border-slate-150 text-[10px] uppercase tracking-wider text-slate-400 font-extrabold">
                                     <th className="py-4 px-6">Candidate</th>
                                     <th className="py-4 px-6 text-center">Modules Completed</th>
                                     <th className="py-4 px-6 text-center">Overall Progress</th>
                                     <th className="py-4 px-6 text-center">Quiz Avg</th>
+                                    <th className="py-4 px-6 text-right">Action</th>
                                 </tr>
                             </thead>
                             <tbody className="divide-y divide-slate-100 bg-white">
@@ -136,6 +177,14 @@ const NewlyOnboardedPage = () => {
                                                 <Award className="w-3.5 h-3.5" /> {c.overallScore ?? 0}%
                                             </span>
                                         </td>
+                                        <td className="py-4 px-6 text-right">
+                                            <button
+                                                onClick={() => setAllocatingCandidate(c)}
+                                                className="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-xs font-semibold text-white bg-indigo-600 hover:bg-indigo-700 transition-colors shadow-sm"
+                                            >
+                                                <UserPlus className="w-3.5 h-3.5" /> Allocate
+                                            </button>
+                                        </td>
                                     </tr>
                                 ))}
                             </tbody>
@@ -143,6 +192,17 @@ const NewlyOnboardedPage = () => {
                     </div>
                 )}
             </div>
+
+            {allocatingCandidate && (
+                <AllocationModalV2
+                    isOpen={true}
+                    onClose={() => setAllocatingCandidate(null)}
+                    onSubmit={handleAllocate}
+                    projects={projectOptions}
+                    presetEmployeeId={allocatingCandidate.employeeId}
+                    presetEmployeeName={allocatingCandidate.name}
+                />
+            )}
         </div>
     );
 };

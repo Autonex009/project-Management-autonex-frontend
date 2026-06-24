@@ -8,10 +8,12 @@ const AllocationModalV2 = ({
     onSubmit,
     employees = [],
     projects = [],
-    editingAllocation = null
+    editingAllocation = null,
+    presetEmployeeId = null,
+    presetEmployeeName = ''
 }) => {
     const [formData, setFormData] = useState({
-        employee_id: '',
+        employee_id: presetEmployeeId || '',
         project_id: '',
         total_daily_hours: 8,
         active_start_date: new Date().toISOString().split('T')[0],
@@ -27,6 +29,12 @@ const AllocationModalV2 = ({
 
     // Common role suggestions
     const roleSuggestions = ['Annotation', 'Review', 'QA', 'Training', 'Management'];
+
+    useEffect(() => {
+        if (presetEmployeeId) {
+            setFormData(prev => ({ ...prev, employee_id: presetEmployeeId }));
+        }
+    }, [presetEmployeeId, isOpen]);
 
     useEffect(() => {
         if (editingAllocation) {
@@ -154,15 +162,21 @@ const AllocationModalV2 = ({
                             <label className="block text-sm font-medium text-gray-700 mb-1">
                                 Employee <span className="text-red-500">*</span>
                             </label>
-                            <Dropdown
-                                options={employees.filter(e => e.status === 'active').map(emp => ({
-                                    value: emp.id.toString(),
-                                    label: `${emp.name} - ${emp.employee_type}`
-                                }))}
-                                value={formData.employee_id.toString()}
-                                onChange={(val) => setFormData(prev => ({ ...prev, employee_id: parseInt(val) || '' }))}
-                                placeholder="Select employee"
-                            />
+                            {presetEmployeeId ? (
+                                <div className="w-full px-3 py-2 border border-gray-200 rounded-md bg-gray-50 text-sm font-medium text-gray-800">
+                                    {presetEmployeeName || 'Selected candidate'}
+                                </div>
+                            ) : (
+                                <Dropdown
+                                    options={employees.filter(e => e.status === 'active').map(emp => ({
+                                        value: emp.id.toString(),
+                                        label: `${emp.name} - ${emp.employee_type}`
+                                    }))}
+                                    value={formData.employee_id.toString()}
+                                    onChange={(val) => setFormData(prev => ({ ...prev, employee_id: parseInt(val) || '' }))}
+                                    placeholder="Select employee"
+                                />
+                            )}
                         </div>
 
                         <div>
