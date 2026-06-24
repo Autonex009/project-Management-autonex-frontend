@@ -52,7 +52,7 @@ const EmployeeLayout = () => {
     const theme = isPm ? accentTheme.pm : accentTheme.employee;
 
     const hasAnnotationSkill = Array.isArray(user.skills) &&
-        user.skills.some(s => String(s).trim().toLowerCase() === 'annotation');
+        user.skills.some(s => String(s).toLowerCase().includes('annotation'));
     const isAnnotator = hasAnnotationSkill || (user.designation && (
         user.designation.toLowerCase().includes('annotator') ||
         user.designation.toLowerCase().includes('reviewer')

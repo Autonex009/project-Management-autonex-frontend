@@ -45,7 +45,6 @@ const EmployeeReferralsPage = lazy(() => import('./pages/employee/EmployeeReferr
 const CompanyInfoPage = lazy(() => import('./pages/employee/CompanyInfoPage'));
 const OnboardingDashboard = lazy(() => import('./pages/employee/OnboardingDashboard'));
 const ModuleView = lazy(() => import('./pages/employee/ModuleView'));
-const PMOnboardingDashboard = lazy(() => import('./pages/pm/PMOnboardingDashboard'));
 const NewlyOnboardedPage = lazy(() => import('./pages/NewlyOnboardedPage'));
 const PMMentorshipPage = lazy(() => import('./pages/pm/PMMentorshipPage'));
 const AdminModulesList = lazy(() => import('./pages/admin/AdminModulesList'));
