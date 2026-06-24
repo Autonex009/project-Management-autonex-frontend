@@ -46,6 +46,7 @@ const CompanyInfoPage = lazy(() => import('./pages/employee/CompanyInfoPage'));
 const OnboardingDashboard = lazy(() => import('./pages/employee/OnboardingDashboard'));
 const ModuleView = lazy(() => import('./pages/employee/ModuleView'));
 const PMOnboardingDashboard = lazy(() => import('./pages/pm/PMOnboardingDashboard'));
+const NewlyOnboardedPage = lazy(() => import('./pages/NewlyOnboardedPage'));
 const AdminModulesList = lazy(() => import('./pages/admin/AdminModulesList'));
 const AdminModulesBuilder = lazy(() => import('./pages/admin/AdminModulesBuilder'));
 const AdminReportsPage = lazy(() => import('./pages/admin/AdminReportsPage'));
@@ -98,6 +99,7 @@ function App() {
               <Route path="modules" element={<AdminModulesList />} />
               <Route path="modules/new" element={<AdminModulesBuilder />} />
               <Route path="onboarding-reports" element={<AdminReportsPage />} />
+              <Route path="newly-onboarded" element={<NewlyOnboardedPage />} />
               <Route path="onboarding-analytics" element={<AdminAnalyticsPage />} />
               <Route path="company-settings" element={<AdminCompanySettingsPage />} />
             </Route>
@@ -143,6 +145,7 @@ function App() {
               <Route path="side-projects" element={<SideProjectsPage />} />
               <Route path="guidelines" element={<GuidelinesPage />} />
               <Route path="onboarding-mentor" element={<PMOnboardingDashboard />} />
+              <Route path="newly-onboarded" element={<NewlyOnboardedPage />} />
             </Route>
 
             {/* Catch all */}

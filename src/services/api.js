@@ -248,6 +248,7 @@ export const onboardingApi = {
     getAnalyticsDashboard: () => api.get('/onboarding/analytics/dashboard').then(res => res.data),
     getFullAnalytics: () => api.get('/onboarding/analytics/full').then(res => res.data),
     getMentees: (mentorId) => api.get(`/onboarding/mentors/${mentorId}/mentees`).then(res => res.data),
+    getNewlyOnboarded: () => api.get('/onboarding/newly-onboarded').then(res => res.data),
     getReports: () => api.get('/onboarding/reports').then(res => res.data),
     getReportsExportUrl: () => `${apiBaseUrl}/onboarding/reports/export`,
     exportReports: () => api.get('/onboarding/reports/export', { responseType: 'blob' }).then(res => res.data),
