@@ -97,6 +97,11 @@ export const employeeApi = {
     convertToFulltime: (id, data) => api.post(`/employees/${id}/convert-to-fulltime`, data).then(res => res.data),
     restore: (id) => api.post(`/employees/${id}/restore`).then(res => res.data),
     getSlackLink: (id) => api.get(`/employees/${id}/slack-link`).then(res => res.data),
+    uploadAvatar: (id, formData) => api.post(`/employees/${id}/avatar`, formData, {
+        headers: { 'Content-Type': 'multipart/form-data' },
+    }).then(res => res.data),
+    setAvatarFromSlack: (id) => api.post(`/employees/${id}/avatar/from-slack`).then(res => res.data),
+    deleteAvatar: (id) => api.delete(`/employees/${id}/avatar`).then(res => res.data),
     getActive: () => api.get('/employees/status/active').then(res => res.data),
     getInactive: () => api.get('/employees/status/inactive').then(res => res.data),
     getIdle: () => api.get('/employees/status/idle').then(res => res.data),
