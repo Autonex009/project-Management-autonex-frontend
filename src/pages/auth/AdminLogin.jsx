@@ -3,6 +3,7 @@ import { useNavigate, useLocation } from 'react-router-dom';
 import { useMutation } from '@tanstack/react-query';
 import { Lock, Mail, AlertCircle, Briefcase, User } from 'lucide-react';
 import { authApi } from '../../services/api';
+import Spinner from '../../components/ui/LoadingSpinner';
 import toast from 'react-hot-toast';
 import AuthBrandPanel from '../../components/brand/AuthBrandPanel';
 
@@ -132,11 +133,7 @@ const AdminLogin = () => {
                             disabled={loginMutation.isPending}
                             className="flex w-full items-center justify-center gap-2 rounded-2xl bg-gradient-to-r from-[#103ea8] via-[#1c4fd1] to-[#2b67ff] px-4 py-3 font-semibold text-white shadow-[0_18px_40px_rgba(29,78,216,0.35)] transition-all hover:brightness-110 disabled:cursor-not-allowed disabled:opacity-50"
                         >
-                            {loginMutation.isPending ? (
-                                <div className="h-4 w-4 animate-spin rounded-full border-2 border-white/30 border-t-white" />
-                            ) : (
-                                'Sign In'
-                            )}
+                            {loginMutation.isPending ? <Spinner size="sm" color="white" text="Signing in..." /> : 'Sign In'}
                         </button>
                     </form>
 

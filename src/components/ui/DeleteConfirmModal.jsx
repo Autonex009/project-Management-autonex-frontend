@@ -1,5 +1,7 @@
 import { createPortal } from 'react-dom';
 import { X, Trash2 } from 'lucide-react';
+import Spinner from './LoadingSpinner';
+import Button from './Button';
 
 export default function DeleteConfirmModal({
   isOpen,
@@ -47,22 +49,10 @@ export default function DeleteConfirmModal({
 
           {/* Footer Actions */}
           <div className="flex justify-end gap-3 pt-4 border-t border-slate-100 mt-6">
-            <button
-              type="button"
-              onClick={onClose}
-              disabled={isPending}
-              className="px-4 py-2 border border-slate-200 hover:bg-slate-50 text-slate-700 rounded-xl text-sm font-medium transition-colors"
-            >
-              Cancel
-            </button>
-            <button
-              type="button"
-              onClick={onConfirm}
-              disabled={isPending}
-              className="px-4 py-2 bg-red-600 hover:bg-red-700 disabled:bg-red-400 text-white rounded-xl text-sm font-medium transition-colors flex items-center gap-2 shadow-sm"
-            >
-              {isPending ? 'Deleting...' : confirmText}
-            </button>
+            <Button type="button" variant="cancel" onClick={onClose} disabled={isPending}>Cancel</Button>
+            <Button type="button" variant="danger" onClick={onConfirm} disabled={isPending} isLoading={isPending}>
+              {!isPending && confirmText}
+            </Button>
           </div>
         </div>
       </div>

@@ -1,5 +1,6 @@
 import React, { useRef, useState } from 'react';
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
+import Button from '../../components/ui/Button';
 import { guidelineApi, projectApi, subProjectApi } from '../../services/api';
 import { FileText, Plus, Trash2, Edit3, X, Save, Download, FolderOpen, UploadCloud } from 'lucide-react';
 import toast from 'react-hot-toast';
@@ -148,12 +149,9 @@ const GuidelinesPage = () => {
                     <p className="text-slate-500 text-sm mt-1">Reference documents and instructions for projects</p>
                 </div>
                 {canEdit && (
-                    <button
-                        onClick={() => { resetForm(); setShowForm(true); }}
-                        className="flex items-center gap-2 px-4 py-2.5 bg-blue-600 text-white rounded-xl text-sm font-medium hover:bg-blue-700 transition-colors shadow-sm"
-                    >
+                    <Button variant="blue" onClick={() => { resetForm(); setShowForm(true); }}>
                         <Plus className="w-4 h-4" /> Add Guideline
-                    </button>
+                    </Button>
                 )}
             </div>
 
@@ -283,10 +281,8 @@ const GuidelinesPage = () => {
                             </>
                         )}
                         <div className="flex justify-end gap-3">
-                            <button type="button" onClick={resetForm} className="px-4 py-2 text-sm text-slate-600 hover:bg-slate-50 rounded-lg transition-colors">Cancel</button>
-                            <button type="submit" className="flex items-center gap-2 px-4 py-2 bg-blue-600 text-white rounded-lg text-sm font-medium hover:bg-blue-700 transition-colors">
-                                <Save className="w-4 h-4" /> {editingId ? 'Update' : 'Upload'}
-                            </button>
+                            <Button type="button" variant="cancel" onClick={resetForm}>Cancel</Button>
+                            <Button type="submit" variant="blue"><Save className="w-4 h-4" /> {editingId ? 'Update' : 'Upload'}</Button>
                         </div>
                     </form>
                 </div>

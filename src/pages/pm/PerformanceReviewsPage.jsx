@@ -1,5 +1,6 @@
 import React, { useState } from 'react';
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
+import Button from '../../components/ui/Button';
 import { employeeApi, allocationApi, parentProjectApi, subProjectApi, performanceReviewApi } from '../../services/api';
 import { getPmEmployeeId, getPmSubProjects } from '../../utils/pmScope';
 import { ChevronDown, ChevronUp, MessageSquare, Star, ClipboardList, Plus, Pencil, Trash2, X, Check } from 'lucide-react';
@@ -101,12 +102,10 @@ const ReviewForm = ({ initial = EMPTY_FORM, onSubmit, onCancel, loading }) => {
             )}
 
             <div className="flex justify-end gap-2 pt-1">
-                <button type="button" onClick={onCancel} className="flex items-center gap-1.5 rounded-xl border border-slate-200 bg-white px-4 py-2 text-sm font-medium text-slate-600 hover:bg-slate-50 transition-colors">
-                    <X className="w-3.5 h-3.5" /> Cancel
-                </button>
-                <button type="submit" disabled={loading} className="flex items-center gap-1.5 rounded-xl bg-blue-600 px-4 py-2 text-sm font-medium text-white hover:bg-blue-700 disabled:opacity-50 transition-colors">
-                    <Check className="w-3.5 h-3.5" /> {loading ? 'Saving…' : 'Save'}
-                </button>
+                <Button type="button" variant="cancel" onClick={onCancel}><X className="w-3.5 h-3.5" /> Cancel</Button>
+                <Button type="submit" variant="blue" disabled={loading} isLoading={loading}>
+                    {!loading && <Check className="w-3.5 h-3.5" />} {loading ? 'Saving…' : 'Save'}
+                </Button>
             </div>
         </form>
     );

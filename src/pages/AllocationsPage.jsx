@@ -477,6 +477,8 @@ import toast from 'react-hot-toast';
 import ConfirmDialog from '../components/ui/ConfirmDialog';
 import { getPmEmployeeId, getPmSubProjects } from '../utils/pmScope';
 import PageSearchBar from '../components/ui/PageSearchBar';
+import Table from '../components/ui/Table';
+import Button from '../components/ui/Button';
 
 // Stable color palette for avatars based on the employee name
 const AVATAR_PALETTE = [
@@ -804,8 +806,6 @@ const AllocationsPage = () => {
     });
   }, [projectAllocations, searchQuery, employees]);
 
-  const totalPages = Math.ceil(filteredProjectAllocations.length / PAGE_SIZE);
-  const paginatedAllocations = filteredProjectAllocations.slice((currentPage - 1) * PAGE_SIZE, currentPage * PAGE_SIZE);
 
   return (
     <div className="space-y-6">
@@ -815,17 +815,10 @@ const AllocationsPage = () => {
           <h1 className="text-2xl font-bold text-slate-800">Allocations</h1>
           <p className="mt-1 text-sm text-slate-500">Assign employees to projects</p>
         </div>
-        <button
-          onClick={() => {
-            setSelectedProject(null);
-            setSelectedEmployees([]);
-            setIsModalOpen(true);
-          }}
-          className="inline-flex items-center gap-2 px-4 py-2.5 bg-indigo-600 hover:bg-indigo-700 text-white font-medium rounded-lg transition-colors shadow-sm"
-        >
+        <Button onClick={() => { setSelectedProject(null); setSelectedEmployees([]); setIsModalOpen(true); }}>
           <Plus className="w-4 h-4" />
           Create Allocation
-        </button>
+        </Button>
       </div>
 
 
@@ -839,259 +832,124 @@ const AllocationsPage = () => {
         />
       </div>
 
-      {/* Modern Card Container */}
-      <div className="bg-white rounded-2xl border border-slate-200/60 shadow-[0_1px_3px_rgba(0,0,0,0.04)] overflow-hidden">
-        <div className="overflow-x-auto">
-          <table className="w-full">
-            <thead className="bg-slate-50/80 border-b border-slate-100">
-              <tr>
-                <th className="px-5 py-4 text-left text-xs font-medium text-slate-400 uppercase tracking-wider">Project Name</th>
-                <th className="px-5 py-4 text-center text-xs font-medium text-slate-400 uppercase tracking-wider">Required</th>
-                <th className="px-5 py-4 text-left text-xs font-medium text-slate-400 uppercase tracking-wider">Allocated Employees</th>
-                <th className="px-5 py-4 text-right text-xs font-medium text-slate-400 uppercase tracking-wider">Actions</th>
-              </tr>
-            </thead>
-            <tbody className="divide-y divide-slate-100">
-              {isDataLoading ? (
-                <tr>
-                  <td colSpan="4" className="px-5 py-16 text-center">
-                    <div className="flex flex-col items-center gap-2 text-slate-400">
-                      <div className="animate-spin h-8 w-8 border-4 border-indigo-500 border-t-transparent rounded-full"></div>
-                      <p className="text-sm">Loading allocations...</p>
-                    </div>
-                  </td>
-                </tr>
-              ) : filteredProjectAllocations.length === 0 ? (
-                <tr>
-                  <td colSpan="4" className="px-5 py-16 text-center">
-                    <div className="text-slate-400">
-                      <p className="text-lg font-medium mb-1">
-                        {searchQuery ? 'No matching allocations' : 'No allocations yet'}
-                      </p>
-                      <p className="text-sm">
-                        {searchQuery ? 'Try adjusting your search query.' : 'Create your first allocation to get started'}
-                      </p>
-                    </div>
-                  </td>
-                </tr>
-              ) : (
-                paginatedAllocations.map(({ project, allocations: projectAllocs, requiredManpower }) => (
-                  <tr key={project.id} className="hover:bg-slate-50 transition-colors">
-                    <td className="px-5 py-4">
-                      <div className="font-semibold text-slate-800">{project.name}</div>
-                      <div className="text-xs text-slate-400">{project.project_type}</div>
-                    </td>
-                    <td className="px-5 py-4 text-center">
-                      <span className="inline-flex items-center px-2.5 py-1 bg-slate-100 text-slate-700 rounded-lg font-semibold text-sm">
-                        {requiredManpower}
-                      </span>
-                    </td>
-                    <td className="px-5 py-4">
-                      <div className="flex items-center justify-between gap-4">
-                        {/* Left Side: Avatar stack & Add button */}
-                        <div className="flex items-center gap-2">
-                          <div className="flex -space-x-1.5 overflow-hidden">
-                            {projectAllocs.slice(0, 3).map(alloc => {
-                              const emp = employees.find(e => e.id === alloc.employee_id);
-                              const name = emp?.name || 'Unknown';
-                              const initials = name.split(/\s+/).slice(0, 2).map(p => p[0]).join('').toUpperCase();
-                              const gradient = getAvatarGradient(name);
-                              return (
-                                <div
-                                  key={alloc.id}
-                                  className={`w-8 h-8 rounded-full bg-gradient-to-br ${gradient} text-white flex items-center justify-center text-[10px] font-bold border-2 border-white shadow-sm ring-1 ring-slate-100/50 shrink-0`}
-                                  title={name}
-                                >
-                                  {initials}
-                                </div>
-                              );
-                            })}
-                            {projectAllocs.length > 3 && (
-                              <div className="w-8 h-8 rounded-full bg-slate-100 border-2 border-white text-[10px] font-bold text-slate-500 flex items-center justify-center shadow-sm ring-1 ring-slate-100/50 shrink-0">
-                                +{projectAllocs.length - 3}
-                              </div>
-                            )}
+      <Table
+        loading={isDataLoading}
+        columns={[
+          {
+            key: 'project',
+            label: 'Project Name',
+            render: (project) => (
+              <div>
+                <div className="font-semibold text-slate-800">{project.name}</div>
+                <div className="text-xs text-slate-400">{project.project_type}</div>
+              </div>
+            ),
+          },
+          {
+            key: 'requiredManpower',
+            label: 'Required',
+            align: 'center',
+            render: (value) => (
+              <span className="inline-flex items-center px-2.5 py-1 bg-slate-100 text-slate-700 rounded-lg font-semibold text-sm">
+                {value}
+              </span>
+            ),
+          },
+          {
+            key: 'allocations',
+            label: 'Allocated Employees',
+            render: (projectAllocs, row) => {
+              const project = row.project;
+              const requiredManpower = row.requiredManpower;
+              return (
+                <div className="flex items-center justify-between gap-4">
+                  <div className="flex items-center gap-2">
+                    <div className="flex -space-x-1.5 overflow-hidden">
+                      {projectAllocs.slice(0, 3).map(alloc => {
+                        const emp = employees.find(e => e.id === alloc.employee_id);
+                        const name = emp?.name || 'Unknown';
+                        const initials = name.split(/\s+/).slice(0, 2).map(p => p[0]).join('').toUpperCase();
+                        const gradient = getAvatarGradient(name);
+                        return (
+                          <div key={alloc.id} className={`w-8 h-8 rounded-full bg-gradient-to-br ${gradient} text-white flex items-center justify-center text-[10px] font-bold border-2 border-white shadow-sm ring-1 ring-slate-100/50 shrink-0`} title={name}>
+                            {initials}
                           </div>
-                          
-                          <button
-                            onClick={() => {
-                              setSelectedProject(project);
-                              setIsModalOpen(true);
-                            }}
-                            className="w-8 h-8 rounded-full border border-dashed border-slate-300 text-slate-400 hover:text-indigo-600 hover:border-indigo-500 hover:bg-indigo-50/50 flex items-center justify-center transition-all shrink-0"
-                            title="Add employees"
-                          >
-                            <UserPlus className="w-3.5 h-3.5" />
-                          </button>
+                        );
+                      })}
+                      {projectAllocs.length > 3 && (
+                        <div className="w-8 h-8 rounded-full bg-slate-100 border-2 border-white text-[10px] font-bold text-slate-500 flex items-center justify-center shadow-sm ring-1 ring-slate-100/50 shrink-0">
+                          +{projectAllocs.length - 3}
                         </div>
-
-                        {/* Right Side: Allocation Popover Badge & Leave Pill */}
-                        <div className="flex items-center gap-2">
-                          {(() => {
-                            const assignedCount = projectAllocs.length;
-                            const todayStr = new Date().toISOString().slice(0, 10);
-                            const onLeaveDetails = projectAllocs
-                              .map(a => {
-                                const leave = leaves.find(l =>
-                                  l.employee_id === a.employee_id &&
-                                  l.status === 'approved' &&
-                                  String(l.start_date).slice(0, 10) <= todayStr &&
-                                  String(l.end_date).slice(0, 10) >= todayStr
-                                );
-                                if (!leave) return null;
-                                const name = getEmployeeName(a.employee_id);
-                                const initials = (name || '')
-                                  .split(' ')
-                                  .map(w => w[0])
-                                  .filter(Boolean)
-                                  .slice(0, 2)
-                                  .join('')
-                                  .toUpperCase();
-                                return {
-                                  employeeId: a.employee_id,
-                                  name,
-                                  initials,
-                                  leaveType: leave.leave_type || leave.type || null,
-                                };
-                              })
-                              .filter(Boolean);
-                            const onLeaveToday = onLeaveDetails.length;
-
-                            return (
-                              <>
-                                {onLeaveToday > 0 && (
-                                  <div className="relative group/leave shrink-0">
-                                    <span className="px-2.5 py-1 bg-amber-50 text-amber-700 border border-amber-200/50 rounded-full text-xs font-semibold flex items-center gap-1 cursor-default">
-                                      <span className="w-1.5 h-1.5 rounded-full bg-amber-500 animate-pulse" />
-                                      <span>{onLeaveToday} Leave</span>
-                                    </span>
-
-                                    {/* Hover card */}
-                                    <div className="absolute right-0 top-full mt-2 z-50 w-60 origin-top-right rounded-xl border border-slate-200 bg-white shadow-xl shadow-slate-900/10 opacity-0 invisible translate-y-1 group-hover/leave:opacity-100 group-hover/leave:visible group-hover/leave:translate-y-0 transition-all duration-150">
-                                      <div className="px-3.5 py-2.5 border-b border-slate-100 flex items-center gap-2">
-                                        <span className="w-1.5 h-1.5 rounded-full bg-amber-500" />
-                                        <span className="text-xs font-semibold text-slate-700">
-                                          On leave today
-                                        </span>
-                                        <span className="ml-auto text-[10px] font-semibold text-amber-700 bg-amber-50 border border-amber-200/60 rounded-full px-1.5 py-0.5">
-                                          {onLeaveToday}
-                                        </span>
-                                      </div>
-                                      <ul className="py-1.5 max-h-56 overflow-y-auto">
-                                        {onLeaveDetails.map(d => (
-                                          <li
-                                            key={d.employeeId}
-                                            className="px-3.5 py-1.5 flex items-center gap-2.5 hover:bg-slate-50"
-                                          >
-                                            <span className="w-7 h-7 rounded-full bg-gradient-to-br from-amber-400 to-orange-500 text-white text-[10px] font-bold flex items-center justify-center shrink-0">
-                                              {d.initials || '?'}
-                                            </span>
-                                            <div className="min-w-0">
-                                              <p className="text-xs font-medium text-slate-800 truncate">
-                                                {d.name}
-                                              </p>
-                                              {d.leaveType && (
-                                                <p className="text-[10px] text-slate-400 capitalize truncate">
-                                                  {String(d.leaveType).replace(/_/g, ' ')}
-                                                </p>
-                                              )}
-                                            </div>
-                                          </li>
-                                        ))}
-                                      </ul>
-                                    </div>
-                                  </div>
-                                )}
-
-                                <AllocationPopover
-                                  project={project}
-                                  allocations={projectAllocs}
-                                  employees={employees}
-                                  badgeContent={(
-                                    <span className={`text-xs font-semibold px-2.5 py-1 rounded-lg border transition-all flex items-center gap-1.5 cursor-pointer select-none ${
-                                      assignedCount >= requiredManpower
-                                        ? 'bg-emerald-50/40 text-emerald-700 border-emerald-100/70 hover:bg-emerald-100/40'
-                                        : 'bg-amber-50/40 text-amber-700 border-amber-100/70 hover:bg-amber-100/40'
-                                      }`}>
-                                      <span className={`w-1.5 h-1.5 rounded-full ${
-                                        assignedCount >= requiredManpower ? 'bg-emerald-500' : 'bg-amber-500'
-                                      }`} />
-                                      <span>{assignedCount} / {requiredManpower}</span>
-                                    </span>
-                                  )}
-                                  onOpenAllocations={() => { setSelectedProject(project); setIsModalOpen(true); }}
-                                />
-                              </>
-                            );
-                          })()}
-                        </div>
-                      </div>
-                    </td>
-                    <td className="px-5 py-4 text-right">
-                      <button
-                        onClick={() => {
-                          setEditingAllocation({ project, allocations: projectAllocs });
-                        }}
-                        className="p-2 text-slate-500 hover:text-indigo-600 hover:bg-indigo-50 rounded-lg transition-colors"
-                        title="Edit"
-                      >
-                        <Edit className="w-4 h-4" />
-                      </button>
-                    </td>
-                  </tr>
-                ))
-              )}
-            </tbody>
-          </table>
-        </div>
-        {totalPages > 1 && (
-          <div className="flex items-center justify-between px-5 py-3 border-t border-slate-100">
-            <p className="text-sm text-slate-500">
-              Showing {(currentPage - 1) * PAGE_SIZE + 1}–{Math.min(currentPage * PAGE_SIZE, projectAllocations.length)} of {projectAllocations.length} items
-            </p>
-            <div className="flex items-center gap-1">
-              <button
-                onClick={() => setCurrentPage(p => Math.max(1, p - 1))}
-                disabled={currentPage === 1}
-                className="px-3 py-1.5 text-sm rounded-lg border border-slate-200 text-slate-600 hover:bg-slate-50 disabled:opacity-40 disabled:cursor-not-allowed transition-colors"
-              >
-                Previous
-              </button>
-              {Array.from({ length: totalPages }, (_, i) => i + 1)
-                .filter(p => p === 1 || p === totalPages || Math.abs(p - currentPage) <= 1)
-                .reduce((acc, p, idx, arr) => {
-                  if (idx > 0 && p - arr[idx - 1] > 1) acc.push('...');
-                  acc.push(p);
-                  return acc;
-                }, [])
-                .map((p, idx) =>
-                  p === '...' ? (
-                    <span key={`ellipsis-${idx}`} className="px-2 text-slate-400 text-sm">…</span>
-                  ) : (
-                    <button
-                      key={p}
-                      onClick={() => setCurrentPage(p)}
-                      className={`px-3 py-1.5 text-sm rounded-lg border transition-colors ${
-                        currentPage === p
-                          ? 'bg-indigo-600 border-indigo-600 text-white font-medium'
-                          : 'border-slate-200 text-slate-600 hover:bg-slate-50'
-                      }`}
-                    >
-                      {p}
+                      )}
+                    </div>
+                    <button onClick={() => { setSelectedProject(project); setIsModalOpen(true); }} className="w-8 h-8 rounded-full border border-dashed border-slate-300 text-slate-400 hover:text-indigo-600 hover:border-indigo-500 hover:bg-indigo-50/50 flex items-center justify-center transition-all shrink-0" title="Add employees">
+                      <UserPlus className="w-3.5 h-3.5" />
                     </button>
-                  )
-                )}
+                  </div>
+                  <div className="flex items-center gap-2">
+                    {(() => {
+                      const assignedCount = projectAllocs.length;
+                      const todayStr = new Date().toISOString().slice(0, 10);
+                      const onLeaveToday = projectAllocs.filter(a =>
+                        leaves.some(l =>
+                          l.employee_id === a.employee_id &&
+                          l.status === 'approved' &&
+                          String(l.start_date).slice(0, 10) <= todayStr &&
+                          String(l.end_date).slice(0, 10) >= todayStr
+                        )
+                      ).length;
+                      return (
+                        <>
+                          {onLeaveToday > 0 && (
+                            <span className="px-2.5 py-1 bg-amber-50 text-amber-700 border border-amber-200/50 rounded-full text-xs font-semibold flex items-center gap-1 shrink-0" title={`${onLeaveToday} employee${onLeaveToday > 1 ? 's' : ''} on approved leave today`}>
+                              <span className="w-1.5 h-1.5 rounded-full bg-amber-500 animate-pulse" />
+                              <span>{onLeaveToday} Leave</span>
+                            </span>
+                          )}
+                          <AllocationPopover
+                            project={project}
+                            allocations={projectAllocs}
+                            employees={employees}
+                            badgeContent={(
+                              <span className={`text-xs font-semibold px-2.5 py-1 rounded-lg border transition-all flex items-center gap-1.5 cursor-pointer select-none ${assignedCount >= requiredManpower ? 'bg-emerald-50/40 text-emerald-700 border-emerald-100/70 hover:bg-emerald-100/40' : 'bg-amber-50/40 text-amber-700 border-amber-100/70 hover:bg-amber-100/40'}`}>
+                                <span className={`w-1.5 h-1.5 rounded-full ${assignedCount >= requiredManpower ? 'bg-emerald-500' : 'bg-amber-500'}`} />
+                                <span>{assignedCount} / {requiredManpower}</span>
+                              </span>
+                            )}
+                            onOpenAllocations={() => { setSelectedProject(project); setIsModalOpen(true); }}
+                          />
+                        </>
+                      );
+                    })()}
+                  </div>
+                </div>
+              );
+            },
+          },
+          {
+            key: '_edit',
+            label: 'Actions',
+            align: 'right',
+            render: (_, row) => (
               <button
-                onClick={() => setCurrentPage(p => Math.min(totalPages, p + 1))}
-                disabled={currentPage === totalPages}
-                className="px-3 py-1.5 text-sm rounded-lg border border-slate-200 text-slate-600 hover:bg-slate-50 disabled:opacity-40 disabled:cursor-not-allowed transition-colors"
+                onClick={() => setEditingAllocation({ project: row.project, allocations: row.allocations })}
+                className="p-2 text-slate-500 hover:text-indigo-600 hover:bg-indigo-50 rounded-lg transition-colors"
+                title="Edit"
               >
-                Next
+                <Edit className="w-4 h-4" />
               </button>
-            </div>
-          </div>
-        )}
-      </div>
+            ),
+          },
+        ]}
+        data={filteredProjectAllocations}
+        currentPage={currentPage}
+        pageSize={PAGE_SIZE}
+        onPageChange={setCurrentPage}
+        emptyState={{
+          title: searchQuery ? 'No matching allocations' : 'No allocations yet',
+          description: searchQuery ? 'Try adjusting your search query.' : 'Create your first allocation to get started',
+        }}
+      />
 
       {/* Create Allocation Modal */}
       {isModalOpen && (
@@ -1550,22 +1408,14 @@ const AllocationsPage = () => {
               )}
 
               <div className="flex justify-end gap-3 pt-4 border-t border-gray-200">
-                <button
-                  type="button"
-                  onClick={closeCreateModal}
-                  className="btn btn-secondary"
-                >
-                  Cancel
-                </button>
-                <button
+                <Button type="button" variant="cancel" onClick={closeCreateModal}>Cancel</Button>
+                <Button
                   type="submit"
                   disabled={!selectedProject || selectedEmployees.length === 0 || createMutation.isPending}
-                  className="btn btn-primary disabled:opacity-50 disabled:cursor-not-allowed"
+                  isLoading={createMutation.isPending}
                 >
-                  {createMutation.isPending
-                    ? 'Allocating...'
-                    : `Allocate ${selectedEmployees.length} Employee${selectedEmployees.length !== 1 ? 's' : ''}`}
-                </button>
+                  {!createMutation.isPending && `Allocate ${selectedEmployees.length} Employee${selectedEmployees.length !== 1 ? 's' : ''}`}
+                </Button>
               </div>
             </form>
           </div>

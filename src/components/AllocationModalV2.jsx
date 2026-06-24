@@ -1,5 +1,6 @@
 import { useState, useEffect } from 'react';
 import { X, Plus, Trash2, AlertCircle, Users, CalendarRange, Target, CheckCircle2, Activity } from 'lucide-react';
+import Button from './ui/Button';
 import Dropdown from './ui/Dropdown';
 import { recommendationsApi } from '../services/api';
 
@@ -374,13 +375,9 @@ const AllocationModalV2 = ({
                                 placeholder="Enter role (e.g., Annotation)"
                                 className="flex-1 px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500 text-sm"
                             />
-                            <button
-                                type="button"
-                                onClick={handleAddRole}
-                                className="px-4 py-2 bg-blue-600 text-white rounded-md hover:bg-blue-700 transition-colors flex items-center gap-2 text-sm"
-                            >
+                            <Button type="button" variant="blue" size="sm" onClick={handleAddRole}>
                                 <Plus className="w-4 h-4" /> Add Role
-                            </button>
+                            </Button>
                         </div>
 
                         {/* Role Suggestions */}
@@ -483,19 +480,10 @@ const AllocationModalV2 = ({
 
                     {/* Footer */}
                     <div className="flex justify-end gap-3 pt-4 border-t border-gray-200">
-                        <button
-                            type="button"
-                            onClick={onClose}
-                            className="px-4 py-2 border border-gray-300 text-gray-700 rounded-md hover:bg-gray-50 transition-colors"
-                        >
-                            Cancel
-                        </button>
-                        <button
-                            type="submit"
-                            className="px-6 py-2 bg-blue-600 text-white rounded-md hover:bg-blue-700 transition-colors font-medium"
-                        >
+                        <Button type="button" variant="cancel" onClick={onClose}>Cancel</Button>
+                        <Button type="submit" variant="blue">
                             {editingAllocation ? 'Update Allocation' : 'Create Allocation'}
-                        </button>
+                        </Button>
                     </div>
                 </form>
             </div>

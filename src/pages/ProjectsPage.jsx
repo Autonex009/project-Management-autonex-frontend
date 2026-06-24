@@ -1,6 +1,8 @@
 import { useState, useEffect, useRef } from 'react';
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import { useNavigate, useSearchParams } from 'react-router-dom';
+import Button from '../components/ui/Button';
+import Spinner from '../components/ui/LoadingSpinner';
 import { subProjectApi, parentProjectApi, employeeApi, allocationApi, skillApi, leaveApi, guidelineApi } from '../services/api';
 import { Plus, Edit, Trash2, X, UserCheck, Users, ChevronDown, ArrowRight, Copy, Settings, UploadCloud, FileText, Search } from 'lucide-react';
 import { Link } from 'react-router-dom';
@@ -606,13 +608,6 @@ toast.success(wasEditing ? 'Project updated successfully' : 'Project created suc
 
   const currentMainProject = visibleMainProjects.find(p => p.id === parseInt(filterMainProjectId));
 
-  if (isLoading) {
-    return (
-      <div className="flex items-center justify-center py-12">
-        <div className="text-gray-500">Loading projects...</div>
-      </div>
-    );
-  }
 
   return (
     <div className="space-y-6 p-2">
@@ -640,21 +635,10 @@ toast.success(wasEditing ? 'Project updated successfully' : 'Project created suc
             <Settings className="w-4 h-4" />
             Organizations
           </Link>
-          <button
-            onClick={() => {
-              setEditingProject(null);
-              setSelectedSkills([]);
-              setGuidelineFiles([]);
-              setFormMainProjectId(filterMainProjectId || '');
-              setFormPriority('medium');
-              setFormProjectStatus('active');
-              setIsModalOpen(true);
-            }}
-            className="inline-flex items-center gap-2 px-4 py-2.5 bg-indigo-600 hover:bg-indigo-700 text-white font-medium text-sm rounded-xl shadow-sm transition-colors"
-          >
+          <Button onClick={() => { setEditingProject(null); setSelectedSkills([]); setGuidelineFiles([]); setFormMainProjectId(filterMainProjectId || ''); setFormPriority('medium'); setFormProjectStatus('active'); setIsModalOpen(true); }}>
             <Plus className="w-4 h-4" />
             Add Project
-          </button>
+          </Button>
         </div>
       </div>
 
@@ -665,48 +649,27 @@ toast.success(wasEditing ? 'Project updated successfully' : 'Project created suc
           {statusParam && (
             <span className="inline-flex items-center gap-1.5 px-2.5 py-1 rounded-full text-xs font-medium bg-indigo-50 text-indigo-700 border border-indigo-200">
               Status: {statusParam}
-              <button 
-                onClick={() => {
-                  const params = new URLSearchParams(searchParams);
-                  params.delete('status');
-                  setSearchParams(params);
-                }} 
-                className="hover:bg-indigo-100 rounded-full p-0.5"
-              >
+              <Button variant="ghost" size="icon" onClick={() => { const params = new URLSearchParams(searchParams); params.delete('status'); setSearchParams(params); }} className="rounded-full p-0.5">
                 <X className="w-3 h-3" />
-              </button>
+              </Button>
             </span>
           )}
           {recommendationParam && (
             <span className="inline-flex items-center gap-1.5 px-2.5 py-1 rounded-full text-xs font-medium bg-red-50 text-red-700 border border-red-200">
               Recommendation: {recommendationParam}
-              <button 
-                onClick={() => {
-                  const params = new URLSearchParams(searchParams);
-                  params.delete('recommendation');
-                  setSearchParams(params);
-                }} 
-                className="hover:bg-red-100 rounded-full p-0.5"
-              >
+              <Button variant="ghost" size="icon" onClick={() => { const params = new URLSearchParams(searchParams); params.delete('recommendation'); setSearchParams(params); }} className="rounded-full p-0.5">
                 <X className="w-3 h-3" />
-              </button>
+              </Button>
             </span>
           )}
-          <button
-            onClick={() => {
-              const params = new URLSearchParams(searchParams);
-              params.delete('status');
-              params.delete('recommendation');
-              setSearchParams(params);
-            }}
-            className="text-xs font-medium text-slate-500 hover:text-slate-800 transition-colors ml-auto"
-          >
+          <Button variant="link" onClick={() => { const params = new URLSearchParams(searchParams); params.delete('status'); params.delete('recommendation'); setSearchParams(params); }} className="ml-auto text-xs text-slate-500 hover:text-slate-800">
             Clear all
-          </button>
+          </Button>
         </div>
       )}
 
       <Table
+        loading={isLoading}
         columns={[
           {
             key: 'name',
@@ -1244,25 +1207,15 @@ toast.success(wasEditing ? 'Project updated successfully' : 'Project created suc
             </div>
 
             <div className="flex justify-end gap-3 px-6 py-4 border-t border-gray-200 flex-shrink-0">
-              <button
-                type="button"
-                onClick={resetModalState}
-                className="btn btn-secondary"
-              >
-                Cancel
-              </button>
-              <button
+              <Button type="button" variant="cancel" onClick={resetModalState}>Cancel</Button>
+              <Button
                 type="submit"
                 form="project-form"
                 disabled={createMutation.isPending || updateMutation.isPending}
-                className="btn btn-primary"
+                isLoading={createMutation.isPending || updateMutation.isPending}
               >
-                {createMutation.isPending || updateMutation.isPending
-                  ? 'Saving...'
-                  : editingProject
-                    ? 'Update Sub-Project'
-                    : 'Create Sub-Project'}
-              </button>
+                {!(createMutation.isPending || updateMutation.isPending) && (editingProject ? 'Update Sub-Project' : 'Create Sub-Project')}
+              </Button>
             </div>
           </div>
         </div>

@@ -1,6 +1,8 @@
 import React, { useState, useEffect } from 'react';
 import { createPortal } from 'react-dom';
 import { Plus, BookOpen, Trash2, Layers, GripVertical, AlertTriangle } from 'lucide-react';
+import Spinner from '../../components/ui/LoadingSpinner';
+import Button from '../../components/ui/Button';
 import { useNavigate } from 'react-router-dom';
 import toast from 'react-hot-toast';
 import { onboardingApi } from '../../services/api';
@@ -83,12 +85,9 @@ export default function AdminModulesList() {
           <h2 className="text-2xl font-extrabold text-slate-900">Module Management</h2>
           <p className="text-sm text-slate-500">Create and oversee onboarding training modules. Drag rows to reorder.</p>
         </div>
-        <button
-          onClick={() => navigate('/admin/modules/new')}
-          className="flex items-center gap-2 px-5 py-2.5 rounded-xl text-white text-sm font-semibold transition-all hover:shadow-lg hover:bg-indigo-700 shadow-md bg-indigo-600"
-        >
+        <Button size="lg" onClick={() => navigate('/admin/modules/new')}>
           <Plus className="h-4 w-4" /> Create Module
-        </button>
+        </Button>
       </div>
 
       <div className="bg-white p-6 rounded-2xl shadow-[0_1px_3px_rgba(0,0,0,0.04)] border border-slate-200/60 mb-6">
@@ -108,8 +107,7 @@ export default function AdminModulesList() {
 
         {loading ? (
           <div className="p-10 text-center text-slate-500 flex items-center justify-center gap-2">
-            <span className="h-5 w-5 animate-spin rounded-full border-2 border-slate-350 border-t-indigo-600" />
-            Loading modules...
+            <Spinner size="sm" color="indigo" text="Loading modules..." />
           </div>
         ) : (
           <div className="space-y-3 p-6 bg-slate-50/50 rounded-b-2xl">
@@ -201,18 +199,8 @@ export default function AdminModulesList() {
               </div>
             </div>
             <div className="flex justify-end gap-3 mt-6">
-              <button
-                onClick={() => setPendingDelete(null)}
-                className="px-4 py-2 rounded-xl text-sm font-semibold text-slate-600 hover:bg-slate-100 transition-colors"
-              >
-                Cancel
-              </button>
-              <button
-                onClick={confirmDelete}
-                className="px-4 py-2 rounded-xl text-sm font-semibold text-white bg-red-600 hover:bg-red-700 transition-colors shadow-sm"
-              >
-                Delete Module
-              </button>
+              <Button variant="cancel" onClick={() => setPendingDelete(null)}>Cancel</Button>
+              <Button variant="danger" onClick={confirmDelete}>Delete Module</Button>
             </div>
           </div>
         </div>,

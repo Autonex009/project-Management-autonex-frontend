@@ -1,6 +1,8 @@
 import { useState, useMemo } from 'react';
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import { employeeApi, payrollApi } from '../services/api';
+import Spinner from '../components/ui/LoadingSpinner';
+import Button from '../components/ui/Button';
 import toast from 'react-hot-toast';
 import {
     Download, CheckCircle2, XCircle, AlertTriangle, IndianRupee,
@@ -248,13 +250,9 @@ const PayrollPage = () => {
                         className="w-full px-3 py-2 border border-slate-200 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-indigo-500"
                     />
                     {unlockError && <p className="text-sm text-red-600">{unlockError}</p>}
-                    <button
-                        type="submit"
-                        disabled={unlocking || !passcodeInput}
-                        className="w-full px-4 py-2 bg-indigo-600 text-white rounded-lg text-sm font-medium hover:bg-indigo-700 disabled:opacity-50"
-                    >
-                        {unlocking ? 'Checking…' : 'Unlock'}
-                    </button>
+                    <Button type="submit" disabled={unlocking || !passcodeInput} isLoading={unlocking} className="w-full justify-center">
+                        {!unlocking && 'Unlock'}
+                    </Button>
                 </form>
             </div>
         );
@@ -277,13 +275,9 @@ const PayrollPage = () => {
                         onChange={e => { setMonth(e.target.value); setGenerated(false); setAdjustments({}); setSearchQuery(''); }}
                         className="px-3 py-2 border border-slate-200 rounded-xl text-sm outline-none focus:border-indigo-400 focus:ring-2 focus:ring-indigo-100"
                     />
-                    <button
-                        onClick={handleGenerate}
-                        disabled={isLoading}
-                        className="px-4 py-2 bg-indigo-600 text-white text-sm font-semibold rounded-xl hover:bg-indigo-700 transition-colors disabled:opacity-60"
-                    >
-                        {isLoading ? 'Loading...' : 'Generate'}
-                    </button>
+                    <Button onClick={handleGenerate} disabled={isLoading} isLoading={isLoading}>
+                        {!isLoading && 'Generate'}
+                    </Button>
                     <button
                         onClick={handleLock}
                         title="Lock payroll"
@@ -481,20 +475,12 @@ const PayrollPage = () => {
                             >
                                 <Download className="w-4 h-4" /> Export CSV
                             </button>
-                            <button
-                                onClick={() => handleSave('draft')}
-                                disabled={saveMutation.isPending}
-                                className="px-4 py-2 text-sm font-medium border border-slate-200 bg-white text-slate-700 rounded-xl hover:bg-slate-50 transition-colors disabled:opacity-50"
-                            >
+                            <Button variant="secondary" onClick={() => handleSave('draft')} disabled={saveMutation.isPending}>
                                 Save Draft
-                            </button>
-                            <button
-                                onClick={() => handleSave('finalized')}
-                                disabled={saveMutation.isPending}
-                                className="px-4 py-2 text-sm font-semibold bg-emerald-600 text-white rounded-xl hover:bg-emerald-700 transition-colors disabled:opacity-50"
-                            >
-                                {saveMutation.isPending ? 'Saving...' : 'Finalize Payroll'}
-                            </button>
+                            </Button>
+                            <Button variant="success" onClick={() => handleSave('finalized')} disabled={saveMutation.isPending} isLoading={saveMutation.isPending}>
+                                {!saveMutation.isPending && 'Finalize Payroll'}
+                            </Button>
                         </div>
                     </div>
                 </div>
@@ -624,12 +610,9 @@ const PayrollPage = () => {
                                         </span>
                                     </p>
                                 </div>
-                                <button
-                                    onClick={() => setReviewModal(null)}
-                                    className="px-5 py-2 bg-indigo-600 text-white text-sm font-semibold rounded-xl hover:bg-indigo-700 transition-colors"
-                                >
+                                <Button onClick={() => setReviewModal(null)}>
                                     Done
-                                </button>
+                                </Button>
                             </div>
                         </div>
                     </div>

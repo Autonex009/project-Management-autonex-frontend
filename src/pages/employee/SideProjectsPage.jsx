@@ -1,5 +1,6 @@
 import React, { useState } from 'react';
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
+import Button from '../../components/ui/Button';
 import { sideProjectApi } from '../../services/api';
 import { Rocket, Plus, X, Trash2, Edit3, Save } from 'lucide-react';
 import toast from 'react-hot-toast';
@@ -63,9 +64,9 @@ const SideProjectsPage = () => {
                     <h1 className="text-2xl font-bold text-slate-900">Side Projects</h1>
                     <p className="text-slate-500 text-sm mt-1">Personal projects and learning initiatives</p>
                 </div>
-                <button onClick={() => { resetForm(); setShowForm(true); }} className="flex items-center gap-2 px-4 py-2.5 bg-indigo-600 text-white rounded-xl text-sm font-medium hover:bg-indigo-700 transition-colors shadow-sm">
+                <Button onClick={() => { resetForm(); setShowForm(true); }}>
                     <Plus className="w-4 h-4" /> Add Project
-                </button>
+                </Button>
             </div>
 
             {showForm && (
@@ -105,9 +106,7 @@ const SideProjectsPage = () => {
                             <input type="date" value={form.end_date} onChange={e => setForm({ ...form, end_date: e.target.value })} className="w-full px-3 py-2 border border-slate-200 rounded-lg text-sm" />
                         </div>
                         <div className="md:col-span-2 flex justify-end">
-                            <button type="submit" className="flex items-center gap-2 px-4 py-2 bg-indigo-600 text-white rounded-lg text-sm font-medium hover:bg-indigo-700">
-                                <Save className="w-4 h-4" /> {editingId ? 'Update' : 'Create'}
-                            </button>
+                            <Button type="submit"><Save className="w-4 h-4" /> {editingId ? 'Update' : 'Create'}</Button>
                         </div>
                     </form>
                 </div>

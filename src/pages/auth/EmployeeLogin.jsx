@@ -2,6 +2,7 @@ import React, { useState } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { Lock, Mail, ArrowRight, UserPlus, KeyRound, Briefcase, Shield } from 'lucide-react';
 import { useMutation } from '@tanstack/react-query';
+import Spinner from '../../components/ui/LoadingSpinner';
 import { authApi } from '../../services/api';
 import toast from 'react-hot-toast';
 import AuthBrandPanel from '../../components/brand/AuthBrandPanel';
@@ -119,12 +120,7 @@ const EmployeeLogin = () => {
                             disabled={loginMutation.isPending}
                             className="flex w-full items-center justify-center gap-2 rounded-2xl bg-emerald-600 px-4 py-3 font-semibold text-white shadow-[0_16px_38px_rgba(5,150,105,0.24)] transition-all hover:bg-emerald-700 disabled:cursor-not-allowed disabled:opacity-70"
                         >
-                            {loginMutation.isPending ? (
-                                <span className="flex items-center gap-2">
-                                    <span className="h-5 w-5 animate-spin rounded-full border-2 border-white/30 border-t-white" />
-                                    Signing in...
-                                </span>
-                            ) : (
+                            {loginMutation.isPending ? <Spinner size="sm" color="white" text="Signing in..." /> : (
                                 <>
                                     Access Workspace
                                     <ArrowRight className="h-4 w-4" />

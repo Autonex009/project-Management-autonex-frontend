@@ -1,6 +1,7 @@
 import React, { useState, useEffect } from 'react';
 import { Users, BookOpen, Award, CheckCircle, HelpCircle } from 'lucide-react';
 import { onboardingApi } from '../../services/api';
+import Table from '../../components/ui/Table';
 
 const PMOnboardingDashboard = ({ embedded = false }) => {
     const [mentees, setMentees] = useState([]);
@@ -45,8 +46,7 @@ const PMOnboardingDashboard = ({ embedded = false }) => {
     if (loading) {
         return (
             <div className="flex items-center justify-center min-h-[400px] text-slate-500 font-medium">
-                <span className="h-6 w-6 animate-spin rounded-full border-2 border-blue-500/20 border-t-blue-600 mr-2" />
-                Loading your mentorship dashboard...
+                <Spinner size="md" color="indigo" text="Loading your mentorship dashboard..." />
             </div>
         );
     }
@@ -100,58 +100,61 @@ const PMOnboardingDashboard = ({ embedded = false }) => {
                             </p>
                         </div>
                     ) : (
-                        <div className="overflow-x-auto">
-                            <table className="w-full text-left border-collapse min-w-[600px]">
-                                <thead>
-                                    <tr className="bg-slate-50/80 border-b border-slate-150 text-[10px] uppercase tracking-wider text-slate-400 font-extrabold">
-                                        <th className="py-4 px-6">Candidate</th>
-                                        <th className="py-4 px-6 text-center">Modules Completed</th>
-                                        <th className="py-4 px-6 text-center">Quiz Score Average</th>
-                                        <th className="py-4 px-6 text-center">Status</th>
-                                    </tr>
-                                </thead>
-                                <tbody className="divide-y divide-slate-100 bg-white">
-                                    {mentees.map((m) => (
-                                        <tr key={m.id} className="hover:bg-slate-50/30 transition-colors">
-                                            <td className="py-4 px-6">
-                                                <div className="flex items-center gap-3">
-                                                    <div className="h-9 w-9 rounded-full flex items-center justify-center text-white text-xs font-bold bg-gradient-to-br from-blue-600 to-cyan-500 shadow-sm uppercase">
-                                                        {m.name ? m.name.split(' ').map(n => n[0]).join('').substring(0, 2) : 'EM'}
-                                                    </div>
-                                                    <div>
-                                                        <p className="font-bold text-slate-800 text-sm">{m.name}</p>
-                                                        <p className="text-[10px] text-slate-400">{m.email}</p>
-                                                        <span className="inline-block mt-1 text-[9px] uppercase tracking-wider font-extrabold bg-slate-100 text-slate-500 px-1.5 py-0.5 rounded border border-slate-200">
-                                                            {m.department || 'Annotator'}
-                                                        </span>
-                                                    </div>
-                                                </div>
-                                            </td>
-                                            <td className="py-4 px-6 text-center">
-                                                <div className="flex flex-col items-center">
-                                                    <span className="font-extrabold text-slate-800 text-base">{m.completedModulesCount}</span>
-                                                    <span className="text-[9px] uppercase font-bold text-slate-400 tracking-wider">Completed</span>
-                                                </div>
-                                            </td>
-                                            <td className="py-4 px-6 text-center">
-                                                <div className="inline-flex items-center gap-1 bg-blue-50/80 text-blue-700 font-extrabold px-3 py-1 rounded-full border border-blue-100 text-xs">
-                                                    {m.quizScorePercent}%
-                                                </div>
-                                            </td>
-                                            <td className="py-4 px-6 text-center">
-                                                <span className={`text-[9px] uppercase font-bold tracking-wider px-2 py-0.5 rounded-full ${
-                                                    m.isActive 
-                                                        ? 'bg-emerald-50 text-emerald-700 border border-emerald-100' 
-                                                        : 'bg-slate-100 text-slate-400 border border-slate-200'
-                                                }`}>
-                                                    {m.isActive ? 'Active' : 'Inactive'}
+                        <Table
+                            variant="borderless"
+                            columns={[
+                                {
+                                    key: 'name',
+                                    label: 'Candidate',
+                                    render: (value, m) => (
+                                        <div className="flex items-center gap-3">
+                                            <div className="h-9 w-9 rounded-full flex items-center justify-center text-white text-xs font-bold bg-gradient-to-br from-blue-600 to-cyan-500 shadow-sm uppercase flex-shrink-0">
+                                                {value ? value.split(' ').map(n => n[0]).join('').substring(0, 2) : 'EM'}
+                                            </div>
+                                            <div>
+                                                <p className="font-bold text-slate-800 text-sm">{value}</p>
+                                                <p className="text-[10px] text-slate-400">{m.email}</p>
+                                                <span className="inline-block mt-1 text-[9px] uppercase tracking-wider font-extrabold bg-slate-100 text-slate-500 px-1.5 py-0.5 rounded border border-slate-200">
+                                                    {m.department || 'Annotator'}
                                                 </span>
-                                            </td>
-                                        </tr>
-                                    ))}
-                                </tbody>
-                            </table>
-                        </div>
+                                            </div>
+                                        </div>
+                                    ),
+                                },
+                                {
+                                    key: 'completedModulesCount',
+                                    label: 'Modules Completed',
+                                    align: 'center',
+                                    render: (value) => (
+                                        <div className="flex flex-col items-center">
+                                            <span className="font-extrabold text-slate-800 text-base">{value}</span>
+                                            <span className="text-[9px] uppercase font-bold text-slate-400 tracking-wider">Completed</span>
+                                        </div>
+                                    ),
+                                },
+                                {
+                                    key: 'quizScorePercent',
+                                    label: 'Quiz Score Average',
+                                    align: 'center',
+                                    render: (value) => (
+                                        <div className="inline-flex items-center gap-1 bg-blue-50/80 text-blue-700 font-extrabold px-3 py-1 rounded-full border border-blue-100 text-xs">
+                                            {value}%
+                                        </div>
+                                    ),
+                                },
+                                {
+                                    key: 'isActive',
+                                    label: 'Status',
+                                    align: 'center',
+                                    render: (value) => (
+                                        <span className={`text-[9px] uppercase font-bold tracking-wider px-2 py-0.5 rounded-full ${value ? 'bg-emerald-50 text-emerald-700 border border-emerald-100' : 'bg-slate-100 text-slate-400 border border-slate-200'}`}>
+                                            {value ? 'Active' : 'Inactive'}
+                                        </span>
+                                    ),
+                                },
+                            ]}
+                            data={mentees}
+                        />
                     )}
                 </div>
             </div>

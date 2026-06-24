@@ -172,7 +172,7 @@ const NotificationBell = () => {
               {readCount > 0 && (
                 <button
                   onClick={() => clearReadMutation.mutate()}
-                  className="flex items-center gap-1 rounded-lg border border-slate-200 bg-slate-50 px-2.5 py-1.5 text-xs font-semibold text-slate-600 transition-all hover:bg-slate-100 hover:text-red-600 hover:border-red-100 hover:bg-red-50"
+                  className="flex items-center gap-1 rounded-lg border border-slate-200 bg-slate-50 px-2.5 py-1.5 text-xs font-semibold text-slate-600 transition-all  hover:text-red-600 hover:border-red-100 hover:bg-red-50"
                   title="Clear all read notifications"
                 >
                   <Trash2 className="w-3.5 h-3.5" />

@@ -449,6 +449,8 @@ import toast from 'react-hot-toast';
 import PageSearchBar from '../components/ui/PageSearchBar';
 import Table, { ColumnTemplates } from '../components/ui/Table';
 import Dropdown from '../components/ui/Dropdown';
+import Spinner from '../components/ui/LoadingSpinner';
+import Button from '../components/ui/Button';
 
 const LEAVE_TYPE_LABELS = {
   paid: 'Paid Leave',
@@ -653,8 +655,7 @@ function EmployeeArchiveModal({ employee, onClose, onConfirm, isPending }) {
         {/* Content */}
         {isLoading ? (
           <div className="flex items-center justify-center h-48 text-slate-400 text-sm">
-            <div className="w-6 h-6 border-2 border-indigo-500 border-t-transparent rounded-full animate-spin mr-2"></div>
-            Checking allocations...
+            <Spinner size="sm" color="indigo" text="Checking allocations..." />
           </div>
         ) : (
           <div className="p-6 space-y-4">
@@ -697,12 +698,7 @@ function EmployeeArchiveModal({ employee, onClose, onConfirm, isPending }) {
             {/* Footer Actions */}
             <div className="flex justify-end gap-3 pt-4 border-t border-slate-100 mt-4">
               {hasAllocations ? (
-                <button
-                  onClick={onClose}
-                  className="px-4 py-2 bg-slate-100 hover:bg-slate-200 text-slate-700 rounded-xl text-sm font-medium transition-colors"
-                >
-                  Close
-                </button>
+                <Button variant="cancel" onClick={onClose}>Close</Button>
               ) : (
                 <>
                   <button
@@ -711,13 +707,9 @@ function EmployeeArchiveModal({ employee, onClose, onConfirm, isPending }) {
                   >
                     Cancel
                   </button>
-                  <button
-                    onClick={onConfirm}
-                    disabled={isPending}
-                    className="px-4 py-2 bg-amber-600 hover:bg-amber-700 disabled:bg-amber-400 text-white rounded-xl text-sm font-medium transition-colors flex items-center gap-2"
-                  >
-                    {isPending ? 'Archiving...' : 'Archive'}
-                  </button>
+                  <Button variant="warning" onClick={onConfirm} disabled={isPending} isLoading={isPending}>
+                    {!isPending && 'Archive'}
+                  </Button>
                 </>
               )}
             </div>
@@ -770,19 +762,10 @@ function EmployeeRestoreModal({ employee, onClose, onConfirm, isPending }) {
 
           {/* Footer Actions */}
           <div className="flex justify-end gap-3 pt-4 border-t border-slate-100 mt-4">
-            <button
-              onClick={onClose}
-              className="px-4 py-2 border border-slate-200 hover:bg-slate-50 text-slate-700 rounded-xl text-sm font-medium transition-colors"
-            >
-              Cancel
-            </button>
-            <button
-              onClick={onConfirm}
-              disabled={isPending}
-              className="px-4 py-2 bg-emerald-600 hover:bg-emerald-700 disabled:bg-emerald-400 text-white rounded-xl text-sm font-medium transition-colors flex items-center gap-2"
-            >
-              {isPending ? 'Restoring...' : 'Restore'}
-            </button>
+            <Button variant="cancel" onClick={onClose}>Cancel</Button>
+            <Button variant="success" onClick={onConfirm} disabled={isPending} isLoading={isPending}>
+              {!isPending && 'Restore'}
+            </Button>
           </div>
         </div>
       </div>
@@ -832,19 +815,10 @@ function EmployeeConvertToFulltimeModal({ employee, onClose, onConfirm, isPendin
 
           {/* Footer Actions */}
           <div className="flex justify-end gap-3 pt-4 border-t border-slate-100 mt-4">
-            <button
-              onClick={onClose}
-              className="px-4 py-2 border border-slate-200 hover:bg-slate-50 text-slate-700 rounded-xl text-sm font-medium transition-colors"
-            >
-              Cancel
-            </button>
-            <button
-              onClick={onConfirm}
-              disabled={isPending}
-              className="px-4 py-2 bg-indigo-600 hover:bg-indigo-700 disabled:bg-indigo-400 text-white rounded-xl text-sm font-medium transition-colors flex items-center gap-2"
-            >
-              {isPending ? 'Converting...' : 'Convert'}
-            </button>
+            <Button variant="cancel" onClick={onClose}>Cancel</Button>
+            <Button onClick={onConfirm} disabled={isPending} isLoading={isPending}>
+              {!isPending && 'Convert'}
+            </Button>
           </div>
         </div>
       </div>
@@ -1013,13 +987,7 @@ const MultiSelectDropdown = ({ name, defaultValue = [], predefinedSkills, queryC
                 placeholder="Add custom skill..."
                 className="flex-1 px-3 py-1.5 text-sm border border-slate-350 rounded-md focus:ring-2 focus:ring-blue-100 focus:border-blue-500 outline-none transition-all"
               />
-              <button
-                type="button"
-                onClick={addCustomSkill}
-                className="px-3.5 py-1.5 text-sm bg-blue-600 hover:bg-blue-700 active:bg-blue-800 text-white font-medium rounded-md shadow-sm transition-all"
-              >
-                Add
-              </button>
+              <Button type="button" variant="blue" size="sm" onClick={addCustomSkill}>Add</Button>
             </div>
             <p className="mt-1.5 text-[11px] text-slate-400 font-medium">Press Enter or click Add</p>
           </div>
@@ -1293,16 +1261,7 @@ const EmployeesPage = () => {
     setCurrentPage(1);
   }, [searchQuery, skillFilter, designationFilter, idleOnly, statusParam]);
 
-  const totalPages = Math.ceil(filteredEmployees.length / PAGE_SIZE);
-  const paginatedEmployees = filteredEmployees.slice((currentPage - 1) * PAGE_SIZE, currentPage * PAGE_SIZE);
 
-  if (isLoading || skillsLoading || allocationsLoading) {
-    return (
-      <div className="flex items-center justify-center py-12">
-        <div className="text-gray-500">Loading...</div>
-      </div>
-    );
-  }
 
   return (
     <div className="space-y-6 p-2">
@@ -1404,19 +1363,10 @@ const EmployeesPage = () => {
             placeholder="Search employees..."
           />
 
-          <button
-            onClick={() => {
-              setEditingEmployee(null);
-              setFormDesignation('Annotator/ Reviewer');
-              setFormEmployeeType('Full-time');
-              setFormEmpStatus('active');
-              setIsModalOpen(true);
-            }}
-            className="inline-flex items-center gap-2 px-4 py-2.5 bg-indigo-600 hover:bg-indigo-700 text-white font-medium text-sm rounded-xl shadow-sm transition-colors"
-          >
+          <Button onClick={() => { setEditingEmployee(null); setFormDesignation('Annotator/ Reviewer'); setFormEmployeeType('Full-time'); setFormEmpStatus('active'); setIsModalOpen(true); }}>
             <Plus className="w-4 h-4" />
             Add Employee
-          </button>
+          </Button>
         </div>
       </div>
 
@@ -1427,48 +1377,27 @@ const EmployeesPage = () => {
           {idleOnly && (
             <span className="inline-flex items-center gap-1.5 px-2.5 py-1 rounded-full text-xs font-medium bg-amber-50 text-amber-700 border border-amber-200">
               Idle Only
-              <button 
-                onClick={() => {
-                  const params = new URLSearchParams(searchParams);
-                  params.delete('idleOnly');
-                  setSearchParams(params);
-                }} 
-                className="hover:bg-amber-100 rounded-full p-0.5"
-              >
+              <Button variant="ghost" size="icon" onClick={() => { const params = new URLSearchParams(searchParams); params.delete('idleOnly'); setSearchParams(params); }} className="rounded-full p-0.5 ">
                 <X className="w-3 h-3" />
-              </button>
+              </Button>
             </span>
           )}
           {statusParam && (
             <span className="inline-flex items-center gap-1.5 px-2.5 py-1 rounded-full text-xs font-medium bg-indigo-50 text-indigo-700 border border-indigo-200">
               Status: {statusParam}
-              <button 
-                onClick={() => {
-                  const params = new URLSearchParams(searchParams);
-                  params.delete('status');
-                  setSearchParams(params);
-                }} 
-                className="hover:bg-indigo-100 rounded-full p-0.5"
-              >
+              <Button variant="ghost" size="icon" onClick={() => { const params = new URLSearchParams(searchParams); params.delete('status'); setSearchParams(params); }} className="rounded-full p-0.5">
                 <X className="w-3 h-3" />
-              </button>
+              </Button>
             </span>
           )}
-          <button
-            onClick={() => {
-              const params = new URLSearchParams(searchParams);
-              params.delete('idleOnly');
-              params.delete('status');
-              setSearchParams(params);
-            }}
-            className="text-xs font-medium text-slate-500 hover:text-slate-800 transition-colors ml-auto"
-          >
+          <Button variant="link" onClick={() => { const params = new URLSearchParams(searchParams); params.delete('idleOnly'); params.delete('status'); setSearchParams(params); }} className="ml-auto text-xs text-slate-500 hover:text-slate-800">
             Clear all
-          </button>
+          </Button>
         </div>
       )}
 
       <Table
+        loading={isLoading || skillsLoading || allocationsLoading}
         columns={[
           ColumnTemplates.avatarInfo('name', 'Employee', 'email'),
           ColumnTemplates.text('designation', 'Designation'),
@@ -1837,31 +1766,21 @@ const EmployeesPage = () => {
 
             {/* Fixed Footer with Buttons */}
             <div className="flex justify-end gap-3 px-6 py-4 border-t border-gray-200 flex-shrink-0">
-              <button
+              <Button
                 type="button"
-                onClick={() => {
-                  setIsModalOpen(false);
-                  setEditingEmployee(null);
-                  setFormDesignation('Annotator/ Reviewer');
-                  setFormEmployeeType('Full-time');
-                  setFormEmpStatus('active');
-                }}
-                className="btn btn-secondary"
+                variant="cancel"
+                onClick={() => { setIsModalOpen(false); setEditingEmployee(null); setFormDesignation('Annotator/ Reviewer'); setFormEmployeeType('Full-time'); setFormEmpStatus('active'); }}
               >
                 Cancel
-              </button>
-              <button
+              </Button>
+              <Button
                 type="submit"
                 form="employee-form"
                 disabled={createMutation.isPending || updateMutation.isPending}
-                className="btn btn-primary"
+                isLoading={createMutation.isPending || updateMutation.isPending}
               >
-                {createMutation.isPending || updateMutation.isPending
-                  ? 'Saving...'
-                  : editingEmployee
-                    ? 'Update Employee'
-                    : 'Create Employee'}
-              </button>
+                {!(createMutation.isPending || updateMutation.isPending) && (editingEmployee ? 'Update Employee' : 'Create Employee')}
+              </Button>
             </div>
           </div>
         </div>

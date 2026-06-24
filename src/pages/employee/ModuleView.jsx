@@ -1,6 +1,8 @@
 import React, { useState, useEffect } from 'react';
 import { useParams, useNavigate } from 'react-router-dom';
 import { ArrowLeft, Award, HelpCircle, FileText, ExternalLink, Check, Circle, CheckCircle, ArrowRight, Video } from 'lucide-react';
+import Button from '../../components/ui/Button';
+import Spinner from '../../components/ui/LoadingSpinner';
 import { onboardingApi } from '../../services/api';
 import toast from 'react-hot-toast';
 
@@ -49,8 +51,7 @@ const ModuleView = () => {
     if (loading) {
         return (
             <div className="flex items-center justify-center min-h-[400px] text-slate-500 font-medium">
-                <span className="h-6 w-6 animate-spin rounded-full border-2 border-emerald-500/20 border-t-emerald-600 mr-2" />
-                Loading module lessons...
+                <Spinner size="md" color="emerald" text="Loading module lessons..." />
             </div>
         );
     }
@@ -388,25 +389,18 @@ const ModuleView = () => {
                                     Complete Section <Check className="w-4 h-4" />
                                 </button>
                             ) : activeTab === 'quiz' && !quizSubmitted[currentSection.id] ? (
-                                <button 
-                                    onClick={() => handleQuizSubmit(currentSection.id)}
-                                    disabled={answeredCurrentQuestions < currentSection.questions.length}
-                                    className="px-6 py-3 rounded-xl font-bold text-white bg-emerald-600 hover:bg-emerald-700 transition-colors text-xs uppercase tracking-wider cursor-pointer disabled:opacity-40 disabled:cursor-not-allowed focus:ring-2 focus:ring-emerald-500 focus:ring-offset-2"
-                                >
+                                <Button variant="success" onClick={() => handleQuizSubmit(currentSection.id)} disabled={answeredCurrentQuestions < currentSection.questions.length} className="px-6 py-3 text-xs uppercase tracking-wider font-bold">
                                     Submit Quiz Answers
-                                </button>
+                                </Button>
                             ) : (
                                 <div />
                             )}
                             
                             {completedSections.has(currentSection.id) && (
-                                <button 
-                                    onClick={handleAdvance} 
-                                    className="px-6 py-3 rounded-xl font-bold text-white bg-emerald-600 hover:bg-emerald-700 transition-colors text-xs uppercase tracking-wider flex items-center gap-1.5 cursor-pointer shadow-md hover:shadow-lg"
-                                >
+                                <Button variant="success" onClick={handleAdvance} className="px-6 py-3 text-xs uppercase tracking-wider font-bold shadow-md hover:shadow-lg">
                                     <span>{activeSectionIndex === moduleData.sections.length - 1 ? 'Finish Module' : 'Next Lesson'}</span>
                                     <ArrowRight className="w-4 h-4" />
-                                </button>
+                                </Button>
                             )}
                         </footer>
                     </>
@@ -508,26 +502,14 @@ const ModuleView = () => {
 
                         <div className="w-full space-y-2">
                             {modalData.passed ? (
-                                <button
-                                    onClick={() => {
-                                        setShowScoreModal(false);
-                                        handleAdvance();
-                                    }}
-                                    className="w-full py-3.5 bg-emerald-600 hover:bg-emerald-700 text-white rounded-2xl font-bold text-sm tracking-wide transition-all shadow-md shadow-emerald-600/10 cursor-pointer uppercase"
-                                >
+                                <Button variant="success" onClick={() => { setShowScoreModal(false); handleAdvance(); }} className="w-full justify-center py-3.5 text-sm uppercase tracking-wide font-bold rounded-2xl shadow-md">
                                     {activeSectionIndex === moduleData.sections.length - 1 ? 'Finish Module' : 'Next Lesson'}
-                                </button>
+                                </Button>
                             ) : (
                                 <>
-                                    <button
-                                        onClick={() => {
-                                            setShowScoreModal(false);
-                                            handleRetakeQuiz(modalData.sectionId);
-                                        }}
-                                        className="w-full py-3.5 bg-amber-600 hover:bg-amber-700 text-white rounded-2xl font-bold text-sm tracking-wide transition-all shadow-md shadow-amber-600/10 cursor-pointer uppercase"
-                                    >
+                                    <Button variant="warning" onClick={() => { setShowScoreModal(false); handleRetakeQuiz(modalData.sectionId); }} className="w-full justify-center py-3.5 text-sm uppercase tracking-wide font-bold rounded-2xl shadow-md">
                                         Retry Quiz
-                                    </button>
+                                    </Button>
                                     <button
                                         onClick={() => {
                                             setShowScoreModal(false);

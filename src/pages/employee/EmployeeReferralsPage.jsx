@@ -1,6 +1,8 @@
 import { useState } from 'react';
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import { referralApi } from '../../services/api';
+import Spinner from '../../components/ui/LoadingSpinner';
+import Button from '../../components/ui/Button';
 import toast from 'react-hot-toast';
 import {
     Users2, Plus, X, Trash2, Clock, Search, Briefcase, CheckCircle2,
@@ -130,12 +132,9 @@ const EmployeeReferralsPage = () => {
                         Refer talented people you know for open roles at Autonex.
                     </p>
                 </div>
-                <button
-                    onClick={() => { setShowForm(true); setErrors({}); }}
-                    className="inline-flex items-center gap-2 px-4 py-2.5 rounded-xl bg-emerald-600 text-white text-sm font-semibold shadow-sm hover:bg-emerald-700 transition-colors"
-                >
+                <Button variant="success" onClick={() => { setShowForm(true); setErrors({}); }}>
                     <Plus className="w-4 h-4" /> Refer Someone
-                </button>
+                </Button>
             </div>
 
             {/* Stats */}
@@ -163,12 +162,9 @@ const EmployeeReferralsPage = () => {
                         <Users2 className="w-10 h-10 mb-3 text-slate-300" />
                         <p className="font-medium text-slate-500">No referrals yet</p>
                         <p className="text-sm mt-1">Know someone who'd be a great fit? Refer them!</p>
-                        <button
-                            onClick={() => { setShowForm(true); setErrors({}); }}
-                            className="mt-4 inline-flex items-center gap-2 px-4 py-2 rounded-xl bg-emerald-50 text-emerald-700 text-sm font-medium hover:bg-emerald-100 transition-colors"
-                        >
+                        <Button variant="success" onClick={() => { setShowForm(true); setErrors({}); }} className="mt-4">
                             <Plus className="w-4 h-4" /> Submit your first referral
-                        </button>
+                        </Button>
                     </div>
                 ) : (
                     <div className="divide-y divide-slate-100">
@@ -379,20 +375,10 @@ const EmployeeReferralsPage = () => {
                             </div>
 
                             <div className="flex justify-end gap-3 pt-2">
-                                <button
-                                    type="button"
-                                    onClick={() => setShowForm(false)}
-                                    className="px-4 py-2 text-sm font-medium text-slate-600 hover:bg-slate-100 rounded-xl transition-colors"
-                                >
-                                    Cancel
-                                </button>
-                                <button
-                                    type="submit"
-                                    disabled={createMutation.isPending}
-                                    className="px-5 py-2 text-sm font-semibold bg-emerald-600 text-white rounded-xl hover:bg-emerald-700 transition-colors disabled:opacity-60"
-                                >
-                                    {createMutation.isPending ? 'Submitting...' : 'Submit Referral'}
-                                </button>
+                                <Button type="button" variant="cancel" onClick={() => setShowForm(false)}>Cancel</Button>
+                                <Button type="submit" variant="success" disabled={createMutation.isPending} isLoading={createMutation.isPending}>
+                                    {!createMutation.isPending && 'Submit Referral'}
+                                </Button>
                             </div>
                         </form>
                     </div>
@@ -408,16 +394,10 @@ const EmployeeReferralsPage = () => {
                             This will remove your referral for <strong>{deleteConfirm.candidate_name}</strong>. This action cannot be undone.
                         </p>
                         <div className="flex justify-end gap-3 mt-5">
-                            <button onClick={() => setDeleteConfirm(null)}
-                                className="px-4 py-2 text-sm font-medium text-slate-600 hover:bg-slate-100 rounded-xl transition-colors">
-                                Cancel
-                            </button>
-                            <button
-                                onClick={() => deleteMutation.mutate(deleteConfirm.id)}
-                                disabled={deleteMutation.isPending}
-                                className="px-4 py-2 text-sm font-semibold bg-red-500 text-white rounded-xl hover:bg-red-600 transition-colors disabled:opacity-50">
-                                {deleteMutation.isPending ? 'Withdrawing...' : 'Withdraw'}
-                            </button>
+                            <Button variant="cancel" onClick={() => setDeleteConfirm(null)}>Cancel</Button>
+                            <Button variant="danger" onClick={() => deleteMutation.mutate(deleteConfirm.id)} disabled={deleteMutation.isPending} isLoading={deleteMutation.isPending}>
+                                {!deleteMutation.isPending && 'Withdraw'}
+                            </Button>
                         </div>
                     </div>
                 </div>

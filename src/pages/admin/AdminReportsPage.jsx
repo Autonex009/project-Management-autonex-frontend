@@ -1,6 +1,8 @@
 import React, { useState, useEffect } from 'react';
 import { Download, Users, TrendingUp, CheckCircle2, ChevronDown, ChevronRight } from 'lucide-react';
+import Button from '../../components/ui/Button';
 import { onboardingApi } from '../../services/api';
+import Spinner from '../../components/ui/LoadingSpinner';
 import SearchInput from '../../components/ui/SearchInput';
 
 export default function AdminReportsPage() {
@@ -51,12 +53,9 @@ export default function AdminReportsPage() {
           <h1 className="text-2xl sm:text-3xl font-extrabold text-slate-900">Candidate Reports</h1>
           <p className="text-sm text-slate-500">Track company-wide onboarding progress and quiz scores in one place.</p>
         </div>
-        <button 
-          onClick={handleExportCSV} 
-          className="flex items-center gap-2 px-5 py-2.5 rounded-xl text-white text-sm font-semibold transition-all hover:bg-indigo-700 shadow-md cursor-pointer bg-indigo-600"
-        >
+        <Button size="lg" onClick={handleExportCSV}>
           <Download className="h-4 w-4" /> Export CSV
-        </button>
+        </Button>
       </div>
 
       {/* Stats Cards */}
@@ -116,8 +115,7 @@ export default function AdminReportsPage() {
                <tbody className="divide-y divide-slate-100 bg-white">
                  <tr>
                    <td colSpan={6} className="py-10 text-center text-slate-500 font-medium">
-                     <span className="h-5 w-5 animate-spin rounded-full border-2 border-slate-350 border-t-indigo-650 inline-block mr-2 align-middle" />
-                     Loading reports data...
+                     <Spinner size="sm" color="indigo" text="Loading reports data..." />
                    </td>
                  </tr>
                </tbody>

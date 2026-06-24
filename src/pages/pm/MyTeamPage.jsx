@@ -2,6 +2,7 @@ import React, { useMemo, useState } from 'react';
 import { useQuery } from '@tanstack/react-query';
 import { allocationApi, employeeApi, parentProjectApi, subProjectApi } from '../../services/api';
 import { Briefcase, Clock3, FolderKanban, Mail, Phone, Search, Users, X } from 'lucide-react';
+import Button from '../../components/ui/Button';
 import SlackIcon from '../../components/icons/SlackIcon';
 import { getPmEmployeeId, getPmSubProjects } from '../../utils/pmScope';
 
@@ -303,15 +304,10 @@ const SlackDmButton = ({ employee }) => {
 
     return (
         <div className="flex flex-col items-end gap-1">
-            <button
-                type="button"
-                onClick={handleClick}
-                disabled={loading}
-                className="inline-flex items-center gap-2 rounded-xl border border-slate-200 bg-white px-3 py-2 text-xs font-semibold text-slate-700 shadow-sm transition hover:bg-slate-50 disabled:cursor-not-allowed disabled:opacity-60"
-            >
-                <SlackIcon size={16} />
+            <Button type="button" variant="secondary" size="sm" onClick={handleClick} disabled={loading} isLoading={loading}>
+                {!loading && <SlackIcon size={16} />}
                 {loading ? 'Opening…' : 'Slack DM'}
-            </button>
+            </Button>
             {error && <span className="text-xs font-medium text-amber-600">{error}</span>}
         </div>
     );

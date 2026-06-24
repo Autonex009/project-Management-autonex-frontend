@@ -1,6 +1,8 @@
 import { useState } from 'react';
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import { signupRequestApi } from '../services/api';
+import Spinner from '../components/ui/LoadingSpinner';
+import Button from '../components/ui/Button';
 import { CheckCircle, XCircle, Clock, User, Mail, Phone, Briefcase, AlertTriangle, X } from 'lucide-react';
 import { format, parseISO } from 'date-fns';
 import toast from 'react-hot-toast';
@@ -165,23 +167,17 @@ const SignupRequestsPage = () => {
 
                                         {/* Right — actions */}
                                         <div className="flex items-center gap-2 shrink-0">
-                                            <button onClick={() => setExpandedId(isExpanded ? null : req.id)}
-                                                className="px-3 py-1.5 text-xs font-medium text-slate-600 bg-slate-100 hover:bg-slate-200 rounded-lg transition-colors">
+                                            <Button variant="secondary" size="sm" onClick={() => setExpandedId(isExpanded ? null : req.id)}>
                                                 {isExpanded ? 'Less' : 'Details'}
-                                            </button>
+                                            </Button>
                                             {req.status === 'pending' && (
                                                 <>
-                                                    <button
-                                                        onClick={() => approveMutation.mutate(req.id)}
-                                                        disabled={approveMutation.isPending}
-                                                        className="inline-flex items-center gap-1.5 px-3 py-1.5 text-xs font-medium bg-emerald-600 text-white rounded-lg hover:bg-emerald-700 transition-colors disabled:opacity-50">
+                                                    <Button variant="success" size="sm" onClick={() => approveMutation.mutate(req.id)} disabled={approveMutation.isPending}>
                                                         <CheckCircle className="w-3.5 h-3.5"/>Approve
-                                                    </button>
-                                                    <button
-                                                        onClick={() => { setRejectModal({ requestId: req.id, name: req.name }); setRejectReason(''); }}
-                                                        className="inline-flex items-center gap-1.5 px-3 py-1.5 text-xs font-medium bg-red-500 text-white rounded-lg hover:bg-red-600 transition-colors">
+                                                    </Button>
+                                                    <Button variant="danger" size="sm" onClick={() => { setRejectModal({ requestId: req.id, name: req.name }); setRejectReason(''); }}>
                                                         <XCircle className="w-3.5 h-3.5"/>Reject
-                                                    </button>
+                                                    </Button>
                                                 </>
                                             )}
                                         </div>
@@ -319,16 +315,10 @@ const SignupRequestsPage = () => {
                                 rows={3} />
                         </div>
                         <div className="flex justify-end gap-3 mt-4">
-                            <button onClick={() => setRejectModal(null)}
-                                className="px-4 py-2 text-sm font-medium text-slate-600 hover:bg-slate-100 rounded-lg transition-colors">
-                                Cancel
-                            </button>
-                            <button
-                                onClick={() => rejectMutation.mutate({ id: rejectModal.requestId, reason: rejectReason })}
-                                disabled={rejectMutation.isPending}
-                                className="px-4 py-2 text-sm font-medium bg-red-500 text-white rounded-lg hover:bg-red-600 transition-colors disabled:opacity-50">
-                                {rejectMutation.isPending ? 'Rejecting...' : 'Confirm Reject'}
-                            </button>
+                            <Button variant="cancel" onClick={() => setRejectModal(null)}>Cancel</Button>
+                            <Button variant="danger" onClick={() => rejectMutation.mutate({ id: rejectModal.requestId, reason: rejectReason })} disabled={rejectMutation.isPending} isLoading={rejectMutation.isPending}>
+                                {!rejectMutation.isPending && 'Confirm Reject'}
+                            </Button>
                         </div>
                     </div>
                 </div>
