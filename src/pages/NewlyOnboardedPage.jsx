@@ -271,6 +271,7 @@ const NewlyOnboardedPage = ({ embedded = false }) => {
                     projectInsights={true}
                     allocations={allocations}
                     candidateSkills={allocatingCandidate.skills || []}
+                    excludeProjectIds={(allocatingCandidate.allocations || []).map(a => a.projectId)}
                 />
             )}
         </div>

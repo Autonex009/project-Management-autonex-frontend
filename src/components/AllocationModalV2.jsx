@@ -3,13 +3,6 @@ import { X, Plus, Trash2, AlertCircle, Users, CalendarRange, Target, CheckCircle
 import Dropdown from './ui/Dropdown';
 import { recommendationsApi } from '../services/api';
 
-const isActiveAlloc = (a) => {
-    const today = new Date().toISOString().split('T')[0];
-    const start = a.active_start_date || null;
-    const end = a.active_end_date || null;
-    return (!start || start <= today) && (!end || end >= today);
-};
-
 const capacityPill = (status) => {
     if (status === 'overburdened') return { cls: 'bg-red-50 text-red-700 border-red-200', label: 'Overburdened' };
     if (status === 'underutilized') return { cls: 'bg-amber-50 text-amber-700 border-amber-200', label: 'Underutilized' };
@@ -30,7 +23,8 @@ const AllocationModalV2 = ({
     hideRoleTags = false,
     projectInsights = false,
     allocations = [],
-    candidateSkills = []
+    candidateSkills = [],
+    excludeProjectIds = []
 }) => {
     const [formData, setFormData] = useState({
         employee_id: presetEmployeeId || '',
@@ -227,10 +221,12 @@ const AllocationModalV2 = ({
                                 Project <span className="text-red-500">*</span>
                             </label>
                             <Dropdown
-                                options={projects.filter(p => p.project_status === 'active').map(proj => ({
-                                    value: proj.id.toString(),
-                                    label: proj.name
-                                }))}
+                                options={projects
+                                    .filter(p => p.project_status === 'active' && !excludeProjectIds.map(String).includes(String(p.id)))
+                                    .map(proj => ({
+                                        value: proj.id.toString(),
+                                        label: proj.name
+                                    }))}
                                 value={formData.project_id.toString()}
                                 onChange={(val) => setFormData(prev => ({ ...prev, project_id: parseInt(val) || '' }))}
                                 placeholder="Select project"
@@ -241,7 +237,7 @@ const AllocationModalV2 = ({
                     {/* Project-fit insights */}
                     {projectInsights && selectedProject && (() => {
                         const required = selectedProject.required_manpower || 0;
-                        const allocated = allocations.filter(a => String(a.sub_project_id) === String(selectedProject.id) && isActiveAlloc(a)).length;
+                        const allocated = allocations.filter(a => String(a.sub_project_id) === String(selectedProject.id)).length;
                         const remaining = required - allocated;
                         const req = Array.isArray(selectedProject.required_expertise) ? selectedProject.required_expertise : [];
                         const have = (candidateSkills || []).map(s => String(s).trim().toLowerCase());
