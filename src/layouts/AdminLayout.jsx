@@ -1,5 +1,5 @@
 import { Link, useLocation, Outlet, useNavigate } from 'react-router-dom';
-import { LogOut, Menu, X, GraduationCap, FileSpreadsheet, BarChart3, ChevronLeft, ChevronRight } from 'lucide-react';
+import { LogOut, Menu, X, GraduationCap, FileSpreadsheet, ChevronLeft, ChevronRight, Sparkles } from 'lucide-react';
 import SearchInput from '../components/ui/SearchInput';
 import { navigation } from '../config/navigation';
 import api, { signupRequestApi } from '../services/api';
@@ -11,8 +11,8 @@ import NotificationBell from '../components/NotificationBell';
 
 const onboardingNavigation = [
   { name: 'Training Modules', href: '/admin/modules', icon: GraduationCap },
+  { name: 'Newly Onboarded', href: '/admin/newly-onboarded', icon: Sparkles },
   { name: 'Progress Reports', href: '/admin/onboarding-reports', icon: FileSpreadsheet },
-  { name: 'Training Analytics', href: '/admin/onboarding-analytics', icon: BarChart3 },
 ];
 
 const AdminLayout = () => {
