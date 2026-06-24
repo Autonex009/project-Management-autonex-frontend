@@ -31,7 +31,7 @@ const NewlyOnboardedPage = ({ embedded = false }) => {
     // Project options for the allocation modal.
     const { data: subProjects = [] } = useQuery({ queryKey: ['sub-projects'], queryFn: subProjectApi.getAll });
     const { data: parentProjects = [] } = useQuery({ queryKey: ['parent-projects'], queryFn: parentProjectApi.getAll, enabled: isPm });
-    const { data: allocations = [] } = useQuery({ queryKey: ['allocations'], queryFn: allocationApi.getAll, enabled: isPm });
+    const { data: allocations = [] } = useQuery({ queryKey: ['allocations'], queryFn: allocationApi.getAll });
 
     const projectOptions = useMemo(() => {
         if (isPm) {
@@ -267,6 +267,10 @@ const NewlyOnboardedPage = ({ embedded = false }) => {
                     presetEmployeeId={allocatingCandidate.employeeId}
                     presetEmployeeName={allocatingCandidate.name}
                     hideOverride={true}
+                    hideRoleTags={true}
+                    projectInsights={true}
+                    allocations={allocations}
+                    candidateSkills={allocatingCandidate.skills || []}
                 />
             )}
         </div>
