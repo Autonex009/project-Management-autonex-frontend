@@ -47,6 +47,7 @@ const OnboardingDashboard = lazy(() => import('./pages/employee/OnboardingDashbo
 const ModuleView = lazy(() => import('./pages/employee/ModuleView'));
 const PMOnboardingDashboard = lazy(() => import('./pages/pm/PMOnboardingDashboard'));
 const NewlyOnboardedPage = lazy(() => import('./pages/NewlyOnboardedPage'));
+const PMMentorshipPage = lazy(() => import('./pages/pm/PMMentorshipPage'));
 const AdminModulesList = lazy(() => import('./pages/admin/AdminModulesList'));
 const AdminModulesBuilder = lazy(() => import('./pages/admin/AdminModulesBuilder'));
 const AdminReportsPage = lazy(() => import('./pages/admin/AdminReportsPage'));
@@ -144,8 +145,8 @@ function App() {
               <Route path="my-leaves" element={<PMMyLeavesPage />} />
               <Route path="side-projects" element={<SideProjectsPage />} />
               <Route path="guidelines" element={<GuidelinesPage />} />
-              <Route path="onboarding-mentor" element={<PMOnboardingDashboard />} />
-              <Route path="newly-onboarded" element={<NewlyOnboardedPage />} />
+              <Route path="onboarding-mentor" element={<PMMentorshipPage />} />
+              <Route path="newly-onboarded" element={<Navigate to="/pm/onboarding-mentor" replace />} />
             </Route>
 
             {/* Catch all */}

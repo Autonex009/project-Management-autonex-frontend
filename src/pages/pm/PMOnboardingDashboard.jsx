@@ -2,7 +2,7 @@ import React, { useState, useEffect } from 'react';
 import { Users, BookOpen, Award, CheckCircle, HelpCircle } from 'lucide-react';
 import { onboardingApi } from '../../services/api';
 
-const PMOnboardingDashboard = () => {
+const PMOnboardingDashboard = ({ embedded = false }) => {
     const [mentees, setMentees] = useState([]);
     const [loading, setLoading] = useState(true);
     const [error, setError] = useState(null);
@@ -60,27 +60,29 @@ const PMOnboardingDashboard = () => {
     }
 
     return (
-        <div className="space-y-8 animate-in fade-in duration-500">
+        <div className={embedded ? '' : 'space-y-8 animate-in fade-in duration-500'}>
             {/* Header section */}
-            <div className="flex flex-col md:flex-row justify-between items-start md:items-end gap-6">
-                <div>
-                    <span className="text-xs font-bold uppercase tracking-widest text-blue-600">PM Portal</span>
-                    <h1 className="text-3xl font-extrabold text-slate-900 mt-1">
-                        Mentorship & Onboarding
-                    </h1>
-                    <p className="text-slate-500 text-sm mt-1">Monitor training progression and quiz outcomes for your team.</p>
-                </div>
+            {!embedded && (
+                <div className="flex flex-col md:flex-row justify-between items-start md:items-end gap-6">
+                    <div>
+                        <span className="text-xs font-bold uppercase tracking-widest text-blue-600">PM Portal</span>
+                        <h1 className="text-3xl font-extrabold text-slate-900 mt-1">
+                            Mentorship & Onboarding
+                        </h1>
+                        <p className="text-slate-500 text-sm mt-1">Monitor training progression and quiz outcomes for your team.</p>
+                    </div>
 
-                <div className="flex items-center gap-4 bg-white border border-slate-200/60 p-4 px-6 rounded-2xl shadow-sm w-full md:w-auto">
-                    <div className="flex items-center gap-3">
-                        <Users className="w-8 h-8 text-blue-500 shrink-0" />
-                        <div>
-                            <p className="text-[10px] font-bold uppercase tracking-widest text-slate-400">Assigned Candidates</p>
-                            <p className="text-lg font-extrabold text-slate-800">{mentees.length}</p>
+                    <div className="flex items-center gap-4 bg-white border border-slate-200/60 p-4 px-6 rounded-2xl shadow-sm w-full md:w-auto">
+                        <div className="flex items-center gap-3">
+                            <Users className="w-8 h-8 text-blue-500 shrink-0" />
+                            <div>
+                                <p className="text-[10px] font-bold uppercase tracking-widest text-slate-400">Assigned Candidates</p>
+                                <p className="text-lg font-extrabold text-slate-800">{mentees.length}</p>
+                            </div>
                         </div>
                     </div>
                 </div>
-            </div>
+            )}
 
             {/* Mentees list container */}
             <div className="bg-white rounded-2xl border border-slate-200/60 shadow-sm overflow-hidden">

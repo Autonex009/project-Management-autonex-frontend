@@ -1,6 +1,6 @@
 import React, { useState, useEffect } from 'react';
 import { Outlet, NavLink, useNavigate } from 'react-router-dom';
-import { LayoutDashboard, FolderKanban, Calendar, CalendarCheck, Rocket, LogOut, Menu, X, FileText, Layers, UserCog, UserRound, Users, Users2, TrendingUp, GraduationCap, Info, ChevronLeft, ChevronRight, Sparkles } from 'lucide-react';
+import { LayoutDashboard, FolderKanban, Calendar, CalendarCheck, Rocket, LogOut, Menu, X, FileText, Layers, UserCog, UserRound, Users, Users2, TrendingUp, GraduationCap, Info, ChevronLeft, ChevronRight } from 'lucide-react';
 import BrandLockup from '../components/brand/BrandLockup';
 import NotificationBell from '../components/NotificationBell';
 
@@ -71,7 +71,6 @@ const EmployeeLayout = () => {
             { to: `${prefix}/side-projects`, label: 'Side Projects', icon: Rocket },
             { to: `${prefix}/guidelines`, label: 'Guidelines', icon: FileText },
             { to: `${prefix}/onboarding-mentor`, label: 'Mentorship', icon: GraduationCap },
-            { to: `${prefix}/newly-onboarded`, label: 'Newly Onboarded', icon: Sparkles },
         ]
         : [
             { to: `${prefix}/dashboard`, label: 'Dashboard', icon: LayoutDashboard },

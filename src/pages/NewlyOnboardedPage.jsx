@@ -14,7 +14,7 @@ const scoreBadgeClass = (score) => {
     return 'bg-red-50 text-red-700 border-red-100';
 };
 
-const NewlyOnboardedPage = () => {
+const NewlyOnboardedPage = ({ embedded = false }) => {
     const queryClient = useQueryClient();
     const [search, setSearch] = useState('');
     const [allocatingCandidate, setAllocatingCandidate] = useState(null);
@@ -97,26 +97,28 @@ const NewlyOnboardedPage = () => {
     }
 
     return (
-        <div className="space-y-8 animate-in fade-in duration-500">
+        <div className={embedded ? '' : 'space-y-8 animate-in fade-in duration-500'}>
             {/* Header */}
-            <div className="flex flex-col md:flex-row justify-between items-start md:items-end gap-6">
-                <div>
-                    <span className="text-xs font-bold uppercase tracking-widest text-indigo-600">Onboarding</span>
-                    <h1 className="text-3xl font-extrabold text-slate-900 mt-1 flex items-center gap-2">
-                        <Sparkles className="w-7 h-7 text-indigo-500" /> Newly Onboarded
-                    </h1>
-                    <p className="text-slate-500 text-sm mt-1">
-                        Annotation employees not yet assigned to a project, ranked by assessment performance. Allocate the best fits straight from here.
-                    </p>
-                </div>
-                <div className="flex items-center gap-4 bg-white border border-slate-200/60 p-4 px-6 rounded-2xl shadow-sm w-full md:w-auto">
-                    <Users className="w-8 h-8 text-indigo-500 shrink-0" />
+            {!embedded && (
+                <div className="flex flex-col md:flex-row justify-between items-start md:items-end gap-6">
                     <div>
-                        <p className="text-[10px] font-bold uppercase tracking-widest text-slate-400">Available Candidates</p>
-                        <p className="text-lg font-extrabold text-slate-800">{candidates.length}</p>
+                        <span className="text-xs font-bold uppercase tracking-widest text-indigo-600">Onboarding</span>
+                        <h1 className="text-3xl font-extrabold text-slate-900 mt-1 flex items-center gap-2">
+                            <Sparkles className="w-7 h-7 text-indigo-500" /> Newly Onboarded
+                        </h1>
+                        <p className="text-slate-500 text-sm mt-1">
+                            Annotation employees not yet assigned to a project, ranked by assessment performance. Allocate the best fits straight from here.
+                        </p>
+                    </div>
+                    <div className="flex items-center gap-4 bg-white border border-slate-200/60 p-4 px-6 rounded-2xl shadow-sm w-full md:w-auto">
+                        <Users className="w-8 h-8 text-indigo-500 shrink-0" />
+                        <div>
+                            <p className="text-[10px] font-bold uppercase tracking-widest text-slate-400">Available Candidates</p>
+                            <p className="text-lg font-extrabold text-slate-800">{candidates.length}</p>
+                        </div>
                     </div>
                 </div>
-            </div>
+            )}
 
             {/* List container */}
             <div className="bg-white rounded-2xl border border-slate-200/60 shadow-sm overflow-hidden">
