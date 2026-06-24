@@ -48,7 +48,7 @@ const ModuleView = lazy(() => import('./pages/employee/ModuleView'));
 const PMOnboardingDashboard = lazy(() => import('./pages/pm/PMOnboardingDashboard'));
 const AdminModulesList = lazy(() => import('./pages/admin/AdminModulesList'));
 const AdminModulesBuilder = lazy(() => import('./pages/admin/AdminModulesBuilder'));
-const AdminTeamPage = lazy(() => import('./pages/admin/AdminTeamPage'));
+// const AdminTeamPage = lazy(() => import('./pages/admin/AdminTeamPage'));
 const AdminReportsPage = lazy(() => import('./pages/admin/AdminReportsPage'));
 // const AdminAnalyticsPage = lazy(() => import('./pages/admin/AdminAnalyticsPage'));
 
@@ -97,7 +97,7 @@ function App() {
               <Route path="guidelines" element={<GuidelinesPage />} />
               <Route path="modules" element={<AdminModulesList />} />
               <Route path="modules/new" element={<AdminModulesBuilder />} />
-              <Route path="onboarding-team" element={<AdminTeamPage />} />
+              {/* <Route path="onboarding-team" element={<AdminTeamPage />} /> */}
               <Route path="onboarding-reports" element={<AdminReportsPage />} />
               {/* <Route path="onboarding-analytics" element={<AdminAnalyticsPage />} /> */}
             </Route>
