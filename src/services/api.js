@@ -88,23 +88,13 @@ export const recommendationsApi = {
 export const parentProjectApi = projectApi;
 
 export const employeeApi = {
-    getAll: (params) => api.get('/employees', { params }).then(res => res.data),
+    getAll: () => api.get('/employees').then(res => res.data),
     getOne: (id) => api.get(`/employees/${id}`).then(res => res.data),
     create: (data) => api.post('/employees', data).then(res => res.data),
     update: (id, data) => api.put(`/employees/${id}`, data).then(res => res.data),
     delete: (id) => api.delete(`/employees/${id}`).then(res => res.data),
     getAvailability: (id) => api.get(`/employees/${id}/availability`).then(res => res.data),
     convertToFulltime: (id, data) => api.post(`/employees/${id}/convert-to-fulltime`, data).then(res => res.data),
-    restore: (id) => api.post(`/employees/${id}/restore`).then(res => res.data),
-    getSlackLink: (id) => api.get(`/employees/${id}/slack-link`).then(res => res.data),
-    uploadAvatar: (id, formData) => api.post(`/employees/${id}/avatar`, formData, {
-        headers: { 'Content-Type': 'multipart/form-data' },
-    }).then(res => res.data),
-    setAvatarFromSlack: (id) => api.post(`/employees/${id}/avatar/from-slack`).then(res => res.data),
-    deleteAvatar: (id) => api.delete(`/employees/${id}/avatar`).then(res => res.data),
-    getActive: () => api.get('/employees/status/active').then(res => res.data),
-    getInactive: () => api.get('/employees/status/inactive').then(res => res.data),
-    getIdle: () => api.get('/employees/status/idle').then(res => res.data),
 };
 
 export const allocationApi = {
@@ -137,7 +127,6 @@ export const signupRequestApi = {
     getAll: (params) => api.get('/signup-requests', { params }).then(res => res.data),
     approve: (id, reviewedBy) => api.patch(`/signup-requests/${id}/approve`, null, { params: { reviewed_by: reviewedBy } }).then(res => res.data),
     reject: (id, reviewedBy, reason) => api.patch(`/signup-requests/${id}/reject`, { reason: reason || null }, { params: { reviewed_by: reviewedBy } }).then(res => res.data),
-    update: (id, data) => api.patch(`/signup-requests/${id}`, data).then(res => res.data),
 };
 
 export const wfhApi = {
@@ -203,6 +192,16 @@ export const payrollApi = {
     save: (data) => api.post('/payroll/save', data, { headers: payrollHeaders() }).then(res => res.data),
     getSaved: (month) => api.get('/payroll/saved', { params: { month }, headers: payrollHeaders() }).then(res => res.data),
     exportCsvUrl: (month) => `${apiBaseUrl}/payroll/export.csv?month=${month}&passcode=${encodeURIComponent(sessionStorage.getItem('payroll_passcode') || '')}`,
+    // Pay — ground-truth salary records (the source the Monthly Pay calc derives from)
+    getSalaries: () => api.get('/payroll/salaries', { headers: payrollHeaders() }).then(res => res.data),
+    updateSalary: (employeeId, baseSalary) =>
+        api.put(`/payroll/salaries/${employeeId}`, { base_salary: baseSalary }, { headers: payrollHeaders() }).then(res => res.data),
+    // Salary table — list of actual pay values (the Pay tab's source of truth)
+    getSalaryRecords: () => api.get('/payroll/salary-records', { headers: payrollHeaders() }).then(res => res.data),
+    updateSalaryRecord: (id, { baseMonthly, bonusMonthly }) =>
+        api.put(`/payroll/salary-records/${id}`, { base_pay_monthly: baseMonthly, opt_bonus_monthly: bonusMonthly ?? null }, { headers: payrollHeaders() }).then(res => res.data),
+    setSalaryRecordStatus: (id, status) =>
+        api.patch(`/payroll/salary-records/${id}/status`, { status }, { headers: payrollHeaders() }).then(res => res.data),
 };
 
 // === Referrals API ===
@@ -229,7 +228,6 @@ export const notificationApi = {
     getAll: (userId) => api.get('/notifications', { params: { user_id: userId } }).then(res => res.data),
     markRead: (id, userId) => api.patch(`/notifications/${id}/read`, null, { params: { user_id: userId } }).then(res => res.data),
     markAllRead: (userId) => api.patch('/notifications/read-all', null, { params: { user_id: userId } }).then(res => res.data),
-    clearRead: (userId) => api.delete('/notifications/clear-read', { params: { user_id: userId } }).then(res => res.data),
 };
 
 // === Onboarding API ===
@@ -239,7 +237,6 @@ export const onboardingApi = {
     createModule: (data) => api.post('/onboarding/modules', data).then(res => res.data),
     updateModule: (id, data) => api.put(`/onboarding/modules/${id}`, data).then(res => res.data),
     deleteModule: (id) => api.delete(`/onboarding/modules/${id}`).then(res => res.data),
-    reorderModules: (orderedIds) => api.post('/onboarding/modules/reorder', { ordered_ids: orderedIds }).then(res => res.data),
     createSection: (moduleId, data) => api.post(`/onboarding/modules/${moduleId}/sections`, data).then(res => res.data),
     deleteSection: (id) => api.delete(`/onboarding/sections/${id}`).then(res => res.data),
     importQuestions: (moduleId, sectionId, formData) => api.post(`/onboarding/modules/${moduleId}/sections/${sectionId}/import-questions`, formData, {
@@ -249,28 +246,20 @@ export const onboardingApi = {
     recordProgress: (moduleId, sectionId, userId = null) => api.post('/onboarding/progress/section', { module_id: moduleId, section_id: sectionId, user_id: userId }).then(res => res.data),
     getProgress: (userId) => api.get(`/onboarding/progress/${userId}`).then(res => res.data),
     submitQuiz: (sectionId, answers, userId = null) => api.post('/onboarding/quiz/submit', { section_id: sectionId, answers, user_id: userId }).then(res => res.data),
+    getTeam: () => api.get('/onboarding/team').then(res => res.data),
+    createTeamMember: (data) => api.post('/onboarding/team', data).then(res => res.data),
+    updateTeamMember: (id, data) => api.put(`/onboarding/team/${id}`, data).then(res => res.data),
+    deleteTeamMember: (id) => api.delete(`/onboarding/team/${id}`).then(res => res.data),
+    importTeam: (formData) => api.post('/onboarding/team/bulk-import', formData, {
+        headers: { 'Content-Type': 'multipart/form-data' },
+    }).then(res => res.data),
+    getTeamSampleUrl: () => `${apiBaseUrl}/onboarding/team/sample-excel`,
     getCandidateDashboard: (userId) => api.get(`/onboarding/candidates/${userId}/dashboard`).then(res => res.data),
+    getAnalyticsDashboard: () => api.get('/onboarding/analytics/dashboard').then(res => res.data),
+    getFullAnalytics: () => api.get('/onboarding/analytics/full').then(res => res.data),
     getMentees: (mentorId) => api.get(`/onboarding/mentors/${mentorId}/mentees`).then(res => res.data),
-    getNewlyOnboarded: () => api.get('/onboarding/newly-onboarded').then(res => res.data),
     getReports: () => api.get('/onboarding/reports').then(res => res.data),
     getReportsExportUrl: () => `${apiBaseUrl}/onboarding/reports/export`,
-    exportReports: () => api.get('/onboarding/reports/export', { responseType: 'blob' }).then(res => res.data),
-};
-
-// === Company Settings API ===
-export const companySettingsApi = {
-    getAll: () => api.get('/company-settings').then(res => res.data),
-    get: (key) => api.get(`/company-settings/${key}`).then(res => res.data),
-    upsert: (key, data) => api.put(`/company-settings/${key}`, data).then(res => res.data),
-    delete: (key) => api.delete(`/company-settings/${key}`).then(res => res.data),
-};
-
-// === WiFi Networks API ===
-export const wifiNetworksApi = {
-    getAll: () => api.get('/wifi-networks').then(res => res.data),
-    create: (data) => api.post('/wifi-networks', data).then(res => res.data),
-    update: (id, data) => api.put(`/wifi-networks/${id}`, data).then(res => res.data),
-    delete: (id) => api.delete(`/wifi-networks/${id}`).then(res => res.data),
 };
 
 export default api;
