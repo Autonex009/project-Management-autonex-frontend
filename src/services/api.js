@@ -203,6 +203,16 @@ export const payrollApi = {
     save: (data) => api.post('/payroll/save', data, { headers: payrollHeaders() }).then(res => res.data),
     getSaved: (month) => api.get('/payroll/saved', { params: { month }, headers: payrollHeaders() }).then(res => res.data),
     exportCsvUrl: (month) => `${apiBaseUrl}/payroll/export.csv?month=${month}&passcode=${encodeURIComponent(sessionStorage.getItem('payroll_passcode') || '')}`,
+    // Pay — ground-truth salary records (the source the Monthly Pay calc derives from)
+    getSalaries: () => api.get('/payroll/salaries', { headers: payrollHeaders() }).then(res => res.data),
+    updateSalary: (employeeId, baseSalary) =>
+        api.put(`/payroll/salaries/${employeeId}`, { base_salary: baseSalary }, { headers: payrollHeaders() }).then(res => res.data),
+    // Salary table — list of actual pay values (the Pay tab's source of truth)
+    getSalaryRecords: () => api.get('/payroll/salary-records', { headers: payrollHeaders() }).then(res => res.data),
+    updateSalaryRecord: (id, { baseMonthly, bonusMonthly }) =>
+        api.put(`/payroll/salary-records/${id}`, { base_pay_monthly: baseMonthly, opt_bonus_monthly: bonusMonthly ?? null }, { headers: payrollHeaders() }).then(res => res.data),
+    setSalaryRecordStatus: (id, status) =>
+        api.patch(`/payroll/salary-records/${id}/status`, { status }, { headers: payrollHeaders() }).then(res => res.data),
 };
 
 // === Referrals API ===
@@ -252,6 +262,16 @@ export const onboardingApi = {
     getCandidateDashboard: (userId) => api.get(`/onboarding/candidates/${userId}/dashboard`).then(res => res.data),
     getMentees: (mentorId) => api.get(`/onboarding/mentors/${mentorId}/mentees`).then(res => res.data),
     getNewlyOnboarded: () => api.get('/onboarding/newly-onboarded').then(res => res.data),
+    getTeam: () => api.get('/onboarding/team').then(res => res.data),
+    createTeamMember: (data) => api.post('/onboarding/team', data).then(res => res.data),
+    updateTeamMember: (id, data) => api.put(`/onboarding/team/${id}`, data).then(res => res.data),
+    deleteTeamMember: (id) => api.delete(`/onboarding/team/${id}`).then(res => res.data),
+    importTeam: (formData) => api.post('/onboarding/team/bulk-import', formData, {
+        headers: { 'Content-Type': 'multipart/form-data' },
+    }).then(res => res.data),
+    getTeamSampleUrl: () => `${apiBaseUrl}/onboarding/team/sample-excel`,
+    getAnalyticsDashboard: () => api.get('/onboarding/analytics/dashboard').then(res => res.data),
+    getFullAnalytics: () => api.get('/onboarding/analytics/full').then(res => res.data),
     getReports: () => api.get('/onboarding/reports').then(res => res.data),
     getReportsExportUrl: () => `${apiBaseUrl}/onboarding/reports/export`,
     exportReports: () => api.get('/onboarding/reports/export', { responseType: 'blob' }).then(res => res.data),
