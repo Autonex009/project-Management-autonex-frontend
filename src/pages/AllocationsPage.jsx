@@ -900,25 +900,77 @@ const AllocationsPage = () => {
                           {(() => {
                             const assignedCount = projectAllocs.length;
                             const todayStr = new Date().toISOString().slice(0, 10);
-                            const onLeaveToday = projectAllocs.filter(a =>
-                              leaves.some(l =>
-                                l.employee_id === a.employee_id &&
-                                l.status === 'approved' &&
-                                String(l.start_date).slice(0, 10) <= todayStr &&
-                                String(l.end_date).slice(0, 10) >= todayStr
-                              )
-                            ).length;
+                            const onLeaveDetails = projectAllocs
+                              .map(a => {
+                                const leave = leaves.find(l =>
+                                  l.employee_id === a.employee_id &&
+                                  l.status === 'approved' &&
+                                  String(l.start_date).slice(0, 10) <= todayStr &&
+                                  String(l.end_date).slice(0, 10) >= todayStr
+                                );
+                                if (!leave) return null;
+                                const name = getEmployeeName(a.employee_id);
+                                const initials = (name || '')
+                                  .split(' ')
+                                  .map(w => w[0])
+                                  .filter(Boolean)
+                                  .slice(0, 2)
+                                  .join('')
+                                  .toUpperCase();
+                                return {
+                                  employeeId: a.employee_id,
+                                  name,
+                                  initials,
+                                  leaveType: leave.leave_type || leave.type || null,
+                                };
+                              })
+                              .filter(Boolean);
+                            const onLeaveToday = onLeaveDetails.length;
 
                             return (
                               <>
                                 {onLeaveToday > 0 && (
-                                  <span 
-                                    className="px-2.5 py-1 bg-amber-50 text-amber-700 border border-amber-200/50 rounded-full text-xs font-semibold flex items-center gap-1 shrink-0"
-                                    title={`${onLeaveToday} employee${onLeaveToday > 1 ? 's' : ''} on approved leave today`}
-                                  >
-                                    <span className="w-1.5 h-1.5 rounded-full bg-amber-500 animate-pulse" />
-                                    <span>{onLeaveToday} Leave</span>
-                                  </span>
+                                  <div className="relative group/leave shrink-0">
+                                    <span className="px-2.5 py-1 bg-amber-50 text-amber-700 border border-amber-200/50 rounded-full text-xs font-semibold flex items-center gap-1 cursor-default">
+                                      <span className="w-1.5 h-1.5 rounded-full bg-amber-500 animate-pulse" />
+                                      <span>{onLeaveToday} Leave</span>
+                                    </span>
+
+                                    {/* Hover card */}
+                                    <div className="absolute right-0 top-full mt-2 z-50 w-60 origin-top-right rounded-xl border border-slate-200 bg-white shadow-xl shadow-slate-900/10 opacity-0 invisible translate-y-1 group-hover/leave:opacity-100 group-hover/leave:visible group-hover/leave:translate-y-0 transition-all duration-150">
+                                      <div className="px-3.5 py-2.5 border-b border-slate-100 flex items-center gap-2">
+                                        <span className="w-1.5 h-1.5 rounded-full bg-amber-500" />
+                                        <span className="text-xs font-semibold text-slate-700">
+                                          On leave today
+                                        </span>
+                                        <span className="ml-auto text-[10px] font-semibold text-amber-700 bg-amber-50 border border-amber-200/60 rounded-full px-1.5 py-0.5">
+                                          {onLeaveToday}
+                                        </span>
+                                      </div>
+                                      <ul className="py-1.5 max-h-56 overflow-y-auto">
+                                        {onLeaveDetails.map(d => (
+                                          <li
+                                            key={d.employeeId}
+                                            className="px-3.5 py-1.5 flex items-center gap-2.5 hover:bg-slate-50"
+                                          >
+                                            <span className="w-7 h-7 rounded-full bg-gradient-to-br from-amber-400 to-orange-500 text-white text-[10px] font-bold flex items-center justify-center shrink-0">
+                                              {d.initials || '?'}
+                                            </span>
+                                            <div className="min-w-0">
+                                              <p className="text-xs font-medium text-slate-800 truncate">
+                                                {d.name}
+                                              </p>
+                                              {d.leaveType && (
+                                                <p className="text-[10px] text-slate-400 capitalize truncate">
+                                                  {String(d.leaveType).replace(/_/g, ' ')}
+                                                </p>
+                                              )}
+                                            </div>
+                                          </li>
+                                        ))}
+                                      </ul>
+                                    </div>
+                                  </div>
                                 )}
 
                                 <AllocationPopover

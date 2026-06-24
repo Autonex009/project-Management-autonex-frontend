@@ -143,6 +143,7 @@ function App() {
               <Route path="side-projects" element={<SideProjectsPage />} />
               <Route path="guidelines" element={<GuidelinesPage />} />
               <Route path="onboarding-mentor" element={<PMOnboardingDashboard />} />
+              <Route path="profile" element={<ProfilePage />} />
             </Route>
 
             {/* Catch all */}
