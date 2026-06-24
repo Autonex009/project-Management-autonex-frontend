@@ -1,5 +1,5 @@
 import React, { useState, useMemo } from 'react';
-import { Users, Award, Sparkles, UserPlus } from 'lucide-react';
+import { Users, Award, Sparkles, UserPlus, ChevronDown, ChevronRight } from 'lucide-react';
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import toast from 'react-hot-toast';
 import { onboardingApi, allocationApi, subProjectApi, parentProjectApi } from '../services/api';
@@ -18,6 +18,7 @@ const NewlyOnboardedPage = () => {
     const queryClient = useQueryClient();
     const [search, setSearch] = useState('');
     const [allocatingCandidate, setAllocatingCandidate] = useState(null);
+    const [expandedRow, setExpandedRow] = useState(null);
 
     const user = JSON.parse(localStorage.getItem('user') || '{}');
     const isPm = (localStorage.getItem('role') || 'employee') === 'pm';
@@ -120,7 +121,10 @@ const NewlyOnboardedPage = () => {
             {/* List container */}
             <div className="bg-white rounded-2xl border border-slate-200/60 shadow-sm overflow-hidden">
                 <div className="p-4 border-b border-slate-100 flex flex-col sm:flex-row sm:items-center justify-between gap-3">
-                    <h3 className="text-lg font-bold text-slate-900">Unassigned Pool</h3>
+                    <div>
+                        <h3 className="text-lg font-bold text-slate-900">Unassigned Pool</h3>
+                        <p className="text-[11px] text-slate-400 font-medium mt-0.5">Click a row to see the per-module breakdown.</p>
+                    </div>
                     <SearchInput value={search} onChange={setSearch} placeholder="Search name, email, role..." clearable className="w-full sm:w-72" />
                 </div>
 
@@ -137,6 +141,7 @@ const NewlyOnboardedPage = () => {
                         <table className="w-full text-left border-collapse min-w-[720px]">
                             <thead>
                                 <tr className="bg-slate-50/80 border-b border-slate-150 text-[10px] uppercase tracking-wider text-slate-400 font-extrabold">
+                                    <th className="py-4 px-4 w-8"></th>
                                     <th className="py-4 px-6">Candidate</th>
                                     <th className="py-4 px-6 text-center">Modules Completed</th>
                                     <th className="py-4 px-6 text-center">Overall Progress</th>
@@ -146,7 +151,13 @@ const NewlyOnboardedPage = () => {
                             </thead>
                             <tbody className="divide-y divide-slate-100 bg-white">
                                 {filtered.map((c) => (
-                                    <tr key={c.userId} className="hover:bg-slate-50/30 transition-colors">
+                                    <React.Fragment key={c.userId}>
+                                    <tr onClick={() => setExpandedRow(expandedRow === c.userId ? null : c.userId)} className="hover:bg-slate-50/30 transition-colors cursor-pointer">
+                                        <td className="py-4 px-4 text-center">
+                                            {expandedRow === c.userId
+                                                ? <ChevronDown className="h-4 w-4 text-indigo-600 inline-block" />
+                                                : <ChevronRight className="h-4 w-4 text-slate-400 inline-block" />}
+                                        </td>
                                         <td className="py-4 px-6">
                                             <div className="flex items-center gap-3">
                                                 <div className="h-9 w-9 rounded-full flex items-center justify-center text-white text-xs font-bold bg-gradient-to-br from-indigo-600 to-blue-500 shadow-sm uppercase">
@@ -189,13 +200,55 @@ const NewlyOnboardedPage = () => {
                                         </td>
                                         <td className="py-4 px-6 text-right">
                                             <button
-                                                onClick={() => setAllocatingCandidate(c)}
+                                                onClick={(e) => { e.stopPropagation(); setAllocatingCandidate(c); }}
                                                 className="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-xs font-semibold text-white bg-indigo-600 hover:bg-indigo-700 transition-colors shadow-sm"
                                             >
                                                 <UserPlus className="w-3.5 h-3.5" /> Allocate
                                             </button>
                                         </td>
                                     </tr>
+
+                                    {expandedRow === c.userId && (c.moduleStats?.length || 0) > 0 && (
+                                        <tr>
+                                            <td colSpan={6} className="p-0">
+                                                <div className="bg-slate-50/70 px-6 sm:px-10 py-4 border-t border-slate-100">
+                                                    <p className="text-xs font-bold text-slate-500 uppercase tracking-widest mb-3">Per-Module Breakdown</p>
+                                                    <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-3">
+                                                        {c.moduleStats.map((ms) => (
+                                                            <div key={ms.moduleId} className="bg-white rounded-xl border border-slate-200 p-4 shadow-sm">
+                                                                <p className="text-sm font-bold text-slate-800 truncate mb-2">{ms.moduleTitle}</p>
+                                                                <div className="flex items-center justify-between text-xs mb-1.5 font-medium">
+                                                                    <span className="text-slate-500">Progress</span>
+                                                                    <span className="font-bold text-slate-700">{ms.progress}%</span>
+                                                                </div>
+                                                                <div className="w-full h-1.5 rounded-full overflow-hidden mb-3 bg-slate-100">
+                                                                    <div className="h-full rounded-full" style={{ width: `${ms.progress}%`, background: ms.progress === 100 ? '#10B981' : '#6366f1' }} />
+                                                                </div>
+                                                                <div className="flex items-center justify-between text-xs font-medium">
+                                                                    <span className="text-slate-500">Quiz Score</span>
+                                                                    <span className={`font-bold px-2 py-0.5 rounded-full text-[11px] ${
+                                                                        ms.totalQuestions === 0 ? 'bg-slate-50 text-slate-400' :
+                                                                        ms.score >= 70 ? 'bg-green-50 text-green-700' :
+                                                                        ms.score >= 40 ? 'bg-amber-50 text-amber-700' :
+                                                                        'bg-red-50 text-red-600'
+                                                                    }`}>
+                                                                        {ms.totalQuestions === 0 ? 'No quiz' : `${ms.score}%`}
+                                                                    </span>
+                                                                </div>
+                                                                {ms.totalQuestions > 0 && (
+                                                                    <div className="flex items-center justify-between text-xs mt-1.5 font-medium">
+                                                                        <span className="text-slate-500">Marks</span>
+                                                                        <span className="font-bold text-slate-700">{ms.correctAnswers}/{ms.totalQuestions}</span>
+                                                                    </div>
+                                                                )}
+                                                            </div>
+                                                        ))}
+                                                    </div>
+                                                </div>
+                                            </td>
+                                        </tr>
+                                    )}
+                                    </React.Fragment>
                                 ))}
                             </tbody>
                         </table>
