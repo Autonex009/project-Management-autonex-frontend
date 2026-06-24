@@ -242,13 +242,16 @@ const MyLeavesPanel = ({
                 period: 'year',
             });
         }
-        ['casual_sick', 'floater'].forEach((t) => cards.push({
-            type: t,
-            quota: ANNUAL_LEAVE_QUOTA[t],
-            used: usedYear[t],
-            remaining: Math.max(ANNUAL_LEAVE_QUOTA[t] - usedYear[t], 0),
-            period: 'year',
-        }));
+        ['casual_sick', 'floater'].forEach((t) => {
+            const quota = (intern && t === 'casual_sick') ? 0 : ANNUAL_LEAVE_QUOTA[t];
+            cards.push({
+                type: t,
+                quota: quota,
+                used: usedYear[t],
+                remaining: Math.max(quota - usedYear[t], 0),
+                period: 'year',
+            });
+        });
         return cards;
     }, [allLeaves, intern, currentYear, currentMonth]);
 

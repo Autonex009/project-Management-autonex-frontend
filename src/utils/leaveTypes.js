@@ -40,7 +40,8 @@ export const ANNUAL_LEAVE_QUOTA = {
 export const INTERN_MONTHLY_PAID_QUOTA = 1;
 
 export function isIntern(employeeType) {
-  return (employeeType || '').trim().toLowerCase() === 'intern';
+  const type = (employeeType || '').trim().toLowerCase();
+  return type === 'intern' || type === 'contract' || type === 'contractor';
 }
 
 export const FLOATER_DATES_2026 = [
