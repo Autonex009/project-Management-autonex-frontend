@@ -4,12 +4,12 @@ import NewlyOnboardedPage from '../NewlyOnboardedPage';
 import PMOnboardingDashboard from './PMOnboardingDashboard';
 
 const TABS = [
-    { key: 'newly', label: 'Newly Onboarded', icon: Sparkles },
     { key: 'mentees', label: 'My Mentees', icon: Users },
+    { key: 'newly', label: 'Newly Onboarded', icon: Sparkles },
 ];
 
 const PMMentorshipPage = () => {
-    const [tab, setTab] = useState('newly');
+    const [tab, setTab] = useState('mentees');
 
     return (
         <div className="space-y-6 animate-in fade-in duration-500">
