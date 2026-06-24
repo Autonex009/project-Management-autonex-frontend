@@ -192,6 +192,16 @@ export const payrollApi = {
     save: (data) => api.post('/payroll/save', data, { headers: payrollHeaders() }).then(res => res.data),
     getSaved: (month) => api.get('/payroll/saved', { params: { month }, headers: payrollHeaders() }).then(res => res.data),
     exportCsvUrl: (month) => `${apiBaseUrl}/payroll/export.csv?month=${month}&passcode=${encodeURIComponent(sessionStorage.getItem('payroll_passcode') || '')}`,
+    // Pay — ground-truth salary records (the source the Monthly Pay calc derives from)
+    getSalaries: () => api.get('/payroll/salaries', { headers: payrollHeaders() }).then(res => res.data),
+    updateSalary: (employeeId, baseSalary) =>
+        api.put(`/payroll/salaries/${employeeId}`, { base_salary: baseSalary }, { headers: payrollHeaders() }).then(res => res.data),
+    // Salary table — list of actual pay values (the Pay tab's source of truth)
+    getSalaryRecords: () => api.get('/payroll/salary-records', { headers: payrollHeaders() }).then(res => res.data),
+    updateSalaryRecord: (id, { baseMonthly, bonusMonthly }) =>
+        api.put(`/payroll/salary-records/${id}`, { base_pay_monthly: baseMonthly, opt_bonus_monthly: bonusMonthly ?? null }, { headers: payrollHeaders() }).then(res => res.data),
+    setSalaryRecordStatus: (id, status) =>
+        api.patch(`/payroll/salary-records/${id}/status`, { status }, { headers: payrollHeaders() }).then(res => res.data),
 };
 
 // === Referrals API ===

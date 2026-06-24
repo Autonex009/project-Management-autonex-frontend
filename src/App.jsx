@@ -40,7 +40,7 @@ const ProfilePage = lazy(() => import('./pages/employee/ProfilePage'));
 const SignupRequestsPage = lazy(() => import('./pages/SignupRequestsPage'));
 const EmployeeSignupPage = lazy(() => import('./pages/EmployeeSignupPage'));
 const ReferralsPage = lazy(() => import('./pages/ReferralsPage'));
-const PayrollPage = lazy(() => import('./pages/PayrollPage'));
+const PayrollPage = lazy(() => import('./pages/PayrollTabs'));
 const EmployeeReferralsPage = lazy(() => import('./pages/employee/EmployeeReferralsPage'));
 const CompanyInfoPage = lazy(() => import('./pages/employee/CompanyInfoPage'));
 const OnboardingDashboard = lazy(() => import('./pages/employee/OnboardingDashboard'));
