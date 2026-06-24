@@ -5,6 +5,7 @@ import toast from 'react-hot-toast';
 import { onboardingApi, allocationApi, subProjectApi, parentProjectApi } from '../services/api';
 import SearchInput from '../components/ui/SearchInput';
 import AllocationModalV2 from '../components/AllocationModalV2';
+import CandidateAllocationsPopover from '../components/CandidateAllocationsPopover';
 import { getPmSubProjects, getPmEmployeeId } from '../utils/pmScope';
 
 const scoreBadgeClass = (score) => {
@@ -154,9 +155,18 @@ const NewlyOnboardedPage = () => {
                                                 <div>
                                                     <p className="font-bold text-slate-800 text-sm">{c.name}</p>
                                                     <p className="text-[10px] text-slate-400">{c.email}</p>
-                                                    <span className="inline-block mt-1 text-[9px] uppercase tracking-wider font-extrabold bg-slate-100 text-slate-500 px-1.5 py-0.5 rounded border border-slate-200">
-                                                        {c.designation || c.department || 'Annotator'}
-                                                    </span>
+                                                    <div className="flex flex-wrap items-center gap-1.5 mt-1">
+                                                        <span className="text-[9px] uppercase tracking-wider font-extrabold bg-slate-100 text-slate-500 px-1.5 py-0.5 rounded border border-slate-200">
+                                                            {c.designation || c.department || 'Annotator'}
+                                                        </span>
+                                                        {(c.allocations?.length || 0) > 0 ? (
+                                                            <CandidateAllocationsPopover allocations={c.allocations} candidateName={c.name} />
+                                                        ) : (
+                                                            <span className="text-[9px] uppercase tracking-wider font-extrabold bg-emerald-50 text-emerald-600 px-1.5 py-0.5 rounded border border-emerald-100">
+                                                                New
+                                                            </span>
+                                                        )}
+                                                    </div>
                                                 </div>
                                             </div>
                                         </td>
