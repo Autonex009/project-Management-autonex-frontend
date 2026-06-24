@@ -137,6 +137,7 @@ export const signupRequestApi = {
     getAll: (params) => api.get('/signup-requests', { params }).then(res => res.data),
     approve: (id, reviewedBy) => api.patch(`/signup-requests/${id}/approve`, null, { params: { reviewed_by: reviewedBy } }).then(res => res.data),
     reject: (id, reviewedBy, reason) => api.patch(`/signup-requests/${id}/reject`, { reason: reason || null }, { params: { reviewed_by: reviewedBy } }).then(res => res.data),
+    update: (id, data) => api.patch(`/signup-requests/${id}`, data).then(res => res.data),
 };
 
 export const wfhApi = {
@@ -249,9 +250,8 @@ export const onboardingApi = {
     getProgress: (userId) => api.get(`/onboarding/progress/${userId}`).then(res => res.data),
     submitQuiz: (sectionId, answers, userId = null) => api.post('/onboarding/quiz/submit', { section_id: sectionId, answers, user_id: userId }).then(res => res.data),
     getCandidateDashboard: (userId) => api.get(`/onboarding/candidates/${userId}/dashboard`).then(res => res.data),
-    getAnalyticsDashboard: () => api.get('/onboarding/analytics/dashboard').then(res => res.data),
-    getFullAnalytics: () => api.get('/onboarding/analytics/full').then(res => res.data),
     getMentees: (mentorId) => api.get(`/onboarding/mentors/${mentorId}/mentees`).then(res => res.data),
+    getNewlyOnboarded: () => api.get('/onboarding/newly-onboarded').then(res => res.data),
     getReports: () => api.get('/onboarding/reports').then(res => res.data),
     getReportsExportUrl: () => `${apiBaseUrl}/onboarding/reports/export`,
     exportReports: () => api.get('/onboarding/reports/export', { responseType: 'blob' }).then(res => res.data),

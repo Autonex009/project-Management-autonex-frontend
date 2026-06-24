@@ -1,9 +1,11 @@
 // import { useState } from 'react';
 import AllocationPopover from '../components/AllocationPopover';
+import Dropdown from '../components/ui/Dropdown';
 // import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 // import { allocationApi, projectApi, employeeApi } from '../services/api';
 // import { Plus, X, Edit, Trash2 } from 'lucide-react';
 // import { format } from 'date-fns';
+import SearchInput from '../components/ui/SearchInput';
 
 // const AllocationsPage = () => {
 //   const queryClient = useQueryClient();
@@ -466,7 +468,7 @@ import AllocationPopover from '../components/AllocationPopover';
 // };
 
 // export default AllocationsPage;
-import { useState, useEffect, useRef } from 'react';
+import { useState, useEffect, useRef, useMemo } from 'react';
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import { useLocation } from 'react-router-dom';
 import { allocationApi, subProjectApi, employeeApi, leaveApi, parentProjectApi } from '../services/api';
@@ -474,6 +476,7 @@ import { Plus, Edit, Trash2, X, UserPlus, UserMinus, CheckSquare, AlertTriangle,
 import toast from 'react-hot-toast';
 import ConfirmDialog from '../components/ui/ConfirmDialog';
 import { getPmEmployeeId, getPmSubProjects } from '../utils/pmScope';
+import PageSearchBar from '../components/ui/PageSearchBar';
 
 // Stable color palette for avatars based on the employee name
 const AVATAR_PALETTE = [
@@ -787,8 +790,22 @@ const AllocationsPage = () => {
     requiredManpower: project.required_manpower || 0,
   })).filter(pa => pa.allocations.length > 0 || pa.requiredManpower > 0);
 
-  const totalPages = Math.ceil(projectAllocations.length / PAGE_SIZE);
-  const paginatedAllocations = projectAllocations.slice((currentPage - 1) * PAGE_SIZE, currentPage * PAGE_SIZE);
+  const [searchQuery, setSearchQuery] = useState('');
+
+  const filteredProjectAllocations = useMemo(() => {
+    if (!searchQuery.trim()) return projectAllocations;
+    const q = searchQuery.toLowerCase();
+    return projectAllocations.filter(({ project, allocations: projectAllocs }) => {
+      if (project.name.toLowerCase().includes(q)) return true;
+      return projectAllocs.some(a => {
+        const empName = getEmployeeName(a.employee_id).toLowerCase();
+        return empName.includes(q);
+      });
+    });
+  }, [projectAllocations, searchQuery, employees]);
+
+  const totalPages = Math.ceil(filteredProjectAllocations.length / PAGE_SIZE);
+  const paginatedAllocations = filteredProjectAllocations.slice((currentPage - 1) * PAGE_SIZE, currentPage * PAGE_SIZE);
 
   return (
     <div className="space-y-6">
@@ -813,6 +830,15 @@ const AllocationsPage = () => {
 
 
 
+      {/* Search Filter */}
+      <div className="flex justify-between items-center mb-4">
+        <PageSearchBar
+          value={searchQuery}
+          onChange={(val) => { setSearchQuery(val); setCurrentPage(1); }}
+          placeholder="Search allocations by project or employee..."
+        />
+      </div>
+
       {/* Modern Card Container */}
       <div className="bg-white rounded-2xl border border-slate-200/60 shadow-[0_1px_3px_rgba(0,0,0,0.04)] overflow-hidden">
         <div className="overflow-x-auto">
@@ -835,12 +861,16 @@ const AllocationsPage = () => {
                     </div>
                   </td>
                 </tr>
-              ) : projectAllocations.length === 0 ? (
+              ) : filteredProjectAllocations.length === 0 ? (
                 <tr>
                   <td colSpan="4" className="px-5 py-16 text-center">
                     <div className="text-slate-400">
-                      <p className="text-lg font-medium mb-1">No allocations yet</p>
-                      <p className="text-sm">Create your first allocation to get started</p>
+                      <p className="text-lg font-medium mb-1">
+                        {searchQuery ? 'No matching allocations' : 'No allocations yet'}
+                      </p>
+                      <p className="text-sm">
+                        {searchQuery ? 'Try adjusting your search query.' : 'Create your first allocation to get started'}
+                      </p>
                     </div>
                   </td>
                 </tr>
@@ -1065,7 +1095,7 @@ const AllocationsPage = () => {
 
       {/* Create Allocation Modal */}
       {isModalOpen && (
-        <div className="fixed inset-0 bg-slate-900/40 backdrop-blur-sm flex items-center justify-center z-50 p-2 sm:p-4">
+        <div className="fixed inset-0 bg-slate-900/40 backdrop-blur-sm flex items-center justify-center z-50 px-2 py-4 sm:px-4">
           <div
             className="bg-white rounded-lg shadow-xl w-full max-w-full sm:max-w-3xl max-h-[95vh] sm:max-h-[90vh] overflow-y-auto"
             onClick={(e) => e.stopPropagation()}
@@ -1089,23 +1119,19 @@ const AllocationsPage = () => {
                 <label className="block text-sm font-medium text-gray-700 mb-1">
                   Select Project <span className="text-red-500">*</span>
                 </label>
-                <select
-                  value={selectedProject?.id || ''}
-                  onChange={(e) => {
-                    const project = visibleProjects.find(p => p.id === parseInt(e.target.value));
+                <Dropdown
+                  options={visibleProjects.map(project => ({
+                    value: project.id.toString(),
+                    label: `${project.name} - Required: ${project.required_manpower || 0}`
+                  }))}
+                  value={selectedProject?.id.toString() || ''}
+                  onChange={(val) => {
+                    const project = visibleProjects.find(p => p.id === parseInt(val));
                     setSelectedProject(project);
                     setSelectedEmployees([]);
                   }}
-                  className="input"
-                  required
-                >
-                  <option value="">Choose a project...</option>
-                  {visibleProjects.map(project => (
-                    <option key={project.id} value={project.id}>
-                      {project.name} - Required: {project.required_manpower || 0}
-                    </option>
-                  ))}
-                </select>
+                  placeholder="Choose a project..."
+                />
               </div>
 
               {selectedProject && (
@@ -1269,12 +1295,11 @@ const AllocationsPage = () => {
 
                     {/* Employee Search */}
                     <div className="mb-3">
-                      <input
-                        type="text"
-                        value={employeeSearch}
-                        onChange={(e) => setEmployeeSearch(e.target.value)}
+                      <SearchInput
                         placeholder="Search employees by name or email..."
-                        className="w-full px-3 py-2 border border-gray-300 rounded-md text-sm focus:outline-none focus:ring-2 focus:ring-indigo-500"
+                        value={employeeSearch}
+                        onChange={setEmployeeSearch}
+                        className="w-full"
                       />
                     </div>
 
@@ -1411,10 +1436,13 @@ const AllocationsPage = () => {
                         <label className="block text-sm font-medium text-gray-700 mb-1">
                           Total Daily Hours
                         </label>
-                        <select
-                          value={totalDailyHours}
-                          onChange={(e) => {
-                            const newHours = e.target.value === '' ? '' : parseInt(e.target.value);
+                        <Dropdown
+                          options={['', ...['4 hours', '6 hours', '8 hours', '10 hours', '12 hours']].map((h, i) =>
+                            h ? { value: (4 + i * 2).toString(), label: h } : { value: '', label: 'Not specified' }
+                          )}
+                          value={totalDailyHours.toString()}
+                          onChange={(val) => {
+                            const newHours = val === '' ? '' : parseInt(val);
                             setTotalDailyHours(newHours);
                             if (newHours !== '') {
                               const currentSum = Object.values(timeDistribution).reduce((a, b) => a + b, 0);
@@ -1423,13 +1451,8 @@ const AllocationsPage = () => {
                               }
                             }
                           }}
-                          className="input w-32"
-                        >
-                          <option value="">Not specified</option>
-                          {[4, 6, 8, 10, 12].map(h => (
-                            <option key={h} value={h}>{h} hours</option>
-                          ))}
-                        </select>
+                          placeholder="Not specified"
+                        />
                       </div>
 
                       {/* Role Tags Selection */}
@@ -1551,7 +1574,7 @@ const AllocationsPage = () => {
 
       {/* Edit Allocation Modal */}
       {editingAllocation && (
-        <div className="fixed inset-0 bg-slate-900/40 backdrop-blur-sm flex items-center justify-center z-50 p-2 sm:p-4">
+        <div className="fixed inset-0 bg-slate-900/40 backdrop-blur-sm flex items-center justify-center z-50 px-2 py-4 sm:px-4">
           <div className="bg-white rounded-lg shadow-xl w-full max-w-full sm:max-w-2xl max-h-[95vh] sm:max-h-[90vh] overflow-y-auto">
             <div className="sticky top-0 bg-white border-b border-gray-200 px-6 py-4 flex justify-between items-center">
               <h2 className="text-xl font-semibold text-gray-900">

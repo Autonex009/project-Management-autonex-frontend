@@ -4,6 +4,7 @@ import { sideProjectApi } from '../../services/api';
 import { Rocket, Plus, X, Trash2, Edit3, Save } from 'lucide-react';
 import toast from 'react-hot-toast';
 import { getEndDateValidationMessage, isEndDateBeforeStartDate } from '../../utils/dateValidation';
+import Dropdown from '../../components/ui/Dropdown';
 
 const SideProjectsPage = () => {
     const queryClient = useQueryClient();
@@ -80,11 +81,16 @@ const SideProjectsPage = () => {
                         </div>
                         <div>
                             <label className="block text-sm font-medium text-slate-700 mb-1">Status</label>
-                            <select value={form.status} onChange={e => setForm({ ...form, status: e.target.value })} className="w-full px-3 py-2 border border-slate-200 rounded-lg text-sm">
-                                <option value="active">Active</option>
-                                <option value="completed">Completed</option>
-                                <option value="paused">Paused</option>
-                            </select>
+                            <Dropdown
+                                className="w-full"
+                                options={[
+                                    { value: 'active', label: 'Active' },
+                                    { value: 'completed', label: 'Completed' },
+                                    { value: 'paused', label: 'Paused' }
+                                ]}
+                                value={form.status}
+                                onChange={(value) => setForm({ ...form, status: value })}
+                            />
                         </div>
                         <div className="md:col-span-2">
                             <label className="block text-sm font-medium text-slate-700 mb-1">Description</label>

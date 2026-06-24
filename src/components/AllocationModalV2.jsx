@@ -1,5 +1,14 @@
 import { useState, useEffect } from 'react';
-import { X, Plus, Trash2, AlertCircle } from 'lucide-react';
+import { X, Plus, Trash2, AlertCircle, Users, CalendarRange, Target, CheckCircle2, Activity } from 'lucide-react';
+import Dropdown from './ui/Dropdown';
+import { recommendationsApi } from '../services/api';
+
+const capacityPill = (status) => {
+    if (status === 'overburdened') return { cls: 'bg-red-50 text-red-700 border-red-200', label: 'Overburdened' };
+    if (status === 'underutilized') return { cls: 'bg-amber-50 text-amber-700 border-amber-200', label: 'Underutilized' };
+    if (status === 'balanced') return { cls: 'bg-emerald-50 text-emerald-700 border-emerald-200', label: 'Balanced' };
+    return { cls: 'bg-slate-100 text-slate-500 border-slate-200', label: status || 'Unknown' };
+};
 
 const AllocationModalV2 = ({
     isOpen,
@@ -7,10 +16,18 @@ const AllocationModalV2 = ({
     onSubmit,
     employees = [],
     projects = [],
-    editingAllocation = null
+    editingAllocation = null,
+    presetEmployeeId = null,
+    presetEmployeeName = '',
+    hideOverride = false,
+    hideRoleTags = false,
+    projectInsights = false,
+    allocations = [],
+    candidateSkills = [],
+    excludeProjectIds = []
 }) => {
     const [formData, setFormData] = useState({
-        employee_id: '',
+        employee_id: presetEmployeeId || '',
         project_id: '',
         total_daily_hours: 8,
         active_start_date: new Date().toISOString().split('T')[0],
@@ -26,6 +43,35 @@ const AllocationModalV2 = ({
 
     // Common role suggestions
     const roleSuggestions = ['Annotation', 'Review', 'QA', 'Training', 'Management'];
+
+    // Project-fit insights (pool flow)
+    const [capacity, setCapacity] = useState(null);
+    const [capacityLoading, setCapacityLoading] = useState(false);
+    const [capacityError, setCapacityError] = useState(false);
+
+    const selectedProject = projects.find(p => String(p.id) === String(formData.project_id)) || null;
+
+    useEffect(() => {
+        if (!projectInsights || !formData.project_id) {
+            setCapacity(null);
+            setCapacityError(false);
+            return;
+        }
+        let cancelled = false;
+        setCapacityLoading(true);
+        setCapacityError(false);
+        recommendationsApi.getByProject(formData.project_id)
+            .then(data => { if (!cancelled) setCapacity(data); })
+            .catch(() => { if (!cancelled) { setCapacity(null); setCapacityError(true); } })
+            .finally(() => { if (!cancelled) setCapacityLoading(false); });
+        return () => { cancelled = true; };
+    }, [projectInsights, formData.project_id]);
+
+    useEffect(() => {
+        if (presetEmployeeId) {
+            setFormData(prev => ({ ...prev, employee_id: presetEmployeeId }));
+        }
+    }, [presetEmployeeId, isOpen]);
 
     useEffect(() => {
         if (editingAllocation) {
@@ -114,7 +160,7 @@ const AllocationModalV2 = ({
     const isBalanced = totalDistributed === formData.total_daily_hours;
 
     return (
-        <div className="fixed inset-0 bg-slate-900/40 backdrop-blur-sm flex items-center justify-center z-50 p-2 sm:p-4">
+        <div className="fixed inset-0 bg-slate-900/40 backdrop-blur-sm flex items-center justify-center z-50 px-2 py-4 sm:px-4">
             <div className="bg-white rounded-lg shadow-xl w-full max-w-full sm:max-w-4xl max-h-[95vh] sm:max-h-[90vh] overflow-y-auto">
                 {/* Header */}
                 <div className="sticky top-0 bg-white border-b border-gray-200 px-6 py-4 flex justify-between items-center">
@@ -153,40 +199,121 @@ const AllocationModalV2 = ({
                             <label className="block text-sm font-medium text-gray-700 mb-1">
                                 Employee <span className="text-red-500">*</span>
                             </label>
-                            <select
-                                value={formData.employee_id}
-                                onChange={(e) => setFormData(prev => ({ ...prev, employee_id: parseInt(e.target.value) }))}
-                                className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500"
-                                required
-                            >
-                                <option value="">Select employee</option>
-                                {employees.filter(e => e.status === 'active').map(emp => (
-                                    <option key={emp.id} value={emp.id}>
-                                        {emp.name} - {emp.employee_type}
-                                    </option>
-                                ))}
-                            </select>
+                            {presetEmployeeId ? (
+                                <div className="w-full px-3 py-2 border border-gray-200 rounded-md bg-gray-50 text-sm font-medium text-gray-800">
+                                    {presetEmployeeName || 'Selected candidate'}
+                                </div>
+                            ) : (
+                                <Dropdown
+                                    options={employees.filter(e => e.status === 'active').map(emp => ({
+                                        value: emp.id.toString(),
+                                        label: `${emp.name} - ${emp.employee_type}`
+                                    }))}
+                                    value={formData.employee_id.toString()}
+                                    onChange={(val) => setFormData(prev => ({ ...prev, employee_id: parseInt(val) || '' }))}
+                                    placeholder="Select employee"
+                                />
+                            )}
                         </div>
 
                         <div>
                             <label className="block text-sm font-medium text-gray-700 mb-1">
                                 Project <span className="text-red-500">*</span>
                             </label>
-                            <select
-                                value={formData.project_id}
-                                onChange={(e) => setFormData(prev => ({ ...prev, project_id: parseInt(e.target.value) }))}
-                                className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500"
-                                required
-                            >
-                                <option value="">Select project</option>
-                                {projects.filter(p => p.project_status === 'active').map(proj => (
-                                    <option key={proj.id} value={proj.id}>
-                                        {proj.name}
-                                    </option>
-                                ))}
-                            </select>
+                            <Dropdown
+                                options={projects
+                                    .filter(p => p.project_status === 'active' && !excludeProjectIds.map(String).includes(String(p.id)))
+                                    .map(proj => ({
+                                        value: proj.id.toString(),
+                                        label: proj.name
+                                    }))}
+                                value={formData.project_id.toString()}
+                                onChange={(val) => setFormData(prev => ({ ...prev, project_id: parseInt(val) || '' }))}
+                                placeholder="Select project"
+                            />
                         </div>
                     </div>
+
+                    {/* Project-fit insights */}
+                    {projectInsights && selectedProject && (() => {
+                        const required = selectedProject.required_manpower || 0;
+                        const allocated = allocations.filter(a => String(a.sub_project_id) === String(selectedProject.id)).length;
+                        const remaining = required - allocated;
+                        const req = Array.isArray(selectedProject.required_expertise) ? selectedProject.required_expertise : [];
+                        const have = (candidateSkills || []).map(s => String(s).trim().toLowerCase());
+                        const matched = req.filter(s => have.includes(String(s).trim().toLowerCase())).length;
+                        const cap = capacity ? capacityPill(capacity.status) : null;
+                        return (
+                            <div className="rounded-lg border border-slate-200 bg-slate-50/60 p-4 space-y-3">
+                                <div className="flex items-center justify-between gap-2">
+                                    <p className="text-sm font-semibold text-slate-800 truncate">{selectedProject.name}</p>
+                                    <div className="flex items-center gap-1.5 shrink-0">
+                                        <span className={`px-1.5 py-0.5 text-[10px] font-bold uppercase rounded border ${selectedProject.is_annotation ? 'bg-indigo-50 text-indigo-600 border-indigo-100' : 'bg-slate-100 text-slate-500 border-slate-200'}`}>
+                                            {selectedProject.is_annotation ? 'Annotation' : 'Non-annotation'}
+                                        </span>
+                                        {selectedProject.priority && (
+                                            <span className="px-1.5 py-0.5 text-[10px] font-bold uppercase rounded border bg-white text-slate-600 border-slate-200">{selectedProject.priority}</span>
+                                        )}
+                                    </div>
+                                </div>
+
+                                {/* Manpower */}
+                                <div>
+                                    <div className="flex items-center justify-between text-xs mb-1">
+                                        <span className="flex items-center gap-1 text-slate-500 font-medium"><Users className="w-3.5 h-3.5" /> Manpower</span>
+                                        <span className="font-bold text-slate-700">
+                                            {allocated}{required ? ` / ${required}` : ''} allocated
+                                            {required ? (remaining > 0 ? ` · needs ${remaining} more` : remaining === 0 ? ' · fully staffed' : ` · over by ${-remaining}`) : ''}
+                                        </span>
+                                    </div>
+                                    {required > 0 && (
+                                        <div className="h-1.5 w-full bg-slate-200 rounded-full overflow-hidden">
+                                            <div className={`h-full rounded-full ${allocated >= required ? 'bg-emerald-500' : 'bg-indigo-500'}`} style={{ width: `${Math.min(100, (allocated / required) * 100)}%` }} />
+                                        </div>
+                                    )}
+                                </div>
+
+                                {/* Skill match */}
+                                <div>
+                                    <div className="flex items-center justify-between text-xs mb-1.5">
+                                        <span className="flex items-center gap-1 text-slate-500 font-medium"><CheckCircle2 className="w-3.5 h-3.5" /> Skill match</span>
+                                        {req.length > 0 && <span className="font-bold text-slate-700">{matched} of {req.length} matched</span>}
+                                    </div>
+                                    {req.length === 0 ? (
+                                        <p className="text-[11px] text-slate-400 italic">No specific skills required</p>
+                                    ) : (
+                                        <div className="flex flex-wrap gap-1">
+                                            {req.map(s => {
+                                                const ok = have.includes(String(s).trim().toLowerCase());
+                                                return <span key={s} className={`px-1.5 py-0.5 text-[10px] font-semibold rounded border ${ok ? 'bg-emerald-50 text-emerald-700 border-emerald-200' : 'bg-slate-100 text-slate-400 border-slate-200'}`}>{ok ? '✓ ' : ''}{s}</span>;
+                                            })}
+                                        </div>
+                                    )}
+                                </div>
+
+                                {/* Timeline & workload */}
+                                <div className="grid grid-cols-1 sm:grid-cols-2 gap-2 text-[11px] text-slate-600">
+                                    <div className="flex items-center gap-1"><CalendarRange className="w-3.5 h-3.5 text-slate-400 shrink-0" /> {selectedProject.start_date || '—'} → {selectedProject.end_date || 'open-ended'}</div>
+                                    <div className="flex items-center gap-1"><Target className="w-3.5 h-3.5 text-slate-400 shrink-0" /> {selectedProject.daily_target || 0}/day · {selectedProject.total_tasks || 0} tasks</div>
+                                </div>
+
+                                {/* Capacity status */}
+                                <div className="pt-2 border-t border-slate-200/70 flex items-center justify-between text-xs">
+                                    <span className="flex items-center gap-1 text-slate-500 font-medium"><Activity className="w-3.5 h-3.5" /> Capacity</span>
+                                    {capacityLoading ? (
+                                        <span className="text-[11px] text-slate-400">Loading…</span>
+                                    ) : capacityError ? (
+                                        <span className="text-[11px] text-slate-400 italic">Couldn't load capacity</span>
+                                    ) : cap ? (
+                                        <span className="flex items-center gap-2">
+                                            <span className={`px-2 py-0.5 text-[10px] font-bold uppercase rounded-full border ${cap.cls}`}>{cap.label}</span>
+                                            <span className="text-[11px] text-slate-500">team {capacity.team_size ?? 0} · {Math.round(capacity.avg_daily_hours_per_employee ?? 0)}h/day</span>
+                                        </span>
+                                    ) : null}
+                                </div>
+                            </div>
+                        );
+                    })()}
 
                     {/* Date Range */}
                     <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
@@ -233,6 +360,7 @@ const AllocationModalV2 = ({
                     </div>
 
                     {/* Role Tagging */}
+                    {!hideRoleTags && (
                     <div className="border border-gray-200 rounded-lg p-4">
                         <h3 className="text-sm font-semibold text-gray-900 mb-3">Role Tags & Time Distribution</h3>
 
@@ -320,35 +448,38 @@ const AllocationModalV2 = ({
                             </div>
                         )}
                     </div>
+                    )}
 
                     {/* Override Controls */}
-                    <div className="border border-gray-200 rounded-lg p-4">
-                        <label className="flex items-center gap-2 mb-3">
-                            <input
-                                type="checkbox"
-                                checked={formData.override_flag}
-                                onChange={(e) => setFormData(prev => ({ ...prev, override_flag: e.target.checked }))}
-                                className="w-4 h-4 text-blue-600 border-gray-300 rounded focus:ring-blue-500"
-                            />
-                            <span className="text-sm font-medium text-gray-700">Force Override (ignore warnings)</span>
-                        </label>
-
-                        {formData.override_flag && (
-                            <div>
-                                <label className="block text-sm font-medium text-gray-700 mb-1">
-                                    Override Reason <span className="text-red-500">*</span>
-                                </label>
-                                <textarea
-                                    value={formData.override_reason}
-                                    onChange={(e) => setFormData(prev => ({ ...prev, override_reason: e.target.value }))}
-                                    placeholder="Explain why this override is necessary..."
-                                    rows="3"
-                                    className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500 text-sm"
-                                    required={formData.override_flag}
+                    {!hideOverride && (
+                        <div className="border border-gray-200 rounded-lg p-4">
+                            <label className="flex items-center gap-2 mb-3">
+                                <input
+                                    type="checkbox"
+                                    checked={formData.override_flag}
+                                    onChange={(e) => setFormData(prev => ({ ...prev, override_flag: e.target.checked }))}
+                                    className="w-4 h-4 text-blue-600 border-gray-300 rounded focus:ring-blue-500"
                                 />
-                            </div>
-                        )}
-                    </div>
+                                <span className="text-sm font-medium text-gray-700">Force Override (ignore warnings)</span>
+                            </label>
+
+                            {formData.override_flag && (
+                                <div>
+                                    <label className="block text-sm font-medium text-gray-700 mb-1">
+                                        Override Reason <span className="text-red-500">*</span>
+                                    </label>
+                                    <textarea
+                                        value={formData.override_reason}
+                                        onChange={(e) => setFormData(prev => ({ ...prev, override_reason: e.target.value }))}
+                                        placeholder="Explain why this override is necessary..."
+                                        rows="3"
+                                        className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500 text-sm"
+                                        required={formData.override_flag}
+                                    />
+                                </div>
+                            )}
+                        </div>
+                    )}
 
                     {/* Footer */}
                     <div className="flex justify-end gap-3 pt-4 border-t border-gray-200">

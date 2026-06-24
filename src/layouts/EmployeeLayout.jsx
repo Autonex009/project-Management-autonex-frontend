@@ -62,10 +62,12 @@ const EmployeeLayout = () => {
     const portalLabel = isPm ? 'PM Portal' : 'Employee Portal';
     const theme = isPm ? accentTheme.pm : accentTheme.employee;
 
-    const isAnnotator = user.designation && (
+    const hasAnnotationSkill = Array.isArray(user.skills) &&
+        user.skills.some(s => String(s).toLowerCase().includes('annotation'));
+    const isAnnotator = hasAnnotationSkill || (user.designation && (
         user.designation.toLowerCase().includes('annotator') ||
         user.designation.toLowerCase().includes('reviewer')
-    );
+    ));
 
     const navItems = isPm
         ? [

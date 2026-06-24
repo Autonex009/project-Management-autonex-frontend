@@ -2,10 +2,12 @@ import { useState } from 'react';
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import { referralApi } from '../services/api';
 import toast from 'react-hot-toast';
+import PageSearchBar from '../components/ui/PageSearchBar';
 import {
     Users2, Briefcase, Mail, Phone, Linkedin, ChevronDown, ChevronUp,
     CheckCircle2, Clock, UserCheck, XCircle, TrendingUp, X
 } from 'lucide-react';
+import Dropdown from '../components/ui/Dropdown';
 
 const STATUS_CONFIG = {
     pending:             { label: 'Pending Review',       color: 'bg-amber-50 text-amber-700 border-amber-200',   dot: 'bg-amber-400' },
@@ -45,6 +47,7 @@ const ReferralsPage = () => {
     const [statusModal, setStatusModal] = useState(null); // { referral }
     const [newStatus, setNewStatus] = useState('');
     const [statusNote, setStatusNote] = useState('');
+    const [searchQuery, setSearchQuery] = useState('');
 
     const { data: referrals = [], isLoading } = useQuery({
         queryKey: ['referrals', 'admin'],
@@ -64,9 +67,20 @@ const ReferralsPage = () => {
         onError: (err) => toast.error(err.response?.data?.detail || 'Failed to update status'),
     });
 
+    const handleTabChange = (tab) => {
+        setActiveTab(tab);
+        setSearchQuery('');
+    };
+
     const filtered = referrals.filter(r => {
         const target = TAB_STATUS[activeTab];
-        return !target || r.status === target;
+        if (target && r.status !== target) return false;
+        
+        const q = searchQuery.toLowerCase();
+        const candidateName = (r.candidate_name || '').toLowerCase();
+        const position = (r.position_applied || '').toLowerCase();
+        const referrer = (r.referrer_name || '').toLowerCase();
+        return candidateName.includes(q) || position.includes(q) || referrer.includes(q);
     });
 
     const stats = {
@@ -131,26 +145,34 @@ const ReferralsPage = () => {
                 </p>
             </div>
 
-            {/* Tabs */}
-            <div className="flex gap-1 bg-slate-100 rounded-xl p-1 w-fit flex-wrap">
-                {TABS.map(tab => {
-                    const count = TAB_STATUS[tab]
-                        ? referrals.filter(r => r.status === TAB_STATUS[tab]).length
-                        : referrals.length;
-                    return (
-                        <button key={tab} onClick={() => setActiveTab(tab)}
-                            className={`px-4 py-2 rounded-lg text-sm font-medium transition-all ${
-                                activeTab === tab ? 'bg-white text-slate-800 shadow-sm' : 'text-slate-500 hover:text-slate-700'
-                            }`}>
-                            {tab}
-                            {count > 0 && tab !== 'All' && (
-                                <span className="ml-1.5 inline-flex items-center justify-center h-4 min-w-[16px] px-1 rounded-full text-[10px] font-bold bg-slate-300 text-slate-700">
-                                    {count}
-                                </span>
-                            )}
-                        </button>
-                    );
-                })}
+            {/* Tabs and Search Bar */}
+            <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4">
+                <div className="flex gap-1 bg-slate-100 rounded-xl p-1 w-fit flex-wrap">
+                    {TABS.map(tab => {
+                        const count = TAB_STATUS[tab]
+                            ? referrals.filter(r => r.status === TAB_STATUS[tab]).length
+                            : referrals.length;
+                        return (
+                            <button key={tab} onClick={() => handleTabChange(tab)}
+                                className={`px-4 py-2 rounded-lg text-sm font-medium transition-all ${
+                                    activeTab === tab ? 'bg-white text-slate-800 shadow-sm' : 'text-slate-500 hover:text-slate-700'
+                                }`}>
+                                {tab}
+                                {count > 0 && tab !== 'All' && (
+                                    <span className="ml-1.5 inline-flex items-center justify-center h-4 min-w-[16px] px-1 rounded-full text-[10px] font-bold bg-slate-300 text-slate-700">
+                                        {count}
+                                    </span>
+                                )}
+                            </button>
+                        );
+                    })}
+                </div>
+
+                <PageSearchBar
+                    value={searchQuery}
+                    onChange={setSearchQuery}
+                    placeholder="Search candidates..."
+                />
             </div>
 
             {/* Table */}
@@ -297,15 +319,12 @@ const ReferralsPage = () => {
                         <div className="space-y-4">
                             <div>
                                 <label className="block text-sm font-medium text-slate-700 mb-1.5">New Status</label>
-                                <select
+                                <Dropdown
+                                    options={STATUS_OPTIONS}
                                     value={newStatus}
-                                    onChange={e => setNewStatus(e.target.value)}
-                                    className="w-full rounded-xl border border-slate-200 px-3 py-2.5 text-sm outline-none focus:border-indigo-500 focus:ring-2 focus:ring-indigo-100"
-                                >
-                                    {STATUS_OPTIONS.map(o => (
-                                        <option key={o.value} value={o.value}>{o.label}</option>
-                                    ))}
-                                </select>
+                                    onChange={setNewStatus}
+                                    className="w-full"
+                                />
                             </div>
                             <div>
                                 <label className="block text-sm font-medium text-slate-700 mb-1.5">

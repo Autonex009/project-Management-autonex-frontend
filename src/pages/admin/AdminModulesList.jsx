@@ -1,9 +1,10 @@
 import React, { useState, useEffect } from 'react';
 import { createPortal } from 'react-dom';
-import { Plus, Search, BookOpen, Trash2, Layers, GripVertical, AlertTriangle } from 'lucide-react';
+import { Plus, BookOpen, Trash2, Layers, GripVertical, AlertTriangle } from 'lucide-react';
 import { useNavigate } from 'react-router-dom';
 import toast from 'react-hot-toast';
 import { onboardingApi } from '../../services/api';
+import SearchInput from '../../components/ui/SearchInput';
 
 export default function AdminModulesList() {
   const [modules, setModules] = useState([]);
@@ -92,16 +93,12 @@ export default function AdminModulesList() {
 
       <div className="bg-white p-6 rounded-2xl shadow-[0_1px_3px_rgba(0,0,0,0.04)] border border-slate-200/60 mb-6">
         <div className="p-4 flex flex-col sm:flex-row gap-4 border-b border-slate-100">
-          <div className="relative flex-1">
-            <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-5 w-5 text-slate-400" />
-            <input
-              type="text"
-              placeholder="Search modules..."
-              value={searchQuery}
-              onChange={(e) => setSearchQuery(e.target.value)}
-              className="w-full pl-10 pr-4 py-2 border border-slate-300 rounded-lg focus:ring-2 focus:ring-indigo-500 focus:border-transparent outline-none transition-all text-sm font-medium"
-            />
-          </div>
+          <SearchInput
+            placeholder="Search modules..."
+            value={searchQuery}
+            onChange={setSearchQuery}
+            className="flex-1"
+          />
           <div className="flex gap-2">
             <span className="px-4 py-2 bg-slate-100 text-slate-650 rounded-lg text-sm font-semibold whitespace-nowrap">
               {modules.length} Total Modules
@@ -185,7 +182,7 @@ export default function AdminModulesList() {
 
       {pendingDelete && createPortal(
         <div
-          className="fixed inset-0 bg-slate-900/60 backdrop-blur-sm z-[100] flex items-center justify-center p-4"
+          className="fixed inset-0 bg-slate-900/60 backdrop-blur-sm z-[100] flex items-center justify-center px-4 py-8"
           onClick={() => setPendingDelete(null)}
         >
           <div

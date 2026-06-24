@@ -5,6 +5,7 @@ import { User, Mail, Phone, Briefcase, CheckCircle } from 'lucide-react';
 import toast from 'react-hot-toast';
 import { signupRequestApi } from '../services/api';
 import AuthBrandPanel from '../components/brand/AuthBrandPanel';
+import Dropdown from '../components/ui/Dropdown';
 
 const DESIGNATIONS = [
     'Annotator/ Reviewer',
@@ -138,34 +139,33 @@ const EmployeeSignupPage = () => {
                         <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
                             <div>
                                 <label className="block text-sm font-medium text-slate-700 mb-1.5">Designation</label>
-                                <div className="relative">
-                                    <Briefcase className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-slate-400 pointer-events-none" />
-                                    <select value={form.designation} onChange={e => setForm(f => ({ ...f, designation: e.target.value }))}
-                                        className="w-full appearance-none rounded-xl border border-slate-200 bg-white py-2.5 pl-10 pr-4 text-sm outline-none transition-all focus:border-emerald-500 focus:ring-2 focus:ring-emerald-500/20">
-                                        <option value="">Select...</option>
-                                        {DESIGNATIONS.map(d => <option key={d} value={d}>{d}</option>)}
-                                    </select>
-                                </div>
+                                <Dropdown
+                                    options={['', ...DESIGNATIONS]}
+                                    value={form.designation}
+                                    onChange={e => setForm(f => ({ ...f, designation: e }))}
+                                    placeholder="Select..."
+                                />
                             </div>
                             <div>
                                 <label className="block text-sm font-medium text-slate-700 mb-1.5">Employment Type</label>
-                                <select value={form.employee_type} onChange={e => setForm(f => ({ ...f, employee_type: e.target.value }))}
-                                    className="w-full rounded-xl border border-slate-200 bg-white py-2.5 px-3 text-sm outline-none transition-all focus:border-emerald-500 focus:ring-2 focus:ring-emerald-500/20">
-                                    {EMPLOYEE_TYPES.map(t => <option key={t} value={t}>{t}</option>)}
-                                </select>
+                                <Dropdown
+                                    options={EMPLOYEE_TYPES}
+                                    value={form.employee_type}
+                                    onChange={e => setForm(f => ({ ...f, employee_type: e }))}
+                                    placeholder="Select..."
+                                />
                             </div>
                         </div>
 
                         {/* Work Category */}
                         <div>
                             <label className="block text-sm font-medium text-slate-700 mb-1.5">Work Category</label>
-                            <select
+                            <Dropdown
+                                options={['', ...WORK_CATEGORIES]}
                                 value={form.skills[0] || ''}
-                                onChange={e => setForm(f => ({ ...f, skills: e.target.value ? [e.target.value] : [] }))}
-                                className="w-full rounded-xl border border-slate-200 bg-white py-2.5 px-3 text-sm outline-none transition-all focus:border-emerald-500 focus:ring-2 focus:ring-emerald-500/20">
-                                <option value="">Select a work category...</option>
-                                {WORK_CATEGORIES.map(c => <option key={c} value={c}>{c}</option>)}
-                            </select>
+                                onChange={e => setForm(f => ({ ...f, skills: e ? [e] : [] }))}
+                                placeholder="Select a work category..."
+                            />
                         </div>
 
                         {/* Reason */}
