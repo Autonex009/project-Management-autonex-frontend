@@ -1,7 +1,7 @@
 import { useState, useMemo, useEffect, useRef } from 'react';
 import { createPortal } from 'react-dom';
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
-import { ChevronLeft, ChevronRight, Calendar, AlertTriangle, Clock, CheckCircle, XCircle, Send } from 'lucide-react';
+import { ChevronLeft, ChevronRight, Calendar, AlertTriangle, Clock, CheckCircle, XCircle, Send, X } from 'lucide-react';
 import { leaveApi, wfhApi } from '../services/api';
 import toast from 'react-hot-toast';
 import { format, parseISO } from 'date-fns';
@@ -71,19 +71,16 @@ const DAY_NAMES = ['Sun', 'Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat'];
 function toYMD(dateStr) { return dateStr.slice(0, 10); }
 
 // ─── Overflow popover ────────────────────────────────────────────────────────
-function OverflowPopover({ events }) {
+function OverflowPopover({ dateStr, events }) {
     const [open, setOpen] = useState(false);
-    const [rect, setRect] = useState(null);
-    const btnRef    = useRef(null);
-    const popoverRef = useRef(null);
+    const modalRef = useRef(null);
 
     useEffect(() => {
         if (!open) return;
         const handler = (e) => {
-            if (
-                popoverRef.current && !popoverRef.current.contains(e.target) &&
-                btnRef.current    && !btnRef.current.contains(e.target)
-            ) setOpen(false);
+            if (modalRef.current && !modalRef.current.contains(e.target)) {
+                setOpen(false);
+            }
         };
         document.addEventListener('mousedown', handler);
         return () => document.removeEventListener('mousedown', handler);
@@ -91,58 +88,156 @@ function OverflowPopover({ events }) {
 
     const handleClick = (e) => {
         e.stopPropagation();
-        if (!open && btnRef.current) setRect(btnRef.current.getBoundingClientRect());
-        setOpen(o => !o);
+        setOpen(true);
     };
 
-    const popover = open && rect && createPortal(
+    const formattedDate = useMemo(() => {
+        try {
+            return format(parseISO(dateStr), 'MMMM dd, yyyy');
+        } catch (e) {
+            return dateStr;
+        }
+    }, [dateStr]);
+
+    const modal = open && createPortal(
         <div
-            ref={popoverRef}
             style={{
                 position: 'fixed',
-                left: rect.left,
-                top:  rect.top - 8,
-                transform: 'translateY(-100%)',
+                inset: 0,
+                background: 'rgba(15, 23, 42, 0.3)',
+                backdropFilter: 'blur(4px)',
                 zIndex: 9999,
-                background: 'rgba(255,255,255,0.98)',
-                border: '1px solid #e2e8f0',
-                borderRadius: '10px',
-                boxShadow: '0 8px 32px rgba(0,0,0,0.12)',
-                padding: '8px',
-                minWidth: '160px',
-                maxWidth: '220px',
                 display: 'flex',
-                flexDirection: 'column',
-                gap: '4px',
+                alignItems: 'center',
+                justifyContent: 'center',
             }}
+            onClick={() => setOpen(false)}
         >
-            {events.map((ev, i) => {
-                const isPending = ev.status === 'pending';
-                if (ev.kind === 'wfh') return (
-                    <div key={i} style={{
-                        background: WFH_COLOR.bg, color: WFH_COLOR.text,
-                        opacity: isPending ? PENDING_OPACITY : 1,
-                        borderRadius: '6px', padding: '3px 8px',
-                        fontSize: '11px', fontWeight: 600,
-                    }}>🏠 {ev.employee_name}</div>
-                );
-                
-                const c = LEAVE_COLORS[ev.leave_type] || LEAVE_COLORS.default;
-                const displayName = ev.is_half_day ? `${ev.employee_name} (0.5d)` : ev.employee_name;
-                
-                return (
-                    <div key={i}
-                        className={`rounded px-1.5 py-1 text-[10px] font-medium leading-tight truncate`}
-                        style={{
-                            background: c.bg, 
-                            color: c.text,
-                            opacity: isPending ? PENDING_OPACITY : 1
-                        }}
-                        title={`${c.label}: ${ev.employee_name}${isPending ? ' (pending)' : ''}${ev.is_half_day ? ` (${ev.half_day_slot === 'first_half' ? 'First Half' : 'Second Half'})` : ''}`}>
-                        {displayName}
+            <div
+                ref={modalRef}
+                onClick={(e) => e.stopPropagation()}
+                style={{
+                    background: '#fff',
+                    borderRadius: '16px',
+                    border: '1px solid #e2e8f0',
+                    boxShadow: '0 20px 25px -5px rgba(0, 0, 0, 0.1), 0 10px 10px -5px rgba(0, 0, 0, 0.04)',
+                    padding: '20px',
+                    width: '360px',
+                    maxWidth: '90%',
+                    display: 'flex',
+                    flexDirection: 'column',
+                    gap: '16px',
+                    fontFamily: 'Inter, system-ui, sans-serif',
+                }}
+            >
+                {/* Header */}
+                <div style={{
+                    display: 'flex',
+                    alignItems: 'center',
+                    justifyContent: 'space-between',
+                    borderBottom: '1px solid #f1f5f9',
+                    paddingBottom: '12px',
+                }}>
+                    <div style={{ display: 'flex', flexDirection: 'column', gap: '2px' }}>
+                        <h4 style={{ margin: 0, fontSize: '15px', fontWeight: 700, color: '#1e293b' }}>
+                            Team Leaves & Attendance
+                        </h4>
+                        <p style={{ margin: 0, fontSize: '12px', color: '#64748b', fontWeight: 500 }}>
+                            {formattedDate}
+                        </p>
                     </div>
-                );
-            })}
+                    <button
+                        onClick={() => setOpen(false)}
+                        style={{
+                            background: 'transparent',
+                            border: 'none',
+                            cursor: 'pointer',
+                            color: '#94a3b8',
+                            padding: '4px',
+                            display: 'flex',
+                            alignItems: 'center',
+                            justifyContent: 'center',
+                            borderRadius: '50%',
+                            transition: 'background 0.15s, color 0.15s',
+                        }}
+                        onMouseOver={e => {
+                            e.currentTarget.style.background = '#f1f5f9';
+                            e.currentTarget.style.color = '#475569';
+                        }}
+                        onMouseOut={e => {
+                            e.currentTarget.style.background = 'transparent';
+                            e.currentTarget.style.color = '#94a3b8';
+                        }}
+                    >
+                        <X size={16} />
+                    </button>
+                </div>
+
+                {/* Scrollable Event List */}
+                <div style={{
+                    display: 'flex',
+                    flexDirection: 'column',
+                    gap: '8px',
+                    maxHeight: '280px', // height of ~10 items
+                    overflowY: 'auto',
+                    paddingRight: '4px',
+                }}>
+                    {events.map((ev, i) => {
+                        const isPending = ev.status === 'pending';
+                        let chipBg, chipColor, chipBorder, leaveLabel;
+
+                        if (ev.kind === 'wfh') {
+                            chipBg = WFH_COLOR.bg;
+                            chipColor = WFH_COLOR.text;
+                            chipBorder = '#e9d5ff';
+                            leaveLabel = 'Work From Home';
+                        } else {
+                            const c = LEAVE_COLORS[ev.leave_type] || LEAVE_COLORS.default;
+                            chipBg = c.bg;
+                            chipColor = c.text;
+                            chipBorder = c.dot + '33';
+                            leaveLabel = c.label;
+                        }
+
+                        if (ev.is_half_day) {
+                            leaveLabel += ` (Half-day: ${ev.half_day_slot === 'first_half' ? '1st Half' : '2nd Half'})`;
+                        }
+
+                        return (
+                            <div
+                                key={i}
+                                style={{
+                                    display: 'flex',
+                                    alignItems: 'center',
+                                    justifyContent: 'space-between',
+                                    padding: '8px 12px',
+                                    borderRadius: '10px',
+                                    background: '#f8fafc',
+                                    border: '1px solid #e2e8f0',
+                                    opacity: isPending ? PENDING_OPACITY : 1,
+                                }}
+                            >
+                                <span style={{ fontSize: '13px', fontWeight: 600, color: '#334155' }}>
+                                    {ev.employee_name}
+                                </span>
+                                <span style={{
+                                    fontSize: '10px',
+                                    fontWeight: 700,
+                                    background: chipBg,
+                                    color: chipColor,
+                                    border: `1px solid ${chipBorder}`,
+                                    borderRadius: '6px',
+                                    padding: '2px 8px',
+                                    textTransform: 'uppercase',
+                                    letterSpacing: '0.02em',
+                                }}>
+                                    {leaveLabel}
+                                </span>
+                            </div>
+                        );
+                    })}
+                </div>
+            </div>
         </div>,
         document.body
     );
@@ -150,19 +245,27 @@ function OverflowPopover({ events }) {
     return (
         <>
             <button
-                ref={btnRef}
                 onClick={handleClick}
                 style={{
-                    fontSize: '10px', fontWeight: 600,
-                    color: '#64748b', background: '#f1f5f9',
-                    border: 'none', borderRadius: '4px',
-                    padding: '1px 6px', cursor: 'pointer',
-                    transition: 'background 0.15s',
+                    fontSize: '10px', fontWeight: 700,
+                    color: '#4f46e5', background: '#e0e7ff',
+                    border: 'none', borderRadius: '6px',
+                    padding: '2px 8px', cursor: 'pointer',
+                    transition: 'all 0.15s',
+                    marginTop: '2px',
+                    alignSelf: 'center',
+                    boxShadow: '0 1px 2px rgba(0,0,0,0.05)',
                 }}
-                onMouseOver={e => e.currentTarget.style.background = '#e2e8f0'}
-                onMouseOut={e  => e.currentTarget.style.background = '#f1f5f9'}
-            >+{events.length} more</button>
-            {popover}
+                onMouseOver={e => {
+                    e.currentTarget.style.background = '#c7d2fe';
+                    e.currentTarget.style.color = '#3730a3';
+                }}
+                onMouseOut={e  => {
+                    e.currentTarget.style.background = '#e0e7ff';
+                    e.currentTarget.style.color = '#4f46e5';
+                }}
+            >+{events.length - 2} more</button>
+            {modal}
         </>
     );
 }
@@ -688,7 +791,7 @@ export default function LeaveCalendar({ filterEmployeeIds = null }) {
                                                 <EventChip key={ei} ev={ev} />
                                             ))}
                                             {events.length > 2 && (
-                                                <OverflowPopover events={events.slice(2)} />
+                                                <OverflowPopover dateStr={dateStr} events={events} />
                                             )}
                                         </div>
                                     </div>
