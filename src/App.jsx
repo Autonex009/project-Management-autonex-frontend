@@ -45,11 +45,14 @@ const EmployeeReferralsPage = lazy(() => import('./pages/employee/EmployeeReferr
 const CompanyInfoPage = lazy(() => import('./pages/employee/CompanyInfoPage'));
 const OnboardingDashboard = lazy(() => import('./pages/employee/OnboardingDashboard'));
 const ModuleView = lazy(() => import('./pages/employee/ModuleView'));
-const PMOnboardingDashboard = lazy(() => import('./pages/pm/PMOnboardingDashboard'));
+const NewlyOnboardedPage = lazy(() => import('./pages/NewlyOnboardedPage'));
+const PMMentorshipPage = lazy(() => import('./pages/pm/PMMentorshipPage'));
+// const PMOnboardingDashboard = lazy(() => import('./pages/pm/PMOnboardingDashboard'));
 const AdminModulesList = lazy(() => import('./pages/admin/AdminModulesList'));
 const AdminModulesBuilder = lazy(() => import('./pages/admin/AdminModulesBuilder'));
 // const AdminTeamPage = lazy(() => import('./pages/admin/AdminTeamPage'));
 const AdminReportsPage = lazy(() => import('./pages/admin/AdminReportsPage'));
+const AdminCompanySettingsPage = lazy(() => import('./pages/admin/AdminCompanySettingsPage'));
 // const AdminAnalyticsPage = lazy(() => import('./pages/admin/AdminAnalyticsPage'));
 
 
@@ -99,6 +102,8 @@ function App() {
               <Route path="modules/new" element={<AdminModulesBuilder />} />
               {/* <Route path="onboarding-team" element={<AdminTeamPage />} /> */}
               <Route path="onboarding-reports" element={<AdminReportsPage />} />
+              <Route path="newly-onboarded" element={<NewlyOnboardedPage />} />
+              <Route path="company-settings" element={<AdminCompanySettingsPage />} />
               {/* <Route path="onboarding-analytics" element={<AdminAnalyticsPage />} /> */}
             </Route>
 
@@ -142,7 +147,9 @@ function App() {
               <Route path="my-leaves" element={<PMMyLeavesPage />} />
               <Route path="side-projects" element={<SideProjectsPage />} />
               <Route path="guidelines" element={<GuidelinesPage />} />
-              <Route path="onboarding-mentor" element={<PMOnboardingDashboard />} />
+              <Route path="onboarding-mentor" element={<PMMentorshipPage />} />
+              <Route path="newly-onboarded" element={<Navigate to="/pm/onboarding-mentor" replace />} />
+              {/* <Route path="onboarding-mentor" element={<PMOnboardingDashboard />} /> */}
             </Route>
 
             {/* Catch all */}
