@@ -51,7 +51,6 @@ const PMMentorshipPage = lazy(() => import('./pages/pm/PMMentorshipPage'));
 const AdminModulesList = lazy(() => import('./pages/admin/AdminModulesList'));
 const AdminModulesBuilder = lazy(() => import('./pages/admin/AdminModulesBuilder'));
 const AdminReportsPage = lazy(() => import('./pages/admin/AdminReportsPage'));
-const AdminAnalyticsPage = lazy(() => import('./pages/admin/AdminAnalyticsPage'));
 const AdminCompanySettingsPage = lazy(() => import('./pages/admin/AdminCompanySettingsPage'));
 
 
@@ -101,7 +100,6 @@ function App() {
               <Route path="modules/new" element={<AdminModulesBuilder />} />
               <Route path="onboarding-reports" element={<AdminReportsPage />} />
               <Route path="newly-onboarded" element={<NewlyOnboardedPage />} />
-              <Route path="onboarding-analytics" element={<AdminAnalyticsPage />} />
               <Route path="company-settings" element={<AdminCompanySettingsPage />} />
             </Route>
 
