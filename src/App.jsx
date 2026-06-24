@@ -50,7 +50,7 @@ const AdminModulesList = lazy(() => import('./pages/admin/AdminModulesList'));
 const AdminModulesBuilder = lazy(() => import('./pages/admin/AdminModulesBuilder'));
 const AdminTeamPage = lazy(() => import('./pages/admin/AdminTeamPage'));
 const AdminReportsPage = lazy(() => import('./pages/admin/AdminReportsPage'));
-const AdminAnalyticsPage = lazy(() => import('./pages/admin/AdminAnalyticsPage'));
+// const AdminAnalyticsPage = lazy(() => import('./pages/admin/AdminAnalyticsPage'));
 
 
 const queryClient = new QueryClient({
@@ -99,7 +99,7 @@ function App() {
               <Route path="modules/new" element={<AdminModulesBuilder />} />
               <Route path="onboarding-team" element={<AdminTeamPage />} />
               <Route path="onboarding-reports" element={<AdminReportsPage />} />
-              <Route path="onboarding-analytics" element={<AdminAnalyticsPage />} />
+              {/* <Route path="onboarding-analytics" element={<AdminAnalyticsPage />} /> */}
             </Route>
 
 
