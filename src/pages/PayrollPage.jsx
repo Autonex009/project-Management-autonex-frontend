@@ -6,6 +6,7 @@ import {
     Download, CheckCircle2, XCircle, AlertTriangle, IndianRupee,
     Users, TrendingDown, Wallet, X, ChevronDown, ChevronRight, Edit2, Save, Lock
 } from 'lucide-react';
+import PageSearchBar from '../components/ui/PageSearchBar';
 
 const LEAVE_LABELS = {
     paid: 'Paid', casual_sick: 'Casual/Sick', floater: 'Floater',
@@ -25,6 +26,7 @@ const PayrollPage = () => {
 
     const [month, setMonth] = useState(currentMonthStr());
     const [generated, setGenerated] = useState(false);
+    const [searchQuery, setSearchQuery] = useState('');
 
     // leave_id → deduct (true/false)
     const [adjustments, setAdjustments] = useState({});
@@ -150,6 +152,15 @@ const PayrollPage = () => {
         });
     }, [preview, adjustments]);
 
+    const filteredRows = useMemo(() => {
+        if (!searchQuery.trim()) return rows;
+        const q = searchQuery.toLowerCase();
+        return rows.filter(r =>
+            (r.employee_name || '').toLowerCase().includes(q) ||
+            (r.designation || '').toLowerCase().includes(q)
+        );
+    }, [rows, searchQuery]);
+
     const totals = useMemo(() => ({
         baseSalary: rows.reduce((s, r) => s + (r.base_salary || 0), 0),
         totalDeduction: rows.reduce((s, r) => s + r.total_deduction, 0),
@@ -263,7 +274,7 @@ const PayrollPage = () => {
                     <input
                         type="month"
                         value={month}
-                        onChange={e => { setMonth(e.target.value); setGenerated(false); setAdjustments({}); }}
+                        onChange={e => { setMonth(e.target.value); setGenerated(false); setAdjustments({}); setSearchQuery(''); }}
                         className="px-3 py-2 border border-slate-200 rounded-xl text-sm outline-none focus:border-indigo-400 focus:ring-2 focus:ring-indigo-100"
                     />
                     <button
@@ -313,12 +324,23 @@ const PayrollPage = () => {
                 </div>
             )}
 
+            {/* Search filter */}
+            {generated && (
+                <div className="flex justify-between items-center mb-4">
+                    <PageSearchBar
+                        value={searchQuery}
+                        onChange={setSearchQuery}
+                        placeholder="Search employees..."
+                    />
+                </div>
+            )}
+
             {/* Main table */}
             {generated && (
                 <div className="bg-white rounded-2xl border border-slate-200/60 shadow-sm overflow-hidden">
-                    {rows.length === 0 ? (
+                    {filteredRows.length === 0 ? (
                         <div className="flex items-center justify-center py-16 text-slate-400 text-sm">
-                            No active employees found.
+                            {searchQuery ? 'No employees match your search.' : 'No active employees found.'}
                         </div>
                     ) : (
                         <div className="overflow-x-auto">
@@ -333,7 +355,7 @@ const PayrollPage = () => {
                                     </tr>
                                 </thead>
                                 <tbody className="divide-y divide-slate-100">
-                                    {rows.map(row => {
+                                    {filteredRows.map(row => {
                                         const editing = salaryEdits[row.employee_id] !== undefined;
                                         return (
                                             <tr key={row.employee_id} className="hover:bg-slate-50/50 transition-colors">
@@ -489,7 +511,7 @@ const PayrollPage = () => {
 
             {/* Leave Review Modal */}
             {reviewModal && modalRow && (
-                <div className="fixed inset-0 bg-black/50 flex items-center justify-center z-50 p-2 sm:p-4 overflow-y-auto">
+                <div className="fixed inset-0 bg-black/50 flex items-center justify-center z-50 px-2 py-4 sm:px-4 overflow-y-auto">
                     <div className="bg-white rounded-2xl shadow-xl w-full max-w-full sm:max-w-lg my-2 sm:my-4">
                         {/* Modal header */}
                         <div className="flex items-start justify-between px-6 py-5 border-b border-slate-100">

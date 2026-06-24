@@ -4,6 +4,7 @@ import { leaveApi, wfhApi } from '../services/api';
 import { Calendar, Plus, X, CheckCircle, XCircle, Clock, Home, AlertTriangle, Pencil, Trash2 } from 'lucide-react';
 import { format, parseISO } from 'date-fns';
 import toast from 'react-hot-toast';
+import Dropdown from './ui/Dropdown';
 import { getEndDateValidationMessage, isEndDateBeforeStartDate } from '../utils/dateValidation';
 import { getLeaveTypeLabel, LEAVE_TYPE_OPTIONS, RAZORPAY_NEGATIVE_BALANCE_NOTE, FLOATER_DATES_2026, isValidFloaterDate, getFloaterDateLabel, isNonWorkingDay, getNonWorkingDayLabel, getWorkingDayCount, countNonWorkingDaysInRange, toLocalISODate, ANNUAL_LEAVE_QUOTA, INTERN_MONTHLY_PAID_QUOTA, isIntern, normalizeLeaveType, validateConsecutiveLeaves } from '../utils/leaveTypes';
 import LeaveCalendar from './LeaveCalendar';
@@ -177,6 +178,8 @@ const MyLeavesPanel = ({
     const [editingWfh, setEditingWfh] = useState(null);
     const [editWfhForm, setEditWfhForm] = useState({ wfh_date: '', end_date: '', reason: '' });
     const [deleteTarget, setDeleteTarget] = useState(null);
+    const [formLeaveType, setFormLeaveType] = useState('paid');
+    const [editFormLeaveType, setEditFormLeaveType] = useState('paid');
 
     // Edit/delete only allowed when the date is strictly in the future
     const canModify = (leave) => leave.start_date > today;
@@ -546,10 +549,11 @@ const MyLeavesPanel = ({
                             <form onSubmit={handleLeaveSubmit} className="grid grid-cols-1 md:grid-cols-2 gap-4">
                                 <div>
                                     <label className="block text-sm font-medium text-slate-700 mb-1">Type</label>
-                                    <select value={leaveForm.leave_type} onChange={e => setLeaveForm({ ...leaveForm, leave_type: e.target.value, start_date: '', end_date: '' })}
-                                        className="w-full px-3 py-2 border border-slate-200 rounded-lg text-sm">
-                                        {LEAVE_TYPE_OPTIONS.map(o => <option key={o.value} value={o.value}>{o.label}</option>)}
-                                    </select>
+                                    <Dropdown
+                                        options={LEAVE_TYPE_OPTIONS}
+                                        value={leaveForm.leave_type}
+                                        onChange={e => setLeaveForm({ ...leaveForm, leave_type: e, start_date: '', end_date: '' })}
+                                    />
                                 </div>
                                 <div>
                                     <label className="block text-sm font-medium text-slate-700 mb-1">Reason</label>
@@ -631,10 +635,11 @@ const MyLeavesPanel = ({
                             <form onSubmit={handleEditSubmit} className="grid grid-cols-1 md:grid-cols-2 gap-4">
                                 <div>
                                     <label className="block text-sm font-medium text-slate-700 mb-1">Type</label>
-                                    <select value={editForm.leave_type} onChange={e => setEditForm({ ...editForm, leave_type: e.target.value, start_date: '', end_date: '' })}
-                                        className="w-full px-3 py-2 border border-slate-200 rounded-lg text-sm">
-                                        {LEAVE_TYPE_OPTIONS.map(o => <option key={o.value} value={o.value}>{o.label}</option>)}
-                                    </select>
+                                    <Dropdown
+                                        options={LEAVE_TYPE_OPTIONS}
+                                        value={editForm.leave_type}
+                                        onChange={e => setEditForm({ ...editForm, leave_type: e, start_date: '', end_date: '' })}
+                                    />
                                 </div>
                                 <div>
                                     <label className="block text-sm font-medium text-slate-700 mb-1">Reason</label>

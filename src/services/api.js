@@ -96,6 +96,7 @@ export const employeeApi = {
     getAvailability: (id) => api.get(`/employees/${id}/availability`).then(res => res.data),
     convertToFulltime: (id, data) => api.post(`/employees/${id}/convert-to-fulltime`, data).then(res => res.data),
     restore: (id) => api.post(`/employees/${id}/restore`).then(res => res.data),
+    getSlackLink: (id) => api.get(`/employees/${id}/slack-link`).then(res => res.data),
     getActive: () => api.get('/employees/status/active').then(res => res.data),
     getInactive: () => api.get('/employees/status/inactive').then(res => res.data),
     getIdle: () => api.get('/employees/status/idle').then(res => res.data),
@@ -131,6 +132,7 @@ export const signupRequestApi = {
     getAll: (params) => api.get('/signup-requests', { params }).then(res => res.data),
     approve: (id, reviewedBy) => api.patch(`/signup-requests/${id}/approve`, null, { params: { reviewed_by: reviewedBy } }).then(res => res.data),
     reject: (id, reviewedBy, reason) => api.patch(`/signup-requests/${id}/reject`, { reason: reason || null }, { params: { reviewed_by: reviewedBy } }).then(res => res.data),
+    update: (id, data) => api.patch(`/signup-requests/${id}`, data).then(res => res.data),
 };
 
 export const wfhApi = {

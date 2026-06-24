@@ -1,6 +1,7 @@
 import React, { useState, useEffect } from 'react';
-import { Download, Users, TrendingUp, CheckCircle2, Search, ChevronDown, ChevronRight } from 'lucide-react';
+import { Download, Users, TrendingUp, CheckCircle2, ChevronDown, ChevronRight } from 'lucide-react';
 import { onboardingApi } from '../../services/api';
+import SearchInput from '../../components/ui/SearchInput';
 
 export default function AdminReportsPage() {
   const [reports, setReports] = useState([]);
@@ -90,16 +91,12 @@ export default function AdminReportsPage() {
       {/* Data Table */}
       <div className="bg-white rounded-2xl shadow-[0_1px_3px_rgba(0,0,0,0.04)] border border-slate-200/60 overflow-hidden">
         <div className="p-4 sm:p-5 border-b border-slate-100 flex flex-col sm:flex-row sm:items-center justify-between gap-4 bg-slate-50/50">
-          <div className="relative max-w-sm w-full">
-            <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-slate-400" />
-            <input 
-              type="text" 
-              placeholder="Search candidate..." 
-              className="w-full pl-9 pr-4 py-2 bg-white border border-slate-200 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-indigo-500 transition-all font-medium"
-              value={searchTerm} 
-              onChange={(e) => setSearchTerm(e.target.value)} 
-            />
-          </div>
+          <SearchInput
+            placeholder="Search candidate..."
+            value={searchTerm}
+            onChange={setSearchTerm}
+            className="max-w-sm w-full"
+          />
           <p className="text-xs text-slate-400 font-medium">Click a row to see per-module quiz breakdown</p>
         </div>
 

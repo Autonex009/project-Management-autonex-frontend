@@ -1,0 +1,232 @@
+import React from 'react';
+import { ChevronLeft, ChevronRight, Edit, Trash2, User } from 'lucide-react';
+
+export const Table = ({
+    columns,
+    data,
+    currentPage = 1,
+    pageSize = 10,
+    onPageChange,
+    onEdit,
+    onDelete,
+    loading,
+    emptyState,
+    className = ''
+}) => {
+    const totalPages = Math.ceil((data?.length || 0) / pageSize);
+    const startIndex = (currentPage - 1) * pageSize;
+    const paginatedData = data?.slice(startIndex, startIndex + pageSize) || [];
+
+    return (
+        <div className={`bg-white rounded-2xl border border-slate-200/60 shadow-[0_1px_3px_rgba(0,0,0,0.04)] overflow-hidden ${className}`}>
+            <div className="overflow-x-auto">
+                <table className="w-full">
+                    <thead className="bg-slate-50/80 border-b border-slate-100">
+                        <tr>
+                            {columns.map((col) => (
+                                <th
+                                    key={col.key}
+                                    className={`px-5 py-4 text-xs font-medium text-slate-400 uppercase tracking-wider ${
+                                        col.align === 'center' ? 'text-center' : col.align === 'right' ? 'text-right' : 'text-left'
+                                    } ${col.width ? `w-${col.width}` : ''} ${col.sticky === 'right' ? `sticky ${col.stickyOffset || 'right-0'} bg-slate-50/80 shadow-[-8px_0_8px_-8px_rgba(0,0,0,0.1)]` : ''}`}
+                                >
+                                    {col.label}
+                                </th>
+                            ))}
+                        </tr>
+                    </thead>
+
+                    <tbody className="divide-y divide-slate-100">
+                        {paginatedData.length === 0 ? (
+                            <tr>
+                                <td colSpan={columns.length} className="px-5 py-16 text-center">
+                                    <div className="text-slate-400">
+                                        <p className="text-lg font-medium mb-1">
+                                            {emptyState?.title || 'No data found'}
+                                        </p>
+                                        <p className="text-sm">
+                                            {emptyState?.description || 'Try adjusting your search query'}
+                                        </p>
+                                    </div>
+                                </td>
+                            </tr>
+                        ) : (
+                            paginatedData.map((row, idx) => (
+                                <tr key={idx} className="hover:bg-slate-50 transition-colors">
+                                    {columns.map((col) => (
+                                        <td
+                                            key={col.key}
+                                            className={`px-5 py-4 text-sm ${
+                                                col.align === 'center' ? 'text-center' : col.align === 'right' ? 'text-right' : 'text-left'
+                                            } ${col.sticky === 'right' ? `sticky ${col.stickyOffset || 'right-0'} bg-white shadow-[-8px_0_8px_-8px_rgba(0,0,0,0.1)]` : ''}`}
+                                        >
+                                            {col.render ? (
+                                                col.render(row[col.key], row)
+                                            ) : (
+                                                row[col.key]
+                                            )}
+                                        </td>
+                                    ))}
+                                </tr>
+                            ))
+                        )}
+                    </tbody>
+                </table>
+            </div>
+
+            {totalPages > 1 && onPageChange && (
+                <div className="flex items-center justify-between px-5 py-3 border-t border-slate-100">
+                    <p className="text-sm text-slate-500">
+                        Showing {paginatedData.length === 0 ? 0 : startIndex + 1}–
+                        {Math.min(startIndex + pageSize, data.length)} of {data.length} items
+                    </p>
+                    <div className="flex items-center gap-1">
+                        <button
+                            onClick={() => onPageChange(Math.max(1, currentPage - 1))}
+                            disabled={currentPage === 1}
+                            className="px-3 py-1.5 text-sm rounded-lg border border-slate-200 text-slate-600 hover:bg-slate-50 disabled:opacity-40 disabled:cursor-not-allowed transition-colors"
+                        >
+                            Previous
+                        </button>
+                        {Array.from({ length: totalPages }, (_, i) => i + 1)
+                            .filter(p => p === 1 || p === totalPages || Math.abs(p - currentPage) <= 1)
+                            .reduce((acc, p, idx, arr) => {
+                                if (idx > 0 && p - arr[idx - 1] > 1) acc.push('...');
+                                acc.push(p);
+                                return acc;
+                            }, [])
+                            .map((p, idx) =>
+                                p === '...' ? (
+                                    <span key={`ellipsis-${idx}`} className="px-2 text-slate-400 text-sm">...</span>
+                                ) : (
+                                    <button
+                                        key={p}
+                                        onClick={() => onPageChange(p)}
+                                        className={`px-3 py-1.5 text-sm rounded-lg border transition-colors ${
+                                            currentPage === p
+                                                ? 'bg-indigo-600 border-indigo-600 text-white font-medium'
+                                                : 'border-slate-200 text-slate-600 hover:bg-slate-50'
+                                        }`}
+                                    >
+                                        {p}
+                                    </button>
+                                )
+                            )}
+                        <button
+                            onClick={() => onPageChange(Math.min(totalPages, currentPage + 1))}
+                            disabled={currentPage === totalPages}
+                            className="px-3 py-1.5 text-sm rounded-lg border border-slate-200 text-slate-600 hover:bg-slate-50 disabled:opacity-40 disabled:cursor-not-allowed transition-colors"
+                        >
+                            Next
+                        </button>
+                    </div>
+                </div>
+            )}
+        </div>
+    );
+};
+
+export const ColumnTemplates = {
+    avatarInfo: (key, label, subtitleKey) => ({
+        key,
+        label,
+        render: (value, row) => (
+            <div className="flex items-center gap-3">
+                <div className="w-10 h-10 rounded-lg bg-gradient-to-br from-indigo-500 to-purple-600 flex items-center justify-center flex-shrink-0 text-white text-sm font-bold">
+                    {String(value || '?')[0].toUpperCase()}
+                </div>
+                <div className="min-w-0">
+                    <div className="font-semibold text-slate-800 truncate">{value}</div>
+                    {subtitleKey && (
+                        <div className="text-sm text-slate-400 truncate">{row[subtitleKey]}</div>
+                    )}
+                </div>
+            </div>
+        ),
+    }),
+
+    status: (key, label, colorMap = {}) => ({
+        key,
+        label,
+        align: 'center',
+        render: (value) => {
+            const colors = {
+                active: { dot: 'bg-emerald-500', text: 'text-emerald-600', bg: 'bg-emerald-50' },
+                pending: { dot: 'bg-amber-500', text: 'text-amber-600', bg: 'bg-amber-50' },
+                inactive: { dot: 'bg-slate-400', text: 'text-slate-600', bg: 'bg-slate-50' },
+                completed: { dot: 'bg-blue-500', text: 'text-blue-600', bg: 'bg-blue-50' },
+                ...colorMap,
+            };
+            const color = colors[value] || colors.inactive;
+            return (
+                <div className="flex items-center justify-center gap-2">
+                    <span className={`w-2 h-2 rounded-full ${color.dot}`}></span>
+                    <span className={`text-sm font-medium ${color.text} capitalize`}>{value}</span>
+                </div>
+            );
+        },
+    }),
+
+    badge: (key, label, colorMap = {}) => ({
+        key,
+        label,
+        render: (value) => {
+            const colors = {
+                'Full-time': 'bg-emerald-50 text-emerald-700 border-emerald-200',
+                'Part-time': 'bg-blue-50 text-blue-700 border-blue-200',
+                'Intern': 'bg-amber-50 text-amber-700 border-amber-200',
+                'Contractor': 'bg-slate-100 text-slate-700 border-slate-200',
+                ...colorMap,
+            };
+            const colorClass = colors[value] || 'bg-slate-100 text-slate-700 border-slate-200';
+            return (
+                <span className={`inline-flex px-2.5 py-0.5 rounded-full text-xs font-medium border ${colorClass}`}>
+                    {value}
+                </span>
+            );
+        },
+    }),
+
+    text: (key, label, align = 'left') => ({
+        key,
+        label,
+        align,
+    }),
+
+    number: (key, label, format = (v) => v) => ({
+        key,
+        label,
+        align: 'right',
+        render: (value) => format(value),
+    }),
+
+    actions: () => ({
+        key: 'actions',
+        label: 'Actions',
+        align: 'right',
+        render: (_, row, { onEdit, onDelete }) => (
+            <div className="flex items-center justify-end gap-1">
+                {onEdit && (
+                    <button
+                        onClick={() => onEdit(row)}
+                        className="p-2 text-slate-500 hover:text-indigo-600 hover:bg-indigo-50 rounded-lg transition-colors"
+                        title="Edit"
+                    >
+                        <Edit className="w-4 h-4" />
+                    </button>
+                )}
+                {onDelete && (
+                    <button
+                        onClick={() => onDelete(row)}
+                        className="p-2 text-slate-500 hover:text-red-600 hover:bg-red-50 rounded-lg transition-colors"
+                        title="Delete"
+                    >
+                        <Trash2 className="w-4 h-4" />
+                    </button>
+                )}
+            </div>
+        ),
+    }),
+};
+
+export default Table;

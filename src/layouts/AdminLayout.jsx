@@ -1,5 +1,6 @@
 import { Link, useLocation, Outlet, useNavigate } from 'react-router-dom';
-import { LogOut, Menu, Search, X, GraduationCap, FileSpreadsheet, BarChart3, ChevronLeft, ChevronRight } from 'lucide-react';
+import { LogOut, Menu, X, GraduationCap, FileSpreadsheet, BarChart3, ChevronLeft, ChevronRight } from 'lucide-react';
+import SearchInput from '../components/ui/SearchInput';
 import { navigation } from '../config/navigation';
 import api, { signupRequestApi } from '../services/api';
 import { useState, useEffect } from 'react';
@@ -265,19 +266,13 @@ const AdminLayout = () => {
             <NotificationBell />
 
             {/* Search Bar */}
-            <div className="relative">
-              <div className="hidden md:flex items-center gap-2 px-4 py-2 bg-slate-100/50 rounded-full border border-slate-200 focus-within:ring-2 focus-within:ring-indigo-100 transition-all w-64">
-                <Search className="w-4 h-4 text-slate-400" />
-                <input
-                  type="text"
-                  placeholder="Search resources..."
-                  className="bg-transparent border-none text-sm outline-none w-full placeholder:text-slate-400"
-                  value={searchQuery}
-                  onChange={(e) => { setSearchQuery(e.target.value); setShowResults(true); }}
-                  onFocus={() => setShowResults(true)}
-                  onBlur={() => setTimeout(() => setShowResults(false), 200)}
-                />
-              </div>
+            <div className="relative hidden md:block">
+              <SearchInput
+                placeholder="Search resources..."
+                value={searchQuery}
+                onChange={(val) => { setSearchQuery(val); setShowResults(true); }}
+                className="w-64"
+              />
 
               {/* Search Results Dropdown */}
               {showResults && searchQuery.length > 0 && (

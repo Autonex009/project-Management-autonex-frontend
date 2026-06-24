@@ -446,6 +446,9 @@ import { useSearchParams } from 'react-router-dom';
 import { employeeApi, skillApi, allocationApi } from '../services/api';
 import { Plus, Edit, Trash2, X, User, ChevronDown, Search, CheckCircle, AlertCircle, Clock, ArrowUpCircle, RotateCcw } from 'lucide-react';
 import toast from 'react-hot-toast';
+import PageSearchBar from '../components/ui/PageSearchBar';
+import Table, { ColumnTemplates } from '../components/ui/Table';
+import Dropdown from '../components/ui/Dropdown';
 
 const LEAVE_TYPE_LABELS = {
   paid: 'Paid Leave',
@@ -1094,6 +1097,9 @@ const EmployeesPage = () => {
   const [skillFilter, setSkillFilter] = useState('');
   const [designationFilter, setDesignationFilter] = useState([]);
   const [currentPage, setCurrentPage] = useState(1);
+  const [formDesignation, setFormDesignation] = useState('Annotator/ Reviewer');
+  const [formEmployeeType, setFormEmployeeType] = useState('Full-time');
+  const [formEmpStatus, setFormEmpStatus] = useState('active');
   const PAGE_SIZE = 10;
 
   // Fetch employees
@@ -1347,14 +1353,13 @@ const EmployeesPage = () => {
         </div>
         {/* Filters + Search + Add button on one row */}
         <div className="flex flex-wrap items-center gap-2">
-          <select
+          <Dropdown
+            options={[{ value: '', label: 'All Skills' }, ...predefinedSkills.map(s => ({ value: s, label: s }))]}
             value={skillFilter}
-            onChange={(e) => { setSkillFilter(e.target.value); setCurrentPage(1); }}
-            className="px-3 py-2 border border-slate-200 rounded-lg text-sm focus:ring-2 focus:ring-indigo-100 outline-none bg-white"
-          >
-            <option value="">All Skills</option>
-            {predefinedSkills.map(s => <option key={s} value={s}>{s}</option>)}
-          </select>
+            onChange={(val) => { setSkillFilter(val); setCurrentPage(1); }}
+            placeholder="All Skills"
+            optionsClassName='w-40'
+          />
 
           <DesignationMultiSelect
             options={designationOptions}
@@ -1393,20 +1398,18 @@ const EmployeesPage = () => {
             </div>
           )}
 
-          <div className="relative flex-1 sm:flex-none">
-            <Search className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-slate-400" />
-            <input
-              type="text"
-              placeholder="Search employees..."
-              value={searchQuery}
-              onChange={(e) => { setSearchQuery(e.target.value); setCurrentPage(1); }}
-              className="pl-9 pr-4 py-2 border border-slate-200 rounded-lg text-sm focus:ring-2 focus:ring-indigo-100 outline-none w-full sm:w-64"
-            />
-          </div>
+          <PageSearchBar
+            value={searchQuery}
+            onChange={(val) => { setSearchQuery(val); setCurrentPage(1); }}
+            placeholder="Search employees..."
+          />
 
           <button
             onClick={() => {
               setEditingEmployee(null);
+              setFormDesignation('Annotator/ Reviewer');
+              setFormEmployeeType('Full-time');
+              setFormEmpStatus('active');
               setIsModalOpen(true);
             }}
             className="inline-flex items-center gap-2 px-4 py-2.5 bg-indigo-600 hover:bg-indigo-700 text-white font-medium text-sm rounded-xl shadow-sm transition-colors"
@@ -1465,239 +1468,153 @@ const EmployeesPage = () => {
         </div>
       )}
 
-      {/* Modern Card Container */}
-      <div className="bg-white rounded-2xl border border-slate-200/60 shadow-[0_1px_3px_rgba(0,0,0,0.04)] overflow-hidden">
-        <div className="overflow-x-auto">
-          <table className="w-full">
-            <thead className="bg-slate-50/80 border-b border-slate-100">
-              <tr>
-                <th className="px-5 py-4 text-left text-xs font-medium text-slate-400 uppercase tracking-wider">Employee</th>
-                <th className="px-5 py-4 text-left text-xs font-medium text-slate-400 uppercase tracking-wider">Designation</th>
-                <th className="px-5 py-4 text-center text-xs font-medium text-slate-400 uppercase tracking-wider">Type</th>
-                <th className="px-5 py-4 text-center text-xs font-medium text-slate-400 uppercase tracking-wider">Hours/Day</th>
-                <th className="px-5 py-4 text-left text-xs font-medium text-slate-400 uppercase tracking-wider">Skills</th>
-                <th className="px-5 py-4 text-left text-xs font-medium text-slate-400 uppercase tracking-wider">Assigned Projects</th>
-                <th className="px-5 py-4 text-center text-xs font-medium text-slate-400 uppercase tracking-wider">Status</th>
-                <th className="px-5 py-4 text-right text-xs font-medium text-slate-400 uppercase tracking-wider">Actions</th>
-              </tr>
-            </thead>
-            <tbody className="divide-y divide-slate-100">
-              {filteredEmployees.length === 0 ? (
-                <tr>
-                  <td colSpan="8" className="px-5 py-16 text-center">
-                    <div className="text-slate-400">
-                      <p className="text-lg font-medium mb-1">No employees found</p>
-                      <p className="text-sm">Try adjusting your search query</p>
-                    </div>
-                  </td>
-                </tr>
-              ) : (
-                paginatedEmployees
-                  .map((employee) => (
-                    <tr key={employee.id} className="hover:bg-slate-50 transition-colors">
-                      {/* Employee Info */}
-                      <td className="px-5 py-4">
-                        <div className="flex items-center gap-3 text-left">
-                          <div className="w-10 h-10 rounded-full bg-slate-100 flex items-center justify-center flex-shrink-0">
-                            <User className="w-5 h-5 text-slate-500" />
-                          </div>
-                          <div>
-                            <div className="font-semibold text-slate-800">{employee.name}</div>
-                            <div className="text-sm text-slate-400">{employee.email}</div>
-                          </div>
-                        </div>
-                      </td>
-
-                      {/* Designation */}
-                      <td className="px-5 py-4">
-                        <span className="text-sm text-slate-700">{employee.designation || 'Annotator'}</span>
-                      </td>
-
-                      {/* Type */}
-                      <td className="px-5 py-4 text-center">
-                        <span className={`inline-flex px-3.5 py-1.5 rounded-full text-xs font-semibold tracking-wide min-w-[95px] justify-center ${employee.employee_type === 'Full-time' ? 'bg-emerald-50 text-emerald-700 border border-emerald-200' :
-                          employee.employee_type === 'Part-time' ? 'bg-blue-50 text-blue-700 border border-blue-200' :
-                            'bg-slate-50 text-slate-600 border border-slate-200'
-                          }`}>
-                          {employee.employee_type}
-                        </span>
-                        {employee.converted_to_fulltime_at && (
-                          <p
-                            className="mt-1 text-[10px] text-slate-400 font-medium"
-                            title={`Promoted from ${employee.previous_employee_type || 'Intern'} on ${new Date(employee.converted_to_fulltime_at).toLocaleDateString()}`}
-                          >
-                            promoted {new Date(employee.converted_to_fulltime_at).toLocaleDateString()}
-                          </p>
-                        )}
-                      </td>
-
-                      {/* Hours */}
-                      <td className="px-5 py-4 text-center">
-                        <div className="font-semibold text-slate-800">{employee.working_hours_per_day}h</div>
-                      </td>
-
-                      {/* Skills */}
-                      <td className="px-5 py-4">
-                        <div className="text-xs text-slate-600 font-medium">
-                          {employee.skills && employee.skills.length > 0 ? (
-                            <>
-                              <span>{employee.skills.slice(0, 3).join(', ')}</span>
-                              {employee.skills.length > 3 && (
-                                <span className="text-slate-400"> +{employee.skills.length - 3}</span>
-                              )}
-                            </>
-                          ) : (
-                            <span className="text-slate-400">—</span>
-                          )}
-                        </div>
-                      </td>
-
-                      {/* Assigned Projects */}
-                      <td className="px-5 py-4">
-                        {(() => {
-                          const projects = employeeProjectsMap[employee.id];
-                          if (!projects || projects.size === 0) {
-                            return (
-                              <span className="inline-flex items-center px-2 py-0.5 rounded-full text-xs font-medium bg-amber-50 text-amber-700 border border-amber-200">
-                                Idle
-                              </span>
-                            );
-                          }
-                          const list = [...projects];
-                          return (
-                            <div className="flex flex-wrap gap-1">
-                              {list.slice(0, 2).map((name, idx) => (
-                                <span key={idx} className="inline-flex items-center px-2 py-0.5 rounded-full text-xs font-medium bg-indigo-50 text-indigo-700 border border-indigo-100 max-w-[140px] truncate" title={name}>
-                                  {name}
-                                </span>
-                              ))}
-                              {list.length > 2 && (
-                                <span className="text-xs text-slate-400 self-center" title={list.slice(2).join(', ')}>
-                                  +{list.length - 2}
-                                </span>
-                              )}
-                            </div>
-                          );
-                        })()}
-                      </td>
-
-                      {/* Status */}
-                      <td className="px-5 py-4 text-center">
-                        <div className="flex items-center justify-center gap-2">
-                          <span className={`w-2 h-2 rounded-full ${employee.status === 'active' ? 'bg-emerald-500' :
-                            employee.status === 'on-leave' ? 'bg-amber-500' :
-                              'bg-slate-400'
-                            }`}></span>
-                          <span className="text-sm text-slate-600 capitalize">{employee.status}</span>
-                        </div>
-                      </td>
-
-                      {/* Actions */}
-                      <td className="px-5 py-4 text-right">
-                        <div className="flex items-center justify-end gap-1">
-                          {statusParam === 'archived' ? (
-                            <button
-                              onClick={() => {
-                                setRestoreTarget(employee);
-                              }}
-                              disabled={restoreMutation.isPending}
-                              className="p-2 text-slate-500 hover:text-indigo-600 hover:bg-indigo-50 rounded-lg transition-colors disabled:opacity-50"
-                              title="Restore Employee"
-                            >
-                              <RotateCcw className="w-4 h-4" />
-                            </button>
-                          ) : (
-                            <>
-                              {employee.employee_type === 'Intern' && (
-                                <button
-                                  onClick={() => handleConvertToFulltime(employee)}
-                                  disabled={convertMutation.isPending}
-                                  className="p-2 text-slate-500 hover:text-emerald-600 hover:bg-emerald-50 rounded-lg transition-colors disabled:opacity-50"
-                                  title="Convert to Full-time employee"
-                                >
-                                  <ArrowUpCircle className="w-4 h-4" />
-                                </button>
-                              )}
-                              <button
-                                onClick={() => {
-                                  setEditingEmployee(employee);
-                                  setIsModalOpen(true);
-                                }}
-                                className="p-2 text-slate-500 hover:text-indigo-600 hover:bg-indigo-50 rounded-lg transition-colors"
-                                title="Edit"
-                              >
-                                <Edit className="w-4 h-4" />
-                              </button>
-                              <button
-                                onClick={() => {
-                                  setArchiveTarget(employee);
-                                }}
-                                disabled={archiveMutation.isPending}
-                                className="p-2 text-slate-500 hover:text-amber-600 hover:bg-amber-50 rounded-lg transition-colors disabled:opacity-50"
-                                title="Archive"
-                              >
-                                <Trash2 className="w-4 h-4" />
-                              </button>
-                            </>
-                          )}
-                        </div>
-                      </td>
-                    </tr>
-                  ))
-              )}
-            </tbody>
-          </table>
-        </div>
-
-        {/* Pagination */}
-        {totalPages > 1 && (
-          <div className="flex items-center justify-between px-5 py-3 border-t border-slate-100">
-            <p className="text-sm text-slate-500">
-              Showing {(currentPage - 1) * PAGE_SIZE + 1}–{Math.min(currentPage * PAGE_SIZE, filteredEmployees.length)} of {filteredEmployees.length} employees
-            </p>
-            <div className="flex items-center gap-1">
-              <button
-                onClick={() => setCurrentPage(p => Math.max(1, p - 1))}
-                disabled={currentPage === 1}
-                className="px-3 py-1.5 text-sm rounded-lg border border-slate-200 text-slate-600 hover:bg-slate-50 disabled:opacity-40 disabled:cursor-not-allowed transition-colors"
-              >
-                Previous
-              </button>
-              {Array.from({ length: totalPages }, (_, i) => i + 1)
-                .filter(p => p === 1 || p === totalPages || Math.abs(p - currentPage) <= 1)
-                .reduce((acc, p, idx, arr) => {
-                  if (idx > 0 && p - arr[idx - 1] > 1) acc.push('...');
-                  acc.push(p);
-                  return acc;
-                }, [])
-                .map((p, idx) =>
-                  p === '...' ? (
-                    <span key={`ellipsis-${idx}`} className="px-2 text-slate-400 text-sm">…</span>
-                  ) : (
-                    <button
-                      key={p}
-                      onClick={() => setCurrentPage(p)}
-                      className={`px-3 py-1.5 text-sm rounded-lg border transition-colors ${
-                        currentPage === p
-                          ? 'bg-indigo-600 border-indigo-600 text-white font-medium'
-                          : 'border-slate-200 text-slate-600 hover:bg-slate-50'
-                      }`}
-                    >
-                      {p}
-                    </button>
-                  )
+      <Table
+        columns={[
+          ColumnTemplates.avatarInfo('name', 'Employee', 'email'),
+          ColumnTemplates.text('designation', 'Designation'),
+          {
+            key: 'employee_type',
+            label: 'Type',
+            align: 'center',
+            render: (value, row) => (
+              <div className="flex flex-col items-center gap-1">
+                <span className={`inline-flex px-3.5 py-1.5 rounded-full text-xs font-semibold tracking-wide min-w-[95px] justify-center ${
+                  value === 'Full-time' ? 'bg-emerald-50 text-emerald-700 border border-emerald-200' :
+                  value === 'Part-time' ? 'bg-blue-50 text-blue-700 border border-blue-200' :
+                  'bg-slate-50 text-slate-600 border border-slate-200'
+                }`}>
+                  {value}
+                </span>
+                {row.converted_to_fulltime_at && (
+                  <p className="text-[10px] text-slate-400 font-medium" title={`Promoted from ${row.previous_employee_type || 'Intern'} on ${new Date(row.converted_to_fulltime_at).toLocaleDateString()}`}>
+                    promoted {new Date(row.converted_to_fulltime_at).toLocaleDateString()}
+                  </p>
                 )}
-              <button
-                onClick={() => setCurrentPage(p => Math.min(totalPages, p + 1))}
-                disabled={currentPage === totalPages}
-                className="px-3 py-1.5 text-sm rounded-lg border border-slate-200 text-slate-600 hover:bg-slate-50 disabled:opacity-40 disabled:cursor-not-allowed transition-colors"
-              >
-                Next
-              </button>
-            </div>
-          </div>
-        )}
-      </div>
+              </div>
+            ),
+          },
+          {
+            key: 'working_hours_per_day',
+            label: 'Hours/Day',
+            align: 'center',
+            render: (value) => <span className="font-semibold text-slate-800">{value}h</span>,
+          },
+          {
+            key: 'skills',
+            label: 'Skills',
+            render: (value) => (
+              <div className="text-xs text-slate-600 font-medium">
+                {value && value.length > 0 ? (
+                  <>
+                    <span>{value.slice(0, 3).join(', ')}</span>
+                    {value.length > 3 && <span className="text-slate-400"> +{value.length - 3}</span>}
+                  </>
+                ) : (
+                  <span className="text-slate-400">—</span>
+                )}
+              </div>
+            ),
+          },
+          {
+            key: 'id',
+            label: 'Assigned Projects',
+            render: (_, row) => {
+              const projects = employeeProjectsMap[row.id];
+              if (!projects || projects.size === 0) {
+                return <span className="inline-flex items-center px-2 py-0.5 rounded-full text-xs font-medium bg-amber-50 text-amber-700 border border-amber-200">Idle</span>;
+              }
+              const list = [...projects];
+              return (
+                <div className="flex flex-wrap gap-1">
+                  {list.slice(0, 2).map((name, idx) => (
+                    <span key={idx} className="inline-flex items-center px-2 py-0.5 rounded-full text-xs font-medium bg-indigo-50 text-indigo-700 border border-indigo-100 max-w-[140px] truncate" title={name}>
+                      {name}
+                    </span>
+                  ))}
+                  {list.length > 2 && (
+                    <span className="text-xs text-slate-400 self-center" title={list.slice(2).join(', ')}>
+                      +{list.length - 2}
+                    </span>
+                  )}
+                </div>
+              );
+            },
+          },
+          {
+            key: 'status',
+            label: 'Status',
+            align: 'center',
+            render: (value) => (
+              <div className="flex items-center justify-center gap-2">
+                <span className={`w-2 h-2 rounded-full ${
+                  value === 'active' ? 'bg-emerald-500' :
+                  value === 'on-leave' ? 'bg-amber-500' :
+                  'bg-slate-400'
+                }`}></span>
+                <span className="text-sm text-slate-600 capitalize">{value}</span>
+              </div>
+            ),
+          },
+          {
+            key: 'id',
+            label: 'Actions',
+            align: 'right',
+            render: (_, row) => (
+              <div className="flex items-center justify-end gap-1">
+                {statusParam === 'archived' ? (
+                  <button
+                    onClick={() => setRestoreTarget(row)}
+                    disabled={restoreMutation.isPending}
+                    className="p-2 text-slate-500 hover:text-indigo-600 hover:bg-indigo-50 rounded-lg transition-colors disabled:opacity-50"
+                    title="Restore Employee"
+                  >
+                    <RotateCcw className="w-4 h-4" />
+                  </button>
+                ) : (
+                  <>
+                    {row.employee_type === 'Intern' && (
+                      <button
+                        onClick={() => handleConvertToFulltime(row)}
+                        disabled={convertMutation.isPending}
+                        className="p-2 text-slate-500 hover:text-emerald-600 hover:bg-emerald-50 rounded-lg transition-colors disabled:opacity-50"
+                        title="Convert to Full-time employee"
+                      >
+                        <ArrowUpCircle className="w-4 h-4" />
+                      </button>
+                    )}
+                    <button
+                      onClick={() => {
+                        setEditingEmployee(row);
+                        setFormDesignation(row.designation || 'Annotator/ Reviewer');
+                        setFormEmployeeType(row.employee_type || 'Full-time');
+                        setFormEmpStatus(row.status || 'active');
+                        setIsModalOpen(true);
+                      }}
+                      className="p-2 text-slate-500 hover:text-indigo-600 hover:bg-indigo-50 rounded-lg transition-colors"
+                      title="Edit"
+                    >
+                      <Edit className="w-4 h-4" />
+                    </button>
+                    <button
+                      onClick={() => setArchiveTarget(row)}
+                      disabled={archiveMutation.isPending}
+                      className="p-2 text-slate-500 hover:text-amber-600 hover:bg-amber-50 rounded-lg transition-colors disabled:opacity-50"
+                      title="Archive"
+                    >
+                      <Trash2 className="w-4 h-4" />
+                    </button>
+                  </>
+                )}
+              </div>
+            ),
+          },
+        ]}
+        data={filteredEmployees}
+        currentPage={currentPage}
+        pageSize={PAGE_SIZE}
+        onPageChange={setCurrentPage}
+        emptyState={{ title: 'No employees found', description: 'Try adjusting your search query' }}
+      />
 
       {/* Availability Modal */}
       {availabilityEmployee && (
@@ -1760,6 +1677,9 @@ const EmployeesPage = () => {
                   onClick={() => {
                     setIsModalOpen(false);
                     setEditingEmployee(null);
+                    setFormDesignation('Annotator/ Reviewer');
+                    setFormEmployeeType('Full-time');
+                    setFormEmpStatus('active');
                   }}
                   className="text-gray-400 hover:text-gray-600 transition-colors"
                 >
@@ -1821,34 +1741,30 @@ const EmployeesPage = () => {
                       <label className="block text-sm font-medium text-gray-700 mb-1">
                         Designation <span className="text-red-500">*</span>
                       </label>
-                      <select
-                        name="designation"
-                        required
-                        defaultValue={editingEmployee?.designation || 'Annotator/ Reviewer'}
-                        className="input"
-                      >
-                        {ALLOWED_DESIGNATIONS.map((designation) => (
-                          <option key={designation} value={designation}>
-                            {designation}
-                          </option>
-                        ))}
-                      </select>
+                      <input type="hidden" name="designation" value={formDesignation} />
+                      <Dropdown
+                        options={ALLOWED_DESIGNATIONS.map(d => ({ value: d, label: d }))}
+                        value={formDesignation}
+                        onChange={setFormDesignation}
+                        placeholder="Select designation"
+                      />
                     </div>
                     <div>
                       <label className="block text-sm font-medium text-gray-700 mb-1">
                         Type <span className="text-red-500">*</span>
                       </label>
-                      <select
-                        name="employee_type"
-                        required
-                        defaultValue={editingEmployee?.employee_type || 'Full-time'}
-                        className="input"
-                      >
-                        <option value="Full-time">Full-time</option>
-                        <option value="Part-time">Part-time</option>
-                        <option value="Intern">Intern</option>
-                        <option value="Contract">Contract</option>
-                      </select>
+                      <input type="hidden" name="employee_type" value={formEmployeeType} />
+                      <Dropdown
+                        options={[
+                          { value: 'Full-time', label: 'Full-time' },
+                          { value: 'Part-time', label: 'Part-time' },
+                          { value: 'Intern', label: 'Intern' },
+                          { value: 'Contract', label: 'Contract' },
+                        ]}
+                        value={formEmployeeType}
+                        onChange={setFormEmployeeType}
+                        placeholder="Select type"
+                      />
                     </div>
                   </div>
 
@@ -1890,16 +1806,17 @@ const EmployeesPage = () => {
                       <label className="block text-sm font-medium text-gray-700 mb-1">
                         Status <span className="text-red-500">*</span>
                       </label>
-                      <select
-                        name="status"
-                        required
-                        defaultValue={editingEmployee?.status || 'active'}
-                        className="input"
-                      >
-                        <option value="active">Active</option>
-                        <option value="inactive">Inactive</option>
-                        <option value="on-leave">On Leave</option>
-                      </select>
+                      <input type="hidden" name="status" value={formEmpStatus} />
+                      <Dropdown
+                        options={[
+                          { value: 'active', label: 'Active' },
+                          { value: 'inactive', label: 'Inactive' },
+                          { value: 'on-leave', label: 'On Leave' },
+                        ]}
+                        value={formEmpStatus}
+                        onChange={setFormEmpStatus}
+                        placeholder="Select status"
+                      />
                     </div>
                   </div>
 
@@ -1925,6 +1842,9 @@ const EmployeesPage = () => {
                 onClick={() => {
                   setIsModalOpen(false);
                   setEditingEmployee(null);
+                  setFormDesignation('Annotator/ Reviewer');
+                  setFormEmployeeType('Full-time');
+                  setFormEmpStatus('active');
                 }}
                 className="btn btn-secondary"
               >

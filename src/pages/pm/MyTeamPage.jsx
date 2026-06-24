@@ -1,7 +1,8 @@
-import React from 'react';
+import React, { useMemo, useState } from 'react';
 import { useQuery } from '@tanstack/react-query';
 import { allocationApi, employeeApi, parentProjectApi, subProjectApi } from '../../services/api';
-import { Briefcase, Clock3, FolderKanban, Mail, Phone, Users } from 'lucide-react';
+import { Briefcase, Clock3, FolderKanban, Mail, Phone, Search, Users, X } from 'lucide-react';
+import SlackIcon from '../../components/icons/SlackIcon';
 import { getPmEmployeeId, getPmSubProjects } from '../../utils/pmScope';
 
 const badgeTone = {
@@ -12,6 +13,8 @@ const badgeTone = {
 
 const MyTeamPage = () => {
     const user = JSON.parse(localStorage.getItem('user') || '{}');
+    const role = localStorage.getItem('role') || user.role || 'employee';
+    const canMessageOnSlack = role === 'pm' || role === 'admin';
     const pmEmployeeId = getPmEmployeeId(user);
 
     const { data: parentProjects = [] } = useQuery({
@@ -69,6 +72,38 @@ const MyTeamPage = () => {
 
     const isLoading = projectsLoading || employeesLoading || allocationsLoading;
 
+    const [searchTerm, setSearchTerm] = useState('');
+    const [projectFilter, setProjectFilter] = useState('all');
+    const [roleFilter, setRoleFilter] = useState('all');
+
+    const roleOptions = useMemo(
+        () =>
+            Array.from(new Set(teamMembers.map((member) => member.designation).filter(Boolean))).sort((a, b) =>
+                a.localeCompare(b),
+            ),
+        [teamMembers],
+    );
+
+    const filteredMembers = useMemo(() => {
+        const term = searchTerm.trim().toLowerCase();
+        return teamMembers.filter((member) => {
+            const matchesName = !term || (member.name || '').toLowerCase().includes(term);
+            const matchesProject =
+                projectFilter === 'all' ||
+                member.memberProjects.some((project) => String(project.id) === projectFilter);
+            const matchesRole = roleFilter === 'all' || member.designation === roleFilter;
+            return matchesName && matchesProject && matchesRole;
+        });
+    }, [teamMembers, searchTerm, projectFilter, roleFilter]);
+
+    const hasActiveFilters = searchTerm.trim() !== '' || projectFilter !== 'all' || roleFilter !== 'all';
+
+    const clearFilters = () => {
+        setSearchTerm('');
+        setProjectFilter('all');
+        setRoleFilter('all');
+    };
+
     return (
         <div className="space-y-8">
             <section className="overflow-hidden rounded-[28px] border border-blue-100 bg-[linear-gradient(135deg,rgba(37,99,235,0.12),rgba(255,255,255,0.94)_42%,rgba(239,246,255,1))] p-6 shadow-sm">
@@ -93,6 +128,62 @@ const MyTeamPage = () => {
                 </div>
             </section>
 
+            {!isLoading && teamMembers.length > 0 && (
+                <section className="rounded-2xl border border-slate-200/70 bg-white p-4 shadow-sm">
+                    <div className="flex flex-col gap-3 lg:flex-row lg:items-center">
+                        <div className="relative flex-1">
+                            <Search className="pointer-events-none absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-slate-400" />
+                            <input
+                                type="text"
+                                value={searchTerm}
+                                onChange={(event) => setSearchTerm(event.target.value)}
+                                placeholder="Search team members by name..."
+                                className="w-full rounded-xl border border-slate-200 bg-slate-50 py-2.5 pl-10 pr-3 text-sm text-slate-700 outline-none transition focus:border-blue-300 focus:bg-white focus:ring-2 focus:ring-blue-100"
+                            />
+                        </div>
+                        <div className="flex flex-col gap-3 sm:flex-row">
+                            <select
+                                value={projectFilter}
+                                onChange={(event) => setProjectFilter(event.target.value)}
+                                className="rounded-xl border border-slate-200 bg-slate-50 px-3 py-2.5 text-sm text-slate-700 outline-none transition focus:border-blue-300 focus:bg-white focus:ring-2 focus:ring-blue-100"
+                            >
+                                <option value="all">All projects</option>
+                                {scopedProjects.map((project) => (
+                                    <option key={project.id} value={String(project.id)}>
+                                        {project.name}
+                                    </option>
+                                ))}
+                            </select>
+                            <select
+                                value={roleFilter}
+                                onChange={(event) => setRoleFilter(event.target.value)}
+                                className="rounded-xl border border-slate-200 bg-slate-50 px-3 py-2.5 text-sm text-slate-700 outline-none transition focus:border-blue-300 focus:bg-white focus:ring-2 focus:ring-blue-100"
+                            >
+                                <option value="all">All roles</option>
+                                {roleOptions.map((roleName) => (
+                                    <option key={roleName} value={roleName}>
+                                        {roleName}
+                                    </option>
+                                ))}
+                            </select>
+                            {hasActiveFilters && (
+                                <button
+                                    type="button"
+                                    onClick={clearFilters}
+                                    className="inline-flex items-center justify-center gap-1.5 rounded-xl border border-slate-200 bg-white px-3 py-2.5 text-sm font-medium text-slate-600 transition hover:bg-slate-50"
+                                >
+                                    <X className="h-4 w-4" />
+                                    Clear
+                                </button>
+                            )}
+                        </div>
+                    </div>
+                    <p className="mt-3 text-xs font-medium text-slate-400">
+                        Showing {filteredMembers.length} of {teamMembers.length} team members
+                    </p>
+                </section>
+            )}
+
             {isLoading ? (
                 <div className="rounded-2xl border border-slate-200 bg-white p-10 text-center text-sm text-slate-400 shadow-sm">
                     Loading team details...
@@ -105,9 +196,15 @@ const MyTeamPage = () => {
                         Team members will appear here once employees are allocated to projects inside your PM scope.
                     </p>
                 </div>
+            ) : filteredMembers.length === 0 ? (
+                <div className="rounded-3xl border border-dashed border-slate-200 bg-white p-12 text-center shadow-sm">
+                    <Search className="mx-auto h-10 w-10 text-slate-300" />
+                    <h2 className="mt-4 text-lg font-semibold text-slate-800">No team members match your filters</h2>
+                    <p className="mt-2 text-sm text-slate-500">Try adjusting your search or clearing the filters.</p>
+                </div>
             ) : (
                 <section className="grid gap-5 xl:grid-cols-2">
-                    {teamMembers.map((member) => (
+                    {filteredMembers.map((member) => (
                         <article key={member.id} className="rounded-3xl border border-slate-200/70 bg-white p-6 shadow-sm">
                             <div className="flex flex-col gap-4 lg:flex-row lg:items-start lg:justify-between">
                                 <div className="flex items-start gap-4">
@@ -124,9 +221,12 @@ const MyTeamPage = () => {
                                         <p className="mt-1 text-sm text-slate-500">{member.designation || 'Team Member'}</p>
                                     </div>
                                 </div>
-                                <div className="rounded-2xl bg-slate-50 px-4 py-3 text-right">
-                                    <p className="text-xs font-medium uppercase tracking-[0.16em] text-slate-400">Daily Load</p>
-                                    <p className="mt-1 text-lg font-semibold text-slate-900">{member.totalDailyHours}h</p>
+                                <div className="flex flex-col items-end gap-3">
+                                    {canMessageOnSlack && <SlackDmButton employee={member} />}
+                                    <div className="rounded-2xl bg-slate-50 px-4 py-3 text-right">
+                                        <p className="text-xs font-medium uppercase tracking-[0.16em] text-slate-400">Daily Load</p>
+                                        <p className="mt-1 text-lg font-semibold text-slate-900">{member.totalDailyHours}h</p>
+                                    </div>
                                 </div>
                             </div>
 
@@ -175,6 +275,44 @@ const MyTeamPage = () => {
                     ))}
                 </section>
             )}
+        </div>
+    );
+};
+
+const SlackDmButton = ({ employee }) => {
+    const [loading, setLoading] = useState(false);
+    const [error, setError] = useState('');
+
+    const handleClick = async () => {
+        setError('');
+        setLoading(true);
+        try {
+            const { url } = await employeeApi.getSlackLink(employee.id);
+            if (url) {
+                window.open(url, '_blank', 'noopener,noreferrer');
+            } else {
+                setError('Slack account not found');
+            }
+        } catch (err) {
+            const status = err?.response?.status;
+            setError(status === 404 ? 'Slack account not found' : 'Slack unavailable');
+        } finally {
+            setLoading(false);
+        }
+    };
+
+    return (
+        <div className="flex flex-col items-end gap-1">
+            <button
+                type="button"
+                onClick={handleClick}
+                disabled={loading}
+                className="inline-flex items-center gap-2 rounded-xl border border-slate-200 bg-white px-3 py-2 text-xs font-semibold text-slate-700 shadow-sm transition hover:bg-slate-50 disabled:cursor-not-allowed disabled:opacity-60"
+            >
+                <SlackIcon size={16} />
+                {loading ? 'Opening…' : 'Slack DM'}
+            </button>
+            {error && <span className="text-xs font-medium text-amber-600">{error}</span>}
         </div>
     );
 };

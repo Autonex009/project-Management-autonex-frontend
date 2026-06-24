@@ -6,6 +6,7 @@ import {
     Users2, Plus, X, Trash2, Clock, Search, Briefcase, CheckCircle2,
     XCircle, ChevronDown, ChevronUp, Linkedin, Phone, Mail, Link2
 } from 'lucide-react';
+import Dropdown from '../../components/ui/Dropdown';
 
 const STATUS_CONFIG = {
     pending:             { label: 'Pending Review',        color: 'bg-amber-50 text-amber-700 border-amber-200' },
@@ -334,39 +335,33 @@ const EmployeeReferralsPage = () => {
                                     <label className="block text-sm font-medium text-slate-700 mb-1">
                                         Position <span className="text-red-500">*</span>
                                     </label>
-                                    <select
+                                    <Dropdown
+                                        options={[{ value: '', label: 'Select position' }, ...POSITIONS.map(p => ({ value: p, label: p }))]}
                                         value={form.position_applied}
-                                        onChange={e => field('position_applied', e.target.value)}
-                                        className={inputCls('position_applied')}
-                                    >
-                                        <option value="">Select position</option>
-                                        {POSITIONS.map(p => <option key={p} value={p}>{p}</option>)}
-                                    </select>
+                                        onChange={val => field('position_applied', val)}
+                                        className="w-full"
+                                    />
                                     {errors.position_applied && <p className="mt-1 text-xs text-red-500">{errors.position_applied}</p>}
                                 </div>
                                 <div>
                                     <label className="block text-sm font-medium text-slate-700 mb-1">Department</label>
-                                    <select
+                                    <Dropdown
+                                        options={[{ value: '', label: 'Select department' }, ...DEPARTMENTS.map(d => ({ value: d, label: d }))]}
                                         value={form.department}
-                                        onChange={e => field('department', e.target.value)}
-                                        className={inputCls('department')}
-                                    >
-                                        <option value="">Select department</option>
-                                        {DEPARTMENTS.map(d => <option key={d} value={d}>{d}</option>)}
-                                    </select>
+                                        onChange={val => field('department', val)}
+                                        className="w-full"
+                                    />
                                 </div>
                                 <div className="sm:col-span-2">
                                     <label className="block text-sm font-medium text-slate-700 mb-1">
                                         Your Relationship <span className="text-red-500">*</span>
                                     </label>
-                                    <select
+                                    <Dropdown
+                                        options={[{ value: '', label: 'How do you know this person?' }, ...RELATIONSHIPS.map(r => ({ value: r, label: r }))]}
                                         value={form.relationship}
-                                        onChange={e => field('relationship', e.target.value)}
-                                        className={inputCls('relationship')}
-                                    >
-                                        <option value="">How do you know this person?</option>
-                                        {RELATIONSHIPS.map(r => <option key={r} value={r}>{r}</option>)}
-                                    </select>
+                                        onChange={val => field('relationship', val)}
+                                        className="w-full"
+                                    />
                                     {errors.relationship && <p className="mt-1 text-xs text-red-500">{errors.relationship}</p>}
                                 </div>
                                 <div className="sm:col-span-2">

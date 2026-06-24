@@ -462,7 +462,7 @@ const ModuleView = () => {
             </aside>
 
             {showScoreModal && modalData && (
-                <div className="fixed inset-0 bg-slate-900/60 backdrop-blur-sm z-50 flex items-center justify-center p-4">
+                <div className="fixed inset-0 bg-slate-900/60 backdrop-blur-sm z-50 flex items-center justify-center px-4 py-8">
                     <div className="bg-white rounded-3xl max-w-md w-full overflow-hidden shadow-2xl border border-slate-100 animate-in zoom-in-95 duration-200 p-8 text-center flex flex-col items-center">
                         <div className={`h-20 w-20 rounded-full flex items-center justify-center mb-6 ${
                             modalData.passed 
