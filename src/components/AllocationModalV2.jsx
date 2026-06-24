@@ -10,7 +10,8 @@ const AllocationModalV2 = ({
     projects = [],
     editingAllocation = null,
     presetEmployeeId = null,
-    presetEmployeeName = ''
+    presetEmployeeName = '',
+    hideOverride = false
 }) => {
     const [formData, setFormData] = useState({
         employee_id: presetEmployeeId || '',
@@ -329,33 +330,35 @@ const AllocationModalV2 = ({
                     </div>
 
                     {/* Override Controls */}
-                    <div className="border border-gray-200 rounded-lg p-4">
-                        <label className="flex items-center gap-2 mb-3">
-                            <input
-                                type="checkbox"
-                                checked={formData.override_flag}
-                                onChange={(e) => setFormData(prev => ({ ...prev, override_flag: e.target.checked }))}
-                                className="w-4 h-4 text-blue-600 border-gray-300 rounded focus:ring-blue-500"
-                            />
-                            <span className="text-sm font-medium text-gray-700">Force Override (ignore warnings)</span>
-                        </label>
-
-                        {formData.override_flag && (
-                            <div>
-                                <label className="block text-sm font-medium text-gray-700 mb-1">
-                                    Override Reason <span className="text-red-500">*</span>
-                                </label>
-                                <textarea
-                                    value={formData.override_reason}
-                                    onChange={(e) => setFormData(prev => ({ ...prev, override_reason: e.target.value }))}
-                                    placeholder="Explain why this override is necessary..."
-                                    rows="3"
-                                    className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500 text-sm"
-                                    required={formData.override_flag}
+                    {!hideOverride && (
+                        <div className="border border-gray-200 rounded-lg p-4">
+                            <label className="flex items-center gap-2 mb-3">
+                                <input
+                                    type="checkbox"
+                                    checked={formData.override_flag}
+                                    onChange={(e) => setFormData(prev => ({ ...prev, override_flag: e.target.checked }))}
+                                    className="w-4 h-4 text-blue-600 border-gray-300 rounded focus:ring-blue-500"
                                 />
-                            </div>
-                        )}
-                    </div>
+                                <span className="text-sm font-medium text-gray-700">Force Override (ignore warnings)</span>
+                            </label>
+
+                            {formData.override_flag && (
+                                <div>
+                                    <label className="block text-sm font-medium text-gray-700 mb-1">
+                                        Override Reason <span className="text-red-500">*</span>
+                                    </label>
+                                    <textarea
+                                        value={formData.override_reason}
+                                        onChange={(e) => setFormData(prev => ({ ...prev, override_reason: e.target.value }))}
+                                        placeholder="Explain why this override is necessary..."
+                                        rows="3"
+                                        className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500 text-sm"
+                                        required={formData.override_flag}
+                                    />
+                                </div>
+                            )}
+                        </div>
+                    )}
 
                     {/* Footer */}
                     <div className="flex justify-end gap-3 pt-4 border-t border-gray-200">

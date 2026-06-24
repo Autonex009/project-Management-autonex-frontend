@@ -201,6 +201,7 @@ const NewlyOnboardedPage = () => {
                     projects={projectOptions}
                     presetEmployeeId={allocatingCandidate.employeeId}
                     presetEmployeeName={allocatingCandidate.name}
+                    hideOverride={true}
                 />
             )}
         </div>
