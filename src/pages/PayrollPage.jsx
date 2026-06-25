@@ -14,6 +14,13 @@ const LEAVE_LABELS = {
 const fmt = (n) => new Intl.NumberFormat('en-IN', { minimumFractionDigits: 2, maximumFractionDigits: 2 }).format(n || 0);
 const fmtCurrency = (n) => `₹${fmt(n)}`;
 
+// Format an ISO date 'YYYY-MM-DD' as e.g. '23 Apr' without timezone shifts.
+const MONTHS_SHORT = ['Jan', 'Feb', 'Mar', 'Apr', 'May', 'Jun', 'Jul', 'Aug', 'Sep', 'Oct', 'Nov', 'Dec'];
+const fmtDay = (iso) => {
+    const [, m, d] = (iso || '').split('-');
+    return m && d ? `${parseInt(d, 10)} ${MONTHS_SHORT[parseInt(m, 10) - 1]}` : iso;
+};
+
 const currentMonthStr = () => {
     const d = new Date();
     return `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}`;
@@ -100,21 +107,24 @@ const PayrollPage = () => {
         refetch().then(({ data }) => {
             if (!data) return;
             setGenerated(true);
-            // Seed per-leave UNPAID-day counts from the backend's auto classification
-            // (annual paid-leave entitlement applied) or a finalized run's snapshot.
-            const initial = {};
-            data.employees?.forEach(emp => {
-                emp.leaves.forEach(l => {
-                    initial[l.leave_id] = l.unpaid_days ?? (l.deduct ? l.days_in_month : 0);
-                });
-            });
-            setAdjustments(initial);
+            // No seeding needed: the backend returns each leave's per-date paid/unpaid
+            // (auto classification, or a finalized run's snapshot). `adjustments` only
+            // holds the admin's overrides; absent = use the backend's per-date default.
+            setAdjustments({});
         });
     };
 
-    // Admin override: set how many of a leave's days are unpaid (deducted).
-    const setLeaveUnpaid = (leaveId, unpaidDays) => {
-        setAdjustments(prev => ({ ...prev, [leaveId]: unpaidDays }));
+    // Admin override: set the exact list of UNPAID dates (ISO strings) for a leave.
+    const setLeaveDates = (leaveId, unpaidDates) => {
+        setAdjustments(prev => ({ ...prev, [leaveId]: unpaidDates }));
+    };
+
+    // Flip a single day of a leave between paid and unpaid; rest stay as-is.
+    const toggleLeaveDay = (leaf, date) => {
+        const current = leaf.dates.filter(d => d.unpaid).map(d => d.date);
+        const set = new Set(current);
+        if (set.has(date)) set.delete(date); else set.add(date);
+        setLeaveDates(leaf.leave_id, Array.from(set));
     };
 
     // Recompute rows with current adjustments applied
@@ -125,7 +135,14 @@ const PayrollPage = () => {
             let totalDeductedDays = 0;
             let totalPaidDays = 0;
             const leaves = emp.leaves.map(l => {
-                const unpaidDays = Math.max(0, Math.min(adjustments[l.leave_id] ?? l.unpaid_days ?? 0, l.days_in_month));
+                const backendDates = l.dates || [];
+                // Effective unpaid dates: admin override if any, else the backend's per-date default.
+                const override = adjustments[l.leave_id];
+                const unpaidSet = new Set(
+                    override ?? backendDates.filter(d => d.unpaid).map(d => d.date)
+                );
+                const dates = backendDates.map(d => ({ ...d, unpaid: unpaidSet.has(d.date) }));
+                const unpaidDays = dates.filter(d => d.unpaid).length;
                 const paidDays = Math.max(l.days_in_month - unpaidDays, 0);
                 const deductionAmount = unpaidDays * perDay;
                 totalDeductedDays += unpaidDays;
@@ -133,7 +150,7 @@ const PayrollPage = () => {
                 const classification = unpaidDays <= 0
                     ? 'paid'
                     : (unpaidDays >= l.days_in_month ? 'unpaid' : 'partial');
-                return { ...l, unpaidDays, paidDays, classification, deduct: unpaidDays > 0, deductionAmount };
+                return { ...l, dates, unpaidDays, paidDays, classification, deduct: unpaidDays > 0, deductionAmount };
             });
             const totalDeduction = totalDeductedDays * perDay;
             // Bonus: capped at the employee's limit; uses the in-progress edit if any,
@@ -191,6 +208,7 @@ const PayrollPage = () => {
                 leave_id: l.leave_id,
                 deduct: l.deduct,
                 unpaid_days: l.unpaidDays,
+                unpaid_dates: (l.dates || []).filter(d => d.unpaid).map(d => d.date),
             }))
         );
 
@@ -621,61 +639,85 @@ const PayrollPage = () => {
                                     : l.classification === 'unpaid'
                                         ? { txt: 'Unpaid', cls: 'bg-red-100 text-red-700' }
                                         : { txt: 'Partly unpaid', cls: 'bg-amber-100 text-amber-700' };
-                                const auto = l.unpaid_days ?? 0;   // backend auto suggestion
-                                const isAuto = l.unpaidDays === auto;
+                                const dateList = l.dates || [];
+                                const allDates = dateList.map(d => d.date);
+                                const autoUnpaid = dateList.filter(d => d.auto_unpaid).map(d => d.date);
+                                const curUnpaid = dateList.filter(d => d.unpaid).map(d => d.date);
+                                const isAuto = curUnpaid.length === autoUnpaid.length && curUnpaid.every(x => autoUnpaid.includes(x));
                                 return (
-                                    <div key={l.leave_id} className="px-6 py-4 flex items-center justify-between gap-4">
-                                        <div className="min-w-0">
-                                            <div className="flex items-center gap-2">
-                                                <span className="text-sm font-medium text-slate-800">
-                                                    {LEAVE_LABELS[l.leave_type] || l.leave_type}
-                                                </span>
-                                                <span className="text-xs bg-slate-100 text-slate-600 px-2 py-0.5 rounded-full">
-                                                    {l.days_in_month}d
-                                                </span>
-                                                <span className={`text-xs px-2 py-0.5 rounded-full font-semibold ${badge.cls}`}>
-                                                    {badge.txt}
-                                                </span>
+                                    <div key={l.leave_id} className="px-6 py-4 space-y-3">
+                                        <div className="flex items-start justify-between gap-4">
+                                            <div className="min-w-0">
+                                                <div className="flex items-center gap-2">
+                                                    <span className="text-sm font-medium text-slate-800">
+                                                        {LEAVE_LABELS[l.leave_type] || l.leave_type}
+                                                    </span>
+                                                    <span className="text-xs bg-slate-100 text-slate-600 px-2 py-0.5 rounded-full">
+                                                        {l.days_in_month}d
+                                                    </span>
+                                                    <span className={`text-xs px-2 py-0.5 rounded-full font-semibold ${badge.cls}`}>
+                                                        {badge.txt}
+                                                    </span>
+                                                </div>
+                                                <p className="text-xs text-slate-400 mt-0.5">
+                                                    {l.start_date} → {l.end_date}
+                                                    {l.reason && ` · ${l.reason}`}
+                                                </p>
+                                                <p className="text-xs font-medium mt-0.5 text-slate-600">
+                                                    {l.paidDays > 0 && <span className="text-emerald-600">{l.paidDays}d paid</span>}
+                                                    {l.paidDays > 0 && l.unpaidDays > 0 && ' · '}
+                                                    {l.unpaidDays > 0 && <span className="text-red-600">{l.unpaidDays}d unpaid −{fmtCurrency(l.deductionAmount)}</span>}
+                                                    {l.unpaidDays <= 0 && l.paidDays === l.days_in_month && <span className="text-emerald-600"> — no deduction</span>}
+                                                </p>
                                             </div>
-                                            <p className="text-xs text-slate-400 mt-0.5">
-                                                {l.start_date} → {l.end_date}
-                                                {l.reason && ` · ${l.reason}`}
-                                            </p>
-                                            <p className="text-xs font-medium mt-0.5 text-slate-600">
-                                                {l.paidDays > 0 && <span className="text-emerald-600">{l.paidDays}d paid</span>}
-                                                {l.paidDays > 0 && l.unpaidDays > 0 && ' · '}
-                                                {l.unpaidDays > 0 && <span className="text-red-600">{l.unpaidDays}d unpaid −{fmtCurrency(l.deductionAmount)}</span>}
-                                                {l.unpaidDays <= 0 && l.paidDays === l.days_in_month && <span className="text-emerald-600"> — no deduction</span>}
-                                            </p>
+                                            {/* Quick set: Auto / All unpaid / All paid */}
+                                            <div className="flex gap-1.5 shrink-0">
+                                                <button
+                                                    onClick={() => setLeaveDates(l.leave_id, autoUnpaid)}
+                                                    title={`Auto (balance-based): ${autoUnpaid.length}d unpaid`}
+                                                    className={`px-2.5 py-1.5 text-xs font-semibold rounded-lg transition-colors ${
+                                                        isAuto ? 'bg-indigo-100 text-indigo-700' : 'bg-slate-100 text-slate-400 hover:bg-indigo-50 hover:text-indigo-600'
+                                                    }`}
+                                                >
+                                                    Auto
+                                                </button>
+                                                <button
+                                                    onClick={() => setLeaveDates(l.leave_id, allDates)}
+                                                    className={`px-2.5 py-1.5 text-xs font-semibold rounded-lg transition-colors ${
+                                                        !isAuto && l.unpaidDays >= l.days_in_month ? 'bg-red-100 text-red-700' : 'bg-slate-100 text-slate-400 hover:bg-red-50 hover:text-red-600'
+                                                    }`}
+                                                >
+                                                    All unpaid
+                                                </button>
+                                                <button
+                                                    onClick={() => setLeaveDates(l.leave_id, [])}
+                                                    className={`px-2.5 py-1.5 text-xs font-semibold rounded-lg transition-colors ${
+                                                        !isAuto && l.unpaidDays <= 0 ? 'bg-emerald-100 text-emerald-700' : 'bg-slate-100 text-slate-400 hover:bg-emerald-50 hover:text-emerald-600'
+                                                    }`}
+                                                >
+                                                    All paid
+                                                </button>
+                                            </div>
                                         </div>
-                                        {/* Override: Auto / All unpaid / All paid */}
-                                        <div className="flex gap-1.5 shrink-0">
-                                            <button
-                                                onClick={() => setLeaveUnpaid(l.leave_id, auto)}
-                                                title={`Auto (balance-based): ${auto}d unpaid`}
-                                                className={`px-2.5 py-1.5 text-xs font-semibold rounded-lg transition-colors ${
-                                                    isAuto ? 'bg-indigo-100 text-indigo-700' : 'bg-slate-100 text-slate-400 hover:bg-indigo-50 hover:text-indigo-600'
-                                                }`}
-                                            >
-                                                Auto
-                                            </button>
-                                            <button
-                                                onClick={() => setLeaveUnpaid(l.leave_id, l.days_in_month)}
-                                                className={`px-2.5 py-1.5 text-xs font-semibold rounded-lg transition-colors ${
-                                                    !isAuto && l.unpaidDays >= l.days_in_month ? 'bg-red-100 text-red-700' : 'bg-slate-100 text-slate-400 hover:bg-red-50 hover:text-red-600'
-                                                }`}
-                                            >
-                                                All unpaid
-                                            </button>
-                                            <button
-                                                onClick={() => setLeaveUnpaid(l.leave_id, 0)}
-                                                className={`px-2.5 py-1.5 text-xs font-semibold rounded-lg transition-colors ${
-                                                    !isAuto && l.unpaidDays <= 0 ? 'bg-emerald-100 text-emerald-700' : 'bg-slate-100 text-slate-400 hover:bg-emerald-50 hover:text-emerald-600'
-                                                }`}
-                                            >
-                                                All paid
-                                            </button>
-                                        </div>
+                                        {/* Per-day toggles — click a day to flip paid/unpaid; the rest stay as-is */}
+                                        {dateList.length > 0 && (
+                                            <div className="flex flex-wrap gap-1.5">
+                                                {dateList.map(d => (
+                                                    <button
+                                                        key={d.date}
+                                                        onClick={() => toggleLeaveDay(l, d.date)}
+                                                        title={d.unpaid ? 'Unpaid — click to mark paid' : 'Paid — click to mark unpaid'}
+                                                        className={`px-2 py-1 rounded-lg text-xs font-medium border transition-colors ${
+                                                            d.unpaid
+                                                                ? 'bg-red-50 border-red-200 text-red-700 hover:bg-red-100'
+                                                                : 'bg-emerald-50 border-emerald-200 text-emerald-700 hover:bg-emerald-100'
+                                                        } ${d.unpaid !== d.auto_unpaid ? 'ring-1 ring-indigo-300' : ''}`}
+                                                    >
+                                                        {fmtDay(d.date)} · {d.unpaid ? 'Unpaid' : 'Paid'}
+                                                    </button>
+                                                ))}
+                                            </div>
+                                        )}
                                     </div>
                                 );
                             })}
