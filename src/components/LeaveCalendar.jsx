@@ -515,6 +515,10 @@ export default function LeaveCalendar({ filterEmployeeIds = null }) {
 
     const handleApplySubmit = (e) => {
         e.preventDefault();
+        if (!reason || !reason.trim()) {
+            toast.error('Please enter a reason for this request.');
+            return;
+        }
         if (isSubmitDisabled) return;
 
         if (leaveType === 'wfh') {
@@ -884,12 +888,12 @@ export default function LeaveCalendar({ filterEmployeeIds = null }) {
                             {/* Reason input */}
                             <div style={{ marginBottom: '16px' }}>
                                 <label style={{ display: 'block', fontSize: '13px', fontWeight: 600, color: sidebarTheme.text, marginBottom: '6px' }}>
-                                    Reason (Optional)
+                                    Reason
                                 </label>
                                 <textarea
                                     value={reason}
                                     onChange={e => setReason(e.target.value)}
-                                    placeholder="Enter reason for this request..."
+                                    placeholder="Enter reason for this request (required)..."
                                     rows={3}
                                     style={{
                                         width: '100%',

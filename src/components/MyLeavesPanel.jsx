@@ -341,6 +341,10 @@ const MyLeavesPanel = ({
 
     const handleLeaveSubmit = (e) => {
         e.preventDefault();
+        if (!leaveForm.reason || !leaveForm.reason.trim()) {
+            toast.error('Please enter a reason for your leave request.');
+            return;
+        }
         const isHalf = leaveForm.leave_type === 'first_half' || leaveForm.leave_type === 'second_half';
         const sDate = leaveForm.start_date;
         const eDate = isHalf ? sDate : leaveForm.end_date;
@@ -390,6 +394,10 @@ const MyLeavesPanel = ({
 
     const handleWfhSubmit = (e) => {
         e.preventDefault();
+        if (!wfhForm.reason || !wfhForm.reason.trim()) {
+            toast.error('Please enter a reason for your WFH request.');
+            return;
+        }
         if (!wfhForm.wfh_date) { toast.error('Please select a start date'); return; }
         if (wfhForm.end_date && wfhForm.end_date < wfhForm.wfh_date) {
             toast.error('End date cannot be before start date');
@@ -413,6 +421,10 @@ const MyLeavesPanel = ({
 
     const handleEditSubmit = (e) => {
         e.preventDefault();
+        if (!editForm.reason || !editForm.reason.trim()) {
+            toast.error('Please enter a reason for your leave request.');
+            return;
+        }
         const isHalf = editForm.leave_type === 'first_half' || editForm.leave_type === 'second_half';
         const sDate = editForm.start_date;
         const eDate = isHalf ? sDate : editForm.end_date;
@@ -475,6 +487,10 @@ const MyLeavesPanel = ({
 
     const handleWfhEditSubmit = (e) => {
         e.preventDefault();
+        if (!editWfhForm.reason || !editWfhForm.reason.trim()) {
+            toast.error('Please enter a reason for your WFH request.');
+            return;
+        }
         if (!editWfhForm.wfh_date) { toast.error('Please select a start date'); return; }
         if (editWfhForm.end_date && editWfhForm.end_date < editWfhForm.wfh_date) {
             toast.error('End date cannot be before start date');
@@ -567,7 +583,7 @@ const MyLeavesPanel = ({
                                 <div>
                                     <label className="block text-sm font-medium text-slate-700 mb-1">Reason</label>
                                     <input type="text" value={leaveForm.reason} onChange={e => setLeaveForm({ ...leaveForm, reason: e.target.value })}
-                                        className="w-full px-3 py-2 border border-slate-200 rounded-lg text-sm" placeholder="Optional reason"/>
+                                        className="w-full px-3 py-2 border border-slate-200 rounded-lg text-sm" placeholder="Reason for leave (required)"/>
                                 </div>
                                 {leaveForm.leave_type === 'floater' ? (
                                     <FloaterDatePicker
@@ -653,7 +669,7 @@ const MyLeavesPanel = ({
                                 <div>
                                     <label className="block text-sm font-medium text-slate-700 mb-1">Reason</label>
                                     <input type="text" value={editForm.reason} onChange={e => setEditForm({ ...editForm, reason: e.target.value })}
-                                        className="w-full px-3 py-2 border border-slate-200 rounded-lg text-sm" placeholder="Optional reason"/>
+                                        className="w-full px-3 py-2 border border-slate-200 rounded-lg text-sm" placeholder="Reason for leave (required)"/>
                                 </div>
                                 {editForm.leave_type === 'floater' ? (
                                     <FloaterDatePicker
@@ -835,7 +851,7 @@ const MyLeavesPanel = ({
                                 <div className="md:col-span-2">
                                     <label className="block text-sm font-medium text-slate-700 mb-1">Reason</label>
                                     <input type="text" value={wfhForm.reason} onChange={e => setWfhForm({ ...wfhForm, reason: e.target.value })}
-                                        className="w-full px-3 py-2 border border-slate-200 rounded-lg text-sm" placeholder="Optional reason"/>
+                                        className="w-full px-3 py-2 border border-slate-200 rounded-lg text-sm" placeholder="Reason for WFH (required)"/>
                                 </div>
                                 <div className="md:col-span-2 flex justify-end">
                                     <button type="submit" disabled={createWfhMutation.isPending}
@@ -869,7 +885,7 @@ const MyLeavesPanel = ({
                                 <div className="md:col-span-2">
                                     <label className="block text-sm font-medium text-slate-700 mb-1">Reason</label>
                                     <input type="text" value={editWfhForm.reason} onChange={e => setEditWfhForm({ ...editWfhForm, reason: e.target.value })}
-                                        className="w-full px-3 py-2 border border-slate-200 rounded-lg text-sm" placeholder="Optional reason"/>
+                                        className="w-full px-3 py-2 border border-slate-200 rounded-lg text-sm" placeholder="Reason for WFH (required)"/>
                                 </div>
                                 <div className="md:col-span-2 rounded-lg border border-blue-100 bg-blue-50 px-3 py-2 text-sm text-blue-700">
                                     Editing will reset the approval status back to <strong>pending</strong> so your manager can re-review.
