@@ -203,6 +203,7 @@ const LeavesPage = () => {
   };
 
   const filteredLeaves = leaves.filter(leave => {
+    if (!leave.start_date || !leave.end_date) return false;
     const name = getEmployeeName(leave.employee_id).toLowerCase();
     const typeLabel = getLeaveTypeLabel(leave.leave_type).toLowerCase();
     const q = searchQuery.toLowerCase();

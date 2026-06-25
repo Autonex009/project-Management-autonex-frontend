@@ -2,7 +2,7 @@ import { useState, useMemo } from 'react';
 import { 
     Search, ArrowUpDown, Calendar, Home, Award, TrendingUp, 
     AlertTriangle, ShieldAlert, FileText, CheckCircle, Clock, X,
-    ChevronRight, BarChart2, ChevronDown, ChevronUp
+    ChevronRight, BarChart2, ChevronDown, ChevronUp, Users
 } from 'lucide-react';
 import { format, parseISO } from 'date-fns';
 import { getWorkingDayCount, getLeaveTypeLabel, toLocalISODate, isIntern } from '../utils/leaveTypes';
@@ -29,6 +29,7 @@ const EmployeeKPIPanel = ({ employees = [], leaves = [], wfhRequests = [] }) => 
     const [sortBy, setSortBy] = useState('reliability'); // 'name', 'leaves', 'wfh', 'reliability'
     const [sortOrder, setSortOrder] = useState('desc'); // 'asc', 'desc'
     const [selectedMonth, setSelectedMonth] = useState('2026-06'); // Default to current workspace active month
+    const [selectedType, setSelectedType] = useState('all'); // 'all', 'full-time', 'intern'
 
     // Calculate month boundary dates
     const monthBoundary = useMemo(() => {
@@ -64,7 +65,11 @@ const EmployeeKPIPanel = ({ employees = [], leaves = [], wfhRequests = [] }) => 
 
             approvedLeaves.forEach(l => {
                 let days = 0;
-                if (selectedMonth === 'all') {
+                if (!l.start_date || !l.end_date) {
+                    if (selectedMonth === 'all') {
+                        days = l.is_half_day ? 0.5 : 1.0;
+                    }
+                } else if (selectedMonth === 'all') {
                     days = getWorkingDayCount(l.start_date, l.end_date, l.is_half_day);
                 } else if (monthBoundary) {
                     const { startDate: mStart, endDate: mEnd } = monthBoundary;
@@ -88,7 +93,11 @@ const EmployeeKPIPanel = ({ employees = [], leaves = [], wfhRequests = [] }) => 
 
             pendingLeaves.forEach(l => {
                 let days = 0;
-                if (selectedMonth === 'all') {
+                if (!l.start_date || !l.end_date) {
+                    if (selectedMonth === 'all') {
+                        days = l.is_half_day ? 0.5 : 1.0;
+                    }
+                } else if (selectedMonth === 'all') {
                     days = getWorkingDayCount(l.start_date, l.end_date, l.is_half_day);
                 } else if (monthBoundary) {
                     const { startDate: mStart, endDate: mEnd } = monthBoundary;
@@ -202,7 +211,16 @@ const EmployeeKPIPanel = ({ employees = [], leaves = [], wfhRequests = [] }) => 
                 const name = item.employee.name.toLowerCase();
                 const designation = (item.employee.designation || '').toLowerCase();
                 const dept = (item.employee.department || '').toLowerCase();
-                return name.includes(q) || designation.includes(q) || dept.includes(q);
+                const matchesSearch = name.includes(q) || designation.includes(q) || dept.includes(q);
+                if (!matchesSearch) return false;
+
+                if (selectedType === 'full-time') {
+                    return !isIntern(item.employee.employee_type);
+                }
+                if (selectedType === 'intern') {
+                    return isIntern(item.employee.employee_type);
+                }
+                return true;
             })
             .sort((a, b) => {
                 let valA, valB;
@@ -232,7 +250,7 @@ const EmployeeKPIPanel = ({ employees = [], leaves = [], wfhRequests = [] }) => 
 
                 return sortOrder === 'asc' ? valA - valB : valB - valA;
             });
-    }, [employeeStats, searchQuery, sortBy, sortOrder]);
+    }, [employeeStats, searchQuery, sortBy, sortOrder, selectedType]);
 
     const handleSort = (field) => {
         if (sortBy === field) {
@@ -297,6 +315,23 @@ const EmployeeKPIPanel = ({ employees = [], leaves = [], wfhRequests = [] }) => 
             <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4">
                 <h2 className="text-lg font-bold text-slate-800">Employee Presence & Reliability Scorecard</h2>
                 <div className="flex flex-col sm:flex-row gap-3 w-full sm:w-auto">
+                    {/* Employee Type filter dropdown */}
+                    <div className="relative w-full sm:w-48">
+                        <Users className="absolute left-3.5 top-1/2 -translate-y-1/2 w-4 h-4 text-slate-400" />
+                        <select
+                            value={selectedType}
+                            onChange={e => setSelectedType(e.target.value)}
+                            className="w-full pl-10 pr-8 py-2 border border-slate-200 rounded-xl text-sm focus:outline-none focus:ring-2 focus:ring-indigo-500 focus:border-indigo-500 bg-white appearance-none cursor-pointer text-slate-700 font-medium"
+                        >
+                            <option value="all">All Roles / Types</option>
+                            <option value="full-time">Full-time</option>
+                            <option value="intern">Interns / Contractors</option>
+                        </select>
+                        <div className="absolute right-3 top-1/2 -translate-y-1/2 pointer-events-none text-slate-400">
+                            <ChevronDown className="w-4 h-4" />
+                        </div>
+                    </div>
+
                     {/* Month selector dropdown */}
                     <div className="relative w-full sm:w-48">
                         <Calendar className="absolute left-3.5 top-1/2 -translate-y-1/2 w-4 h-4 text-slate-400" />
@@ -456,6 +491,7 @@ const EmployeeKPIPanel = ({ employees = [], leaves = [], wfhRequests = [] }) => 
                 // Group leaves/wfh logs to match the selected month if not 'all'
                 const leaveList = allEmpLeaves
                     .filter(l => {
+                        if (!l.start_date || !l.end_date) return false;
                         if (selectedMonth === 'all') return true;
                         if (!monthBoundary) return true;
                         const { startDate: mStart, endDate: mEnd } = monthBoundary;
@@ -540,10 +576,19 @@ const EmployeeKPIPanel = ({ employees = [], leaves = [], wfhRequests = [] }) => 
                                     <h4 className="font-bold text-slate-800 text-sm">Leave Category Distribution ({selectedMonth === 'all' ? 'All Time' : 'This Month'})</h4>
                                     <div className="border border-slate-100 rounded-xl p-4 space-y-4 bg-white">
                                         {['paid', 'casual_sick', 'floater'].map(type => {
-                                            const count = typeBreakdown[type] || 0;
-                                            const maxDays = selectedMonth === 'all' 
-                                                ? (type === 'floater' ? 2 : type === 'casual_sick' ? (employee.employee_type && isIntern(employee.employee_type) ? 0 : 6) : 12)
-                                                : (type === 'floater' ? 2 : type === 'casual_sick' ? 0 : 1); // monthly normalized limits
+                                             const count = typeBreakdown[type] || 0;
+                                             const isEmpIntern = employee.employee_type && isIntern(employee.employee_type);
+                                             const maxDays = selectedMonth === 'all'
+                                                 ? (
+                                                     type === 'paid' ? 12 :
+                                                     type === 'casual_sick' ? (isEmpIntern ? 0 : 6) :
+                                                     type === 'floater' ? (isEmpIntern ? 0 : 2) : 0
+                                                   )
+                                                 : (
+                                                     type === 'paid' ? (isEmpIntern ? 1 : 2) :
+                                                     type === 'casual_sick' ? (isEmpIntern ? 0 : 6) :
+                                                     type === 'floater' ? (isEmpIntern ? 0 : 2) : 0
+                                                   );
 
                                             const percentage = maxDays > 0 ? Math.min(100, (count / maxDays) * 100) : 0;
                                             return (

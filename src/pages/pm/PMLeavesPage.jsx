@@ -36,7 +36,8 @@ const PMLeavesPage = () => {
     const myProjectIds = new Set(scopedProjects.map(p => p.id));
     const teamEmployeeIds = new Set(allocations.filter(a => myProjectIds.has(a.sub_project_id)).map(a => a.employee_id));
 
-    const teamLeaves = allLeaves.filter(l => teamEmployeeIds.has(l.employee_id));
+    const teamLeaves = allLeaves.filter(l => teamEmployeeIds.has(l.employee_id) && l.start_date && l.end_date);
+    const teamLeavesForKpi = allLeaves.filter(l => teamEmployeeIds.has(l.employee_id));
     const teamWfh = wfhRequests.filter(w => teamEmployeeIds.has(w.employee_id));
 
     const approveMutation = useMutation({
@@ -237,7 +238,7 @@ const PMLeavesPage = () => {
             {activeTab === 'Employee KPI' && (
                 <EmployeeKPIPanel 
                     employees={employees.filter(e => teamEmployeeIds.has(e.id))} 
-                    leaves={teamLeaves} 
+                    leaves={teamLeavesForKpi} 
                     wfhRequests={teamWfh} 
                 />
             )}
