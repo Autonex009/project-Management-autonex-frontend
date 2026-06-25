@@ -1,7 +1,7 @@
 import { useState } from 'react';
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import { leaveApi, employeeApi, wfhApi } from '../services/api';
-import { Plus, X, Calendar, Trash2, CheckCircle, XCircle, Clock, AlertTriangle, Home } from 'lucide-react';
+import { Plus, X, Calendar, Trash2, CheckCircle, XCircle, Clock, AlertTriangle, Home, BarChart2 } from 'lucide-react';
 import { format } from 'date-fns';
 import toast from 'react-hot-toast';
 import { getEndDateValidationMessage, isEndDateBeforeStartDate } from '../utils/dateValidation';
@@ -10,8 +10,9 @@ import LeaveCalendar from '../components/LeaveCalendar';
 import DeleteConfirmModal from '../components/ui/DeleteConfirmModal';
 import PageSearchBar from '../components/ui/PageSearchBar';
 import Dropdown from '../components/ui/Dropdown';
+import EmployeeKPIPanel from '../components/EmployeeKPIPanel';
 
-const TABS = ['Leave List', 'Calendar', 'WFH Requests'];
+const TABS = ['Leave List', 'Calendar', 'WFH Requests', 'Employee KPI'];
 
 const getISTDateTime = () => {
     const d = new Date();
@@ -172,7 +173,7 @@ const LeavesPage = () => {
 
     // Validate consecutive leaves safeguard
     if (leaveType !== 'wfh' && !validateConsecutiveLeaves(startDate, endDate, empLeaves, null, isHalf)) {
-      toast.error('Safe guard triggered: You cannot apply for 4 or more consecutive leaves.');
+      toast.error('Safe guard triggered: You cannot apply for 5 or more consecutive leaves.');
       return;
     }
 
@@ -202,6 +203,7 @@ const LeavesPage = () => {
   };
 
   const filteredLeaves = leaves.filter(leave => {
+    if (!leave.start_date || !leave.end_date) return false;
     const name = getEmployeeName(leave.employee_id).toLowerCase();
     const typeLabel = getLeaveTypeLabel(leave.leave_type).toLowerCase();
     const q = searchQuery.toLowerCase();
@@ -249,12 +251,13 @@ const LeavesPage = () => {
                 activeTab === tab ? 'bg-white text-slate-800 shadow-sm' : 'text-slate-500 hover:text-slate-700'
               }`}>
               {tab === 'WFH Requests' ? <span className="flex items-center gap-1.5"><Home className="w-3.5 h-3.5"/>{tab}</span> :
-               tab === 'Calendar' ? <span className="flex items-center gap-1.5"><Calendar className="w-3.5 h-3.5"/>{tab}</span> : tab}
+               tab === 'Calendar' ? <span className="flex items-center gap-1.5"><Calendar className="w-3.5 h-3.5"/>{tab}</span> :
+               tab === 'Employee KPI' ? <span className="flex items-center gap-1.5"><BarChart2 className="w-3.5 h-3.5"/>{tab}</span> : tab}
             </button>
           ))}
         </div>
 
-        {activeTab !== 'Calendar' && (
+        {activeTab !== 'Calendar' && activeTab !== 'Employee KPI' && (
           <PageSearchBar
             value={searchQuery}
             onChange={handleSearchChange}
@@ -450,6 +453,15 @@ const LeavesPage = () => {
             </table>
           </div>
         </div>
+      )}
+
+      {/* ── Tab: Employee KPI ── */}
+      {activeTab === 'Employee KPI' && (
+        <EmployeeKPIPanel 
+          employees={employees} 
+          leaves={leaves} 
+          wfhRequests={wfhRequests} 
+        />
       )}
 
       {/* ── Flagged leave remark modal ── */}

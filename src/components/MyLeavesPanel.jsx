@@ -211,10 +211,16 @@ const MyLeavesPanel = ({
         let paidUsedThisMonth = 0;
         allLeaves.forEach((leave) => {
             if ((leave.status || 'pending') !== 'approved') return;
-            if (leave.is_half_day) return;
             const type = normalizeLeaveType(leave.leave_type);
+            const days = leave.is_half_day ? 0.5 : (leave.start_date && leave.end_date ? getWorkingDayCount(leave.start_date, leave.end_date) : 1.0);
+            if (!leave.start_date || !leave.end_date) {
+                // Sheet leaf placeholder with null dates
+                if (type in usedYear) {
+                    usedYear[type] += days;
+                }
+                return;
+            }
             const d = new Date(leave.start_date + 'T00:00:00');
-            const days = getWorkingDayCount(leave.start_date, leave.end_date);
             if (intern && type === 'paid') {
                 if (d.getFullYear() === currentYear && d.getMonth() === currentMonth) paidUsedThisMonth += days;
                 return;
@@ -242,13 +248,16 @@ const MyLeavesPanel = ({
                 period: 'year',
             });
         }
-        ['casual_sick', 'floater'].forEach((t) => cards.push({
-            type: t,
-            quota: ANNUAL_LEAVE_QUOTA[t],
-            used: usedYear[t],
-            remaining: Math.max(ANNUAL_LEAVE_QUOTA[t] - usedYear[t], 0),
-            period: 'year',
-        }));
+        ['casual_sick', 'floater'].forEach((t) => {
+            const quota = (intern && t === 'casual_sick') ? 0 : ANNUAL_LEAVE_QUOTA[t];
+            cards.push({
+                type: t,
+                quota: quota,
+                used: usedYear[t],
+                remaining: Math.max(quota - usedYear[t], 0),
+                period: 'year',
+            });
+        });
         return cards;
     }, [allLeaves, intern, currentYear, currentMonth]);
 
@@ -367,7 +376,7 @@ const MyLeavesPanel = ({
 
         // Validate consecutive leaves safeguard
         if (leaveForm.leave_type !== 'wfh' && !validateConsecutiveLeaves(sDate, eDate, allLeaves, null, isHalf)) {
-            toast.error('Safe guard triggered: You cannot apply for 4 or more consecutive leaves.');
+            toast.error('Safe guard triggered: You cannot apply for 5 or more consecutive leaves.');
             return;
         }
 
@@ -439,7 +448,7 @@ const MyLeavesPanel = ({
 
         // Validate consecutive leaves safeguard
         if (editForm.leave_type !== 'wfh' && !validateConsecutiveLeaves(sDate, eDate, allLeaves, editingLeave.leave_id, isHalf)) {
-            toast.error('Safe guard triggered: You cannot apply for 4 or more consecutive leaves.');
+            toast.error('Safe guard triggered: You cannot apply for 5 or more consecutive leaves.');
             return;
         }
 
@@ -725,7 +734,7 @@ const MyLeavesPanel = ({
                         </div>
                     ) : (
                         <div className="space-y-3">
-                            {allLeaves.map(leave => {
+                            {allLeaves.filter(leave => leave.start_date && leave.end_date).map(leave => {
                                 const status = leave.status || 'pending';
                                 const modifiable = canModify(leave);
                                 const isEditing = editingLeave?.leave_id === leave.leave_id;
