@@ -5,7 +5,7 @@ import Spinner from '../components/ui/LoadingSpinner';
 import Button from '../components/ui/Button';
 import { parentProjectApi, employeeApi, subProjectApi, allocationApi } from '../services/api';
 import Dropdown from '../components/ui/Dropdown';
-import SearchInput from '../components/ui/SearchInput';
+import SearchBar from '../components/ui/SearchBar';
 import { Plus, X, Edit, Trash2, FolderTree, Users, Calendar, Clock, ChevronRight, Layers, Building2 } from 'lucide-react';
 import { Link } from 'react-router-dom';
 import { format } from 'date-fns';
@@ -246,7 +246,7 @@ const ParentProjectsPage = () => {
                     </p>
                 </div>
                 <div className="flex items-center gap-3">
-                    <SearchInput
+                    <SearchBar
                         placeholder="Search organizations..."
                         value={searchQuery}
                         onChange={setSearchQuery}

@@ -149,7 +149,6 @@ function App() {
               <Route path="guidelines" element={<GuidelinesPage />} />
               <Route path="onboarding-mentor" element={<PMMentorshipPage />} />
               <Route path="newly-onboarded" element={<Navigate to="/pm/onboarding-mentor" replace />} />
-              {/* <Route path="onboarding-mentor" element={<PMOnboardingDashboard />} /> */}
               <Route path="profile" element={<ProfilePage />} />
             </Route>
 

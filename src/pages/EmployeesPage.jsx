@@ -444,9 +444,9 @@ import { createPortal } from 'react-dom';
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import { useSearchParams } from 'react-router-dom';
 import { employeeApi, skillApi, allocationApi } from '../services/api';
-import { Plus, Edit, Trash2, X, User, ChevronDown, Search, CheckCircle, AlertCircle, Clock, ArrowUpCircle, RotateCcw } from 'lucide-react';
+import { Plus, Edit, Trash2, X, User, ChevronDown, CheckCircle, AlertCircle, Clock, ArrowUpCircle, RotateCcw } from 'lucide-react';
 import toast from 'react-hot-toast';
-import PageSearchBar from '../components/ui/PageSearchBar';
+import SearchBar from '../components/ui/SearchBar';
 import Table, { ColumnTemplates } from '../components/ui/Table';
 import Dropdown from '../components/ui/Dropdown';
 import Spinner from '../components/ui/LoadingSpinner';
@@ -1357,7 +1357,7 @@ const EmployeesPage = () => {
             </div>
           )}
 
-          <PageSearchBar
+          <SearchBar responsive
             value={searchQuery}
             onChange={(val) => { setSearchQuery(val); setCurrentPage(1); }}
             placeholder="Search employees..."
@@ -1377,7 +1377,7 @@ const EmployeesPage = () => {
           {idleOnly && (
             <span className="inline-flex items-center gap-1.5 px-2.5 py-1 rounded-full text-xs font-medium bg-amber-50 text-amber-700 border border-amber-200">
               Idle Only
-              <Button variant="ghost" size="icon" onClick={() => { const params = new URLSearchParams(searchParams); params.delete('idleOnly'); setSearchParams(params); }} className="rounded-full p-0.5 ">
+              <Button variant="ghost" size="icon" onClick={() => { const params = new URLSearchParams(searchParams); params.delete('idleOnly'); setSearchParams(params); }} className="rounded-full !p-0 w-4 h-4">
                 <X className="w-3 h-3" />
               </Button>
             </span>
@@ -1385,7 +1385,7 @@ const EmployeesPage = () => {
           {statusParam && (
             <span className="inline-flex items-center gap-1.5 px-2.5 py-1 rounded-full text-xs font-medium bg-indigo-50 text-indigo-700 border border-indigo-200">
               Status: {statusParam}
-              <Button variant="ghost" size="icon" onClick={() => { const params = new URLSearchParams(searchParams); params.delete('status'); setSearchParams(params); }} className="rounded-full p-0.5">
+              <Button variant="ghost" size="icon" onClick={() => { const params = new URLSearchParams(searchParams); params.delete('status'); setSearchParams(params); }} className="rounded-full !p-0 w-4 h-4">
                 <X className="w-3 h-3" />
               </Button>
             </span>

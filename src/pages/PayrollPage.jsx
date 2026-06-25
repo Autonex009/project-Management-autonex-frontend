@@ -8,6 +8,7 @@ import {
     Download, CheckCircle2, XCircle, AlertTriangle, IndianRupee,
     Users, TrendingDown, Wallet, X, ChevronDown, ChevronRight, ChevronLeft, Lock, Gift, PlusCircle, Search
 } from 'lucide-react';
+import SearchBar from '../components/ui/SearchBar';
 
 const LEAVE_LABELS = {
     paid: 'Paid', casual_sick: 'Casual/Sick', floater: 'Floater',
@@ -363,14 +364,11 @@ const PayrollPage = () => {
 
             {/* Search */}
             {generated && rows.length > 0 && (
-                <div className="relative max-w-sm">
-                    <Search className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-slate-400" />
-                    <input
-                        type="text"
+                <div className="flex justify-between items-center mb-4">
+                    <SearchBar responsive
                         value={search}
-                        onChange={(e) => onSearch(e.target.value)}
+                        onChange={setSearch}
                         placeholder="Search by name, designation or type…"
-                        className="w-full pl-9 pr-3 py-2 bg-white border border-slate-200 rounded-xl text-sm focus:outline-none focus:ring-2 focus:ring-indigo-200 focus:border-indigo-300"
                     />
                 </div>
             )}

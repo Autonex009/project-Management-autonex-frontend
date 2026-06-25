@@ -5,7 +5,7 @@ import { guidelineApi, projectApi, subProjectApi } from '../../services/api';
 import { FileText, Plus, Trash2, Edit3, X, Save, Download, FolderOpen, UploadCloud } from 'lucide-react';
 import toast from 'react-hot-toast';
 import { getPmEmployeeId, getPmProjects, getPmSubProjects } from '../../utils/pmScope';
-import PageSearchBar from '../../components/ui/PageSearchBar';
+import SearchBar from '../../components/ui/SearchBar';
 import Dropdown from '../../components/ui/Dropdown';
 
 const GuidelinesPage = () => {
@@ -167,7 +167,7 @@ const GuidelinesPage = () => {
                     <span className="text-sm text-slate-400">{filteredGuidelines.length} guideline{filteredGuidelines.length !== 1 ? 's' : ''}</span>
                 </div>
 
-                <PageSearchBar
+                <SearchBar responsive
                     value={searchQuery}
                     onChange={setSearchQuery}
                     placeholder="Search guidelines..."

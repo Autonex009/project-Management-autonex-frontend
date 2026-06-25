@@ -3,7 +3,7 @@ import { Download, Users, TrendingUp, CheckCircle2, ChevronDown, ChevronRight } 
 import Button from '../../components/ui/Button';
 import { onboardingApi } from '../../services/api';
 import Spinner from '../../components/ui/LoadingSpinner';
-import SearchInput from '../../components/ui/SearchInput';
+import SearchBar from '../../components/ui/SearchBar';
 
 export default function AdminReportsPage() {
   const [reports, setReports] = useState([]);
@@ -90,7 +90,7 @@ export default function AdminReportsPage() {
       {/* Data Table */}
       <div className="bg-white rounded-2xl shadow-[0_1px_3px_rgba(0,0,0,0.04)] border border-slate-200/60 overflow-hidden">
         <div className="p-4 sm:p-5 border-b border-slate-100 flex flex-col sm:flex-row sm:items-center justify-between gap-4 bg-slate-50/50">
-          <SearchInput
+          <SearchBar
             placeholder="Search candidate..."
             value={searchTerm}
             onChange={setSearchTerm}

@@ -10,7 +10,7 @@ import { getEndDateValidationMessage, isEndDateBeforeStartDate } from '../utils/
 import { getLeaveTypeBadgeClass, getLeaveTypeLabel, LEAVE_TYPE_OPTIONS, getWorkingDayCount, validateConsecutiveLeaves } from '../utils/leaveTypes';
 import LeaveCalendar from '../components/LeaveCalendar';
 import DeleteConfirmModal from '../components/ui/DeleteConfirmModal';
-import PageSearchBar from '../components/ui/PageSearchBar';
+import SearchBar from '../components/ui/SearchBar';
 import Dropdown from '../components/ui/Dropdown';
 import Table from '../components/ui/Table';
 import EmployeeKPIPanel from '../components/EmployeeKPIPanel';
@@ -258,7 +258,7 @@ const LeavesPage = () => {
         </div>
 
         {activeTab !== 'Calendar' && activeTab !== 'Employee KPI' && (
-          <PageSearchBar
+          <SearchBar responsive
             value={searchQuery}
             onChange={handleSearchChange}
             placeholder={activeTab === 'WFH Requests' ? "Search WFH requests..." : "Search leaves..."}

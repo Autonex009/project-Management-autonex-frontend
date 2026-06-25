@@ -6,7 +6,7 @@ import Button from '../../components/ui/Button';
 import { useNavigate } from 'react-router-dom';
 import toast from 'react-hot-toast';
 import { onboardingApi } from '../../services/api';
-import SearchInput from '../../components/ui/SearchInput';
+import SearchBar from '../../components/ui/SearchBar';
 
 export default function AdminModulesList() {
   const [modules, setModules] = useState([]);
@@ -92,7 +92,7 @@ export default function AdminModulesList() {
 
       <div className="bg-white p-6 rounded-2xl shadow-[0_1px_3px_rgba(0,0,0,0.04)] border border-slate-200/60 mb-6">
         <div className="p-4 flex flex-col sm:flex-row gap-4 border-b border-slate-100">
-          <SearchInput
+          <SearchBar
             placeholder="Search modules..."
             value={searchQuery}
             onChange={setSearchQuery}

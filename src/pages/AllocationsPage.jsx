@@ -5,7 +5,7 @@ import Dropdown from '../components/ui/Dropdown';
 // import { allocationApi, projectApi, employeeApi } from '../services/api';
 // import { Plus, X, Edit, Trash2 } from 'lucide-react';
 // import { format } from 'date-fns';
-import SearchInput from '../components/ui/SearchInput';
+import SearchBar from '../components/ui/SearchBar';
 
 // const AllocationsPage = () => {
 //   const queryClient = useQueryClient();
@@ -476,7 +476,7 @@ import { Plus, Edit, Trash2, X, UserPlus, UserMinus, CheckSquare, AlertTriangle,
 import toast from 'react-hot-toast';
 import ConfirmDialog from '../components/ui/ConfirmDialog';
 import { getPmEmployeeId, getPmSubProjects } from '../utils/pmScope';
-import PageSearchBar from '../components/ui/PageSearchBar';
+import SearchBar from '../components/ui/SearchBar';
 import Table from '../components/ui/Table';
 import Button from '../components/ui/Button';
 
@@ -825,7 +825,7 @@ const AllocationsPage = () => {
 
       {/* Search Filter */}
       <div className="flex justify-between items-center mb-4">
-        <PageSearchBar
+        <SearchBar responsive
           value={searchQuery}
           onChange={(val) => { setSearchQuery(val); setCurrentPage(1); }}
           placeholder="Search allocations by project or employee..."
@@ -1153,7 +1153,7 @@ const AllocationsPage = () => {
 
                     {/* Employee Search */}
                     <div className="mb-3">
-                      <SearchInput
+                      <SearchBar
                         placeholder="Search employees by name or email..."
                         value={employeeSearch}
                         onChange={setEmployeeSearch}

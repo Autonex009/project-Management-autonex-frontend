@@ -4,7 +4,7 @@ import { referralApi } from '../services/api';
 import Spinner from '../components/ui/LoadingSpinner';
 import Button from '../components/ui/Button';
 import toast from 'react-hot-toast';
-import PageSearchBar from '../components/ui/PageSearchBar';
+import SearchBar from '../components/ui/SearchBar';
 import {
     Users2, Briefcase, Mail, Phone, Linkedin, ChevronDown, ChevronUp,
     CheckCircle2, Clock, UserCheck, XCircle, TrendingUp, X
@@ -170,7 +170,7 @@ const ReferralsPage = () => {
                     })}
                 </div>
 
-                <PageSearchBar
+                <SearchBar responsive
                     value={searchQuery}
                     onChange={setSearchQuery}
                     placeholder="Search candidates..."

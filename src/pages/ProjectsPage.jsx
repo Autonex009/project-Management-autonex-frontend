@@ -4,11 +4,11 @@ import { useNavigate, useSearchParams } from 'react-router-dom';
 import Button from '../components/ui/Button';
 import Spinner from '../components/ui/LoadingSpinner';
 import { subProjectApi, parentProjectApi, employeeApi, allocationApi, skillApi, leaveApi, guidelineApi } from '../services/api';
-import { Plus, Edit, Trash2, X, UserCheck, Users, ChevronDown, ArrowRight, Copy, Settings, UploadCloud, FileText, Search } from 'lucide-react';
+import { Plus, Edit, Trash2, X, UserCheck, Users, ChevronDown, ArrowRight, Copy, Settings, UploadCloud, FileText } from 'lucide-react';
 import { Link } from 'react-router-dom';
 import { format } from 'date-fns';
 import toast from 'react-hot-toast';
-import PageSearchBar from '../components/ui/PageSearchBar';
+import SearchBar from '../components/ui/SearchBar';
 import { getPmEmployeeId, getPmProjects, getPmSubProjects } from '../utils/pmScope';
 import { getEndDateValidationMessage, isEndDateBeforeStartDate } from '../utils/dateValidation';
 import AllocationPopover from '../components/AllocationPopover';
@@ -623,7 +623,7 @@ toast.success(wasEditing ? 'Project updated successfully' : 'Project created suc
           </p>
         </div>
         <div className="flex flex-wrap items-center gap-2">
-          <PageSearchBar
+          <SearchBar responsive
             value={subProjectSearch}
             onChange={setSubProjectSearch}
             placeholder="Search projects..."

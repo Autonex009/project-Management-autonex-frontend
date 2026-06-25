@@ -3,7 +3,7 @@ import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import { signupRequestApi } from '../services/api';
 import Spinner from '../components/ui/LoadingSpinner';
 import Button from '../components/ui/Button';
-import { CheckCircle, XCircle, Clock, User, Mail, Phone, Briefcase, AlertTriangle, X } from 'lucide-react';
+import { CheckCircle, XCircle, Clock, User, Mail, Phone, Briefcase, AlertTriangle, X, RotateCcw } from 'lucide-react';
 import { format, parseISO } from 'date-fns';
 import toast from 'react-hot-toast';
 import Dropdown from '../components/ui/Dropdown';
@@ -63,6 +63,26 @@ const SignupRequestsPage = () => {
             toast.success('Request rejected and applicant notified');
         },
         onError: (err) => toast.error(err.response?.data?.detail || 'Failed to reject request'),
+    });
+
+    const undoRejectMutation = useMutation({
+        mutationFn: (id) => signupRequestApi.undoReject(id, user.id),
+        onSuccess: () => {
+            queryClient.invalidateQueries(['signup-requests']);
+            toast.success('Rejection undone — request is pending again');
+        },
+        onError: (err) => toast.error(err.response?.data?.detail || 'Failed to undo rejection'),
+    });
+
+    const undoApproveMutation = useMutation({
+        mutationFn: ({ id, reason }) => signupRequestApi.undoApprove(id, user.id, reason),
+        onSuccess: () => {
+            queryClient.invalidateQueries(['signup-requests']);
+            setRejectModal(null);
+            setRejectReason('');
+            toast.success('Approval undone — request is pending again');
+        },
+        onError: (err) => toast.error(err.response?.data?.detail || 'Failed to undo approval'),
     });
 
     const filtered = requests.filter(r => {
@@ -167,6 +187,16 @@ const SignupRequestsPage = () => {
 
                                         {/* Right — actions */}
                                         <div className="flex items-center gap-2 shrink-0">
+                                            {req.status === 'rejected' && (
+                                                <Button variant="secondary" size="sm" onClick={() => undoRejectMutation.mutate(req.id)} disabled={undoRejectMutation.isPending}>
+                                                    <RotateCcw className="w-3.5 h-3.5"/>Undo
+                                                </Button>
+                                            )}
+                                            {req.status === 'approved' && (
+                                                <Button variant="secondary" size="sm" onClick={() => { setRejectModal({ requestId: req.id, name: req.name, mode: 'undoApprove' }); setRejectReason(''); }}>
+                                                    <RotateCcw className="w-3.5 h-3.5"/>Undo
+                                                </Button>
+                                            )}
                                             <Button variant="secondary" size="sm" onClick={() => setExpandedId(isExpanded ? null : req.id)}>
                                                 {isExpanded ? 'Less' : 'Details'}
                                             </Button>
@@ -175,7 +205,7 @@ const SignupRequestsPage = () => {
                                                     <Button variant="success" size="sm" onClick={() => approveMutation.mutate(req.id)} disabled={approveMutation.isPending}>
                                                         <CheckCircle className="w-3.5 h-3.5"/>Approve
                                                     </Button>
-                                                    <Button variant="danger" size="sm" onClick={() => { setRejectModal({ requestId: req.id, name: req.name }); setRejectReason(''); }}>
+                                                    <Button variant="danger" size="sm" onClick={() => { setRejectModal({ requestId: req.id, name: req.name, mode: 'reject' }); setRejectReason(''); }}>
                                                         <XCircle className="w-3.5 h-3.5"/>Reject
                                                     </Button>
                                                 </>
@@ -316,8 +346,19 @@ const SignupRequestsPage = () => {
                         </div>
                         <div className="flex justify-end gap-3 mt-4">
                             <Button variant="cancel" onClick={() => setRejectModal(null)}>Cancel</Button>
-                            <Button variant="danger" onClick={() => rejectMutation.mutate({ id: rejectModal.requestId, reason: rejectReason })} disabled={rejectMutation.isPending} isLoading={rejectMutation.isPending}>
-                                {!rejectMutation.isPending && 'Confirm Reject'}
+                            <Button
+                                variant="danger"
+                                onClick={() => {
+                                    if (rejectModal.mode === 'undoApprove') {
+                                        undoApproveMutation.mutate({ id: rejectModal.requestId, reason: rejectReason });
+                                    } else {
+                                        rejectMutation.mutate({ id: rejectModal.requestId, reason: rejectReason });
+                                    }
+                                }}
+                                disabled={rejectModal.mode === 'undoApprove' ? undoApproveMutation.isPending : rejectMutation.isPending}
+                                isLoading={rejectModal.mode === 'undoApprove' ? undoApproveMutation.isPending : rejectMutation.isPending}
+                            >
+                                {!(rejectModal.mode === 'undoApprove' ? undoApproveMutation.isPending : rejectMutation.isPending) && 'Confirm Reject'}
                             </Button>
                         </div>
                     </div>
