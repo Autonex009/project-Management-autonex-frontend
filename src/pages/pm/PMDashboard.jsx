@@ -1,4 +1,4 @@
-import React from 'react';
+import React, { useMemo } from 'react';
 import { useQuery } from '@tanstack/react-query';
 import { allocationApi, subProjectApi, leaveApi, employeeApi } from '../../services/api';
 import { FolderKanban, Users, Calendar, CheckCircle2, Clock, AlertTriangle, TrendingUp } from 'lucide-react';
@@ -27,9 +27,18 @@ const PMDashboard = () => {
         queryKey: ['allocations'],
         queryFn: allocationApi.getAll,
     });
+    const { startStr, endStr } = useMemo(() => {
+        const today = new Date();
+        const y = today.getFullYear();
+        const m = today.getMonth();
+        const start = `${y}-${String(m + 1).padStart(2, '0')}-01`;
+        const end = `${y}-${String(m + 1).padStart(2, '0')}-${String(new Date(y, m + 1, 0).getDate()).padStart(2, '0')}`;
+        return { startStr: start, endStr: end };
+    }, []);
+
     const { data: allLeaves = [] } = useQuery({
-        queryKey: ['leaves'],
-        queryFn: leaveApi.getAll,
+        queryKey: ['leaves', startStr, endStr],
+        queryFn: () => leaveApi.getAll({ start_date: startStr, end_date: endStr }),
     });
 
     const today = new Date();

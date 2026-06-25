@@ -1,4 +1,4 @@
-import React from 'react';
+import React, { useMemo } from 'react';
 import { useQuery } from '@tanstack/react-query';
 import { allocationApi, subProjectApi, leaveApi, authApi } from '../../services/api';
 import { FolderKanban, Clock, Calendar, CheckCircle2, AlertCircle, TrendingUp } from 'lucide-react';
@@ -22,13 +22,21 @@ const EmployeeDashboard = () => {
         queryFn: subProjectApi.getAll,
     });
 
-    // Fetch leaves for this employee
-    const { data: allLeaves = [] } = useQuery({
-        queryKey: ['leaves'],
-        queryFn: leaveApi.getAll,
-    });
+    const { startStr, endStr } = useMemo(() => {
+        const today = new Date();
+        const y = today.getFullYear();
+        const m = today.getMonth();
+        const start = `${y}-${String(m + 1).padStart(2, '0')}-01`;
+        const end = `${y}-${String(m + 1).padStart(2, '0')}-${String(new Date(y, m + 1, 0).getDate()).padStart(2, '0')}`;
+        return { startStr: start, endStr: end };
+    }, []);
 
-    const myLeaves = allLeaves.filter(l => l.employee_id === employeeId);
+    // Fetch leaves for this employee for the current month
+    const { data: myLeaves = [] } = useQuery({
+        queryKey: ['my-leaves', employeeId, startStr, endStr],
+        queryFn: () => leaveApi.getAll({ employee_id: employeeId, start_date: startStr, end_date: endStr }),
+        enabled: !!employeeId,
+    });
     const today = new Date();
 
     // Map allocations to project data
