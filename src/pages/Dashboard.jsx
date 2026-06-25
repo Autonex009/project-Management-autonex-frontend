@@ -132,6 +132,7 @@ const Dashboard = () => {
 
   const today = new Date();
   const employeesOnLeave = leaves.filter(leave => {
+    if (!leave.start_date || !leave.end_date) return false;
     const start = parseISO(leave.start_date);
     const end = parseISO(leave.end_date);
     return isWithinInterval(today, { start, end });

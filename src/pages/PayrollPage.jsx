@@ -1,14 +1,13 @@
 import { useState, useMemo } from 'react';
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
-import { employeeApi, payrollApi } from '../services/api';
+import { payrollApi } from '../services/api';
 import Spinner from '../components/ui/LoadingSpinner';
 import Button from '../components/ui/Button';
 import toast from 'react-hot-toast';
 import {
     Download, CheckCircle2, XCircle, AlertTriangle, IndianRupee,
-    Users, TrendingDown, Wallet, X, ChevronDown, ChevronRight, Edit2, Save, Lock
+    Users, TrendingDown, Wallet, X, ChevronDown, ChevronRight, ChevronLeft, Lock, Gift, PlusCircle, Search
 } from 'lucide-react';
-import PageSearchBar from '../components/ui/PageSearchBar';
 
 const LEAVE_LABELS = {
     paid: 'Paid', casual_sick: 'Casual/Sick', floater: 'Floater',
@@ -16,6 +15,13 @@ const LEAVE_LABELS = {
 
 const fmt = (n) => new Intl.NumberFormat('en-IN', { minimumFractionDigits: 2, maximumFractionDigits: 2 }).format(n || 0);
 const fmtCurrency = (n) => `₹${fmt(n)}`;
+
+// Format an ISO date 'YYYY-MM-DD' as e.g. '23 Apr' without timezone shifts.
+const MONTHS_SHORT = ['Jan', 'Feb', 'Mar', 'Apr', 'May', 'Jun', 'Jul', 'Aug', 'Sep', 'Oct', 'Nov', 'Dec'];
+const fmtDay = (iso) => {
+    const [, m, d] = (iso || '').split('-');
+    return m && d ? `${parseInt(d, 10)} ${MONTHS_SHORT[parseInt(m, 10) - 1]}` : iso;
+};
 
 const currentMonthStr = () => {
     const d = new Date();
@@ -28,14 +34,21 @@ const PayrollPage = () => {
 
     const [month, setMonth] = useState(currentMonthStr());
     const [generated, setGenerated] = useState(false);
-    const [searchQuery, setSearchQuery] = useState('');
 
     // leave_id → deduct (true/false)
     const [adjustments, setAdjustments] = useState({});
 
-    // employee_id → editing base salary string
-    const [salaryEdits, setSalaryEdits] = useState({});
-    const [savingEmpId, setSavingEmpId] = useState(null);
+    // employee_id → bonus amount (number). Absent = use the saved/default value.
+    const [bonuses, setBonuses] = useState({});
+
+    // employee_id → additional payment amount (number). Absent = use the saved/default value.
+    const [additionalPayments, setAdditionalPayments] = useState({});
+
+    // Search + pagination (display only — totals/save/CSV use the full `rows`).
+    const PAGE_SIZE = 12;
+    const [search, setSearch] = useState('');
+    const [page, setPage] = useState(1);
+
 
     // Which employee's leave modal is open
     const [reviewModal, setReviewModal] = useState(null); // employee row object
@@ -91,35 +104,29 @@ const PayrollPage = () => {
         onError: (err) => toast.error(err.response?.data?.detail || 'Failed to save payroll'),
     });
 
-    const empUpdateMutation = useMutation({
-        mutationFn: ({ id, base_salary }) => employeeApi.update(id, { base_salary }),
-        onSuccess: () => {
-            toast.success('Base salary updated');
-            setSavingEmpId(null);
-            refetch();
-        },
-        onError: (err) => toast.error(err.response?.data?.detail || 'Failed to update salary'),
-    });
 
     const handleGenerate = () => {
         refetch().then(({ data }) => {
             if (!data) return;
             setGenerated(true);
-            // Seed per-leave UNPAID-day counts from the backend's auto classification
-            // (annual paid-leave entitlement applied) or a finalized run's snapshot.
-            const initial = {};
-            data.employees?.forEach(emp => {
-                emp.leaves.forEach(l => {
-                    initial[l.leave_id] = l.unpaid_days ?? (l.deduct ? l.days_in_month : 0);
-                });
-            });
-            setAdjustments(initial);
+            // No seeding needed: the backend returns each leave's per-date paid/unpaid
+            // (auto classification, or a finalized run's snapshot). `adjustments` only
+            // holds the admin's overrides; absent = use the backend's per-date default.
+            setAdjustments({});
         });
     };
 
-    // Admin override: set how many of a leave's days are unpaid (deducted).
-    const setLeaveUnpaid = (leaveId, unpaidDays) => {
-        setAdjustments(prev => ({ ...prev, [leaveId]: unpaidDays }));
+    // Admin override: set the exact list of UNPAID dates (ISO strings) for a leave.
+    const setLeaveDates = (leaveId, unpaidDates) => {
+        setAdjustments(prev => ({ ...prev, [leaveId]: unpaidDates }));
+    };
+
+    // Flip a single day of a leave between paid and unpaid; rest stay as-is.
+    const toggleLeaveDay = (leaf, date) => {
+        const current = leaf.dates.filter(d => d.unpaid).map(d => d.date);
+        const set = new Set(current);
+        if (set.has(date)) set.delete(date); else set.add(date);
+        setLeaveDates(leaf.leave_id, Array.from(set));
     };
 
     // Recompute rows with current adjustments applied
@@ -130,7 +137,14 @@ const PayrollPage = () => {
             let totalDeductedDays = 0;
             let totalPaidDays = 0;
             const leaves = emp.leaves.map(l => {
-                const unpaidDays = Math.max(0, Math.min(adjustments[l.leave_id] ?? l.unpaid_days ?? 0, l.days_in_month));
+                const backendDates = l.dates || [];
+                // Effective unpaid dates: admin override if any, else the backend's per-date default.
+                const override = adjustments[l.leave_id];
+                const unpaidSet = new Set(
+                    override ?? backendDates.filter(d => d.unpaid).map(d => d.date)
+                );
+                const dates = backendDates.map(d => ({ ...d, unpaid: unpaidSet.has(d.date) }));
+                const unpaidDays = dates.filter(d => d.unpaid).length;
                 const paidDays = Math.max(l.days_in_month - unpaidDays, 0);
                 const deductionAmount = unpaidDays * perDay;
                 totalDeductedDays += unpaidDays;
@@ -138,10 +152,18 @@ const PayrollPage = () => {
                 const classification = unpaidDays <= 0
                     ? 'paid'
                     : (unpaidDays >= l.days_in_month ? 'unpaid' : 'partial');
-                return { ...l, unpaidDays, paidDays, classification, deduct: unpaidDays > 0, deductionAmount };
+                return { ...l, dates, unpaidDays, paidDays, classification, deduct: unpaidDays > 0, deductionAmount };
             });
             const totalDeduction = totalDeductedDays * perDay;
-            const finalSalary = Math.max((emp.base_salary || 0) - totalDeduction, 0);
+            // Bonus: capped at the employee's limit; uses the in-progress edit if any,
+            // else the saved/default amount from the preview.
+            const bonusLimit = emp.bonus_limit || 0;
+            const rawBonus = bonuses[emp.employee_id] ?? emp.bonus ?? 0;
+            const bonus = Math.max(0, Math.min(Number(rawBonus) || 0, bonusLimit));
+            // Additional payment: free-form, no cap (just non-negative).
+            const rawAdditional = additionalPayments[emp.employee_id] ?? emp.additional_payment ?? 0;
+            const additional = Math.max(0, Number(rawAdditional) || 0);
+            const finalSalary = Math.max((emp.base_salary || 0) - totalDeduction, 0) + bonus + additional;
             return {
                 ...emp,
                 leaves,
@@ -149,26 +171,37 @@ const PayrollPage = () => {
                 total_paid_days: totalPaidDays,
                 total_deducted_days: totalDeductedDays,
                 total_deduction: totalDeduction,
+                bonus_limit: bonusLimit,
+                bonus,
+                additional_payment: additional,
                 final_salary: finalSalary,
             };
         });
-    }, [preview, adjustments]);
-
-    const filteredRows = useMemo(() => {
-        if (!searchQuery.trim()) return rows;
-        const q = searchQuery.toLowerCase();
-        return rows.filter(r =>
-            (r.employee_name || '').toLowerCase().includes(q) ||
-            (r.designation || '').toLowerCase().includes(q)
-        );
-    }, [rows, searchQuery]);
+    }, [preview, adjustments, bonuses, additionalPayments]);
 
     const totals = useMemo(() => ({
         baseSalary: rows.reduce((s, r) => s + (r.base_salary || 0), 0),
         totalDeduction: rows.reduce((s, r) => s + r.total_deduction, 0),
+        totalBonus: rows.reduce((s, r) => s + (r.bonus || 0), 0),
+        totalAdditional: rows.reduce((s, r) => s + (r.additional_payment || 0), 0),
         finalSalary: rows.reduce((s, r) => s + r.final_salary, 0),
         employeesWithSalary: rows.filter(r => r.base_salary).length,
     }), [rows]);
+
+    const filtered = useMemo(() => {
+        const q = search.trim().toLowerCase();
+        if (!q) return rows;
+        return rows.filter(r =>
+            (r.employee_name || '').toLowerCase().includes(q) ||
+            (r.designation || '').toLowerCase().includes(q) ||
+            (r.employee_type || '').toLowerCase().includes(q)
+        );
+    }, [rows, search]);
+
+    const totalPages = Math.max(1, Math.ceil(filtered.length / PAGE_SIZE));
+    const safePage = Math.min(page, totalPages);
+    const pagedRows = filtered.slice((safePage - 1) * PAGE_SIZE, safePage * PAGE_SIZE);
+    const onSearch = (v) => { setSearch(v); setPage(1); };
 
     const buildAdjustmentsPayload = () =>
         rows.flatMap(emp =>
@@ -177,14 +210,27 @@ const PayrollPage = () => {
                 leave_id: l.leave_id,
                 deduct: l.deduct,
                 unpaid_days: l.unpaidDays,
+                unpaid_dates: (l.dates || []).filter(d => d.unpaid).map(d => d.date),
             }))
         );
+
+    const buildBonusesPayload = () =>
+        rows
+            .filter(r => (r.bonus || 0) > 0)
+            .map(r => ({ employee_id: r.employee_id, amount: r.bonus }));
+
+    const buildAdditionalPaymentsPayload = () =>
+        rows
+            .filter(r => (r.additional_payment || 0) > 0)
+            .map(r => ({ employee_id: r.employee_id, amount: r.additional_payment }));
 
     const handleSave = (status) => {
         saveMutation.mutate({
             month,
             status,
             adjustments: buildAdjustmentsPayload(),
+            bonuses: buildBonusesPayload(),
+            additional_payments: buildAdditionalPaymentsPayload(),
             processed_by: user.id,
         });
     };
@@ -193,7 +239,7 @@ const PayrollPage = () => {
         const headers = [
             'Employee', 'Designation', 'Type',
             'Base Salary (₹)', `Per Day (₹, ÷${preview?.working_days || 22})`,
-            'Leave Days', 'Paid Days', 'Unpaid (Deducted) Days', 'Deduction (₹)', 'Final Salary (₹)', 'Notes'
+            'Leave Days', 'Paid Days', 'Unpaid (Deducted) Days', 'Deduction (₹)', 'Bonus (₹)', 'Additional Payments (₹)', 'Final Salary (₹)', 'Notes'
         ];
         const csvRows = [
             headers.join(','),
@@ -207,6 +253,8 @@ const PayrollPage = () => {
                 r.total_paid_days,
                 r.total_deducted_days,
                 r.total_deduction.toFixed(2),
+                (r.bonus || 0).toFixed(2),
+                (r.additional_payment || 0).toFixed(2),
                 r.final_salary.toFixed(2),
                 r.salary_missing ? '"Salary not set"' : '',
             ].join(','))
@@ -218,13 +266,6 @@ const PayrollPage = () => {
         a.download = `payroll_${month}.csv`;
         a.click();
         URL.revokeObjectURL(url);
-    };
-
-    const saveSalary = (empId) => {
-        const val = parseFloat(salaryEdits[empId]);
-        if (!val || val <= 0) { toast.error('Enter a valid salary amount'); return; }
-        setSavingEmpId(empId);
-        empUpdateMutation.mutate({ id: empId, base_salary: val });
     };
 
     const modalRow = reviewModal ? rows.find(r => r.employee_id === reviewModal) : null;
@@ -272,7 +313,7 @@ const PayrollPage = () => {
                     <input
                         type="month"
                         value={month}
-                        onChange={e => { setMonth(e.target.value); setGenerated(false); setAdjustments({}); setSearchQuery(''); }}
+                        onChange={e => { setMonth(e.target.value); setGenerated(false); setAdjustments({}); }}
                         className="px-3 py-2 border border-slate-200 rounded-xl text-sm outline-none focus:border-indigo-400 focus:ring-2 focus:ring-indigo-100"
                     />
                     <Button onClick={handleGenerate} disabled={isLoading} isLoading={isLoading}>
@@ -290,11 +331,13 @@ const PayrollPage = () => {
 
             {/* Stats bar */}
             {generated && preview && (
-                <div className="grid grid-cols-2 lg:grid-cols-4 gap-4">
+                <div className="grid grid-cols-2 lg:grid-cols-6 gap-4">
                     {[
                         { label: 'Employees', value: totals.employeesWithSalary, suffix: `/ ${rows.length}`, icon: Users, color: 'text-slate-700', bg: 'bg-slate-100' },
                         { label: 'Total Base Salary', value: fmtCurrency(totals.baseSalary), icon: Wallet, color: 'text-indigo-700', bg: 'bg-indigo-100' },
                         { label: 'Total Deductions', value: fmtCurrency(totals.totalDeduction), icon: TrendingDown, color: 'text-red-700', bg: 'bg-red-100' },
+                        { label: 'Total Bonus', value: fmtCurrency(totals.totalBonus), icon: Gift, color: 'text-amber-700', bg: 'bg-amber-100' },
+                        { label: 'Total Additional', value: fmtCurrency(totals.totalAdditional), icon: PlusCircle, color: 'text-sky-700', bg: 'bg-sky-100' },
                         { label: 'Total Payable', value: fmtCurrency(totals.finalSalary), icon: IndianRupee, color: 'text-emerald-700', bg: 'bg-emerald-100' },
                     ].map(s => (
                         <div key={s.label} className="bg-white rounded-2xl border border-slate-200/60 shadow-sm p-5">
@@ -318,13 +361,16 @@ const PayrollPage = () => {
                 </div>
             )}
 
-            {/* Search filter */}
-            {generated && (
-                <div className="flex justify-between items-center mb-4">
-                    <PageSearchBar
-                        value={searchQuery}
-                        onChange={setSearchQuery}
-                        placeholder="Search employees..."
+            {/* Search */}
+            {generated && rows.length > 0 && (
+                <div className="relative max-w-sm">
+                    <Search className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-slate-400" />
+                    <input
+                        type="text"
+                        value={search}
+                        onChange={(e) => onSearch(e.target.value)}
+                        placeholder="Search by name, designation or type…"
+                        className="w-full pl-9 pr-3 py-2 bg-white border border-slate-200 rounded-xl text-sm focus:outline-none focus:ring-2 focus:ring-indigo-200 focus:border-indigo-300"
                     />
                 </div>
             )}
@@ -332,25 +378,28 @@ const PayrollPage = () => {
             {/* Main table */}
             {generated && (
                 <div className="bg-white rounded-2xl border border-slate-200/60 shadow-sm overflow-hidden">
-                    {filteredRows.length === 0 ? (
+                    {rows.length === 0 ? (
                         <div className="flex items-center justify-center py-16 text-slate-400 text-sm">
-                            {searchQuery ? 'No employees match your search.' : 'No active employees found.'}
+                            No active employees found.
+                        </div>
+                    ) : filtered.length === 0 ? (
+                        <div className="flex items-center justify-center py-16 text-slate-400 text-sm">
+                            No people match “{search}”.
                         </div>
                     ) : (
                         <div className="overflow-x-auto">
                             <table className="w-full text-sm">
                                 <thead className="bg-slate-50/80 border-b border-slate-100">
                                     <tr>
-                                        {['Employee', 'Base Salary / Per Day', 'Leaves', 'Deducted', 'Final Salary', 'Actions'].map(h => (
+                                        {['Employee', 'Base Salary / Per Day', 'Leaves', 'Deducted', 'Bonus', 'Additional Payments', 'Final Salary', 'Actions'].map(h => (
                                             <th key={h} className={`px-5 py-4 text-xs font-semibold text-slate-400 uppercase tracking-wider ${
-                                                ['Base Salary / Per Day', 'Leaves', 'Deducted', 'Final Salary'].includes(h) ? 'text-right' : 'text-left'
+                                                ['Base Salary / Per Day', 'Leaves', 'Deducted', 'Bonus', 'Additional Payments', 'Final Salary'].includes(h) ? 'text-right' : 'text-left'
                                             }`}>{h}</th>
                                         ))}
                                     </tr>
                                 </thead>
                                 <tbody className="divide-y divide-slate-100">
-                                    {filteredRows.map(row => {
-                                        const editing = salaryEdits[row.employee_id] !== undefined;
+                                    {pagedRows.map(row => {
                                         return (
                                             <tr key={row.employee_id} className="hover:bg-slate-50/50 transition-colors">
                                                 {/* Employee */}
@@ -359,55 +408,17 @@ const PayrollPage = () => {
                                                     <p className="text-xs text-slate-400">{row.designation} · {row.employee_type}</p>
                                                 </td>
 
-                                                {/* Base salary / per day */}
+                                                {/* Base salary / per day — sourced from the Pay tab (read-only here) */}
                                                 <td className="px-5 py-4 text-right">
-                                                    {row.salary_missing || editing ? (
-                                                        <div className="flex items-center justify-end gap-1.5">
-                                                            <span className="text-slate-400">₹</span>
-                                                            <input
-                                                                type="number"
-                                                                autoFocus={editing}
-                                                                value={salaryEdits[row.employee_id] ?? ''}
-                                                                onChange={e => setSalaryEdits(p => ({ ...p, [row.employee_id]: e.target.value }))}
-                                                                placeholder="Enter salary"
-                                                                className="w-32 px-2 py-1 border border-indigo-300 rounded-lg text-sm text-right focus:outline-none focus:ring-2 focus:ring-indigo-200"
-                                                            />
-                                                            <button
-                                                                onClick={() => saveSalary(row.employee_id)}
-                                                                disabled={savingEmpId === row.employee_id}
-                                                                className="p-1.5 bg-emerald-100 text-emerald-700 rounded-lg hover:bg-emerald-200 transition-colors"
-                                                                title="Save salary"
-                                                            >
-                                                                <Save className="w-3.5 h-3.5" />
-                                                            </button>
-                                                            {editing && (
-                                                                <button
-                                                                    onClick={() => setSalaryEdits(p => { const n = {...p}; delete n[row.employee_id]; return n; })}
-                                                                    className="p-1.5 text-slate-400 hover:text-slate-600 rounded-lg"
-                                                                >
-                                                                    <X className="w-3.5 h-3.5" />
-                                                                </button>
-                                                            )}
-                                                        </div>
-                                                    ) : (
-                                                        <div className="flex items-center justify-end gap-2">
-                                                            <div className="text-right">
-                                                                <p className="font-semibold text-slate-800">{fmtCurrency(row.base_salary)}</p>
-                                                                <p className="text-xs text-slate-400">{fmtCurrency(row.per_day_rate)}/day</p>
-                                                            </div>
-                                                            <button
-                                                                onClick={() => setSalaryEdits(p => ({ ...p, [row.employee_id]: row.base_salary }))}
-                                                                className="p-1.5 text-slate-300 hover:text-indigo-600 rounded-lg transition-colors"
-                                                                title="Edit salary"
-                                                            >
-                                                                <Edit2 className="w-3.5 h-3.5" />
-                                                            </button>
-                                                        </div>
-                                                    )}
-                                                    {row.salary_missing && !editing && (
-                                                        <p className="text-xs text-amber-600 flex items-center justify-end gap-1 mt-0.5">
-                                                            <AlertTriangle className="w-3 h-3" />Not set
+                                                    {row.salary_missing ? (
+                                                        <p className="text-xs text-amber-600 flex items-center justify-end gap-1">
+                                                            <AlertTriangle className="w-3 h-3" />Set in Pay tab
                                                         </p>
+                                                    ) : (
+                                                        <div className="text-right">
+                                                            <p className="font-semibold text-slate-800">{fmtCurrency(row.base_salary)}</p>
+                                                            <p className="text-xs text-slate-400">{fmtCurrency(row.per_day_rate)}/day</p>
+                                                        </div>
                                                     )}
                                                 </td>
 
@@ -430,6 +441,60 @@ const PayrollPage = () => {
                                                         </span>
                                                     ) : (
                                                         <span className="text-slate-300 text-xs">—</span>
+                                                    )}
+                                                </td>
+
+                                                {/* Bonus — granted up to the employee's limit (from the Pay tab) */}
+                                                <td className="px-5 py-4 text-right">
+                                                    {row.salary_missing || row.bonus_limit <= 0 ? (
+                                                        <span className="text-slate-300 text-xs">—</span>
+                                                    ) : (
+                                                        <div className="flex items-center justify-end gap-2">
+                                                            <input
+                                                                type="checkbox"
+                                                                checked={row.bonus > 0}
+                                                                onChange={(e) => setBonuses(p => ({ ...p, [row.employee_id]: e.target.checked ? row.bonus_limit : 0 }))}
+                                                                className="w-4 h-4 rounded border-slate-300 text-indigo-600 focus:ring-indigo-200 cursor-pointer"
+                                                                title={row.bonus > 0 ? 'Remove bonus' : 'Grant bonus'}
+                                                            />
+                                                            {row.bonus > 0 ? (
+                                                                <div className="text-right">
+                                                                    <div className="flex items-center justify-end gap-1">
+                                                                        <span className="text-slate-400 text-xs">₹</span>
+                                                                        <input
+                                                                            type="number"
+                                                                            min={0}
+                                                                            max={row.bonus_limit}
+                                                                            value={bonuses[row.employee_id] ?? row.bonus}
+                                                                            onChange={(e) => setBonuses(p => ({ ...p, [row.employee_id]: e.target.value }))}
+                                                                            className="w-24 px-2 py-1 border border-indigo-300 rounded-lg text-sm text-right focus:outline-none focus:ring-2 focus:ring-indigo-200"
+                                                                        />
+                                                                    </div>
+                                                                    <p className="text-[10px] text-slate-400 mt-0.5">max {fmtCurrency(row.bonus_limit)}</p>
+                                                                </div>
+                                                            ) : (
+                                                                <span className="text-xs text-slate-400">up to {fmtCurrency(row.bonus_limit)}</span>
+                                                            )}
+                                                        </div>
+                                                    )}
+                                                </td>
+
+                                                {/* Additional payments — free-form extra amount */}
+                                                <td className="px-5 py-4 text-right">
+                                                    {row.salary_missing ? (
+                                                        <span className="text-slate-300 text-xs">—</span>
+                                                    ) : (
+                                                        <div className="flex items-center justify-end gap-1">
+                                                            <span className="text-slate-400 text-xs">₹</span>
+                                                            <input
+                                                                type="number"
+                                                                min={0}
+                                                                value={additionalPayments[row.employee_id] ?? (row.additional_payment || '')}
+                                                                onChange={(e) => setAdditionalPayments(p => ({ ...p, [row.employee_id]: e.target.value }))}
+                                                                placeholder="0"
+                                                                className="w-24 px-2 py-1 border border-slate-300 rounded-lg text-sm text-right focus:outline-none focus:ring-2 focus:ring-indigo-200 focus:border-indigo-300"
+                                                            />
+                                                        </div>
                                                     )}
                                                 </td>
 
@@ -459,6 +524,31 @@ const PayrollPage = () => {
                                     })}
                                 </tbody>
                             </table>
+                            {/* Pagination */}
+                            <div className="flex items-center justify-between px-5 py-3 border-t border-slate-100 text-sm text-slate-500">
+                                <span>
+                                    Showing {(safePage - 1) * PAGE_SIZE + 1}–{Math.min(safePage * PAGE_SIZE, filtered.length)} of {filtered.length}
+                                </span>
+                                <div className="flex items-center gap-2">
+                                    <button
+                                        onClick={() => setPage(safePage - 1)}
+                                        disabled={safePage <= 1}
+                                        className="p-1.5 rounded-lg hover:bg-slate-100 disabled:opacity-30 disabled:hover:bg-transparent transition-colors"
+                                        title="Previous page"
+                                    >
+                                        <ChevronLeft className="w-4 h-4" />
+                                    </button>
+                                    <span className="text-xs font-medium text-slate-600">Page {safePage} / {totalPages}</span>
+                                    <button
+                                        onClick={() => setPage(safePage + 1)}
+                                        disabled={safePage >= totalPages}
+                                        className="p-1.5 rounded-lg hover:bg-slate-100 disabled:opacity-30 disabled:hover:bg-transparent transition-colors"
+                                        title="Next page"
+                                    >
+                                        <ChevronRight className="w-4 h-4" />
+                                    </button>
+                                </div>
+                            </div>
                         </div>
                     )}
 
@@ -497,7 +587,7 @@ const PayrollPage = () => {
 
             {/* Leave Review Modal */}
             {reviewModal && modalRow && (
-                <div className="fixed inset-0 bg-black/50 flex items-center justify-center z-50 px-2 py-4 sm:px-4 overflow-y-auto">
+                <div className="fixed inset-0 bg-black/50 flex items-center justify-center z-50 p-2 sm:p-4 overflow-y-auto">
                     <div className="bg-white rounded-2xl shadow-xl w-full max-w-full sm:max-w-lg my-2 sm:my-4">
                         {/* Modal header */}
                         <div className="flex items-start justify-between px-6 py-5 border-b border-slate-100">
@@ -535,61 +625,85 @@ const PayrollPage = () => {
                                     : l.classification === 'unpaid'
                                         ? { txt: 'Unpaid', cls: 'bg-red-100 text-red-700' }
                                         : { txt: 'Partly unpaid', cls: 'bg-amber-100 text-amber-700' };
-                                const auto = l.unpaid_days ?? 0;   // backend auto suggestion
-                                const isAuto = l.unpaidDays === auto;
+                                const dateList = l.dates || [];
+                                const allDates = dateList.map(d => d.date);
+                                const autoUnpaid = dateList.filter(d => d.auto_unpaid).map(d => d.date);
+                                const curUnpaid = dateList.filter(d => d.unpaid).map(d => d.date);
+                                const isAuto = curUnpaid.length === autoUnpaid.length && curUnpaid.every(x => autoUnpaid.includes(x));
                                 return (
-                                    <div key={l.leave_id} className="px-6 py-4 flex items-center justify-between gap-4">
-                                        <div className="min-w-0">
-                                            <div className="flex items-center gap-2">
-                                                <span className="text-sm font-medium text-slate-800">
-                                                    {LEAVE_LABELS[l.leave_type] || l.leave_type}
-                                                </span>
-                                                <span className="text-xs bg-slate-100 text-slate-600 px-2 py-0.5 rounded-full">
-                                                    {l.days_in_month}d
-                                                </span>
-                                                <span className={`text-xs px-2 py-0.5 rounded-full font-semibold ${badge.cls}`}>
-                                                    {badge.txt}
-                                                </span>
+                                    <div key={l.leave_id} className="px-6 py-4 space-y-3">
+                                        <div className="flex items-start justify-between gap-4">
+                                            <div className="min-w-0">
+                                                <div className="flex items-center gap-2">
+                                                    <span className="text-sm font-medium text-slate-800">
+                                                        {LEAVE_LABELS[l.leave_type] || l.leave_type}
+                                                    </span>
+                                                    <span className="text-xs bg-slate-100 text-slate-600 px-2 py-0.5 rounded-full">
+                                                        {l.days_in_month}d
+                                                    </span>
+                                                    <span className={`text-xs px-2 py-0.5 rounded-full font-semibold ${badge.cls}`}>
+                                                        {badge.txt}
+                                                    </span>
+                                                </div>
+                                                <p className="text-xs text-slate-400 mt-0.5">
+                                                    {l.start_date} → {l.end_date}
+                                                    {l.reason && ` · ${l.reason}`}
+                                                </p>
+                                                <p className="text-xs font-medium mt-0.5 text-slate-600">
+                                                    {l.paidDays > 0 && <span className="text-emerald-600">{l.paidDays}d paid</span>}
+                                                    {l.paidDays > 0 && l.unpaidDays > 0 && ' · '}
+                                                    {l.unpaidDays > 0 && <span className="text-red-600">{l.unpaidDays}d unpaid −{fmtCurrency(l.deductionAmount)}</span>}
+                                                    {l.unpaidDays <= 0 && l.paidDays === l.days_in_month && <span className="text-emerald-600"> — no deduction</span>}
+                                                </p>
                                             </div>
-                                            <p className="text-xs text-slate-400 mt-0.5">
-                                                {l.start_date} → {l.end_date}
-                                                {l.reason && ` · ${l.reason}`}
-                                            </p>
-                                            <p className="text-xs font-medium mt-0.5 text-slate-600">
-                                                {l.paidDays > 0 && <span className="text-emerald-600">{l.paidDays}d paid</span>}
-                                                {l.paidDays > 0 && l.unpaidDays > 0 && ' · '}
-                                                {l.unpaidDays > 0 && <span className="text-red-600">{l.unpaidDays}d unpaid −{fmtCurrency(l.deductionAmount)}</span>}
-                                                {l.unpaidDays <= 0 && l.paidDays === l.days_in_month && <span className="text-emerald-600"> — no deduction</span>}
-                                            </p>
+                                            {/* Quick set: Auto / All unpaid / All paid */}
+                                            <div className="flex gap-1.5 shrink-0">
+                                                <button
+                                                    onClick={() => setLeaveDates(l.leave_id, autoUnpaid)}
+                                                    title={`Auto (balance-based): ${autoUnpaid.length}d unpaid`}
+                                                    className={`px-2.5 py-1.5 text-xs font-semibold rounded-lg transition-colors ${
+                                                        isAuto ? 'bg-indigo-100 text-indigo-700' : 'bg-slate-100 text-slate-400 hover:bg-indigo-50 hover:text-indigo-600'
+                                                    }`}
+                                                >
+                                                    Auto
+                                                </button>
+                                                <button
+                                                    onClick={() => setLeaveDates(l.leave_id, allDates)}
+                                                    className={`px-2.5 py-1.5 text-xs font-semibold rounded-lg transition-colors ${
+                                                        !isAuto && l.unpaidDays >= l.days_in_month ? 'bg-red-100 text-red-700' : 'bg-slate-100 text-slate-400 hover:bg-red-50 hover:text-red-600'
+                                                    }`}
+                                                >
+                                                    All unpaid
+                                                </button>
+                                                <button
+                                                    onClick={() => setLeaveDates(l.leave_id, [])}
+                                                    className={`px-2.5 py-1.5 text-xs font-semibold rounded-lg transition-colors ${
+                                                        !isAuto && l.unpaidDays <= 0 ? 'bg-emerald-100 text-emerald-700' : 'bg-slate-100 text-slate-400 hover:bg-emerald-50 hover:text-emerald-600'
+                                                    }`}
+                                                >
+                                                    All paid
+                                                </button>
+                                            </div>
                                         </div>
-                                        {/* Override: Auto / All unpaid / All paid */}
-                                        <div className="flex gap-1.5 shrink-0">
-                                            <button
-                                                onClick={() => setLeaveUnpaid(l.leave_id, auto)}
-                                                title={`Auto (balance-based): ${auto}d unpaid`}
-                                                className={`px-2.5 py-1.5 text-xs font-semibold rounded-lg transition-colors ${
-                                                    isAuto ? 'bg-indigo-100 text-indigo-700' : 'bg-slate-100 text-slate-400 hover:bg-indigo-50 hover:text-indigo-600'
-                                                }`}
-                                            >
-                                                Auto
-                                            </button>
-                                            <button
-                                                onClick={() => setLeaveUnpaid(l.leave_id, l.days_in_month)}
-                                                className={`px-2.5 py-1.5 text-xs font-semibold rounded-lg transition-colors ${
-                                                    !isAuto && l.unpaidDays >= l.days_in_month ? 'bg-red-100 text-red-700' : 'bg-slate-100 text-slate-400 hover:bg-red-50 hover:text-red-600'
-                                                }`}
-                                            >
-                                                All unpaid
-                                            </button>
-                                            <button
-                                                onClick={() => setLeaveUnpaid(l.leave_id, 0)}
-                                                className={`px-2.5 py-1.5 text-xs font-semibold rounded-lg transition-colors ${
-                                                    !isAuto && l.unpaidDays <= 0 ? 'bg-emerald-100 text-emerald-700' : 'bg-slate-100 text-slate-400 hover:bg-emerald-50 hover:text-emerald-600'
-                                                }`}
-                                            >
-                                                All paid
-                                            </button>
-                                        </div>
+                                        {/* Per-day toggles — click a day to flip paid/unpaid; the rest stay as-is */}
+                                        {dateList.length > 0 && (
+                                            <div className="flex flex-wrap gap-1.5">
+                                                {dateList.map(d => (
+                                                    <button
+                                                        key={d.date}
+                                                        onClick={() => toggleLeaveDay(l, d.date)}
+                                                        title={d.unpaid ? 'Unpaid — click to mark paid' : 'Paid — click to mark unpaid'}
+                                                        className={`px-2 py-1 rounded-lg text-xs font-medium border transition-colors ${
+                                                            d.unpaid
+                                                                ? 'bg-red-50 border-red-200 text-red-700 hover:bg-red-100'
+                                                                : 'bg-emerald-50 border-emerald-200 text-emerald-700 hover:bg-emerald-100'
+                                                        } ${d.unpaid !== d.auto_unpaid ? 'ring-1 ring-indigo-300' : ''}`}
+                                                    >
+                                                        {fmtDay(d.date)} · {d.unpaid ? 'Unpaid' : 'Paid'}
+                                                    </button>
+                                                ))}
+                                            </div>
+                                        )}
                                     </div>
                                 );
                             })}

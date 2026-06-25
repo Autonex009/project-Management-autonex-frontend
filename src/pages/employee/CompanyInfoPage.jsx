@@ -239,14 +239,15 @@ const CompanyInfoPage = () => {
                             </ul>
                         </div>
 
-                        {/* 3. Intern and Clubbing Policies */}
+                        {/* 3. Intern/Contractor and Clubbing Policies */}
                         <div className="grid grid-cols-1 sm:grid-cols-2 gap-6 pt-2">
                             <div className="bg-white border border-slate-200/80 rounded-2xl p-5 shadow-sm space-y-3">
-                                <h4 className="font-bold text-slate-800 text-sm border-b border-slate-100 pb-2">Leave Policy for Interns 🎓</h4>
+                                <h4 className="font-bold text-slate-800 text-sm border-b border-slate-100 pb-2">Leave Policy for Interns & Contractors 🎓</h4>
                                 <ul className="list-disc list-inside text-sm text-slate-600 space-y-1.5">
-                                    <li>Interns are eligible to avail <strong>1 leave per month</strong>.</li>
-                                    <li>Any leave exceeding <strong>1 leave per month</strong> will be considered as <strong>unpaid leave</strong>.</li>
-                                    <li>Additional leave requests may be considered only under exceptional circumstances and subject to management approval.</li>
+                                    <li>Eligible for <strong>1 Paid Leave per month</strong> (accrues/resets monthly).</li>
+                                    <li>Eligible for <strong>0 Casual/Sick Leaves</strong>. Any casual/sick leave taken is unpaid.</li>
+                                    <li>Eligible for <strong>2 Floater Leaves</strong> overall per year, matching standard employees.</li>
+                                    <li>Any leave taken exceeding these quotas is treated as unpaid.</li>
                                 </ul>
                             </div>
                             <div className="bg-white border border-slate-200/80 rounded-2xl p-5 shadow-sm space-y-3">
