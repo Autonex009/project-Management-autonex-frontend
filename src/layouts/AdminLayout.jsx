@@ -57,13 +57,13 @@ const AdminLayout = () => {
     staleTime: 5 * 60 * 1000
   });
 
-  const { data: pendingSignups = [] } = useQuery({
-    queryKey: ['signup-requests', 'pending'],
-    queryFn: () => signupRequestApi.getAll({ status: 'pending' }),
+  const { data: signupCounts } = useQuery({
+    queryKey: ['signup-requests-counts'],
+    queryFn: () => signupRequestApi.getCounts(),
     refetchInterval: 60_000,
     staleTime: 30_000,
   });
-  const pendingSignupCount = pendingSignups.length;
+  const pendingSignupCount = signupCounts?.pending || 0;
 
   const filteredResults = {
     employees: (searchEmployees || []).filter(e => e.name.toLowerCase().includes(searchQuery.toLowerCase())).slice(0, 3),

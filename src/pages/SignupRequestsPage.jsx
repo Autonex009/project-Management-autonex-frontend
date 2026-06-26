@@ -27,16 +27,31 @@ const SignupRequestsPage = () => {
     const [localEmployeeTypes, setLocalEmployeeTypes] = useState({});
     const PAGE_SIZE = 10;
 
-    const { data: requests = [], isLoading } = useQuery({
-        queryKey: ['signup-requests'],
-        queryFn: () => signupRequestApi.getAll(),
+    const { data: listData, isLoading } = useQuery({
+        queryKey: ['signup-requests', activeTab, currentPage],
+        queryFn: () => signupRequestApi.getAll({
+            page: currentPage,
+            page_size: PAGE_SIZE,
+            ...(activeTab !== 'All' && { status: activeTab.toLowerCase() }),
+        }),
         refetchInterval: 30_000,
     });
+
+    const { data: counts } = useQuery({
+        queryKey: ['signup-requests-counts'],
+        queryFn: () => signupRequestApi.getCounts(),
+        refetchInterval: 30_000,
+    });
+
+    const requests = listData?.items || [];
+    const totalPages = listData?.total_pages || 1;
+    const pendingCount = counts?.pending || 0;
 
     const approveMutation = useMutation({
         mutationFn: (id) => signupRequestApi.approve(id, user.id),
         onSuccess: (data) => {
             queryClient.invalidateQueries(['signup-requests']);
+            queryClient.invalidateQueries(['signup-requests-counts']);
             queryClient.invalidateQueries(['employees']);
             toast.success(data.message || 'Account created and credentials emailed');
         },
@@ -47,6 +62,7 @@ const SignupRequestsPage = () => {
         mutationFn: ({ id, data }) => signupRequestApi.update(id, data),
         onSuccess: () => {
             queryClient.invalidateQueries(['signup-requests']);
+            queryClient.invalidateQueries(['signup-requests-counts']);
             toast.success('Employment type updated');
         },
         onError: (err) => toast.error(err.response?.data?.detail || 'Failed to update employment type'),
@@ -56,6 +72,7 @@ const SignupRequestsPage = () => {
         mutationFn: ({ id, reason }) => signupRequestApi.reject(id, user.id, reason),
         onSuccess: () => {
             queryClient.invalidateQueries(['signup-requests']);
+            queryClient.invalidateQueries(['signup-requests-counts']);
             setRejectModal(null);
             setRejectReason('');
             toast.success('Request rejected and applicant notified');
@@ -63,14 +80,6 @@ const SignupRequestsPage = () => {
         onError: (err) => toast.error(err.response?.data?.detail || 'Failed to reject request'),
     });
 
-    const filtered = requests.filter(r => {
-        if (activeTab === 'All') return true;
-        return r.status === activeTab.toLowerCase();
-    });
-
-    const pendingCount = requests.filter(r => r.status === 'pending').length;
-    const totalPages = Math.ceil(filtered.length / PAGE_SIZE);
-    const paginatedRequests = filtered.slice((currentPage - 1) * PAGE_SIZE, currentPage * PAGE_SIZE);
 
     const handleTabChange = (tab) => {
         setActiveTab(tab);
@@ -115,7 +124,7 @@ const SignupRequestsPage = () => {
             <div className="bg-white rounded-2xl border border-slate-200/60 shadow-sm">
                 {isLoading ? (
                     <div className="flex items-center justify-center py-16 text-slate-400">Loading...</div>
-                ) : filtered.length === 0 ? (
+                ) : requests.length === 0 ? (
                     <div className="flex flex-col items-center justify-center py-16 text-slate-400">
                         <User className="w-10 h-10 mb-3 text-slate-300" />
                         <p className="font-medium">No {activeTab.toLowerCase()} requests</p>
@@ -125,7 +134,7 @@ const SignupRequestsPage = () => {
                     </div>
                 ) : (
                     <div className="divide-y divide-slate-100">
-                        {paginatedRequests.map(req => {
+                        {requests.map(req => {
                             const isExpanded = expandedId === req.id;
                             return (
                                 <div key={req.id} className="hover:bg-slate-50/50 transition-colors">
