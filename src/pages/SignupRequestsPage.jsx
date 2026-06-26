@@ -4,6 +4,9 @@ import { signupRequestApi } from '../services/api';
 import { CheckCircle, XCircle, Clock, User, Mail, Phone, Briefcase, AlertTriangle, X } from 'lucide-react';
 import { format, parseISO } from 'date-fns';
 import toast from 'react-hot-toast';
+import Dropdown from '../components/ui/Dropdown';
+
+const EMPLOYEE_TYPES = ['Full-time', 'Part-time', 'Intern', 'Contractor'];
 
 const STATUS_BADGE = {
     pending:  <span className="inline-flex items-center gap-1 px-2.5 py-0.5 rounded-full text-xs font-medium bg-amber-50 text-amber-700 border border-amber-200"><Clock className="w-3 h-3"/>Pending</span>,
@@ -21,28 +24,55 @@ const SignupRequestsPage = () => {
     const [rejectReason, setRejectReason] = useState('');
     const [expandedId, setExpandedId] = useState(null);
     const [currentPage, setCurrentPage] = useState(1);
+    const [localEmployeeTypes, setLocalEmployeeTypes] = useState({});
     const PAGE_SIZE = 10;
 
-    const { data: requests = [], isLoading } = useQuery({
-        queryKey: ['signup-requests'],
-        queryFn: () => signupRequestApi.getAll(),
+    const { data: listData, isLoading } = useQuery({
+        queryKey: ['signup-requests', activeTab, currentPage],
+        queryFn: () => signupRequestApi.getAll({
+            page: currentPage,
+            page_size: PAGE_SIZE,
+            ...(activeTab !== 'All' && { status: activeTab.toLowerCase() }),
+        }),
         refetchInterval: 30_000,
     });
+
+    const { data: counts } = useQuery({
+        queryKey: ['signup-requests-counts'],
+        queryFn: () => signupRequestApi.getCounts(),
+        refetchInterval: 30_000,
+    });
+
+    const requests = listData?.items || [];
+    const totalPages = listData?.total_pages || 1;
+    const pendingCount = counts?.pending || 0;
 
     const approveMutation = useMutation({
         mutationFn: (id) => signupRequestApi.approve(id, user.id),
         onSuccess: (data) => {
             queryClient.invalidateQueries(['signup-requests']);
+            queryClient.invalidateQueries(['signup-requests-counts']);
             queryClient.invalidateQueries(['employees']);
             toast.success(data.message || 'Account created and credentials emailed');
         },
         onError: (err) => toast.error(err.response?.data?.detail || 'Failed to approve request'),
     });
 
+    const updateMutation = useMutation({
+        mutationFn: ({ id, data }) => signupRequestApi.update(id, data),
+        onSuccess: () => {
+            queryClient.invalidateQueries(['signup-requests']);
+            queryClient.invalidateQueries(['signup-requests-counts']);
+            toast.success('Employment type updated');
+        },
+        onError: (err) => toast.error(err.response?.data?.detail || 'Failed to update employment type'),
+    });
+
     const rejectMutation = useMutation({
         mutationFn: ({ id, reason }) => signupRequestApi.reject(id, user.id, reason),
         onSuccess: () => {
             queryClient.invalidateQueries(['signup-requests']);
+            queryClient.invalidateQueries(['signup-requests-counts']);
             setRejectModal(null);
             setRejectReason('');
             toast.success('Request rejected and applicant notified');
@@ -50,14 +80,6 @@ const SignupRequestsPage = () => {
         onError: (err) => toast.error(err.response?.data?.detail || 'Failed to reject request'),
     });
 
-    const filtered = requests.filter(r => {
-        if (activeTab === 'All') return true;
-        return r.status === activeTab.toLowerCase();
-    });
-
-    const pendingCount = requests.filter(r => r.status === 'pending').length;
-    const totalPages = Math.ceil(filtered.length / PAGE_SIZE);
-    const paginatedRequests = filtered.slice((currentPage - 1) * PAGE_SIZE, currentPage * PAGE_SIZE);
 
     const handleTabChange = (tab) => {
         setActiveTab(tab);
@@ -99,10 +121,10 @@ const SignupRequestsPage = () => {
             </div>
 
             {/* Table */}
-            <div className="bg-white rounded-2xl border border-slate-200/60 shadow-sm overflow-hidden">
+            <div className="bg-white rounded-2xl border border-slate-200/60 shadow-sm">
                 {isLoading ? (
                     <div className="flex items-center justify-center py-16 text-slate-400">Loading...</div>
-                ) : filtered.length === 0 ? (
+                ) : requests.length === 0 ? (
                     <div className="flex flex-col items-center justify-center py-16 text-slate-400">
                         <User className="w-10 h-10 mb-3 text-slate-300" />
                         <p className="font-medium">No {activeTab.toLowerCase()} requests</p>
@@ -112,7 +134,7 @@ const SignupRequestsPage = () => {
                     </div>
                 ) : (
                     <div className="divide-y divide-slate-100">
-                        {paginatedRequests.map(req => {
+                        {requests.map(req => {
                             const isExpanded = expandedId === req.id;
                             return (
                                 <div key={req.id} className="hover:bg-slate-50/50 transition-colors">
@@ -180,7 +202,14 @@ const SignupRequestsPage = () => {
                                             <div className="pt-4 grid grid-cols-1 md:grid-cols-2 gap-4 text-sm">
                                                 <div>
                                                     <p className="text-xs font-semibold text-slate-400 uppercase mb-1">Employment Type</p>
-                                                    <p className="text-slate-700">{req.employee_type}</p>
+                                                    <Dropdown
+                                                        options={EMPLOYEE_TYPES}
+                                                        value={localEmployeeTypes[req.id] ?? req.employee_type ?? ''}
+                                                        onChange={newType => {
+                                                            setLocalEmployeeTypes(prev => ({ ...prev, [req.id]: newType }));
+                                                            updateMutation.mutate({ id: req.id, data: { employee_type: newType } });
+                                                        }}
+                                                    />
                                                 </div>
                                                 <div>
                                                     <p className="text-xs font-semibold text-slate-400 uppercase mb-1">Skills</p>
@@ -273,7 +302,7 @@ const SignupRequestsPage = () => {
 
             {/* Reject modal */}
             {rejectModal && (
-                <div className="fixed inset-0 bg-black/50 flex items-center justify-center z-50 p-4">
+                <div className="fixed inset-0 bg-black/50 flex items-center justify-center z-50 px-4 py-8">
                     <div className="bg-white rounded-2xl shadow-xl w-full max-w-md p-6">
                         <div className="flex items-start gap-3 mb-4">
                             <div className="p-2 bg-red-100 rounded-lg shrink-0">

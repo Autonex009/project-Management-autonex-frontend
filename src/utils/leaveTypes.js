@@ -2,6 +2,8 @@ export const LEAVE_TYPE_OPTIONS = [
   { value: 'paid', label: 'Paid Leave' },
   { value: 'casual_sick', label: 'Casual/Sick Leave' },
   { value: 'floater', label: 'Floater Leave' },
+  { value: 'first_half', label: 'First Half-day Leave' },
+  { value: 'second_half', label: 'Second Half-day Leave' },
 ];
 
 const LEGACY_LEAVE_TYPE_ALIASES = {
@@ -20,6 +22,8 @@ const LEAVE_TYPE_BADGES = {
   paid: 'bg-blue-50 text-blue-700',
   casual_sick: 'bg-emerald-50 text-emerald-700',
   floater: 'bg-amber-50 text-amber-700',
+  first_half: 'bg-indigo-50 text-indigo-700',
+  second_half: 'bg-violet-50 text-violet-700',
 };
 
 // Annual paid-leave entitlement (working days/year), mirrors the backend
@@ -36,7 +40,8 @@ export const ANNUAL_LEAVE_QUOTA = {
 export const INTERN_MONTHLY_PAID_QUOTA = 1;
 
 export function isIntern(employeeType) {
-  return (employeeType || '').trim().toLowerCase() === 'intern';
+  const type = (employeeType || '').trim().toLowerCase();
+  return type === 'intern' || type === 'contract' || type === 'contractor';
 }
 
 export const FLOATER_DATES_2026 = [
@@ -50,7 +55,6 @@ export const FLOATER_DATES_2026 = [
   { date: '2026-04-03', label: 'Good Friday' },
   { date: '2026-04-14', label: 'Ambedkar Jayanti' },
   { date: '2026-05-27', label: 'Bakrid' },
-  { date: '2026-06-26', label: 'Muharram' },
   { date: '2026-08-15', label: 'Independence Day' },
   { date: '2026-08-26', label: 'Onam' },
   { date: '2026-08-28', label: 'Raksha Bandhan' },
@@ -78,6 +82,7 @@ export const FIXED_HOLIDAYS_2026 = [
   { date: '2026-01-26', label: 'Republic Day' },
   { date: '2026-03-04', label: 'Holi' },
   { date: '2026-05-01', label: 'Maharashtra Day' },
+  { date: '2026-06-26', label: 'Muharram' },
   { date: '2026-09-14', label: 'Ganesh Chaturthi' },
   { date: '2026-10-02', label: 'Mahatma Gandhi Jayanti' },
   { date: '2026-11-09', label: 'Govardhan Puja' },
@@ -144,7 +149,7 @@ export function findNonWorkingDayInRange(startDateStr, endDateStr) {
   return null;
 }
 
-export function getWorkingDayCount(startDateStr, endDateStr) {
+export function getWorkingDayCount(startDateStr, endDateStr, isHalfDay = false) {
   if (!startDateStr || !endDateStr) return 0;
   const start = new Date(startDateStr + 'T00:00:00');
   const end = new Date(endDateStr + 'T00:00:00');
@@ -155,7 +160,7 @@ export function getWorkingDayCount(startDateStr, endDateStr) {
     if (!isNonWorkingDay(toLocalISODate(cur))) count++;
     cur.setDate(cur.getDate() + 1);
   }
-  return count;
+  return isHalfDay ? (count > 0 ? 0.5 : 0) : count;
 }
 
 export function countNonWorkingDaysInRange(startDateStr, endDateStr) {
@@ -187,4 +192,68 @@ export function getLeaveTypeLabel(value) {
 
 export function getLeaveTypeBadgeClass(value) {
   return LEAVE_TYPE_BADGES[normalizeLeaveType(value)] || 'bg-slate-100 text-slate-600';
+}
+
+export function validateConsecutiveLeaves(startDateStr, endDateStr, leavesList, excludeLeaveId = null, isHalfDay = false) {
+  if (isHalfDay) return true;
+  if (!startDateStr || !endDateStr) return true;
+  
+  const start = new Date(startDateStr + 'T00:00:00');
+  const end = new Date(endDateStr + 'T00:00:00');
+  
+  const windowStart = new Date(start);
+  windowStart.setDate(windowStart.getDate() - 10);
+  const windowEnd = new Date(end);
+  windowEnd.setDate(windowEnd.getDate() + 10);
+
+  const leaveDates = new Set();
+
+  // Add new leave's working days
+  let cur = new Date(start);
+  while (cur <= end) {
+    const ds = toLocalISODate(cur);
+    if (!isNonWorkingDay(ds)) {
+      leaveDates.add(ds);
+    }
+    cur.setDate(cur.getDate() + 1);
+  }
+
+  // Add existing non-rejected leaves' working days
+  leavesList.forEach(l => {
+    if (l.status === 'rejected' || l.leave_id === excludeLeaveId) return;
+    if (l.is_half_day || l.leave_type === 'first_half' || l.leave_type === 'second_half') return;
+    
+    let lStart = new Date(l.start_date + 'T00:00:00');
+    let lEnd = new Date(l.end_date + 'T00:00:00');
+    
+    let c = new Date(lStart < windowStart ? windowStart : lStart);
+    let actualEnd = lEnd > windowEnd ? windowEnd : lEnd;
+    
+    while (c <= actualEnd) {
+      const ds = toLocalISODate(c);
+      if (!isNonWorkingDay(ds)) {
+        leaveDates.add(ds);
+      }
+      c.setDate(c.getDate() + 1);
+    }
+  });
+
+  // Scan the window day-by-day and track consecutive run
+  let consecutiveRun = 0;
+  cur = new Date(windowStart);
+  while (cur <= windowEnd) {
+    const ds = toLocalISODate(cur);
+    if (!isNonWorkingDay(ds)) {
+      if (leaveDates.has(ds)) {
+        consecutiveRun++;
+        if (consecutiveRun >= 5) {
+          return false; // Safely blocked!
+        }
+      } else {
+        consecutiveRun = 0;
+      }
+    }
+    cur.setDate(cur.getDate() + 1);
+  }
+  return true;
 }

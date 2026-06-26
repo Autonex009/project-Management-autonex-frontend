@@ -40,17 +40,20 @@ const ProfilePage = lazy(() => import('./pages/employee/ProfilePage'));
 const SignupRequestsPage = lazy(() => import('./pages/SignupRequestsPage'));
 const EmployeeSignupPage = lazy(() => import('./pages/EmployeeSignupPage'));
 const ReferralsPage = lazy(() => import('./pages/ReferralsPage'));
-const PayrollPage = lazy(() => import('./pages/PayrollPage'));
+const PayrollTabs = lazy(() => import('./pages/PayrollTabs'));
 const EmployeeReferralsPage = lazy(() => import('./pages/employee/EmployeeReferralsPage'));
 const CompanyInfoPage = lazy(() => import('./pages/employee/CompanyInfoPage'));
 const OnboardingDashboard = lazy(() => import('./pages/employee/OnboardingDashboard'));
 const ModuleView = lazy(() => import('./pages/employee/ModuleView'));
-const PMOnboardingDashboard = lazy(() => import('./pages/pm/PMOnboardingDashboard'));
+const NewlyOnboardedPage = lazy(() => import('./pages/NewlyOnboardedPage'));
+const PMMentorshipPage = lazy(() => import('./pages/pm/PMMentorshipPage'));
+// const PMOnboardingDashboard = lazy(() => import('./pages/pm/PMOnboardingDashboard'));
 const AdminModulesList = lazy(() => import('./pages/admin/AdminModulesList'));
 const AdminModulesBuilder = lazy(() => import('./pages/admin/AdminModulesBuilder'));
-const AdminTeamPage = lazy(() => import('./pages/admin/AdminTeamPage'));
+// const AdminTeamPage = lazy(() => import('./pages/admin/AdminTeamPage'));
 const AdminReportsPage = lazy(() => import('./pages/admin/AdminReportsPage'));
-const AdminAnalyticsPage = lazy(() => import('./pages/admin/AdminAnalyticsPage'));
+const AdminCompanySettingsPage = lazy(() => import('./pages/admin/AdminCompanySettingsPage'));
+// const AdminAnalyticsPage = lazy(() => import('./pages/admin/AdminAnalyticsPage'));
 
 
 const queryClient = new QueryClient({
@@ -92,14 +95,16 @@ function App() {
               <Route path="allocations" element={<AllocationsPage />} />
               <Route path="leaves" element={<LeavesPage />} />
               <Route path="signup-requests" element={<SignupRequestsPage />} />
-              <Route path="payroll" element={<PayrollPage />} />
+              <Route path="payroll" element={<PayrollTabs />} />
               <Route path="referrals" element={<ReferralsPage />} />
               <Route path="guidelines" element={<GuidelinesPage />} />
               <Route path="modules" element={<AdminModulesList />} />
               <Route path="modules/new" element={<AdminModulesBuilder />} />
-              <Route path="onboarding-team" element={<AdminTeamPage />} />
+              {/* <Route path="onboarding-team" element={<AdminTeamPage />} /> */}
               <Route path="onboarding-reports" element={<AdminReportsPage />} />
-              <Route path="onboarding-analytics" element={<AdminAnalyticsPage />} />
+              <Route path="newly-onboarded" element={<NewlyOnboardedPage />} />
+              <Route path="company-settings" element={<AdminCompanySettingsPage />} />
+              {/* <Route path="onboarding-analytics" element={<AdminAnalyticsPage />} /> */}
             </Route>
 
 
@@ -142,7 +147,10 @@ function App() {
               <Route path="my-leaves" element={<PMMyLeavesPage />} />
               <Route path="side-projects" element={<SideProjectsPage />} />
               <Route path="guidelines" element={<GuidelinesPage />} />
-              <Route path="onboarding-mentor" element={<PMOnboardingDashboard />} />
+              <Route path="onboarding-mentor" element={<PMMentorshipPage />} />
+              <Route path="newly-onboarded" element={<Navigate to="/pm/onboarding-mentor" replace />} />
+              {/* <Route path="onboarding-mentor" element={<PMOnboardingDashboard />} /> */}
+              <Route path="profile" element={<ProfilePage />} />
             </Route>
 
             {/* Catch all */}

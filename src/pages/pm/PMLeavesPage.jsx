@@ -1,14 +1,15 @@
 import { useState } from 'react';
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import { leaveApi, allocationApi, employeeApi, subProjectApi, wfhApi, parentProjectApi } from '../../services/api';
-import { Calendar, CheckCircle, XCircle, Clock, AlertTriangle, Home } from 'lucide-react';
+import { Calendar, CheckCircle, XCircle, Clock, AlertTriangle, Home, BarChart2 } from 'lucide-react';
 import { format, parseISO } from 'date-fns';
 import toast from 'react-hot-toast';
 import { getPmEmployeeId, getPmSubProjects } from '../../utils/pmScope';
 import { getLeaveTypeLabel } from '../../utils/leaveTypes';
 import LeaveCalendar from '../../components/LeaveCalendar';
+import EmployeeKPIPanel from '../../components/EmployeeKPIPanel';
 
-const TABS = ['Leave Requests', 'Calendar', 'WFH Requests'];
+const TABS = ['Leave Requests', 'Calendar', 'WFH Requests', 'Employee KPI'];
 
 const STATUS_STYLES = {
     pending:  'bg-amber-50 text-amber-700 border-amber-200',
@@ -35,7 +36,8 @@ const PMLeavesPage = () => {
     const myProjectIds = new Set(scopedProjects.map(p => p.id));
     const teamEmployeeIds = new Set(allocations.filter(a => myProjectIds.has(a.sub_project_id)).map(a => a.employee_id));
 
-    const teamLeaves = allLeaves.filter(l => teamEmployeeIds.has(l.employee_id));
+    const teamLeaves = allLeaves.filter(l => teamEmployeeIds.has(l.employee_id) && l.start_date && l.end_date);
+    const teamLeavesForKpi = allLeaves.filter(l => teamEmployeeIds.has(l.employee_id));
     const teamWfh = wfhRequests.filter(w => teamEmployeeIds.has(w.employee_id));
 
     const approveMutation = useMutation({
@@ -86,7 +88,8 @@ const PMLeavesPage = () => {
                             activeTab === tab ? 'bg-white text-slate-800 shadow-sm' : 'text-slate-500 hover:text-slate-700'
                         }`}>
                         {tab === 'WFH Requests' ? <span className="flex items-center gap-1.5"><Home className="w-3.5 h-3.5"/>{tab}</span> :
-                         tab === 'Calendar' ? <span className="flex items-center gap-1.5"><Calendar className="w-3.5 h-3.5"/>{tab}</span> : tab}
+                         tab === 'Calendar' ? <span className="flex items-center gap-1.5"><Calendar className="w-3.5 h-3.5"/>{tab}</span> :
+                         tab === 'Employee KPI' ? <span className="flex items-center gap-1.5"><BarChart2 className="w-3.5 h-3.5"/>{tab}</span> : tab}
                     </button>
                 ))}
             </div>
@@ -137,7 +140,11 @@ const PMLeavesPage = () => {
                                                 </td>
                                                 <td className="px-5 py-3.5 text-sm text-slate-600">{getLeaveTypeLabel(leave.leave_type)}</td>
                                                 <td className="px-5 py-3.5 text-center text-sm text-slate-600 font-mono">
-                                                    {format(parseISO(leave.start_date), 'MMM dd')} — {format(parseISO(leave.end_date), 'MMM dd')}
+                                                    {leave.is_half_day ? (
+                                                        <span>{format(parseISO(leave.start_date), 'MMM dd, yyyy')} (0.5d - {leave.half_day_slot === 'first_half' ? 'First Half' : 'Second Half'})</span>
+                                                    ) : (
+                                                        <span>{format(parseISO(leave.start_date), 'MMM dd')} — {format(parseISO(leave.end_date), 'MMM dd')}</span>
+                                                    )}
                                                 </td>
                                                 <td className="px-5 py-3.5 text-center">
                                                     <span className={`inline-flex items-center gap-1 px-2.5 py-0.5 rounded-full text-xs font-medium border ${STATUS_STYLES[status]}`}>
@@ -225,6 +232,15 @@ const PMLeavesPage = () => {
                         </div>
                     </div>
                 )
+            )}
+
+            {/* ── Employee KPI ── */}
+            {activeTab === 'Employee KPI' && (
+                <EmployeeKPIPanel 
+                    employees={employees.filter(e => teamEmployeeIds.has(e.id))} 
+                    leaves={teamLeavesForKpi} 
+                    wfhRequests={teamWfh} 
+                />
             )}
 
             {/* ── Flagged leave remark modal ── */}

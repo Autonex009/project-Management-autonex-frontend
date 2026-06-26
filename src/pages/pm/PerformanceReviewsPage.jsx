@@ -4,6 +4,7 @@ import { employeeApi, allocationApi, parentProjectApi, subProjectApi, performanc
 import { getPmEmployeeId, getPmSubProjects } from '../../utils/pmScope';
 import { ChevronDown, ChevronUp, MessageSquare, Star, ClipboardList, Plus, Pencil, Trash2, X, Check } from 'lucide-react';
 import toast from 'react-hot-toast';
+import Dropdown from '../../components/ui/Dropdown';
 
 const REVIEW_TYPES = [
     { value: 'feedback', label: 'Feedback', icon: MessageSquare, color: 'text-blue-600', bg: 'bg-blue-50', border: 'border-blue-200', badge: 'bg-blue-50 text-blue-700 border-blue-200' },
@@ -34,6 +35,7 @@ const EMPTY_FORM = { review_type: 'feedback', title: '', content: '', rating: nu
 const ReviewForm = ({ initial = EMPTY_FORM, onSubmit, onCancel, loading }) => {
     const [form, setForm] = useState(initial);
     const set = (key, val) => setForm(prev => ({ ...prev, [key]: val }));
+    const reviewTypeOptions = REVIEW_TYPES.map(t => ({ value: t.value, label: t.label }));
 
     const handleSubmit = (e) => {
         e.preventDefault();
@@ -49,13 +51,11 @@ const ReviewForm = ({ initial = EMPTY_FORM, onSubmit, onCancel, loading }) => {
             <div className="grid gap-4 sm:grid-cols-2">
                 <div>
                     <label className="block text-xs font-semibold uppercase tracking-wide text-slate-500 mb-1.5">Type</label>
-                    <select
+                    <Dropdown
+                        options={reviewTypeOptions}
                         value={form.review_type}
-                        onChange={e => set('review_type', e.target.value)}
-                        className="w-full rounded-xl border border-slate-200 bg-white px-3 py-2.5 text-sm text-slate-800 focus:border-blue-400 focus:outline-none focus:ring-2 focus:ring-blue-100"
-                    >
-                        {REVIEW_TYPES.map(t => <option key={t.value} value={t.value}>{t.label}</option>)}
-                    </select>
+                        onChange={(val) => set('review_type', val)}
+                    />
                 </div>
                 <div>
                     <label className="block text-xs font-semibold uppercase tracking-wide text-slate-500 mb-1.5">Period (optional)</label>

@@ -4,15 +4,57 @@ import { leaveApi, wfhApi } from '../services/api';
 import { Calendar, Plus, X, CheckCircle, XCircle, Clock, Home, AlertTriangle, Pencil, Trash2 } from 'lucide-react';
 import { format, parseISO } from 'date-fns';
 import toast from 'react-hot-toast';
+import Dropdown from './ui/Dropdown';
 import { getEndDateValidationMessage, isEndDateBeforeStartDate } from '../utils/dateValidation';
-import { getLeaveTypeLabel, LEAVE_TYPE_OPTIONS, RAZORPAY_NEGATIVE_BALANCE_NOTE, FLOATER_DATES_2026, isValidFloaterDate, getFloaterDateLabel, isNonWorkingDay, getNonWorkingDayLabel, getWorkingDayCount, countNonWorkingDaysInRange, toLocalISODate, ANNUAL_LEAVE_QUOTA, INTERN_MONTHLY_PAID_QUOTA, isIntern, normalizeLeaveType } from '../utils/leaveTypes';
+import { getLeaveTypeLabel, LEAVE_TYPE_OPTIONS, RAZORPAY_NEGATIVE_BALANCE_NOTE, FLOATER_DATES_2026, isValidFloaterDate, getFloaterDateLabel, isNonWorkingDay, getNonWorkingDayLabel, getWorkingDayCount, countNonWorkingDaysInRange, toLocalISODate, ANNUAL_LEAVE_QUOTA, INTERN_MONTHLY_PAID_QUOTA, isIntern, normalizeLeaveType, validateConsecutiveLeaves } from '../utils/leaveTypes';
 import LeaveCalendar from './LeaveCalendar';
+import DeleteConfirmModal from './ui/DeleteConfirmModal';
 
 const TABS = ['My Leaves', 'Calendar', 'Work From Home'];
 
 const today = toLocalISODate(new Date());
 
 const upcomingFloaterDates = FLOATER_DATES_2026.filter((d) => d.date >= today);
+
+const getISTDateTime = () => {
+    const d = new Date();
+    const options = { timeZone: 'Asia/Kolkata', year: 'numeric', month: '2-digit', day: '2-digit', hour: '2-digit', minute: '2-digit', second: '2-digit', hour12: false };
+    const formatter = new Intl.DateTimeFormat('en-US', options);
+    const parts = formatter.formatToParts(d);
+    const partMap = Object.fromEntries(parts.map(p => [p.type, p.value]));
+    
+    const yr = parseInt(partMap.year);
+    const mo = parseInt(partMap.month) - 1;
+    const dy = parseInt(partMap.day);
+    const hr = parseInt(partMap.hour);
+    const min = parseInt(partMap.minute);
+    
+    return {
+        dateStr: `${partMap.year}-${partMap.month}-${partMap.day}`,
+        hour: hr,
+        minute: min
+    };
+};
+
+const checkHalfDayTiming = (startDateStr, slot) => {
+    const ist = getISTDateTime();
+    const todayStr = ist.dateStr;
+    
+    if (slot === 'first_half') {
+        if (todayStr >= startDateStr) {
+            return 'First-half leaves must be applied at least one day in advance.';
+        }
+    } else if (slot === 'second_half') {
+        if (todayStr > startDateStr) {
+            return 'Cannot apply for a second-half leave after the request date has passed.';
+        } else if (todayStr === startDateStr) {
+            if (ist.hour >= 14) {
+                return 'Second-half leaves must be applied before 2:00 PM on the same day.';
+            }
+        }
+    }
+    return null;
+};
 
 function FloaterDatePicker({ value, onChange, label = 'Date', required = false }) {
     const isInvalid = value && !isValidFloaterDate(value);
@@ -60,12 +102,13 @@ function FloaterDatePicker({ value, onChange, label = 'Date', required = false }
     );
 }
 
-function DateRangeSummary({ startDate, endDate }) {
-    if (!startDate || !endDate || endDate < startDate) return null;
-    const workingDays = getWorkingDayCount(startDate, endDate);
-    const skipped = countNonWorkingDaysInRange(startDate, endDate);
+function DateRangeSummary({ startDate, endDate, isHalfDay = false }) {
+    if (!startDate || !endDate || (!isHalfDay && endDate < startDate)) return null;
+    const effectiveEndDate = isHalfDay ? startDate : endDate;
+    const workingDays = getWorkingDayCount(startDate, effectiveEndDate, isHalfDay);
+    const skipped = isHalfDay ? 0 : countNonWorkingDaysInRange(startDate, effectiveEndDate);
     const startNonWorking = isNonWorkingDay(startDate);
-    const endNonWorking = isNonWorkingDay(endDate);
+    const endNonWorking = !isHalfDay && isNonWorkingDay(effectiveEndDate);
     if (workingDays === 0) {
         return (
             <div className="md:col-span-2">
@@ -83,7 +126,7 @@ function DateRangeSummary({ startDate, endDate }) {
                     <AlertTriangle className="w-4 h-4 mt-0.5 flex-shrink-0"/>
                     <span>
                         {startNonWorking && <>Start date falls on a <strong>{getNonWorkingDayLabel(startDate)}</strong>. </>}
-                        {endNonWorking && <>End date falls on a <strong>{getNonWorkingDayLabel(endDate)}</strong>. </>}
+                        {endNonWorking && <>End date falls on a <strong>{getNonWorkingDayLabel(effectiveEndDate)}</strong>. </>}
                         Weekends and public holidays are not counted as leave days.
                     </span>
                 </div>
@@ -128,12 +171,15 @@ const MyLeavesPanel = ({
     const [activeTab, setActiveTab] = useState('My Leaves');
     const [showLeaveForm, setShowLeaveForm] = useState(false);
     const [showWfhForm, setShowWfhForm] = useState(false);
-    const [leaveForm, setLeaveForm] = useState({ leave_type: 'paid', start_date: '', end_date: '', reason: '' });
+    const [leaveForm, setLeaveForm] = useState({ leave_type: 'paid', start_date: '', end_date: '', reason: '', is_half_day: false, half_day_slot: '' });
     const [wfhForm, setWfhForm] = useState({ wfh_date: '', end_date: '', reason: '' });
     const [editingLeave, setEditingLeave] = useState(null);
-    const [editForm, setEditForm] = useState({ leave_type: 'paid', start_date: '', end_date: '', reason: '' });
+    const [editForm, setEditForm] = useState({ leave_type: 'paid', start_date: '', end_date: '', reason: '', is_half_day: false, half_day_slot: '' });
     const [editingWfh, setEditingWfh] = useState(null);
     const [editWfhForm, setEditWfhForm] = useState({ wfh_date: '', end_date: '', reason: '' });
+    const [deleteTarget, setDeleteTarget] = useState(null);
+    const [formLeaveType, setFormLeaveType] = useState('paid');
+    const [editFormLeaveType, setEditFormLeaveType] = useState('paid');
 
     // Edit/delete only allowed when the date is strictly in the future
     const canModify = (leave) => leave.start_date > today;
@@ -166,8 +212,15 @@ const MyLeavesPanel = ({
         allLeaves.forEach((leave) => {
             if ((leave.status || 'pending') !== 'approved') return;
             const type = normalizeLeaveType(leave.leave_type);
+            const days = leave.is_half_day ? 0.5 : (leave.start_date && leave.end_date ? getWorkingDayCount(leave.start_date, leave.end_date) : 1.0);
+            if (!leave.start_date || !leave.end_date) {
+                // Sheet leaf placeholder with null dates
+                if (type in usedYear) {
+                    usedYear[type] += days;
+                }
+                return;
+            }
             const d = new Date(leave.start_date + 'T00:00:00');
-            const days = getWorkingDayCount(leave.start_date, leave.end_date);
             if (intern && type === 'paid') {
                 if (d.getFullYear() === currentYear && d.getMonth() === currentMonth) paidUsedThisMonth += days;
                 return;
@@ -195,13 +248,16 @@ const MyLeavesPanel = ({
                 period: 'year',
             });
         }
-        ['casual_sick', 'floater'].forEach((t) => cards.push({
-            type: t,
-            quota: ANNUAL_LEAVE_QUOTA[t],
-            used: usedYear[t],
-            remaining: Math.max(ANNUAL_LEAVE_QUOTA[t] - usedYear[t], 0),
-            period: 'year',
-        }));
+        ['casual_sick', 'floater'].forEach((t) => {
+            const quota = (intern && t === 'casual_sick') ? 0 : ANNUAL_LEAVE_QUOTA[t];
+            cards.push({
+                type: t,
+                quota: quota,
+                used: usedYear[t],
+                remaining: Math.max(quota - usedYear[t], 0),
+                period: 'year',
+            });
+        });
         return cards;
     }, [allLeaves, intern, currentYear, currentMonth]);
 
@@ -211,7 +267,7 @@ const MyLeavesPanel = ({
             queryClient.invalidateQueries({ queryKey: ['my-leaves'] });
             queryClient.invalidateQueries(['leave-calendar']);
             setShowLeaveForm(false);
-            setLeaveForm({ leave_type: 'paid', start_date: '', end_date: '', reason: '' });
+            setLeaveForm({ leave_type: 'paid', start_date: '', end_date: '', reason: '', is_half_day: false, half_day_slot: '' });
             if (data.flagged) {
                 toast.success('Leave request submitted — flagged for exceeding monthly limit, awaiting approval with justification.');
             } else {
@@ -285,25 +341,51 @@ const MyLeavesPanel = ({
 
     const handleLeaveSubmit = (e) => {
         e.preventDefault();
-        if (isEndDateBeforeStartDate(leaveForm.start_date, leaveForm.end_date)) {
-            toast.error(getEndDateValidationMessage());
-            return;
+        const isHalf = leaveForm.leave_type === 'first_half' || leaveForm.leave_type === 'second_half';
+        const sDate = leaveForm.start_date;
+        const eDate = isHalf ? sDate : leaveForm.end_date;
+
+        if (isHalf) {
+            const timingErr = checkHalfDayTiming(sDate, leaveForm.leave_type);
+            if (timingErr) {
+                toast.error(timingErr);
+                return;
+            }
+        } else {
+            if (isEndDateBeforeStartDate(sDate, eDate)) {
+                toast.error(getEndDateValidationMessage());
+                return;
+            }
         }
-        if (getWorkingDayCount(leaveForm.start_date, leaveForm.end_date) === 0) {
+
+        if (getWorkingDayCount(sDate, eDate, isHalf) === 0) {
             toast.error('No working days in the selected range. Please choose dates that include at least one working day.');
             return;
         }
+
         if (leaveForm.leave_type === 'floater') {
-            if (!isValidFloaterDate(leaveForm.start_date)) {
+            if (!isValidFloaterDate(sDate)) {
                 toast.error('Start date is not an approved floater holiday date.');
                 return;
             }
-            if (leaveForm.end_date !== leaveForm.start_date && !isValidFloaterDate(leaveForm.end_date)) {
+            if (eDate !== sDate && !isValidFloaterDate(eDate)) {
                 toast.error('End date is not an approved floater holiday date.');
                 return;
             }
         }
-        createLeaveMutation.mutate(leaveForm);
+
+        // Validate consecutive leaves safeguard
+        if (leaveForm.leave_type !== 'wfh' && !validateConsecutiveLeaves(sDate, eDate, allLeaves, null, isHalf)) {
+            toast.error('Safe guard triggered: You cannot apply for 5 or more consecutive leaves.');
+            return;
+        }
+
+        createLeaveMutation.mutate({
+            ...leaveForm,
+            is_half_day: isHalf,
+            half_day_slot: isHalf ? leaveForm.leave_type : null,
+            end_date: eDate,
+        });
     };
 
     const handleWfhSubmit = (e) => {
@@ -318,36 +400,71 @@ const MyLeavesPanel = ({
 
     const handleEditOpen = (leave) => {
         setEditingLeave(leave);
-        setEditForm({ leave_type: leave.leave_type, start_date: leave.start_date, end_date: leave.end_date, reason: leave.reason || '' });
+        setEditForm({
+            leave_type: leave.leave_type,
+            start_date: leave.start_date,
+            end_date: leave.end_date,
+            reason: leave.reason || '',
+            is_half_day: leave.is_half_day || false,
+            half_day_slot: leave.half_day_slot || '',
+        });
         setShowLeaveForm(false);
     };
 
     const handleEditSubmit = (e) => {
         e.preventDefault();
-        if (isEndDateBeforeStartDate(editForm.start_date, editForm.end_date)) {
-            toast.error(getEndDateValidationMessage());
-            return;
+        const isHalf = editForm.leave_type === 'first_half' || editForm.leave_type === 'second_half';
+        const sDate = editForm.start_date;
+        const eDate = isHalf ? sDate : editForm.end_date;
+
+        if (isHalf) {
+            const timingErr = checkHalfDayTiming(sDate, editForm.leave_type);
+            if (timingErr) {
+                toast.error(timingErr);
+                return;
+            }
+        } else {
+            if (isEndDateBeforeStartDate(sDate, eDate)) {
+                toast.error(getEndDateValidationMessage());
+                return;
+            }
         }
-        if (getWorkingDayCount(editForm.start_date, editForm.end_date) === 0) {
+
+        if (getWorkingDayCount(sDate, eDate, isHalf) === 0) {
             toast.error('No working days in the selected range. Please choose dates that include at least one working day.');
             return;
         }
+
         if (editForm.leave_type === 'floater') {
-            if (!isValidFloaterDate(editForm.start_date)) {
+            if (!isValidFloaterDate(sDate)) {
                 toast.error('Start date is not an approved floater holiday date.');
                 return;
             }
-            if (editForm.end_date !== editForm.start_date && !isValidFloaterDate(editForm.end_date)) {
+            if (eDate !== sDate && !isValidFloaterDate(eDate)) {
                 toast.error('End date is not an approved floater holiday date.');
                 return;
             }
         }
-        updateLeaveMutation.mutate({ id: editingLeave.leave_id, data: editForm });
+
+        // Validate consecutive leaves safeguard
+        if (editForm.leave_type !== 'wfh' && !validateConsecutiveLeaves(sDate, eDate, allLeaves, editingLeave.leave_id, isHalf)) {
+            toast.error('Safe guard triggered: You cannot apply for 5 or more consecutive leaves.');
+            return;
+        }
+
+        updateLeaveMutation.mutate({
+            id: editingLeave.leave_id,
+            data: {
+                ...editForm,
+                is_half_day: isHalf,
+                half_day_slot: isHalf ? editForm.leave_type : null,
+                end_date: eDate,
+            }
+        });
     };
 
     const handleDelete = (leave) => {
-        if (!window.confirm(`Delete this ${getLeaveTypeLabel(leave.leave_type)} request (${leave.start_date} — ${leave.end_date})?`)) return;
-        deleteLeaveMutation.mutate(leave.leave_id);
+        setDeleteTarget(leave);
     };
 
     const handleWfhEditOpen = (wfh) => {
@@ -441,10 +558,11 @@ const MyLeavesPanel = ({
                             <form onSubmit={handleLeaveSubmit} className="grid grid-cols-1 md:grid-cols-2 gap-4">
                                 <div>
                                     <label className="block text-sm font-medium text-slate-700 mb-1">Type</label>
-                                    <select value={leaveForm.leave_type} onChange={e => setLeaveForm({ ...leaveForm, leave_type: e.target.value, start_date: '', end_date: '' })}
-                                        className="w-full px-3 py-2 border border-slate-200 rounded-lg text-sm">
-                                        {LEAVE_TYPE_OPTIONS.map(o => <option key={o.value} value={o.value}>{o.label}</option>)}
-                                    </select>
+                                    <Dropdown
+                                        options={LEAVE_TYPE_OPTIONS}
+                                        value={leaveForm.leave_type}
+                                        onChange={e => setLeaveForm({ ...leaveForm, leave_type: e, start_date: '', end_date: '' })}
+                                    />
                                 </div>
                                 <div>
                                     <label className="block text-sm font-medium text-slate-700 mb-1">Reason</label>
@@ -461,17 +579,47 @@ const MyLeavesPanel = ({
                                 ) : (
                                     <>
                                         <div>
-                                            <label className="block text-sm font-medium text-slate-700 mb-1">Start Date</label>
-                                            <input type="date" value={leaveForm.start_date} onChange={e => setLeaveForm({ ...leaveForm, start_date: e.target.value })}
+                                            <label className="block text-sm font-medium text-slate-700 mb-1">
+                                                { (leaveForm.leave_type === 'first_half' || leaveForm.leave_type === 'second_half') ? 'Date' : 'Start Date' }
+                                            </label>
+                                            <input type="date" value={leaveForm.start_date} onChange={e => {
+                                                const sDate = e.target.value;
+                                                setLeaveForm(prev => ({
+                                                    ...prev,
+                                                    start_date: sDate,
+                                                    end_date: (prev.leave_type === 'first_half' || prev.leave_type === 'second_half') ? sDate : prev.end_date
+                                                }));
+                                            }}
                                                 className="w-full px-3 py-2 border border-slate-200 rounded-lg text-sm" required/>
                                         </div>
-                                        <div>
-                                            <label className="block text-sm font-medium text-slate-700 mb-1">End Date</label>
-                                            <input type="date" value={leaveForm.end_date} onChange={e => setLeaveForm({ ...leaveForm, end_date: e.target.value })}
-                                                className="w-full px-3 py-2 border border-slate-200 rounded-lg text-sm" required/>
-                                        </div>
-                                        <DateRangeSummary startDate={leaveForm.start_date} endDate={leaveForm.end_date} />
+                                        {!(leaveForm.leave_type === 'first_half' || leaveForm.leave_type === 'second_half') && (
+                                            <div>
+                                                <label className="block text-sm font-medium text-slate-700 mb-1">End Date</label>
+                                                <input type="date" value={leaveForm.end_date} onChange={e => setLeaveForm({ ...leaveForm, end_date: e.target.value })}
+                                                    className="w-full px-3 py-2 border border-slate-200 rounded-lg text-sm" required/>
+                                            </div>
+                                        )}
+                                        <DateRangeSummary startDate={leaveForm.start_date} endDate={(leaveForm.leave_type === 'first_half' || leaveForm.leave_type === 'second_half') ? leaveForm.start_date : leaveForm.end_date} isHalfDay={leaveForm.leave_type === 'first_half' || leaveForm.leave_type === 'second_half'} />
                                     </>
+                                )}
+                                {(leaveForm.leave_type === 'first_half' || leaveForm.leave_type === 'second_half') && (
+                                    <div className="md:col-span-2 rounded-xl border border-indigo-150 bg-indigo-50/50 p-4 text-sm text-indigo-900 space-y-2">
+                                        <div className="flex items-center gap-1.5 font-semibold text-indigo-950">
+                                            <Clock className="w-4 h-4 text-indigo-600"/> Half-day Leave Policy & Slots
+                                        </div>
+                                        <div className="grid grid-cols-1 sm:grid-cols-2 gap-3 text-xs">
+                                            <div className="p-2.5 bg-white rounded-lg border border-indigo-100/80">
+                                                <p className="font-semibold text-indigo-950">First Half-day Leave</p>
+                                                <p className="text-slate-600 mt-0.5">🕒 Slot: 9:00 AM – 2:00 PM</p>
+                                                <p className="text-slate-500 mt-1 font-medium italic">⚠️ Apply at least one day in advance.</p>
+                                            </div>
+                                            <div className="p-2.5 bg-white rounded-lg border border-indigo-100/80">
+                                                <p className="font-semibold text-indigo-950">Second Half-day Leave</p>
+                                                <p className="text-slate-600 mt-0.5">🕒 Slot: 2:00 PM – 7:00 PM</p>
+                                                <p className="text-slate-500 mt-1 font-medium italic">⚠️ Apply before 2:00 PM on the same day.</p>
+                                            </div>
+                                        </div>
+                                    </div>
                                 )}
                                 <div className="md:col-span-2 rounded-lg border border-amber-200 bg-amber-50 px-3 py-2 text-sm text-amber-800">
                                     {RAZORPAY_NEGATIVE_BALANCE_NOTE}
@@ -496,10 +644,11 @@ const MyLeavesPanel = ({
                             <form onSubmit={handleEditSubmit} className="grid grid-cols-1 md:grid-cols-2 gap-4">
                                 <div>
                                     <label className="block text-sm font-medium text-slate-700 mb-1">Type</label>
-                                    <select value={editForm.leave_type} onChange={e => setEditForm({ ...editForm, leave_type: e.target.value, start_date: '', end_date: '' })}
-                                        className="w-full px-3 py-2 border border-slate-200 rounded-lg text-sm">
-                                        {LEAVE_TYPE_OPTIONS.map(o => <option key={o.value} value={o.value}>{o.label}</option>)}
-                                    </select>
+                                    <Dropdown
+                                        options={LEAVE_TYPE_OPTIONS}
+                                        value={editForm.leave_type}
+                                        onChange={e => setEditForm({ ...editForm, leave_type: e, start_date: '', end_date: '' })}
+                                    />
                                 </div>
                                 <div>
                                     <label className="block text-sm font-medium text-slate-700 mb-1">Reason</label>
@@ -516,17 +665,47 @@ const MyLeavesPanel = ({
                                 ) : (
                                     <>
                                         <div>
-                                            <label className="block text-sm font-medium text-slate-700 mb-1">Start Date</label>
-                                            <input type="date" value={editForm.start_date} onChange={e => setEditForm({ ...editForm, start_date: e.target.value })}
+                                            <label className="block text-sm font-medium text-slate-700 mb-1">
+                                                { (editForm.leave_type === 'first_half' || editForm.leave_type === 'second_half') ? 'Date' : 'Start Date' }
+                                            </label>
+                                            <input type="date" value={editForm.start_date} onChange={e => {
+                                                const sDate = e.target.value;
+                                                setEditForm(prev => ({
+                                                    ...prev,
+                                                    start_date: sDate,
+                                                    end_date: (prev.leave_type === 'first_half' || prev.leave_type === 'second_half') ? sDate : prev.end_date
+                                                }));
+                                            }}
                                                 className="w-full px-3 py-2 border border-slate-200 rounded-lg text-sm" required/>
                                         </div>
-                                        <div>
-                                            <label className="block text-sm font-medium text-slate-700 mb-1">End Date</label>
-                                            <input type="date" value={editForm.end_date} onChange={e => setEditForm({ ...editForm, end_date: e.target.value })}
-                                                className="w-full px-3 py-2 border border-slate-200 rounded-lg text-sm" required/>
-                                        </div>
-                                        <DateRangeSummary startDate={editForm.start_date} endDate={editForm.end_date} />
+                                        {!(editForm.leave_type === 'first_half' || editForm.leave_type === 'second_half') && (
+                                            <div>
+                                                <label className="block text-sm font-medium text-slate-700 mb-1">End Date</label>
+                                                <input type="date" value={editForm.end_date} onChange={e => setEditForm({ ...editForm, end_date: e.target.value })}
+                                                    className="w-full px-3 py-2 border border-slate-200 rounded-lg text-sm" required/>
+                                            </div>
+                                        )}
+                                        <DateRangeSummary startDate={editForm.start_date} endDate={(editForm.leave_type === 'first_half' || editForm.leave_type === 'second_half') ? editForm.start_date : editForm.end_date} isHalfDay={editForm.leave_type === 'first_half' || editForm.leave_type === 'second_half'} />
                                     </>
+                                )}
+                                {(editForm.leave_type === 'first_half' || editForm.leave_type === 'second_half') && (
+                                    <div className="md:col-span-2 rounded-xl border border-indigo-150 bg-indigo-50/50 p-4 text-sm text-indigo-900 space-y-2">
+                                        <div className="flex items-center gap-1.5 font-semibold text-indigo-950">
+                                            <Clock className="w-4 h-4 text-indigo-600"/> Half-day Leave Policy & Slots
+                                        </div>
+                                        <div className="grid grid-cols-1 sm:grid-cols-2 gap-3 text-xs">
+                                            <div className="p-2.5 bg-white rounded-lg border border-indigo-100/80">
+                                                <p className="font-semibold text-indigo-950">First Half-day Leave</p>
+                                                <p className="text-slate-600 mt-0.5">🕒 Slot: 9:00 AM – 2:00 PM</p>
+                                                <p className="text-slate-500 mt-1 font-medium italic">⚠️ Apply at least one day in advance.</p>
+                                            </div>
+                                            <div className="p-2.5 bg-white rounded-lg border border-indigo-100/80">
+                                                <p className="font-semibold text-indigo-950">Second Half-day Leave</p>
+                                                <p className="text-slate-600 mt-0.5">🕒 Slot: 2:00 PM – 7:00 PM</p>
+                                                <p className="text-slate-500 mt-1 font-medium italic">⚠️ Apply before 2:00 PM on the same day.</p>
+                                            </div>
+                                        </div>
+                                    </div>
                                 )}
                                 <div className="md:col-span-2 rounded-lg border border-blue-100 bg-blue-50 px-3 py-2 text-sm text-blue-700">
                                     Editing will reset the approval status back to <strong>pending</strong> so your manager can re-review.
@@ -555,7 +734,7 @@ const MyLeavesPanel = ({
                         </div>
                     ) : (
                         <div className="space-y-3">
-                            {allLeaves.map(leave => {
+                            {allLeaves.filter(leave => leave.start_date && leave.end_date).map(leave => {
                                 const status = leave.status || 'pending';
                                 const modifiable = canModify(leave);
                                 const isEditing = editingLeave?.leave_id === leave.leave_id;
@@ -578,7 +757,15 @@ const MyLeavesPanel = ({
                                                         )}
                                                     </div>
                                                     <p className="text-xs text-slate-400">
-                                                        {format(parseISO(leave.start_date), 'MMM dd')} — {format(parseISO(leave.end_date), 'MMM dd, yyyy')}
+                                                        {leave.is_half_day ? (
+                                                            <>
+                                                                {format(parseISO(leave.start_date), 'MMM dd, yyyy')} (0.5 day — {leave.half_day_slot === 'first_half' ? 'First Half' : 'Second Half'})
+                                                            </>
+                                                        ) : (
+                                                            <>
+                                                                {format(parseISO(leave.start_date), 'MMM dd')} — {format(parseISO(leave.end_date), 'MMM dd, yyyy')} ({getWorkingDayCount(leave.start_date, leave.end_date)} day{getWorkingDayCount(leave.start_date, leave.end_date) !== 1 ? 's' : ''})
+                                                            </>
+                                                        )}
                                                         {leave.reason && ` • ${leave.reason}`}
                                                     </p>
                                                     {leave.approval_remark && (
@@ -761,6 +948,22 @@ const MyLeavesPanel = ({
                         </div>
                     )}
                 </>
+            )}
+            {deleteTarget && (
+                <DeleteConfirmModal
+                    isOpen={!!deleteTarget}
+                    onClose={() => setDeleteTarget(null)}
+                    onConfirm={() => {
+                        if (deleteTarget) {
+                            deleteLeaveMutation.mutate(deleteTarget.leave_id, {
+                                onSuccess: () => setDeleteTarget(null)
+                            });
+                        }
+                    }}
+                    isPending={deleteLeaveMutation.isPending}
+                    title="Delete Leave Request"
+                    message={`Are you sure you want to delete this ${getLeaveTypeLabel(deleteTarget.leave_type)} request (${deleteTarget.start_date} — ${deleteTarget.end_date})?`}
+                />
             )}
         </div>
     );

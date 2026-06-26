@@ -1,17 +1,128 @@
-import React, { useState } from 'react';
-import { Send, Calendar, Building2, ExternalLink, ShieldCheck } from 'lucide-react';
+import React, { useState, useEffect } from 'react';
+import { Send, Calendar, Building2, ShieldCheck, Sparkles, MapPin, Wifi, Copy, Check, Globe, Cpu, Bot, Layers } from 'lucide-react';
+import { wifiNetworksApi, companySettingsApi } from '../../services/api';
+import toast from 'react-hot-toast';
 
 const CompanyInfoPage = () => {
-    const [activeTab, setActiveTab] = useState('slack');
+    const [activeTab, setActiveTab] = useState('about');
+    const [wifiNetworks, setWifiNetworks] = useState([]);
+    const [generalSettings, setGeneralSettings] = useState({
+        office_address: '',
+        google_maps_link: '',
+        company_perks: ''
+    });
+    const [copiedId, setCopiedId] = useState(null);
+    const [wifiLoading, setWifiLoading] = useState(true);
+
+    useEffect(() => {
+        Promise.all([
+            wifiNetworksApi.getAll(),
+            companySettingsApi.getAll()
+        ]).then(([networksData, settingsData]) => {
+            setWifiNetworks(networksData);
+            const map = {};
+            settingsData.forEach(s => { map[s.key] = s.value || ''; });
+            setGeneralSettings({
+                office_address: map.office_address || '',
+                google_maps_link: map.google_maps_link || '',
+                company_perks: map.company_perks || ''
+            });
+        }).catch(() => {})
+          .finally(() => setWifiLoading(false));
+    }, []);
+
+    const handleCopyPassword = (network) => {
+        if (!network.password) return;
+        navigator.clipboard.writeText(network.password);
+        setCopiedId(network.id);
+        toast.success(`${network.name} password copied!`);
+        setTimeout(() => setCopiedId(null), 2000);
+    };
 
     const tabs = [
+        { id: 'about', label: 'About Autonex', icon: Sparkles },
         { id: 'slack', label: 'Slack Guidelines', icon: Send },
         { id: 'leaves', label: 'Leaves Policy', icon: Calendar },
-        { id: 'office', label: 'Office Details', icon: Building2 },
+        { id: 'office', label: 'Office & Connectivity', icon: Building2 },
+    ];
+
+    const focusAreas = [
+        { icon: Layers, label: 'AI Data Annotation & Labeling' },
+        { icon: Bot, label: 'Robotics & Autonomous Systems Datasets' },
+        { icon: Cpu, label: 'Industrial AI & Predictive Intelligence' },
+        { icon: Globe, label: 'Digital Twins & IIoT' },
+        { icon: Layers, label: 'Sensor Fusion & Multimodal AI Datasets' },
+        { icon: Bot, label: 'Physical AI Infrastructure & Deployment' },
     ];
 
     const renderContent = () => {
         switch (activeTab) {
+            case 'about':
+                return (
+                    <div className="space-y-6 animate-in fade-in duration-300">
+                        {/* Company Description */}
+                        <div className="bg-gradient-to-br from-indigo-50/70 to-blue-50/50 border border-indigo-100/60 rounded-2xl p-6">
+                            <h3 className="text-lg font-bold text-slate-800 mb-4 flex items-center gap-2">
+                                <Sparkles className="w-5 h-5 text-indigo-500" />
+                                What is Autonex AI?
+                            </h3>
+                            <div className="text-sm text-slate-600 space-y-3 leading-relaxed">
+                                <p>
+                                    <strong className="text-slate-800">Autonex AI 360 Pvt. Ltd.</strong> is an India-based AI and data infrastructure company focused on building solutions for Physical AI, industrial automation, robotics, and high-quality AI data annotation services. The company was incorporated in 2025 and is headquartered in Maharashtra, with operations centered around AI, industrial systems, and data services.
+                                </p>
+                                <p>
+                                    The company provides domain-expert annotation services for high-stakes AI applications, particularly in robotics, manufacturing, automation, and sensor-heavy environments where accuracy is critical.
+                                </p>
+                            </div>
+                        </div>
+
+                        {/* Focus Areas */}
+                        <div>
+                            <h3 className="text-sm font-bold text-slate-800 mb-3 uppercase tracking-wider">Focus Areas</h3>
+                            <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-3">
+                                {focusAreas.map((area, idx) => {
+                                    const AreaIcon = area.icon;
+                                    return (
+                                        <div key={idx} className="flex items-center gap-3 bg-white border border-slate-200/80 rounded-xl p-3.5 shadow-[0_1px_2px_rgba(0,0,0,0.02)] hover:border-indigo-200 transition-colors">
+                                            <div className="flex-shrink-0 w-8 h-8 rounded-lg bg-indigo-50 flex items-center justify-center">
+                                                <AreaIcon className="w-4 h-4 text-indigo-500" />
+                                            </div>
+                                            <span className="text-sm text-slate-700 font-medium">{area.label}</span>
+                                        </div>
+                                    );
+                                })}
+                            </div>
+                        </div>
+
+                        {/* Address */}
+                        <div className="bg-slate-50 border border-slate-100 rounded-2xl p-6">
+                            <h3 className="text-lg font-bold text-slate-800 mb-4 flex items-center gap-2">
+                                <MapPin className="w-5 h-5 text-rose-500" />
+                                Office Address
+                            </h3>
+                            <div className="text-sm text-slate-600 space-y-2">
+                                {generalSettings.office_address ? (
+                                    <p className="leading-relaxed whitespace-pre-wrap">
+                                        {generalSettings.office_address}
+                                    </p>
+                                ) : (
+                                    <p className="leading-relaxed italic text-slate-400">Office address not configured.</p>
+                                )}
+                                {generalSettings.google_maps_link && (
+                                    <a
+                                        href={generalSettings.google_maps_link}
+                                        target="_blank"
+                                        rel="noopener noreferrer"
+                                        className="inline-flex items-center gap-1.5 mt-2 text-indigo-600 hover:text-indigo-700 text-xs font-semibold transition-colors"
+                                    >
+                                        <MapPin className="w-3.5 h-3.5" />
+                                        View on Google Maps →
+                                    </a>
+                                )}
+                            </div>
+                        </div>
+                    </div>
+                );
             case 'slack':
                 return (
                     <div className="space-y-6 animate-in fade-in duration-300">
@@ -127,14 +238,15 @@ const CompanyInfoPage = () => {
                             </ul>
                         </div>
 
-                        {/* 3. Intern and Clubbing Policies */}
+                        {/* 3. Intern/Contractor and Clubbing Policies */}
                         <div className="grid grid-cols-1 sm:grid-cols-2 gap-6 pt-2">
                             <div className="bg-white border border-slate-200/80 rounded-2xl p-5 shadow-sm space-y-3">
-                                <h4 className="font-bold text-slate-800 text-sm border-b border-slate-100 pb-2">Leave Policy for Interns 🎓</h4>
+                                <h4 className="font-bold text-slate-800 text-sm border-b border-slate-100 pb-2">Leave Policy for Interns & Contractors 🎓</h4>
                                 <ul className="list-disc list-inside text-sm text-slate-600 space-y-1.5">
-                                    <li>Interns are eligible to avail <strong>1 leave per month</strong>.</li>
-                                    <li>Any leave exceeding <strong>1 leave per month</strong> will be considered as <strong>unpaid leave</strong>.</li>
-                                    <li>Additional leave requests may be considered only under exceptional circumstances and subject to management approval.</li>
+                                    <li>Eligible for <strong>1 Paid Leave per month</strong> (accrues/resets monthly).</li>
+                                    <li>Eligible for <strong>0 Casual/Sick Leaves</strong>. Any casual/sick leave taken is unpaid.</li>
+                                    <li>Eligible for <strong>2 Floater Leaves</strong> overall per year, matching standard employees.</li>
+                                    <li>Any leave taken exceeding these quotas is treated as unpaid.</li>
                                 </ul>
                             </div>
                             <div className="bg-white border border-slate-200/80 rounded-2xl p-5 shadow-sm space-y-3">
@@ -167,15 +279,16 @@ const CompanyInfoPage = () => {
             case 'office':
                 return (
                     <div className="space-y-6 animate-in fade-in duration-300">
+                        {/* Office Hours */}
                         <div className="bg-slate-50 border border-slate-100 rounded-2xl p-6">
                             <h3 className="text-lg font-bold text-slate-800 mb-4 flex items-center gap-2">
                                 <Building2 className="w-5 h-5 text-emerald-500" />
-                                Autonex HQ Office Details
+                                Office Details
                             </h3>
                             <div className="space-y-4 text-sm text-slate-600">
                                 <div>
                                     <strong className="text-slate-800 block mb-1">Physical Address:</strong>
-                                    <p>Autonex AI Innovation Hub, Floor 4, Cyber Towers, Sector 62, Noida, UP - 201301</p>
+                                    <p>703, Lodha Supremus, Saki Vihar Road, Opposite L&T Gate No. 6, Powai, Mumbai 400072</p>
                                 </div>
                                 <hr className="border-slate-200/60" />
                                 <div>
@@ -183,15 +296,73 @@ const CompanyInfoPage = () => {
                                     <p>Monday - Friday: 9:00 AM - 6:00 PM</p>
                                     <p className="text-slate-400 text-xs mt-0.5">Flexible logging available for engineering and annotation teams.</p>
                                 </div>
-                                <hr className="border-slate-200/60" />
-                                <div>
-                                    <strong className="text-slate-800 block mb-1">Facility Rules:</strong>
-                                    <ul className="list-disc list-inside space-y-1 mt-1 text-slate-600">
-                                        <li>Access cards must be worn and visible at all times.</li>
-                                        <li>Cafeteria services are available from 8:30 AM to 7:00 PM.</li>
-                                    </ul>
-                                </div>
                             </div>
+                        </div>
+
+                        {/* WiFi Information — Dynamic */}
+                        <div className="bg-gradient-to-br from-blue-50/60 to-indigo-50/40 border border-blue-100/60 rounded-2xl p-6">
+                            <h3 className="text-lg font-bold text-slate-800 mb-4 flex items-center gap-2">
+                                <Wifi className="w-5 h-5 text-blue-500" />
+                                WiFi Information
+                            </h3>
+                            {wifiLoading ? (
+                                <div className="flex items-center gap-2 text-sm text-slate-400">
+                                    <div className="w-4 h-4 border-2 border-blue-300 border-t-transparent rounded-full animate-spin" />
+                                    Loading WiFi details...
+                                </div>
+                            ) : wifiNetworks.length > 0 ? (
+                                <div className="space-y-4">
+                                    {wifiNetworks.map(network => (
+                                        <div key={network.id} className="bg-white rounded-xl border border-blue-100 p-4 shadow-sm flex flex-col sm:flex-row sm:items-center justify-between gap-4">
+                                            <div>
+                                                <div className="text-xs font-semibold text-blue-500 uppercase tracking-wider mb-1">Network Name</div>
+                                                <div className="text-sm font-bold text-slate-800">{network.name}</div>
+                                            </div>
+                                            <div>
+                                                <div className="text-xs font-semibold text-slate-400 uppercase tracking-wider mb-1">Password</div>
+                                                {network.password ? (
+                                                    <div className="flex items-center gap-3">
+                                                        <span className="text-sm font-mono text-slate-800 bg-slate-50 px-2.5 py-1 rounded border border-slate-200">
+                                                            {network.password}
+                                                        </span>
+                                                        <button
+                                                            onClick={() => handleCopyPassword(network)}
+                                                            className="flex items-center gap-1.5 px-3 py-1.5 text-xs font-semibold rounded-lg bg-blue-50 text-blue-600 hover:bg-blue-100 transition-colors cursor-pointer"
+                                                        >
+                                                            {copiedId === network.id ? <Check className="w-3.5 h-3.5" /> : <Copy className="w-3.5 h-3.5" />}
+                                                            {copiedId === network.id ? 'Copied!' : 'Copy'}
+                                                        </button>
+                                                    </div>
+                                                ) : (
+                                                    <span className="text-sm text-slate-500 italic">Open Network (No password)</span>
+                                                )}
+                                            </div>
+                                        </div>
+                                    ))}
+                                </div>
+                            ) : (
+                                <p className="text-sm text-slate-400 italic">WiFi information has not been configured yet. Please contact your administrator.</p>
+                            )}
+                        </div>
+
+                        {/* Employee Perks & Benefits */}
+                        <div className="bg-emerald-50/40 border border-emerald-100/60 rounded-2xl p-6">
+                            <h3 className="text-lg font-bold text-slate-800 mb-4 flex items-center gap-2">
+                                <Sparkles className="w-5 h-5 text-emerald-500" />
+                                Employee Perks & Benefits
+                            </h3>
+                            {generalSettings.company_perks ? (
+                                <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
+                                    {generalSettings.company_perks.split('\n').filter(p => p.trim()).map((perk, idx) => (
+                                        <div key={idx} className="flex items-center gap-2.5 bg-white border border-emerald-100 rounded-xl px-4 py-3 text-sm text-slate-700">
+                                            <div className="flex-shrink-0 w-2 h-2 rounded-full bg-emerald-400" />
+                                            {perk.trim()}
+                                        </div>
+                                    ))}
+                                </div>
+                            ) : (
+                                <p className="text-sm text-slate-400 italic">Company perks not configured yet.</p>
+                            )}
                         </div>
                     </div>
                 );
@@ -208,7 +379,7 @@ const CompanyInfoPage = () => {
             </div>
 
             {/* Tab Navigation */}
-            <div className="flex border-b border-slate-200">
+            <div className="flex border-b border-slate-200 overflow-x-auto">
                 {tabs.map((tab) => {
                     const Icon = tab.icon;
                     const isActive = activeTab === tab.id;
@@ -216,7 +387,7 @@ const CompanyInfoPage = () => {
                         <button
                             key={tab.id}
                             onClick={() => setActiveTab(tab.id)}
-                            className={`flex items-center gap-2 px-6 py-3 border-b-2 font-medium text-sm transition-all -mb-px cursor-pointer ${
+                            className={`flex items-center gap-2 px-6 py-3 border-b-2 font-medium text-sm transition-all -mb-px cursor-pointer whitespace-nowrap ${
                                 isActive
                                     ? 'border-emerald-500 text-emerald-600'
                                     : 'border-transparent text-slate-500 hover:text-slate-700 hover:border-slate-300'

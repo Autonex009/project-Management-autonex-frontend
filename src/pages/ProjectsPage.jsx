@@ -6,9 +6,12 @@ import { Plus, Edit, Trash2, X, UserCheck, Users, ChevronDown, ArrowRight, Copy,
 import { Link } from 'react-router-dom';
 import { format } from 'date-fns';
 import toast from 'react-hot-toast';
+import PageSearchBar from '../components/ui/PageSearchBar';
 import { getPmEmployeeId, getPmProjects, getPmSubProjects } from '../utils/pmScope';
 import { getEndDateValidationMessage, isEndDateBeforeStartDate } from '../utils/dateValidation';
 import AllocationPopover from '../components/AllocationPopover';
+import Table, { ColumnTemplates } from '../components/ui/Table';
+import Dropdown from '../components/ui/Dropdown';
 
 const SkillMultiSelect = ({ options, value, onChange }) => {
   const [isOpen, setIsOpen] = useState(false);
@@ -282,6 +285,9 @@ const ProjectsPage = () => {
   const [guidelineFiles, setGuidelineFiles] = useState([]);
   const [isDragActive, setIsDragActive] = useState(false);
   const fileInputRef = useRef(null);
+  const [formMainProjectId, setFormMainProjectId] = useState('');
+  const [formPriority, setFormPriority] = useState('medium');
+  const [formProjectStatus, setFormProjectStatus] = useState('active');
 
   const { data: projects = [], isLoading } = useQuery({
     queryKey: ['sub-projects'],
@@ -328,9 +334,9 @@ const ProjectsPage = () => {
     mutationFn: subProjectApi.delete,
     onSuccess: () => {
       queryClient.invalidateQueries(['sub-projects']);
-      toast.success('Sub-project deleted successfully');
+      toast.success('Project deleted successfully');
     },
-    onError: (err) => toast.error(err.response?.data?.detail || 'Failed to delete sub-project'),
+    onError: (err) => toast.error(err.response?.data?.detail || 'Failed to delete project'),
   });
 
   const resetModalState = () => {
@@ -340,6 +346,9 @@ const ProjectsPage = () => {
     setSelectedSkills([]);
     setGuidelineFiles([]);
     setIsDragActive(false);
+    setFormMainProjectId('');
+    setFormPriority('medium');
+    setFormProjectStatus('active');
   };
 
   const addGuidelineFiles = (files) => {
@@ -429,7 +438,7 @@ const ProjectsPage = () => {
       }
     } catch (error) {
       const detail = error.response?.data?.detail;
-      let message = 'Failed to save sub-project';
+      let message = 'Failed to save project';
       if (typeof detail === 'string') {
         message = detail;
       } else if (Array.isArray(detail)) {
@@ -450,14 +459,14 @@ const ProjectsPage = () => {
     const wasEditing = Boolean(editingProject);
     const filesToUpload = guidelineFiles;
     resetModalState();
-    toast.success(wasEditing ? 'Sub-project updated successfully' : 'Sub-project created successfully');
+toast.success(wasEditing ? 'Project updated successfully' : 'Project created successfully');
 
     try {
       if (filesToUpload.length > 0) {
         await uploadGuidelinesForProject(savedProject.id, selectedMainProjectId, filesToUpload);
       }
     } catch (error) {
-      toast.error('Sub-project saved, but guideline upload failed. You can re-upload from the Guidelines page.');
+      toast.error('Project saved, but guideline upload failed. You can re-upload from the Guidelines page.');
     }
 
     await Promise.all([
@@ -567,8 +576,10 @@ const ProjectsPage = () => {
     return { label, dailyHours: avgDailyHoursPerEmployee, workingDays, effectiveDays: totalEffectiveEmployeeDays };
   };
 
-  const [searchParams] = useSearchParams();
+  const [searchParams, setSearchParams] = useSearchParams();
   const filterMainProjectId = searchParams.get('project');
+  const statusParam = searchParams.get('status');
+  const recommendationParam = searchParams.get('recommendation');
   const [subProjectSearch, setSubProjectSearch] = useState('');
   const [currentPage, setCurrentPage] = useState(1);
   const PAGE_SIZE = 10;
@@ -577,16 +588,21 @@ const ProjectsPage = () => {
     ? visibleProjects.filter(p => p.main_project_id === parseInt(filterMainProjectId))
     : visibleProjects
   )
-    .filter(p => p.name.toLowerCase().includes(subProjectSearch.toLowerCase()))
+    .filter(p => {
+      if (statusParam && p.project_status !== statusParam) return false;
+      if (recommendationParam) {
+        const recResult = getSystemRecommendation(p);
+        if (recResult.label.toLowerCase() !== recommendationParam.toLowerCase()) return false;
+      }
+      return p.name.toLowerCase().includes(subProjectSearch.toLowerCase());
+    })
     .sort((a, b) => a.name.localeCompare(b.name));
 
   // Reset to page 1 when filters change
   useEffect(() => {
     setCurrentPage(1);
-  }, [subProjectSearch, filterMainProjectId]);
+  }, [subProjectSearch, filterMainProjectId, statusParam, recommendationParam]);
 
-  const totalPages = Math.ceil(filteredProjects.length / PAGE_SIZE);
-  const paginatedProjects = filteredProjects.slice((currentPage - 1) * PAGE_SIZE, currentPage * PAGE_SIZE);
 
   const currentMainProject = visibleMainProjects.find(p => p.id === parseInt(filterMainProjectId));
 
@@ -600,10 +616,10 @@ const ProjectsPage = () => {
 
   return (
     <div className="space-y-6 p-2">
-      <div className="flex items-center justify-between">
+      <div className="flex flex-col md:flex-row md:items-center justify-between gap-4">
         <div>
           <h1 className="text-2xl font-bold text-slate-900">
-            {currentMainProject ? `Sub-Projects for ${currentMainProject.name}` : 'All Sub-Projects'}
+            {currentMainProject ? `Projects for ${currentMainProject.name}` : 'All Projects'}
           </h1>
           <p className="text-slate-500 text-sm mt-1">
             {currentMainProject
@@ -611,303 +627,327 @@ const ProjectsPage = () => {
               : 'Manage tasks and resource allocation across all projects'}
           </p>
         </div>
-        <div className="flex items-center gap-3">
-          <div className="relative">
-            <Search className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-slate-400 pointer-events-none" />
-            <input
-              type="text"
-              placeholder="Search sub-projects..."
-              value={subProjectSearch}
-              onChange={e => setSubProjectSearch(e.target.value)}
-              className="pl-9 pr-4 py-2 text-sm bg-white border border-slate-200 rounded-xl focus:outline-none focus:ring-2 focus:ring-indigo-100 focus:border-indigo-300 w-52 placeholder:text-slate-400"
-            />
-          </div>
+        <div className="flex flex-wrap items-center gap-2">
+          <PageSearchBar
+            value={subProjectSearch}
+            onChange={setSubProjectSearch}
+            placeholder="Search projects..."
+          />
           <Link
             to={`${prefix}/projects`}
             className="inline-flex items-center gap-2 px-4 py-2.5 bg-white border border-slate-200 text-slate-700 font-medium text-sm rounded-xl shadow-sm hover:bg-slate-50 transition-colors"
           >
             <Settings className="w-4 h-4" />
-            Projects
+            Organizations
           </Link>
           <button
             onClick={() => {
               setEditingProject(null);
               setSelectedSkills([]);
               setGuidelineFiles([]);
+              setFormMainProjectId(filterMainProjectId || '');
+              setFormPriority('medium');
+              setFormProjectStatus('active');
               setIsModalOpen(true);
             }}
             className="inline-flex items-center gap-2 px-4 py-2.5 bg-indigo-600 hover:bg-indigo-700 text-white font-medium text-sm rounded-xl shadow-sm transition-colors"
           >
             <Plus className="w-4 h-4" />
-            Add Sub-Project
+            Add Project
           </button>
         </div>
       </div>
 
-      <div className="bg-white rounded-2xl border border-slate-200/60 shadow-[0_1px_3px_rgba(0,0,0,0.04)] overflow-hidden">
-        <div className="overflow-x-auto">
-          <table className="w-full text-sm">
-            <thead className="bg-slate-50/80 border-b border-slate-100">
-              <tr>
-                <th className="px-5 py-4 text-left text-xs font-bold text-slate-800 uppercase tracking-wider">Parent</th>
-                <th className="px-5 py-4 text-left text-xs font-bold text-slate-800 uppercase tracking-wider">Sub-Project</th>
-                <th className="px-5 py-4 text-left text-xs font-bold text-slate-800 uppercase tracking-wider">Project Manager</th>
-                <th className="px-5 py-4 text-left text-xs font-bold text-slate-800 uppercase tracking-wider">Skills</th>
-                <th className="px-5 py-4 text-center text-xs font-bold text-slate-800 uppercase tracking-wider">Required</th>
-                <th className="px-5 py-4 text-center text-xs font-bold text-slate-800 uppercase tracking-wider">Allocated</th>
-                <th className="px-5 py-4 text-left text-xs font-bold text-slate-800 uppercase tracking-wider">Timeline</th>
-                <th className="px-5 py-4 text-center text-xs font-bold text-slate-800 uppercase tracking-wider">Priority</th>
-                <th className="px-5 py-4 text-center text-xs font-bold text-slate-800 uppercase tracking-wider">Avg Time</th>
-                <th className="px-5 py-4 text-left text-xs font-bold text-slate-800 uppercase tracking-wider">Recommendation</th>
-                <th className="px-5 py-4 text-center text-xs font-bold text-slate-800 uppercase tracking-wider">Status</th>
-                <th className="px-5 py-4 text-right text-xs font-bold text-slate-800 uppercase tracking-wider sticky right-0 bg-slate-50 shadow-[-8px_0_8px_-8px_rgba(0,0,0,0.1)]">Actions</th>
-              </tr>
-            </thead>
-            <tbody className="divide-y divide-slate-100">
-              {filteredProjects.length === 0 ? (
-                <tr>
-                  <td colSpan="15" className="text-center py-16 text-slate-400">
-                    <div className="text-lg font-medium">
-                      {filterMainProjectId ? 'No sub-projects for this project' : 'No sub-projects yet'}
-                    </div>
-                    <p className="text-sm mt-1">Create your first sub-project to get started</p>
-                  </td>
-                </tr>
-              ) : (
-                paginatedProjects.map((project) => {
-                  const parentProject = visibleMainProjects.find(p => p.id === project.main_project_id);
-                  const matchingTotal = getMatchingEmployees(project).length;
-                  const allocatedManpower = getAllocatedManpower(project);
-                  const remainingManpower = matchingTotal - allocatedManpower;
-                  const tasksPerEmp = allocatedManpower > 0 ? Math.round(project.total_tasks / allocatedManpower) : 0;
-                  const recResult = getSystemRecommendation(project);
-                  const recommendation = recResult.label;
-
-                  return (
-                    <tr key={project.id} className="hover:bg-slate-50 transition-colors">
-                      <td className="px-5 py-4">
-                        <div className="font-semibold text-slate-800">{parentProject?.name || '—'}</div>
-                      </td>
-                      <td className="px-5 py-4">
-                        <div className="flex items-center gap-2">
-                          <span className="text-sm text-slate-600 font-semibold">{project.name}</span>
-                          {project.is_annotation && (
-                            <span className="px-1.5 py-0.5 rounded-full text-[9px] font-bold bg-indigo-50 text-indigo-700 border border-indigo-200 uppercase tracking-wider">
-                              Annotation
-                            </span>
-                          )}
-                        </div>
-                        <div className="text-xs text-slate-400">{parentProject?.project_type || '—'}</div>
-                      </td>
-                      <td className="px-5 py-4">
-                        <span className="text-sm text-slate-600">
-                          {(() => {
-                            const mainProject = visibleMainProjects.find(p => p.id === project.main_project_id);
-                            const pmIds = mainProject?.program_manager_ids?.length
-                              ? mainProject.program_manager_ids
-                              : mainProject?.program_manager_id
-                                ? [mainProject.program_manager_id]
-                                : [];
-                            if (pmIds.length === 0) return '—';
-                            const names = pmIds
-                              .map(id => employees.find(e => e.id === id)?.name)
-                              .filter(Boolean);
-                            return names.length ? names.join(', ') : '—';
-                          })()}
-                        </span>
-                      </td>
-                      <td className="px-5 py-4">
-                        <div className="flex flex-wrap gap-1">
-                          {project.required_expertise?.slice(0, 2).map((skill, idx) => (
-                            <span key={idx} className="text-xs text-slate-500 bg-slate-100 px-2 py-0.5 rounded">
-                              {skill}
-                            </span>
-                          ))}
-                          {project.required_expertise?.length > 2 && (
-                            <span className="text-xs text-slate-400">+{project.required_expertise.length - 2}</span>
-                          )}
-                        </div>
-                      </td>
-                      <td className="px-5 py-4 text-center">
-                        <div className="font-semibold text-slate-800">{project.required_manpower || '—'}</div>
-                        <div className="text-xs text-slate-400">needed</div>
-                      </td>
-                      <td className="px-5 py-4 text-center">
-                        {allocatedManpower > 0 ? (
-                          <AllocationPopover
-                            project={project}
-                            allocations={allocations}
-                            employees={employees}
-                            badgeContent={(
-                              <>
-                                <span>Allocated</span>
-                                <span className="font-bold">{allocatedManpower}</span>
-                              </>
-                            )}
-                            onOpenAllocations={() => navigate(`${prefix}/allocations`, { state: { projectId: project.id } })}
-                          />
-                        ) : (
-                          <button
-                            onClick={() => navigate(`${prefix}/allocations`, { state: { projectId: project.id } })}
-                            className="inline-flex items-center gap-1.5 px-3 py-1.5 bg-amber-50 hover:bg-amber-100 text-amber-700 rounded-lg font-medium text-sm transition-colors border border-amber-200"
-                            title={`${matchingTotal} employees available with matching skills - Click to allocate`}
-                          >
-                            <span className="font-bold">{matchingTotal}</span>
-                            <span>available</span>
-                            <ArrowRight className="w-3.5 h-3.5" />
-                          </button>
-                        )}
-                      </td>
-                      <td className="px-5 py-4">
-                        <div className="text-sm text-slate-700">
-                          {format(new Date(project.start_date), 'MMM d')} — {format(new Date(project.end_date), 'MMM d')}
-                        </div>
-                        <div className="text-xs text-slate-400">
-                          {project.project_duration_days < 7 ? `${project.project_duration_days}d` : `${Math.floor(project.project_duration_days / 7)}w ${project.project_duration_days % 7}d`}
-                        </div>
-                      </td>
-                      <td className="px-5 py-4 text-center">
-                        <span className={`inline-flex px-2.5 py-1 rounded-full text-xs font-medium ${project.priority === 'High' ? 'bg-red-50 text-red-700' :
-                          project.priority === 'Medium' ? 'bg-amber-50 text-amber-700' :
-                            'bg-slate-100 text-slate-600'
-                          }`}>
-                          {project.priority}
-                        </span>
-                      </td>
-                      <td className="px-5 py-4 text-center">
-                        <div className="font-medium text-slate-700">{parseFloat(((project.estimated_time_per_task || 0) * 60).toFixed(1))}m</div>
-                      </td>
-                      <td className="px-5 py-4">
-                        <div className="space-y-1">
-                          <span className={`inline-flex px-2.5 py-1 rounded-full text-xs font-medium ${recommendation === 'Overburdened' ? 'bg-red-50 text-red-700' :
-                            recommendation === 'Balanced' ? 'bg-emerald-50 text-emerald-700' :
-                              recommendation === 'Underutilized' ? 'bg-amber-50 text-amber-700' :
-                                'bg-slate-100 text-slate-600'
-                            }`}>
-                            {recommendation}
-                          </span>
-                          {allocatedManpower > 0 && (
-                            <div className="text-xs text-slate-500">
-                              {recResult.dailyHours < 999 ? `${recResult.dailyHours.toFixed(1)}h` : '—'}  / 8h per day
-                              {recResult.workingDays && <span className="text-slate-400"> ({recResult.workingDays}wd)</span>}
-                            </div>
-                          )}
-                        </div>
-                      </td>
-                      <td className="px-5 py-4 text-center">
-                        <div className="flex items-center justify-center gap-2">
-                          <span className={`w-2 h-2 rounded-full ${project.project_status === 'active' ? 'bg-emerald-500' :
-                            project.project_status === 'completed' ? 'bg-blue-500' :
-                              'bg-slate-400'
-                            }`}></span>
-                          <span className="text-sm text-slate-600 capitalize">{project.project_status}</span>
-                        </div>
-                      </td>
-                      <td className="px-5 py-4 text-right sticky right-0 bg-white shadow-[-8px_0_8px_-8px_rgba(0,0,0,0.1)]">
-                        <div className="flex items-center justify-end gap-1">
-                          <button
-                            onClick={() => {
-                              setEditingProject(project);
-                              setSelectedSkills(project.required_expertise || []);
-                              setGuidelineFiles([]);
-                              setIsModalOpen(true);
-                            }}
-                            className="p-2 text-slate-500 hover:text-indigo-600 hover:bg-indigo-50 rounded-lg transition-colors"
-                            title="Edit"
-                          >
-                            <Edit className="w-4 h-4" />
-                          </button>
-                          <button
-                            onClick={() => {
-                              setCopyingProject({
-                                ...project,
-                                name: `${project.name} (Copy)`,
-                              });
-                              setSelectedSkills(project.required_expertise || []);
-                              setGuidelineFiles([]);
-                              setIsModalOpen(true);
-                            }}
-                            className="p-2 text-slate-500 hover:text-emerald-600 hover:bg-emerald-50 rounded-lg transition-colors"
-                            title="Copy"
-                          >
-                            <Copy className="w-4 h-4" />
-                          </button>
-                          <button
-                            onClick={() => {
-                              if (window.confirm(`Delete "${project.name}"?`)) {
-                                deleteMutation.mutate(project.id);
-                              }
-                            }}
-                            className="p-2 text-slate-500 hover:text-red-600 hover:bg-red-50 rounded-lg transition-colors"
-                            title="Delete"
-                          >
-                            <Trash2 className="w-4 h-4" />
-                          </button>
-                        </div>
-                      </td>
-                    </tr>
-                  );
-                })
-              )}
-            </tbody>
-          </table>
+      {/* Active Filters Bar */}
+      {(statusParam || recommendationParam) && (
+        <div className="flex items-center gap-2 flex-wrap bg-slate-50 border border-slate-200/60 rounded-xl px-4 py-2.5">
+          <span className="text-xs font-semibold text-slate-500 uppercase tracking-wider">Active Filters:</span>
+          {statusParam && (
+            <span className="inline-flex items-center gap-1.5 px-2.5 py-1 rounded-full text-xs font-medium bg-indigo-50 text-indigo-700 border border-indigo-200">
+              Status: {statusParam}
+              <button 
+                onClick={() => {
+                  const params = new URLSearchParams(searchParams);
+                  params.delete('status');
+                  setSearchParams(params);
+                }} 
+                className="hover:bg-indigo-100 rounded-full p-0.5"
+              >
+                <X className="w-3 h-3" />
+              </button>
+            </span>
+          )}
+          {recommendationParam && (
+            <span className="inline-flex items-center gap-1.5 px-2.5 py-1 rounded-full text-xs font-medium bg-red-50 text-red-700 border border-red-200">
+              Recommendation: {recommendationParam}
+              <button 
+                onClick={() => {
+                  const params = new URLSearchParams(searchParams);
+                  params.delete('recommendation');
+                  setSearchParams(params);
+                }} 
+                className="hover:bg-red-100 rounded-full p-0.5"
+              >
+                <X className="w-3 h-3" />
+              </button>
+            </span>
+          )}
+          <button
+            onClick={() => {
+              const params = new URLSearchParams(searchParams);
+              params.delete('status');
+              params.delete('recommendation');
+              setSearchParams(params);
+            }}
+            className="text-xs font-medium text-slate-500 hover:text-slate-800 transition-colors ml-auto"
+          >
+            Clear all
+          </button>
         </div>
-        {totalPages > 1 && (
-          <div className="flex items-center justify-between px-5 py-3 border-t border-slate-100">
-            <p className="text-sm text-slate-500">
-              Showing {(currentPage - 1) * PAGE_SIZE + 1}–{Math.min(currentPage * PAGE_SIZE, filteredProjects.length)} of {filteredProjects.length} items
-            </p>
-            <div className="flex items-center gap-1">
-              <button
-                onClick={() => setCurrentPage(p => Math.max(1, p - 1))}
-                disabled={currentPage === 1}
-                className="px-3 py-1.5 text-sm rounded-lg border border-slate-200 text-slate-600 hover:bg-slate-50 disabled:opacity-40 disabled:cursor-not-allowed transition-colors"
-              >
-                Previous
-              </button>
-              {Array.from({ length: totalPages }, (_, i) => i + 1)
-                .filter(p => p === 1 || p === totalPages || Math.abs(p - currentPage) <= 1)
-                .reduce((acc, p, idx, arr) => {
-                  if (idx > 0 && p - arr[idx - 1] > 1) acc.push('...');
-                  acc.push(p);
-                  return acc;
-                }, [])
-                .map((p, idx) =>
-                  p === '...' ? (
-                    <span key={`ellipsis-${idx}`} className="px-2 text-slate-400 text-sm">…</span>
-                  ) : (
-                    <button
-                      key={p}
-                      onClick={() => setCurrentPage(p)}
-                      className={`px-3 py-1.5 text-sm rounded-lg border transition-colors ${
-                        currentPage === p
-                          ? 'bg-indigo-600 border-indigo-600 text-white font-medium'
-                          : 'border-slate-200 text-slate-600 hover:bg-slate-50'
-                      }`}
-                    >
-                      {p}
-                    </button>
-                  )
+      )}
+
+      <Table
+        columns={[
+          {
+            key: 'name',
+            label: 'Project & Org',
+            render: (value, project) => {
+              const parentProject = visibleMainProjects.find(p => p.id === project.main_project_id);
+              return (
+                <div>
+                  <div className="flex items-center gap-2">
+                    <span className="text-sm text-slate-600 font-semibold whitespace-nowrap">{value}</span>
+                    {project.is_annotation && (
+                      <span className="px-1.5 py-0.5 rounded-full text-[9px] font-bold bg-indigo-50 text-indigo-700 border border-indigo-200 uppercase tracking-wider">
+                        Annotation
+                      </span>
+                    )}
+                  </div>
+                  <div className="text-xs text-slate-400 mt-0.5 whitespace-nowrap">
+                    {parentProject?.name || '—'} • {parentProject?.project_type || '—'}
+                  </div>
+                </div>
+              );
+            },
+          },
+          {
+            key: 'main_project_id',
+            label: 'Project Manager',
+            render: (_, project) => {
+              const mainProject = visibleMainProjects.find(p => p.id === project.main_project_id);
+              const pmIds = mainProject?.program_manager_ids?.length
+                ? mainProject.program_manager_ids
+                : mainProject?.program_manager_id ? [mainProject.program_manager_id] : [];
+              if (pmIds.length === 0) return <span className="text-sm text-slate-600">—</span>;
+              const names = pmIds.map(id => employees.find(e => e.id === id)?.name).filter(Boolean);
+              return <span className="text-sm text-slate-600 whitespace-nowrap">{names.length ? names.join(', ') : '—'}</span>;
+            },
+          },
+          {
+            key: 'required_expertise',
+            label: 'Skills',
+            render: (value) => (
+              <div className="text-xs text-slate-600 font-medium whitespace-nowrap">
+                {value && value.length > 0 ? (
+                  <>
+                    <span>{value.slice(0, 2).join(', ')}</span>
+                    {value.length > 2 && <span className="text-slate-400"> +{value.length - 2}</span>}
+                  </>
+                ) : (
+                  <span className="text-slate-400">—</span>
                 )}
-              <button
-                onClick={() => setCurrentPage(p => Math.min(totalPages, p + 1))}
-                disabled={currentPage === totalPages}
-                className="px-3 py-1.5 text-sm rounded-lg border border-slate-200 text-slate-600 hover:bg-slate-50 disabled:opacity-40 disabled:cursor-not-allowed transition-colors"
-              >
-                Next
-              </button>
-            </div>
-          </div>
-        )}
-      </div>
+              </div>
+            ),
+          },
+          {
+            key: 'required_manpower',
+            label: 'Allocated / Req.',
+            align: 'center',
+            render: (_, project) => {
+              const matchingTotal = getMatchingEmployees(project).length;
+              const allocatedManpower = getAllocatedManpower(project);
+              return allocatedManpower > 0 ? (
+                <div className="inline-flex items-center justify-center">
+                  <AllocationPopover
+                    project={project}
+                    allocations={allocations}
+                    employees={employees}
+                    badgeContent={(
+                      <div className="flex items-center gap-1 text-slate-600 hover:text-indigo-600 transition-colors">
+                        <span className="font-bold text-slate-800">{allocatedManpower}</span>
+                        <span className="text-slate-400">/</span>
+                        <span className="font-semibold text-slate-500">{project.required_manpower || '0'}</span>
+                        <span className="text-xs text-slate-400 ml-1 font-normal">allocated</span>
+                      </div>
+                    )}
+                    onOpenAllocations={() => navigate(`${prefix}/allocations`, { state: { projectId: project.id } })}
+                  />
+                </div>
+              ) : (
+                <div className="flex flex-col items-center gap-0.5">
+                  <button
+                    onClick={() => navigate(`${prefix}/allocations`, { state: { projectId: project.id } })}
+                    className="inline-flex items-center gap-1 px-2.5 py-1 bg-amber-50 hover:bg-amber-100 text-amber-700 rounded-lg font-medium text-xs transition-colors border border-amber-200"
+                  >
+                    <span className="font-bold">{matchingTotal}</span>
+                    <span>available</span>
+                    <ArrowRight className="w-3 h-3" />
+                  </button>
+                  <span className="text-[10px] text-slate-400 font-medium">Req: {project.required_manpower || '0'}</span>
+                </div>
+              );
+            },
+          },
+          {
+            key: 'start_date',
+            label: 'Timeline',
+            render: (_, project) => (
+              <div className="whitespace-nowrap">
+                <div className="text-sm text-slate-700">
+                  {format(new Date(project.start_date), 'MMM d')} — {format(new Date(project.end_date), 'MMM d')}
+                </div>
+                <div className="text-xs text-slate-400">
+                  {project.project_duration_days < 7
+                    ? `${project.project_duration_days}d`
+                    : `${Math.floor(project.project_duration_days / 7)}w ${project.project_duration_days % 7}d`}
+                </div>
+              </div>
+            ),
+          },
+          {
+            key: 'priority',
+            label: 'Priority',
+            align: 'center',
+            render: (value) => (
+              <span className={`inline-flex px-2.5 py-1 rounded-full text-xs font-medium whitespace-nowrap ${
+                value === 'High' ? 'bg-red-50 text-red-700' :
+                value === 'Medium' ? 'bg-amber-50 text-amber-700' :
+                value === 'critical' ? 'bg-red-100 text-red-800' :
+                'bg-slate-100 text-slate-600'
+              }`}>
+                {value}
+              </span>
+            ),
+          },
+          {
+            key: 'estimated_time_per_task',
+            label: 'Avg Time',
+            align: 'center',
+            render: (value) => (
+              <div className="font-medium text-slate-700 whitespace-nowrap">
+                {parseFloat(((value || 0) * 60).toFixed(1))}m
+              </div>
+            ),
+          },
+          {
+            key: '_recommendation',
+            label: 'Recommendation',
+            render: (_, project) => {
+              const allocatedManpower = getAllocatedManpower(project);
+              const recResult = getSystemRecommendation(project);
+              const recommendation = recResult.label;
+              return (
+                <div className="space-y-1">
+                  <span className={`inline-flex px-2.5 py-1 rounded-full text-xs font-medium whitespace-nowrap ${
+                    recommendation === 'Overburdened' ? 'bg-red-50 text-red-700' :
+                    recommendation === 'Balanced' ? 'bg-emerald-50 text-emerald-700' :
+                    recommendation === 'Underutilized' ? 'bg-amber-50 text-amber-700' :
+                    'bg-slate-100 text-slate-600'
+                  }`}>
+                    {recommendation}
+                  </span>
+                  {allocatedManpower > 0 && (
+                    <div className="text-xs text-slate-500 whitespace-nowrap">
+                      {recResult.dailyHours < 999 ? `${recResult.dailyHours.toFixed(1)}h` : '—'} / 8h per day
+                      {recResult.workingDays && <span className="text-slate-400"> ({recResult.workingDays}wd)</span>}
+                    </div>
+                  )}
+                </div>
+              );
+            },
+          },
+          {
+            key: 'project_status',
+            label: 'Status',
+            align: 'center',
+            sticky: 'right',
+            stickyOffset: 'right-[112px]',
+            render: (value) => (
+              <div className="flex items-center justify-center gap-2 whitespace-nowrap">
+                <span className={`w-2 h-2 rounded-full ${
+                  value === 'active' ? 'bg-emerald-500' :
+                  value === 'completed' ? 'bg-blue-500' :
+                  'bg-slate-400'
+                }`}></span>
+                <span className="text-sm text-slate-600 capitalize">{value}</span>
+              </div>
+            ),
+          },
+          {
+            key: '_actions',
+            label: 'Actions',
+            align: 'right',
+            sticky: 'right',
+            render: (_, project) => (
+              <div className="flex items-center justify-end gap-1">
+                <button
+                  onClick={() => {
+                    setEditingProject(project);
+                    setSelectedSkills(project.required_expertise || []);
+                    setGuidelineFiles([]);
+                    setFormMainProjectId(String(project.main_project_id || ''));
+                    setFormPriority(project.priority || 'medium');
+                    setFormProjectStatus(project.project_status || 'active');
+                    setIsModalOpen(true);
+                  }}
+                  className="p-2 text-slate-500 hover:text-indigo-600 hover:bg-indigo-50 rounded-lg transition-colors"
+                  title="Edit"
+                >
+                  <Edit className="w-4 h-4" />
+                </button>
+                <button
+                  onClick={() => {
+                    setCopyingProject({ ...project, name: `${project.name} (Copy)` });
+                    setSelectedSkills(project.required_expertise || []);
+                    setGuidelineFiles([]);
+                    setFormMainProjectId(String(project.main_project_id || ''));
+                    setFormPriority(project.priority || 'medium');
+                    setFormProjectStatus(project.project_status || 'active');
+                    setIsModalOpen(true);
+                  }}
+                  className="p-2 text-slate-500 hover:text-emerald-600 hover:bg-emerald-50 rounded-lg transition-colors"
+                  title="Copy"
+                >
+                  <Copy className="w-4 h-4" />
+                </button>
+                <button
+                  onClick={() => { if (window.confirm(`Delete "${project.name}"?`)) deleteMutation.mutate(project.id); }}
+                  className="p-2 text-slate-500 hover:text-red-600 hover:bg-red-50 rounded-lg transition-colors"
+                  title="Delete"
+                >
+                  <Trash2 className="w-4 h-4" />
+                </button>
+              </div>
+            ),
+          },
+        ]}
+        data={filteredProjects}
+        currentPage={currentPage}
+        pageSize={PAGE_SIZE}
+        onPageChange={setCurrentPage}
+        emptyState={{
+          title: filterMainProjectId ? 'No projects under this organization' : 'No projects yet',
+          description: 'Create your first project to get started',
+        }}
+      />
 
       {isModalOpen && (
-        <div className="fixed inset-0 bg-gray-900 bg-opacity-50 flex items-center justify-center z-50 p-2 sm:p-4">
+        <div className="fixed inset-0 bg-slate-900/40 backdrop-blur-sm flex items-center justify-center z-50 p-2 sm:p-4">
           <div className="bg-white rounded-lg shadow-xl w-full max-w-full sm:max-w-3xl max-h-[95vh] sm:max-h-[90vh] flex flex-col">
             <div className="px-6 py-4 border-b border-gray-200 flex-shrink-0">
               <div className="flex justify-between items-center">
                 <h2 className="text-xl font-semibold text-gray-900">
-                  {editingProject ? 'Edit Sub-Project' : copyingProject ? 'Copy Sub-Project' : 'Create New Sub-Project'}
+                  {editingProject ? 'Edit Project' : copyingProject ? 'Copy Project' : 'Create New Project'}
                 </h2>
                 <button
                   onClick={resetModalState}
@@ -923,7 +963,7 @@ const ProjectsPage = () => {
                 <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
                   <div>
                     <label className="block text-sm font-medium text-gray-700 mb-1">
-                      Sub-Project Name <span className="text-red-500">*</span>
+                      Project Name <span className="text-red-500">*</span>
                     </label>
                     <input
                       type="text"
@@ -931,30 +971,21 @@ const ProjectsPage = () => {
                       required
                       defaultValue={(editingProject || copyingProject)?.name}
                       className="input"
-                      placeholder="Enter sub-project name"
+                      placeholder="Enter project name"
                     />
                   </div>
                   <div>
                     <label className="block text-sm font-medium text-gray-700 mb-1">
-                      Parent Project <span className="text-red-500">*</span>
+                      Organization <span className="text-red-500">*</span>
                     </label>
-                    {filterMainProjectId && !editingProject && !copyingProject && (
-                      <input type="hidden" name="main_project_id" value={filterMainProjectId} />
-                    )}
-                    <select
-                      name="main_project_id"
-                      required
-                      defaultValue={(editingProject || copyingProject)?.main_project_id || filterMainProjectId || ''}
+                    <input type="hidden" name="main_project_id" value={filterMainProjectId && !editingProject && !copyingProject ? filterMainProjectId : formMainProjectId} />
+                    <Dropdown
+                      options={[{ value: '', label: 'Select a Project' }, ...visibleMainProjects.map(p => ({ value: String(p.id), label: p.name }))]}
+                      value={filterMainProjectId && !editingProject && !copyingProject ? String(filterMainProjectId) : formMainProjectId}
+                      onChange={setFormMainProjectId}
+                      placeholder="Select a Project"
                       disabled={!!filterMainProjectId && !editingProject && !copyingProject}
-                      className={`input ${filterMainProjectId && !editingProject && !copyingProject ? 'bg-slate-100 cursor-not-allowed' : ''}`}
-                    >
-                      <option value="">Select a Project</option>
-                      {visibleMainProjects.map((proj) => (
-                        <option key={proj.id} value={proj.id}>
-                          {proj.name}
-                        </option>
-                      ))}
-                    </select>
+                    />
                   </div>
                 </div>
 
@@ -963,33 +994,35 @@ const ProjectsPage = () => {
                     <label className="block text-sm font-medium text-gray-700 mb-1">
                       Priority <span className="text-red-500">*</span>
                     </label>
-                    <select
-                      name="priority"
-                      required
-                      defaultValue={(editingProject || copyingProject)?.priority || 'medium'}
-                      className="input"
-                    >
-                      <option value="low">Low</option>
-                      <option value="medium">Medium</option>
-                      <option value="high">High</option>
-                      <option value="critical">Critical</option>
-                    </select>
+                    <input type="hidden" name="priority" value={formPriority} />
+                    <Dropdown
+                      options={[
+                        { value: 'low', label: 'Low' },
+                        { value: 'medium', label: 'Medium' },
+                        { value: 'high', label: 'High' },
+                        { value: 'critical', label: 'Critical' },
+                      ]}
+                      value={formPriority}
+                      onChange={setFormPriority}
+                      placeholder="Select priority"
+                    />
                   </div>
                   <div>
                     <label className="block text-sm font-medium text-gray-700 mb-1">
                       Status <span className="text-red-500">*</span>
                     </label>
-                    <select
-                      name="project_status"
-                      required
-                      defaultValue={(editingProject || copyingProject)?.project_status || 'active'}
-                      className="input"
-                    >
-                      <option value="active">In Progress</option>
-                      <option value="completed">Completed</option>
-                      <option value="on-hold">On Hold</option>
-                      <option value="cancelled">Cancelled</option>
-                    </select>
+                    <input type="hidden" name="project_status" value={formProjectStatus} />
+                    <Dropdown
+                      options={[
+                        { value: 'active', label: 'In Progress' },
+                        { value: 'completed', label: 'Completed' },
+                        { value: 'on-hold', label: 'On Hold' },
+                        { value: 'cancelled', label: 'Cancelled' },
+                      ]}
+                      value={formProjectStatus}
+                      onChange={setFormProjectStatus}
+                      placeholder="Select status"
+                    />
                   </div>
                 </div>
 

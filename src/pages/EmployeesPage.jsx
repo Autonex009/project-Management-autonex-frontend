@@ -442,9 +442,13 @@
 import { useState, useRef, useEffect } from 'react';
 import { createPortal } from 'react-dom';
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
+import { useSearchParams } from 'react-router-dom';
 import { employeeApi, skillApi, allocationApi } from '../services/api';
-import { Plus, Edit, Trash2, X, User, ChevronDown, Search, CheckCircle, AlertCircle, Clock, ArrowUpCircle } from 'lucide-react';
+import { Plus, Edit, Trash2, X, User, ChevronDown, Search, CheckCircle, AlertCircle, Clock, ArrowUpCircle, RotateCcw } from 'lucide-react';
 import toast from 'react-hot-toast';
+import PageSearchBar from '../components/ui/PageSearchBar';
+import Table, { ColumnTemplates } from '../components/ui/Table';
+import Dropdown from '../components/ui/Dropdown';
 
 const LEAVE_TYPE_LABELS = {
   paid: 'Paid Leave',
@@ -613,6 +617,242 @@ function EmployeeAvailabilityModal({ employee, onClose }) {
   );
 }
 
+function EmployeeArchiveModal({ employee, onClose, onConfirm, isPending }) {
+  const { data: allocations, isLoading } = useQuery({
+    queryKey: ['employee-allocations-archive', employee.id],
+    queryFn: () => allocationApi.getByEmployee(employee.id),
+    staleTime: 0,
+  });
+
+  const hasAllocations = allocations && allocations.length > 0;
+
+  return createPortal(
+    <div className="fixed inset-0 z-[9999] flex items-center justify-center p-4 bg-black/40 backdrop-blur-sm" onClick={onClose}>
+      <div
+        className="bg-white rounded-2xl shadow-2xl w-full max-w-md max-h-[90vh] flex flex-col overflow-hidden animate-in fade-in zoom-in-95 duration-200"
+        onClick={(e) => e.stopPropagation()}
+      >
+        {/* Header */}
+        <div className="flex items-start justify-between px-6 py-5 border-b border-slate-100">
+          <div className="flex items-center gap-3">
+            <div className={`w-11 h-11 rounded-full flex items-center justify-center flex-shrink-0 ${hasAllocations ? 'bg-amber-50 text-amber-500' : 'bg-red-50 text-red-500'}`}>
+              <AlertCircle className="w-5 h-5" />
+            </div>
+            <div>
+              <h2 className="text-base font-semibold text-slate-800">
+                {hasAllocations ? 'Cannot Archive Employee' : 'Archive Employee'}
+              </h2>
+              <p className="text-sm text-slate-400">{employee.name}</p>
+            </div>
+          </div>
+          <button onClick={onClose} className="p-1.5 text-slate-400 hover:text-slate-600 hover:bg-slate-100 rounded-lg transition-colors">
+            <X className="w-5 h-5" />
+          </button>
+        </div>
+
+        {/* Content */}
+        {isLoading ? (
+          <div className="flex items-center justify-center h-48 text-slate-400 text-sm">
+            <div className="w-6 h-6 border-2 border-indigo-500 border-t-transparent rounded-full animate-spin mr-2"></div>
+            Checking allocations...
+          </div>
+        ) : (
+          <div className="p-6 space-y-4">
+            {hasAllocations ? (
+              <div className="space-y-3">
+                <p className="text-sm text-slate-600 leading-relaxed">
+                  <strong>{employee.name}</strong> cannot be archived because they are currently allocated to the following projects. Please remove their allocations first:
+                </p>
+                <div className="bg-slate-50 border border-slate-100 rounded-xl p-3 space-y-2 max-h-48 overflow-y-auto">
+                  {allocations.map((alloc) => (
+                    <div key={alloc.id} className="flex justify-between items-center text-xs text-slate-700 font-medium">
+                      <span>{alloc.sub_project_name || alloc.project_name || `Project (ID: ${alloc.sub_project_id})`}</span>
+                      <span className="text-slate-400 font-normal">{alloc.total_daily_hours}h/day ({alloc.allocation_percentage}%)</span>
+                    </div>
+                  ))}
+                </div>
+              </div>
+            ) : (
+              <div className="space-y-4">
+                <p className="text-sm text-slate-600 leading-relaxed">
+                  Are you sure you want to archive <strong>{employee.name}</strong>?
+                </p>
+                <div className="bg-amber-50 border border-amber-100 rounded-xl p-4 space-y-2.5">
+                  <div className="flex gap-2.5 text-xs text-amber-850 leading-relaxed">
+                    <span className="flex-shrink-0">🔒</span>
+                    <span>System access to the portal will be immediately revoked.</span>
+                  </div>
+                  <div className="flex gap-2.5 text-xs text-amber-850 leading-relaxed">
+                    <span className="flex-shrink-0">📁</span>
+                    <span>All historical data (leaves, project allocations history) will be preserved for records.</span>
+                  </div>
+                  <div className="flex gap-2.5 text-xs text-amber-850 leading-relaxed">
+                    <span className="flex-shrink-0">🔄</span>
+                    <span>You can restore this employee at any time from the "Archived / Former" tab.</span>
+                  </div>
+                </div>
+              </div>
+            )}
+
+            {/* Footer Actions */}
+            <div className="flex justify-end gap-3 pt-4 border-t border-slate-100 mt-4">
+              {hasAllocations ? (
+                <button
+                  onClick={onClose}
+                  className="px-4 py-2 bg-slate-100 hover:bg-slate-200 text-slate-700 rounded-xl text-sm font-medium transition-colors"
+                >
+                  Close
+                </button>
+              ) : (
+                <>
+                  <button
+                    onClick={onClose}
+                    className="px-4 py-2 border border-slate-200 hover:bg-slate-50 text-slate-700 rounded-xl text-sm font-medium transition-colors"
+                  >
+                    Cancel
+                  </button>
+                  <button
+                    onClick={onConfirm}
+                    disabled={isPending}
+                    className="px-4 py-2 bg-amber-600 hover:bg-amber-700 disabled:bg-amber-400 text-white rounded-xl text-sm font-medium transition-colors flex items-center gap-2"
+                  >
+                    {isPending ? 'Archiving...' : 'Archive'}
+                  </button>
+                </>
+              )}
+            </div>
+          </div>
+        )}
+      </div>
+    </div>,
+    document.body
+  );
+}
+
+function EmployeeRestoreModal({ employee, onClose, onConfirm, isPending }) {
+  return createPortal(
+    <div className="fixed inset-0 z-[9999] flex items-center justify-center p-4 bg-black/40 backdrop-blur-sm" onClick={onClose}>
+      <div
+        className="bg-white rounded-2xl shadow-2xl w-full max-w-md max-h-[90vh] flex flex-col overflow-hidden animate-in fade-in zoom-in-95 duration-200"
+        onClick={(e) => e.stopPropagation()}
+      >
+        {/* Header */}
+        <div className="flex items-start justify-between px-6 py-5 border-b border-slate-100">
+          <div className="flex items-center gap-3">
+            <div className="w-11 h-11 rounded-full bg-emerald-50 text-emerald-500 flex items-center justify-center flex-shrink-0">
+              <RotateCcw className="w-5 h-5" />
+            </div>
+            <div>
+              <h2 className="text-base font-semibold text-slate-800">Restore Employee</h2>
+              <p className="text-sm text-slate-400">{employee.name}</p>
+            </div>
+          </div>
+          <button onClick={onClose} className="p-1.5 text-slate-400 hover:text-slate-600 hover:bg-slate-100 rounded-lg transition-colors">
+            <X className="w-5 h-5" />
+          </button>
+        </div>
+
+        {/* Content */}
+        <div className="p-6 space-y-4">
+          <p className="text-sm text-slate-600 leading-relaxed">
+            Are you sure you want to restore <strong>{employee.name}</strong> as an active employee?
+          </p>
+          <div className="bg-emerald-50 border border-emerald-100 rounded-xl p-4 space-y-2.5">
+            <div className="flex gap-2.5 text-xs text-emerald-850 leading-relaxed">
+              <span className="flex-shrink-0">🔑</span>
+              <span>Their portal account will be reactivated, allowing them to log in again.</span>
+            </div>
+            <div className="flex gap-2.5 text-xs text-emerald-850 leading-relaxed">
+              <span className="flex-shrink-0">👥</span>
+              <span>They will show up in the active employee list.</span>
+            </div>
+          </div>
+
+          {/* Footer Actions */}
+          <div className="flex justify-end gap-3 pt-4 border-t border-slate-100 mt-4">
+            <button
+              onClick={onClose}
+              className="px-4 py-2 border border-slate-200 hover:bg-slate-50 text-slate-700 rounded-xl text-sm font-medium transition-colors"
+            >
+              Cancel
+            </button>
+            <button
+              onClick={onConfirm}
+              disabled={isPending}
+              className="px-4 py-2 bg-emerald-600 hover:bg-emerald-700 disabled:bg-emerald-400 text-white rounded-xl text-sm font-medium transition-colors flex items-center gap-2"
+            >
+              {isPending ? 'Restoring...' : 'Restore'}
+            </button>
+          </div>
+        </div>
+      </div>
+    </div>,
+    document.body
+  );
+}
+
+function EmployeeConvertToFulltimeModal({ employee, onClose, onConfirm, isPending }) {
+  return createPortal(
+    <div className="fixed inset-0 z-[9999] flex items-center justify-center p-4 bg-black/40 backdrop-blur-sm" onClick={onClose}>
+      <div
+        className="bg-white rounded-2xl shadow-2xl w-full max-w-md max-h-[90vh] flex flex-col overflow-hidden animate-in fade-in zoom-in-95 duration-200"
+        onClick={(e) => e.stopPropagation()}
+      >
+        {/* Header */}
+        <div className="flex items-start justify-between px-6 py-5 border-b border-slate-100">
+          <div className="flex items-center gap-3">
+            <div className="w-11 h-11 rounded-full bg-indigo-50 text-indigo-500 flex items-center justify-center flex-shrink-0">
+              <ArrowUpCircle className="w-5 h-5" />
+            </div>
+            <div>
+              <h2 className="text-base font-semibold text-slate-800">Convert to Full-time</h2>
+              <p className="text-sm text-slate-400">{employee.name}</p>
+            </div>
+          </div>
+          <button onClick={onClose} className="p-1.5 text-slate-400 hover:text-slate-600 hover:bg-slate-100 rounded-lg transition-colors">
+            <X className="w-5 h-5" />
+          </button>
+        </div>
+
+        {/* Content */}
+        <div className="p-6 space-y-4">
+          <p className="text-sm text-slate-600 leading-relaxed">
+            Convert <strong>{employee.name}</strong> from Intern to Full-time employee?
+          </p>
+          <div className="bg-indigo-50 border border-indigo-100 rounded-xl p-4 space-y-2.5">
+            <div className="flex gap-2.5 text-xs text-indigo-850 leading-relaxed">
+              <span className="flex-shrink-0">📝</span>
+              <span>This updates the existing record in place — all leave, payroll, performance and other history is preserved.</span>
+            </div>
+            <div className="flex gap-2.5 text-xs text-indigo-850 leading-relaxed">
+              <span className="flex-shrink-0">🏝️</span>
+              <span>Full-time leave entitlements will apply going forward.</span>
+            </div>
+          </div>
+
+          {/* Footer Actions */}
+          <div className="flex justify-end gap-3 pt-4 border-t border-slate-100 mt-4">
+            <button
+              onClick={onClose}
+              className="px-4 py-2 border border-slate-200 hover:bg-slate-50 text-slate-700 rounded-xl text-sm font-medium transition-colors"
+            >
+              Cancel
+            </button>
+            <button
+              onClick={onConfirm}
+              disabled={isPending}
+              className="px-4 py-2 bg-indigo-600 hover:bg-indigo-700 disabled:bg-indigo-400 text-white rounded-xl text-sm font-medium transition-colors flex items-center gap-2"
+            >
+              {isPending ? 'Converting...' : 'Convert'}
+            </button>
+          </div>
+        </div>
+      </div>
+    </div>,
+    document.body
+  );
+}
+
 const ALLOWED_DESIGNATIONS = ['Admin', 'Annotator/ Reviewer', 'Program Manager', 'Developer'];
 
 // Custom Multi-Select Dropdown Component
@@ -714,8 +954,8 @@ const MultiSelectDropdown = ({ name, defaultValue = [], predefinedSkills, queryC
 
       {/* Dropdown menu */}
       {isOpen && (
-        <div className="absolute z-50 w-full mt-1 bg-white border border-gray-300 rounded-lg shadow-lg max-h-64 overflow-hidden">
-          <div className="max-h-48 overflow-y-auto">
+        <div className="absolute z-50 w-full mt-1 bg-white border border-gray-350 rounded-lg shadow-xl max-h-80 flex flex-col overflow-hidden">
+          <div className="overflow-y-auto flex-1">
             {allSkills.length === 0 ? (
               <div className="px-4 py-3 text-sm text-gray-500 text-center">
                 No skills available. Add one below!
@@ -763,7 +1003,7 @@ const MultiSelectDropdown = ({ name, defaultValue = [], predefinedSkills, queryC
           </div>
 
           {/* Add custom skill section */}
-          <div className="border-t border-gray-200 p-3 bg-gray-50">
+          <div className="border-t border-slate-200 p-3 bg-slate-50 flex-shrink-0">
             <div className="flex gap-2">
               <input
                 type="text"
@@ -771,17 +1011,17 @@ const MultiSelectDropdown = ({ name, defaultValue = [], predefinedSkills, queryC
                 onChange={(e) => setCustomSkill(e.target.value)}
                 onKeyPress={handleKeyPress}
                 placeholder="Add custom skill..."
-                className="flex-1 px-3 py-1.5 text-sm border border-gray-300 rounded focus:ring-2 focus:ring-blue-500 focus:border-blue-500 outline-none"
+                className="flex-1 px-3 py-1.5 text-sm border border-slate-350 rounded-md focus:ring-2 focus:ring-blue-100 focus:border-blue-500 outline-none transition-all"
               />
               <button
                 type="button"
                 onClick={addCustomSkill}
-                className="px-3 py-1.5 text-sm bg-blue-600 text-white rounded hover:bg-blue-700 transition-colors"
+                className="px-3.5 py-1.5 text-sm bg-blue-600 hover:bg-blue-700 active:bg-blue-800 text-white font-medium rounded-md shadow-sm transition-all"
               >
                 Add
               </button>
             </div>
-            <p className="mt-1 text-xs text-gray-500">Press Enter or click Add</p>
+            <p className="mt-1.5 text-[11px] text-slate-400 font-medium">Press Enter or click Add</p>
           </div>
         </div>
       )}
@@ -844,20 +1084,38 @@ const DesignationMultiSelect = ({ options, value, onChange }) => {
 
 const EmployeesPage = () => {
   const queryClient = useQueryClient();
+  const [searchParams, setSearchParams] = useSearchParams();
+  const idleOnly = searchParams.get('idleOnly') === 'true';
+  const statusParam = searchParams.get('status');
   const [isModalOpen, setIsModalOpen] = useState(false);
   const [editingEmployee, setEditingEmployee] = useState(null);
   const [availabilityEmployee, setAvailabilityEmployee] = useState(null);
+  const [archiveTarget, setArchiveTarget] = useState(null);
+  const [restoreTarget, setRestoreTarget] = useState(null);
+  const [convertToFulltimeTarget, setConvertToFulltimeTarget] = useState(null);
   const [searchQuery, setSearchQuery] = useState('');
   const [skillFilter, setSkillFilter] = useState('');
   const [designationFilter, setDesignationFilter] = useState([]);
-  const [idleOnly, setIdleOnly] = useState(false);
   const [currentPage, setCurrentPage] = useState(1);
+  const [formDesignation, setFormDesignation] = useState('Annotator/ Reviewer');
+  const [formEmployeeType, setFormEmployeeType] = useState('Full-time');
+  const [formEmpStatus, setFormEmpStatus] = useState('active');
   const PAGE_SIZE = 10;
 
   // Fetch employees
   const { data: employees = [], isLoading } = useQuery({
-    queryKey: ['employees'],
-    queryFn: employeeApi.getAll,
+    queryKey: ['employees', statusParam],
+    queryFn: () => {
+      if (statusParam === 'active') {
+        return employeeApi.getActive();
+      } else if (statusParam === 'inactive') {
+        return employeeApi.getInactive();
+      } else if (statusParam === 'idle') {
+        return employeeApi.getIdle();
+      } else {
+        return employeeApi.getAll(statusParam ? { status: statusParam } : {});
+      }
+    },
   });
 
   // Fetch all allocations so we can show assigned projects per employee
@@ -911,14 +1169,25 @@ const EmployeesPage = () => {
     }
   });
 
-  const deleteMutation = useMutation({
+  const archiveMutation = useMutation({
     mutationFn: employeeApi.delete,
     onSuccess: () => {
       queryClient.invalidateQueries(['employees']);
-      toast.success('Employee deleted successfully');
+      toast.success('Employee archived successfully');
     },
     onError: (err) => {
-      toast.error(err.response?.data?.detail || 'Failed to delete employee');
+      toast.error(err.response?.data?.detail || 'Failed to archive employee');
+    }
+  });
+
+  const restoreMutation = useMutation({
+    mutationFn: employeeApi.restore,
+    onSuccess: () => {
+      queryClient.invalidateQueries(['employees']);
+      toast.success('Employee restored successfully');
+    },
+    onError: (err) => {
+      toast.error(err.response?.data?.detail || 'Failed to restore employee');
     }
   });
 
@@ -934,13 +1203,7 @@ const EmployeesPage = () => {
   });
 
   const handleConvertToFulltime = (employee) => {
-    if (!window.confirm(
-      `Convert ${employee.name} from Intern to Full-time employee?\n\n` +
-      `This updates the existing record in place — all leave, payroll, performance and ` +
-      `other history is preserved. Full-time leave entitlements will apply going forward.`
-    )) return;
-    const currentUser = JSON.parse(localStorage.getItem('user') || '{}');
-    convertMutation.mutate({ id: employee.id, converted_by: currentUser.id || null });
+    setConvertToFulltimeTarget(employee);
   };
 
   const handleSubmit = (e) => {
@@ -1005,8 +1268,30 @@ const EmployeesPage = () => {
     const matchesDesignation = designationFilter.length === 0 || designationFilter.includes(employee.designation);
     const isIdle = !employeeProjectsMap[employee.id];
     const matchesIdle = !idleOnly || isIdle;
-    return matchesSearch && matchesSkill && matchesDesignation && matchesIdle;
+    const matchesStatus = (() => {
+      if (!statusParam) {
+        return employee.status?.toLowerCase() !== 'archived';
+      }
+      if (statusParam === 'archived') {
+        return employee.status?.toLowerCase() === 'archived';
+      }
+      if (statusParam === 'active') {
+        return employee.status?.toLowerCase() === 'active';
+      }
+      if (statusParam === 'inactive') {
+        return employee.status?.toLowerCase() === 'inactive';
+      }
+      if (statusParam === 'idle') {
+        return employee.status?.toLowerCase() === 'active' && isIdle;
+      }
+      return employee.status?.toLowerCase() === statusParam.toLowerCase();
+    })();
+    return matchesSearch && matchesSkill && matchesDesignation && matchesIdle && matchesStatus;
   });
+
+  useEffect(() => {
+    setCurrentPage(1);
+  }, [searchQuery, skillFilter, designationFilter, idleOnly, statusParam]);
 
   const totalPages = Math.ceil(filteredEmployees.length / PAGE_SIZE);
   const paginatedEmployees = filteredEmployees.slice((currentPage - 1) * PAGE_SIZE, currentPage * PAGE_SIZE);
@@ -1035,16 +1320,46 @@ const EmployeesPage = () => {
             </div>
           </div>
         </div>
+        {/* Tabs for Active Team vs Archived */}
+        <div className="flex border-b border-slate-200 mt-2 mb-1">
+          <button
+            onClick={() => {
+              const params = new URLSearchParams(searchParams);
+              params.delete('status');
+              setSearchParams(params);
+            }}
+            className={`px-4 py-2 text-sm font-semibold border-b-2 -mb-px transition-colors ${
+              statusParam !== 'archived'
+                ? 'border-indigo-600 text-indigo-600'
+                : 'border-transparent text-slate-500 hover:text-slate-700'
+            }`}
+          >
+            Active Team
+          </button>
+          <button
+            onClick={() => {
+              const params = new URLSearchParams(searchParams);
+              params.set('status', 'archived');
+              setSearchParams(params);
+            }}
+            className={`px-4 py-2 text-sm font-semibold border-b-2 -mb-px transition-colors ${
+              statusParam === 'archived'
+                ? 'border-indigo-600 text-indigo-600'
+                : 'border-transparent text-slate-500 hover:text-slate-700'
+            }`}
+          >
+            Archived / Former
+          </button>
+        </div>
         {/* Filters + Search + Add button on one row */}
         <div className="flex flex-wrap items-center gap-2">
-          <select
+          <Dropdown
+            options={[{ value: '', label: 'All Skills' }, ...predefinedSkills.map(s => ({ value: s, label: s }))]}
             value={skillFilter}
-            onChange={(e) => { setSkillFilter(e.target.value); setCurrentPage(1); }}
-            className="px-3 py-2 border border-slate-200 rounded-lg text-sm focus:ring-2 focus:ring-indigo-100 outline-none bg-white"
-          >
-            <option value="">All Skills</option>
-            {predefinedSkills.map(s => <option key={s} value={s}>{s}</option>)}
-          </select>
+            onChange={(val) => { setSkillFilter(val); setCurrentPage(1); }}
+            placeholder="All Skills"
+            optionsClassName='w-40'
+          />
 
           <DesignationMultiSelect
             options={designationOptions}
@@ -1052,32 +1367,49 @@ const EmployeesPage = () => {
             onChange={(val) => { setDesignationFilter(val); setCurrentPage(1); }}
           />
 
-          <button
-            onClick={() => { setIdleOnly(v => !v); setCurrentPage(1); }}
-            className={`px-3 py-2 rounded-lg text-sm font-medium border transition-colors ${
-              idleOnly
-                ? 'bg-amber-50 border-amber-300 text-amber-700'
-                : 'bg-white border-slate-200 text-slate-600 hover:border-slate-300'
-            }`}
-            title="Show only employees not assigned to any project"
-          >
-            Idle Only
-          </button>
+          {statusParam !== 'archived' && (
+            <div className="flex bg-slate-100 p-1 rounded-xl gap-1 border border-slate-200/50">
+              {['all', 'active', 'inactive', 'idle'].map((s) => {
+                const label = s.charAt(0).toUpperCase() + s.slice(1);
+                const isActive = (s === 'all' && !statusParam) || statusParam === s;
+                return (
+                  <button
+                    key={s}
+                    type="button"
+                    onClick={() => {
+                      const params = new URLSearchParams(searchParams);
+                      if (s === 'all') {
+                        params.delete('status');
+                      } else {
+                        params.set('status', s);
+                      }
+                      setSearchParams(params);
+                    }}
+                    className={`px-3 py-1.5 text-xs font-semibold rounded-lg transition-all ${
+                      isActive
+                        ? 'bg-white text-indigo-600 shadow-sm'
+                        : 'text-slate-500 hover:text-slate-800 hover:bg-white/50'
+                    }`}
+                  >
+                    {label}
+                  </button>
+                );
+              })}
+            </div>
+          )}
 
-          <div className="relative flex-1 sm:flex-none">
-            <Search className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-slate-400" />
-            <input
-              type="text"
-              placeholder="Search employees..."
-              value={searchQuery}
-              onChange={(e) => { setSearchQuery(e.target.value); setCurrentPage(1); }}
-              className="pl-9 pr-4 py-2 border border-slate-200 rounded-lg text-sm focus:ring-2 focus:ring-indigo-100 outline-none w-full sm:w-64"
-            />
-          </div>
+          <PageSearchBar
+            value={searchQuery}
+            onChange={(val) => { setSearchQuery(val); setCurrentPage(1); }}
+            placeholder="Search employees..."
+          />
 
           <button
             onClick={() => {
               setEditingEmployee(null);
+              setFormDesignation('Annotator/ Reviewer');
+              setFormEmployeeType('Full-time');
+              setFormEmpStatus('active');
               setIsModalOpen(true);
             }}
             className="inline-flex items-center gap-2 px-4 py-2.5 bg-indigo-600 hover:bg-indigo-700 text-white font-medium text-sm rounded-xl shadow-sm transition-colors"
@@ -1088,244 +1420,201 @@ const EmployeesPage = () => {
         </div>
       </div>
 
-      {/* Modern Card Container */}
-      <div className="bg-white rounded-2xl border border-slate-200/60 shadow-[0_1px_3px_rgba(0,0,0,0.04)] overflow-hidden">
-        <div className="overflow-x-auto">
-          <table className="w-full">
-            <thead className="bg-slate-50/80 border-b border-slate-100">
-              <tr>
-                <th className="px-5 py-4 text-left text-xs font-medium text-slate-400 uppercase tracking-wider">Employee</th>
-                <th className="px-5 py-4 text-left text-xs font-medium text-slate-400 uppercase tracking-wider">Designation</th>
-                <th className="px-5 py-4 text-center text-xs font-medium text-slate-400 uppercase tracking-wider">Type</th>
-                <th className="px-5 py-4 text-center text-xs font-medium text-slate-400 uppercase tracking-wider">Hours/Day</th>
-                <th className="px-5 py-4 text-left text-xs font-medium text-slate-400 uppercase tracking-wider">Skills</th>
-                <th className="px-5 py-4 text-left text-xs font-medium text-slate-400 uppercase tracking-wider">Assigned Projects</th>
-                <th className="px-5 py-4 text-center text-xs font-medium text-slate-400 uppercase tracking-wider">Status</th>
-                <th className="px-5 py-4 text-right text-xs font-medium text-slate-400 uppercase tracking-wider">Actions</th>
-              </tr>
-            </thead>
-            <tbody className="divide-y divide-slate-100">
-              {filteredEmployees.length === 0 ? (
-                <tr>
-                  <td colSpan="8" className="px-5 py-16 text-center">
-                    <div className="text-slate-400">
-                      <p className="text-lg font-medium mb-1">No employees found</p>
-                      <p className="text-sm">Try adjusting your search query</p>
-                    </div>
-                  </td>
-                </tr>
-              ) : (
-                paginatedEmployees
-                  .map((employee) => (
-                    <tr key={employee.id} className="hover:bg-slate-50 transition-colors">
-                      {/* Employee Info */}
-                      <td className="px-5 py-4">
-                        <button
-                          className="flex items-center gap-3 text-left hover:opacity-80 transition-opacity"
-                          onClick={() => setAvailabilityEmployee(employee)}
-                          title="View availability"
-                        >
-                          <div className="w-10 h-10 rounded-full bg-slate-100 flex items-center justify-center flex-shrink-0">
-                            <User className="w-5 h-5 text-slate-500" />
-                          </div>
-                          <div>
-                            <div className="font-semibold text-slate-800 hover:text-indigo-600 transition-colors">{employee.name}</div>
-                            <div className="text-sm text-slate-400">{employee.email}</div>
-                          </div>
-                        </button>
-                      </td>
-
-                      {/* Designation */}
-                      <td className="px-5 py-4">
-                        <span className="text-sm text-slate-700">{employee.designation || 'Annotator'}</span>
-                      </td>
-
-                      {/* Type */}
-                      <td className="px-5 py-4 text-center">
-                        <span className={`inline-flex px-2.5 py-1 rounded-full text-xs font-medium ${employee.employee_type === 'Full-time' ? 'bg-emerald-50 text-emerald-700' :
-                          employee.employee_type === 'Part-time' ? 'bg-blue-50 text-blue-700' :
-                            'bg-slate-100 text-slate-600'
-                          }`}>
-                          {employee.employee_type}
-                        </span>
-                        {employee.converted_to_fulltime_at && (
-                          <p
-                            className="mt-1 text-[10px] text-slate-400"
-                            title={`Promoted from ${employee.previous_employee_type || 'Intern'} on ${new Date(employee.converted_to_fulltime_at).toLocaleDateString()}`}
-                          >
-                            promoted {new Date(employee.converted_to_fulltime_at).toLocaleDateString()}
-                          </p>
-                        )}
-                      </td>
-
-                      {/* Hours */}
-                      <td className="px-5 py-4 text-center">
-                        <div className="font-semibold text-slate-800">{employee.working_hours_per_day}h</div>
-                      </td>
-
-                      {/* Skills */}
-                      <td className="px-5 py-4">
-                        <div className="flex flex-wrap gap-1">
-                          {employee.skills && employee.skills.length > 0 ? (
-                            <>
-                              {employee.skills.slice(0, 3).map((skill, idx) => (
-                                <span key={idx} className="text-xs text-slate-500 bg-slate-100 px-2 py-0.5 rounded">
-                                  {skill}
-                                </span>
-                              ))}
-                              {employee.skills.length > 3 && (
-                                <span className="text-xs text-slate-400">+{employee.skills.length - 3}</span>
-                              )}
-                            </>
-                          ) : (
-                            <span className="text-xs text-slate-400">—</span>
-                          )}
-                        </div>
-                      </td>
-
-                      {/* Assigned Projects */}
-                      <td className="px-5 py-4">
-                        {(() => {
-                          const projects = employeeProjectsMap[employee.id];
-                          if (!projects || projects.size === 0) {
-                            return (
-                              <span className="inline-flex items-center px-2 py-0.5 rounded-full text-xs font-medium bg-amber-50 text-amber-700 border border-amber-200">
-                                Idle
-                              </span>
-                            );
-                          }
-                          const list = [...projects];
-                          return (
-                            <div className="flex flex-wrap gap-1">
-                              {list.slice(0, 2).map((name, idx) => (
-                                <span key={idx} className="inline-flex items-center px-2 py-0.5 rounded-full text-xs font-medium bg-indigo-50 text-indigo-700 border border-indigo-100 max-w-[140px] truncate" title={name}>
-                                  {name}
-                                </span>
-                              ))}
-                              {list.length > 2 && (
-                                <span className="text-xs text-slate-400 self-center" title={list.slice(2).join(', ')}>
-                                  +{list.length - 2}
-                                </span>
-                              )}
-                            </div>
-                          );
-                        })()}
-                      </td>
-
-                      {/* Status */}
-                      <td className="px-5 py-4 text-center">
-                        <div className="flex items-center justify-center gap-2">
-                          <span className={`w-2 h-2 rounded-full ${employee.status === 'active' ? 'bg-emerald-500' :
-                            employee.status === 'on-leave' ? 'bg-amber-500' :
-                              'bg-slate-400'
-                            }`}></span>
-                          <span className="text-sm text-slate-600 capitalize">{employee.status}</span>
-                        </div>
-                      </td>
-
-                      {/* Actions */}
-                      <td className="px-5 py-4 text-right">
-                        <div className="flex items-center justify-end gap-1">
-                          {employee.employee_type === 'Intern' && (
-                            <button
-                              onClick={() => handleConvertToFulltime(employee)}
-                              disabled={convertMutation.isPending}
-                              className="p-2 text-slate-500 hover:text-emerald-600 hover:bg-emerald-50 rounded-lg transition-colors disabled:opacity-50"
-                              title="Convert to Full-time employee"
-                            >
-                              <ArrowUpCircle className="w-4 h-4" />
-                            </button>
-                          )}
-                          <button
-                            onClick={() => {
-                              setEditingEmployee(employee);
-                              setIsModalOpen(true);
-                            }}
-                            className="p-2 text-slate-500 hover:text-indigo-600 hover:bg-indigo-50 rounded-lg transition-colors"
-                            title="Edit"
-                          >
-                            <Edit className="w-4 h-4" />
-                          </button>
-                          <button
-                            onClick={async () => {
-                              try {
-                                const allocs = await allocationApi.getByEmployee(employee.id);
-                                if (allocs && allocs.length > 0) {
-                                  alert(`Cannot delete ${employee.name} as they are allocated to projects.`);
-                                  return;
-                                }
-                                if (window.confirm(`Delete ${employee.name}?`)) {
-                                  deleteMutation.mutate(employee.id);
-                                }
-                              } catch (err) {
-                                console.error("Failed to check allocations", err);
-                                // Fallback to normal delete if check fails? Or block?
-                                // alert("Error checking allocations.");
-                              }
-                            }}
-                            className="p-2 text-slate-500 hover:text-red-600 hover:bg-red-50 rounded-lg transition-colors"
-                            title="Delete"
-                          >
-                            <Trash2 className="w-4 h-4" />
-                          </button>
-                        </div>
-                      </td>
-                    </tr>
-                  ))
-              )}
-            </tbody>
-          </table>
+      {/* Active Filters Bar */}
+      {(idleOnly || statusParam) && (
+        <div className="flex items-center gap-2 flex-wrap bg-slate-50 border border-slate-200/60 rounded-xl px-4 py-2.5">
+          <span className="text-xs font-semibold text-slate-500 uppercase tracking-wider">Active Filters:</span>
+          {idleOnly && (
+            <span className="inline-flex items-center gap-1.5 px-2.5 py-1 rounded-full text-xs font-medium bg-amber-50 text-amber-700 border border-amber-200">
+              Idle Only
+              <button 
+                onClick={() => {
+                  const params = new URLSearchParams(searchParams);
+                  params.delete('idleOnly');
+                  setSearchParams(params);
+                }} 
+                className="hover:bg-amber-100 rounded-full p-0.5"
+              >
+                <X className="w-3 h-3" />
+              </button>
+            </span>
+          )}
+          {statusParam && (
+            <span className="inline-flex items-center gap-1.5 px-2.5 py-1 rounded-full text-xs font-medium bg-indigo-50 text-indigo-700 border border-indigo-200">
+              Status: {statusParam}
+              <button 
+                onClick={() => {
+                  const params = new URLSearchParams(searchParams);
+                  params.delete('status');
+                  setSearchParams(params);
+                }} 
+                className="hover:bg-indigo-100 rounded-full p-0.5"
+              >
+                <X className="w-3 h-3" />
+              </button>
+            </span>
+          )}
+          <button
+            onClick={() => {
+              const params = new URLSearchParams(searchParams);
+              params.delete('idleOnly');
+              params.delete('status');
+              setSearchParams(params);
+            }}
+            className="text-xs font-medium text-slate-500 hover:text-slate-800 transition-colors ml-auto"
+          >
+            Clear all
+          </button>
         </div>
+      )}
 
-        {/* Pagination */}
-        {totalPages > 1 && (
-          <div className="flex items-center justify-between px-5 py-3 border-t border-slate-100">
-            <p className="text-sm text-slate-500">
-              Showing {(currentPage - 1) * PAGE_SIZE + 1}–{Math.min(currentPage * PAGE_SIZE, filteredEmployees.length)} of {filteredEmployees.length} employees
-            </p>
-            <div className="flex items-center gap-1">
-              <button
-                onClick={() => setCurrentPage(p => Math.max(1, p - 1))}
-                disabled={currentPage === 1}
-                className="px-3 py-1.5 text-sm rounded-lg border border-slate-200 text-slate-600 hover:bg-slate-50 disabled:opacity-40 disabled:cursor-not-allowed transition-colors"
-              >
-                Previous
-              </button>
-              {Array.from({ length: totalPages }, (_, i) => i + 1)
-                .filter(p => p === 1 || p === totalPages || Math.abs(p - currentPage) <= 1)
-                .reduce((acc, p, idx, arr) => {
-                  if (idx > 0 && p - arr[idx - 1] > 1) acc.push('...');
-                  acc.push(p);
-                  return acc;
-                }, [])
-                .map((p, idx) =>
-                  p === '...' ? (
-                    <span key={`ellipsis-${idx}`} className="px-2 text-slate-400 text-sm">…</span>
-                  ) : (
-                    <button
-                      key={p}
-                      onClick={() => setCurrentPage(p)}
-                      className={`px-3 py-1.5 text-sm rounded-lg border transition-colors ${
-                        currentPage === p
-                          ? 'bg-indigo-600 border-indigo-600 text-white font-medium'
-                          : 'border-slate-200 text-slate-600 hover:bg-slate-50'
-                      }`}
-                    >
-                      {p}
-                    </button>
-                  )
+      <Table
+        columns={[
+          ColumnTemplates.avatarInfo('name', 'Employee', 'email'),
+          ColumnTemplates.text('designation', 'Designation'),
+          {
+            key: 'employee_type',
+            label: 'Type',
+            align: 'center',
+            render: (value, row) => (
+              <div className="flex flex-col items-center gap-1">
+                <span className={`inline-flex px-3.5 py-1.5 rounded-full text-xs font-semibold tracking-wide min-w-[95px] justify-center ${
+                  value === 'Full-time' ? 'bg-emerald-50 text-emerald-700 border border-emerald-200' :
+                  value === 'Part-time' ? 'bg-blue-50 text-blue-700 border border-blue-200' :
+                  'bg-slate-50 text-slate-600 border border-slate-200'
+                }`}>
+                  {value}
+                </span>
+                {row.converted_to_fulltime_at && (
+                  <p className="text-[10px] text-slate-400 font-medium" title={`Promoted from ${row.previous_employee_type || 'Intern'} on ${new Date(row.converted_to_fulltime_at).toLocaleDateString()}`}>
+                    promoted {new Date(row.converted_to_fulltime_at).toLocaleDateString()}
+                  </p>
                 )}
-              <button
-                onClick={() => setCurrentPage(p => Math.min(totalPages, p + 1))}
-                disabled={currentPage === totalPages}
-                className="px-3 py-1.5 text-sm rounded-lg border border-slate-200 text-slate-600 hover:bg-slate-50 disabled:opacity-40 disabled:cursor-not-allowed transition-colors"
-              >
-                Next
-              </button>
-            </div>
-          </div>
-        )}
-      </div>
+              </div>
+            ),
+          },
+          {
+            key: 'working_hours_per_day',
+            label: 'Hours/Day',
+            align: 'center',
+            render: (value) => <span className="font-semibold text-slate-800">{value}h</span>,
+          },
+          {
+            key: 'skills',
+            label: 'Skills',
+            render: (value) => (
+              <div className="text-xs text-slate-600 font-medium">
+                {value && value.length > 0 ? (
+                  <>
+                    <span>{value.slice(0, 3).join(', ')}</span>
+                    {value.length > 3 && <span className="text-slate-400"> +{value.length - 3}</span>}
+                  </>
+                ) : (
+                  <span className="text-slate-400">—</span>
+                )}
+              </div>
+            ),
+          },
+          {
+            key: 'id',
+            label: 'Assigned Projects',
+            render: (_, row) => {
+              const projects = employeeProjectsMap[row.id];
+              if (!projects || projects.size === 0) {
+                return <span className="inline-flex items-center px-2 py-0.5 rounded-full text-xs font-medium bg-amber-50 text-amber-700 border border-amber-200">Idle</span>;
+              }
+              const list = [...projects];
+              return (
+                <div className="flex flex-wrap gap-1">
+                  {list.slice(0, 2).map((name, idx) => (
+                    <span key={idx} className="inline-flex items-center px-2 py-0.5 rounded-full text-xs font-medium bg-indigo-50 text-indigo-700 border border-indigo-100 max-w-[140px] truncate" title={name}>
+                      {name}
+                    </span>
+                  ))}
+                  {list.length > 2 && (
+                    <span className="text-xs text-slate-400 self-center" title={list.slice(2).join(', ')}>
+                      +{list.length - 2}
+                    </span>
+                  )}
+                </div>
+              );
+            },
+          },
+          {
+            key: 'status',
+            label: 'Status',
+            align: 'center',
+            render: (value) => (
+              <div className="flex items-center justify-center gap-2">
+                <span className={`w-2 h-2 rounded-full ${
+                  value === 'active' ? 'bg-emerald-500' :
+                  value === 'on-leave' ? 'bg-amber-500' :
+                  'bg-slate-400'
+                }`}></span>
+                <span className="text-sm text-slate-600 capitalize">{value}</span>
+              </div>
+            ),
+          },
+          {
+            key: 'id',
+            label: 'Actions',
+            align: 'right',
+            render: (_, row) => (
+              <div className="flex items-center justify-end gap-1">
+                {statusParam === 'archived' ? (
+                  <button
+                    onClick={() => setRestoreTarget(row)}
+                    disabled={restoreMutation.isPending}
+                    className="p-2 text-slate-500 hover:text-indigo-600 hover:bg-indigo-50 rounded-lg transition-colors disabled:opacity-50"
+                    title="Restore Employee"
+                  >
+                    <RotateCcw className="w-4 h-4" />
+                  </button>
+                ) : (
+                  <>
+                    {row.employee_type === 'Intern' && (
+                      <button
+                        onClick={() => handleConvertToFulltime(row)}
+                        disabled={convertMutation.isPending}
+                        className="p-2 text-slate-500 hover:text-emerald-600 hover:bg-emerald-50 rounded-lg transition-colors disabled:opacity-50"
+                        title="Convert to Full-time employee"
+                      >
+                        <ArrowUpCircle className="w-4 h-4" />
+                      </button>
+                    )}
+                    <button
+                      onClick={() => {
+                        setEditingEmployee(row);
+                        setFormDesignation(row.designation || 'Annotator/ Reviewer');
+                        setFormEmployeeType(row.employee_type || 'Full-time');
+                        setFormEmpStatus(row.status || 'active');
+                        setIsModalOpen(true);
+                      }}
+                      className="p-2 text-slate-500 hover:text-indigo-600 hover:bg-indigo-50 rounded-lg transition-colors"
+                      title="Edit"
+                    >
+                      <Edit className="w-4 h-4" />
+                    </button>
+                    <button
+                      onClick={() => setArchiveTarget(row)}
+                      disabled={archiveMutation.isPending}
+                      className="p-2 text-slate-500 hover:text-amber-600 hover:bg-amber-50 rounded-lg transition-colors disabled:opacity-50"
+                      title="Archive"
+                    >
+                      <Trash2 className="w-4 h-4" />
+                    </button>
+                  </>
+                )}
+              </div>
+            ),
+          },
+        ]}
+        data={filteredEmployees}
+        currentPage={currentPage}
+        pageSize={PAGE_SIZE}
+        onPageChange={setCurrentPage}
+        emptyState={{ title: 'No employees found', description: 'Try adjusting your search query' }}
+      />
 
       {/* Availability Modal */}
       {availabilityEmployee && (
@@ -1335,9 +1624,48 @@ const EmployeesPage = () => {
         />
       )}
 
-      {/* Edit / Create Modal */}
+      {/* Archive Modal */}
+      {archiveTarget && (
+        <EmployeeArchiveModal
+          employee={archiveTarget}
+          onClose={() => setArchiveTarget(null)}
+          onConfirm={() => {
+            archiveMutation.mutate(archiveTarget.id);
+            setArchiveTarget(null);
+          }}
+          isPending={archiveMutation.isPending}
+        />
+      )}
+
+      {/* Restore Modal */}
+      {restoreTarget && (
+        <EmployeeRestoreModal
+          employee={restoreTarget}
+          onClose={() => setRestoreTarget(null)}
+          onConfirm={() => {
+            restoreMutation.mutate(restoreTarget.id);
+            setRestoreTarget(null);
+          }}
+          isPending={restoreMutation.isPending}
+        />
+      )}
+
+      {/* Convert to Full-time Modal */}
+      {convertToFulltimeTarget && (
+        <EmployeeConvertToFulltimeModal
+          employee={convertToFulltimeTarget}
+          onClose={() => setConvertToFulltimeTarget(null)}
+          onConfirm={() => {
+            const currentUser = JSON.parse(localStorage.getItem('user') || '{}');
+            convertMutation.mutate({ id: convertToFulltimeTarget.id, converted_by: currentUser.id || null });
+            setConvertToFulltimeTarget(null);
+          }}
+          isPending={convertMutation.isPending}
+        />
+      )}
+
       {isModalOpen && (
-        <div className="fixed inset-0 bg-gray-900 bg-opacity-50 flex items-center justify-center z-50 p-2 sm:p-4">
+        <div className="fixed inset-0 bg-slate-900/40 backdrop-blur-sm flex items-center justify-center z-50 p-2 sm:p-4">
           <div className="bg-white rounded-lg shadow-xl w-full max-w-full sm:max-w-2xl max-h-[95vh] sm:max-h-[90vh] flex flex-col">
             {/* Fixed Header */}
             <div className="px-6 py-4 border-b border-gray-200 flex-shrink-0">
@@ -1349,6 +1677,9 @@ const EmployeesPage = () => {
                   onClick={() => {
                     setIsModalOpen(false);
                     setEditingEmployee(null);
+                    setFormDesignation('Annotator/ Reviewer');
+                    setFormEmployeeType('Full-time');
+                    setFormEmpStatus('active');
                   }}
                   className="text-gray-400 hover:text-gray-600 transition-colors"
                 >
@@ -1410,34 +1741,30 @@ const EmployeesPage = () => {
                       <label className="block text-sm font-medium text-gray-700 mb-1">
                         Designation <span className="text-red-500">*</span>
                       </label>
-                      <select
-                        name="designation"
-                        required
-                        defaultValue={editingEmployee?.designation || 'Annotator/ Reviewer'}
-                        className="input"
-                      >
-                        {ALLOWED_DESIGNATIONS.map((designation) => (
-                          <option key={designation} value={designation}>
-                            {designation}
-                          </option>
-                        ))}
-                      </select>
+                      <input type="hidden" name="designation" value={formDesignation} />
+                      <Dropdown
+                        options={ALLOWED_DESIGNATIONS.map(d => ({ value: d, label: d }))}
+                        value={formDesignation}
+                        onChange={setFormDesignation}
+                        placeholder="Select designation"
+                      />
                     </div>
                     <div>
                       <label className="block text-sm font-medium text-gray-700 mb-1">
                         Type <span className="text-red-500">*</span>
                       </label>
-                      <select
-                        name="employee_type"
-                        required
-                        defaultValue={editingEmployee?.employee_type || 'Full-time'}
-                        className="input"
-                      >
-                        <option value="Full-time">Full-time</option>
-                        <option value="Part-time">Part-time</option>
-                        <option value="Intern">Intern</option>
-                        <option value="Contract">Contract</option>
-                      </select>
+                      <input type="hidden" name="employee_type" value={formEmployeeType} />
+                      <Dropdown
+                        options={[
+                          { value: 'Full-time', label: 'Full-time' },
+                          { value: 'Part-time', label: 'Part-time' },
+                          { value: 'Intern', label: 'Intern' },
+                          { value: 'Contract', label: 'Contract' },
+                        ]}
+                        value={formEmployeeType}
+                        onChange={setFormEmployeeType}
+                        placeholder="Select type"
+                      />
                     </div>
                   </div>
 
@@ -1479,22 +1806,23 @@ const EmployeesPage = () => {
                       <label className="block text-sm font-medium text-gray-700 mb-1">
                         Status <span className="text-red-500">*</span>
                       </label>
-                      <select
-                        name="status"
-                        required
-                        defaultValue={editingEmployee?.status || 'active'}
-                        className="input"
-                      >
-                        <option value="active">Active</option>
-                        <option value="inactive">Inactive</option>
-                        <option value="on-leave">On Leave</option>
-                      </select>
+                      <input type="hidden" name="status" value={formEmpStatus} />
+                      <Dropdown
+                        options={[
+                          { value: 'active', label: 'Active' },
+                          { value: 'inactive', label: 'Inactive' },
+                          { value: 'on-leave', label: 'On Leave' },
+                        ]}
+                        value={formEmpStatus}
+                        onChange={setFormEmpStatus}
+                        placeholder="Select status"
+                      />
                     </div>
                   </div>
 
                   <div>
                     <label className="block text-sm font-medium text-gray-700 mb-1">
-                      Skills
+                      Skills <span className="text-red-500">*</span>
                     </label>
                     <MultiSelectDropdown
                       name="skills"
@@ -1514,6 +1842,9 @@ const EmployeesPage = () => {
                 onClick={() => {
                   setIsModalOpen(false);
                   setEditingEmployee(null);
+                  setFormDesignation('Annotator/ Reviewer');
+                  setFormEmployeeType('Full-time');
+                  setFormEmpStatus('active');
                 }}
                 className="btn btn-secondary"
               >

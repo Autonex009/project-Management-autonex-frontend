@@ -11,8 +11,11 @@ import { getWorkingDays } from '../utils/dateCalculations';
 // ===============================================
 
 // The Core Card Shell
-const Card = ({ children, className = '', loading = false }) => (
-  <div className={`bg-white rounded-2xl border border-slate-200/60 shadow-[0_1px_3px_rgba(0,0,0,0.04)] hover:shadow-[0_4px_12px_rgba(0,0,0,0.06)] transition-shadow duration-300 ${className}`}>
+const Card = ({ children, className = '', loading = false, onClick }) => (
+  <div 
+    onClick={onClick}
+    className={`bg-white rounded-2xl border border-slate-200/60 shadow-[0_1px_3px_rgba(0,0,0,0.04)] hover:shadow-[0_4px_12px_rgba(0,0,0,0.06)] transition-all duration-300 ${onClick ? 'cursor-pointer hover:border-slate-300/80 hover:scale-[1.02]' : ''} ${className}`}
+  >
     {loading ? <CardSkeleton /> : children}
   </div>
 );
@@ -47,8 +50,8 @@ const CardSkeleton = () => (
 );
 
 // Variant: Metric Card (KPI)
-const MetricCard = ({ title, value, subtitle, trend, trendPositive, icon: Icon, loading }) => (
-  <Card loading={loading}>
+const MetricCard = ({ title, value, subtitle, trend, trendPositive, icon: Icon, loading, onClick }) => (
+  <Card loading={loading} onClick={onClick}>
     <CardContent className="p-6">
       <div className="flex items-start justify-between">
         <div className="flex-1">
@@ -127,6 +130,7 @@ const Dashboard = () => {
 
   const today = new Date();
   const employeesOnLeave = leaves.filter(leave => {
+    if (!leave.start_date || !leave.end_date) return false;
     const start = parseISO(leave.start_date);
     const end = parseISO(leave.end_date);
     return isWithinInterval(today, { start, end });
@@ -227,6 +231,7 @@ const Dashboard = () => {
           subtitle={`${totalProjects} total`}
           icon={FolderKanban}
           loading={projectsLoading}
+          onClick={() => navigate('/admin/sub-projects?status=active')}
         />
         <MetricCard
           title="Delivery Risks"
@@ -235,18 +240,21 @@ const Dashboard = () => {
           icon={AlertTriangle}
           trend={overburdenProjects.length > 0 ? '!' : null}
           trendPositive={false}
+          onClick={() => navigate('/admin/sub-projects?recommendation=overburdened')}
         />
         <MetricCard
           title="Utilization"
           value={`${utilizationRate}%`}
           subtitle={`${underutilizedEmployees.length} unallocated`}
           icon={TrendingUp}
+          onClick={() => navigate('/admin/allocations')}
         />
         <MetricCard
           title="Team Available"
           value={activeEmployees - employeesOnLeave.length}
           subtitle={`${employeesOnLeave.length} on leave`}
           icon={Users}
+          onClick={() => navigate('/admin/employees')}
         />
       </div>
 

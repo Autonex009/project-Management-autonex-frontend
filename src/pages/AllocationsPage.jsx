@@ -1,9 +1,11 @@
 // import { useState } from 'react';
 import AllocationPopover from '../components/AllocationPopover';
+import Dropdown from '../components/ui/Dropdown';
 // import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 // import { allocationApi, projectApi, employeeApi } from '../services/api';
 // import { Plus, X, Edit, Trash2 } from 'lucide-react';
 // import { format } from 'date-fns';
+import SearchInput from '../components/ui/SearchInput';
 
 // const AllocationsPage = () => {
 //   const queryClient = useQueryClient();
@@ -466,13 +468,35 @@ import AllocationPopover from '../components/AllocationPopover';
 // };
 
 // export default AllocationsPage;
-import { useState, useEffect, useRef } from 'react';
+import { useState, useEffect, useRef, useMemo } from 'react';
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import { useLocation } from 'react-router-dom';
 import { allocationApi, subProjectApi, employeeApi, leaveApi, parentProjectApi } from '../services/api';
-import { Plus, Edit, Trash2, X, UserPlus, UserMinus, CheckSquare, AlertTriangle } from 'lucide-react';
+import { Plus, Edit, Trash2, X, UserPlus, UserMinus, CheckSquare, AlertTriangle, Users } from 'lucide-react';
 import toast from 'react-hot-toast';
+import ConfirmDialog from '../components/ui/ConfirmDialog';
 import { getPmEmployeeId, getPmSubProjects } from '../utils/pmScope';
+import PageSearchBar from '../components/ui/PageSearchBar';
+
+// Stable color palette for avatars based on the employee name
+const AVATAR_PALETTE = [
+  'from-indigo-500 to-violet-500',
+  'from-emerald-500 to-teal-500',
+  'from-amber-500 to-orange-500',
+  'from-rose-500 to-pink-500',
+  'from-sky-500 to-blue-500',
+  'from-fuchsia-500 to-purple-500',
+  'from-lime-500 to-green-500',
+  'from-cyan-500 to-sky-500',
+];
+
+const getAvatarGradient = (name) => {
+  let hash = 0;
+  for (let i = 0; i < (name || '').length; i++) {
+    hash = (hash << 5) - hash + name.charCodeAt(i);
+  }
+  return AVATAR_PALETTE[Math.abs(hash) % AVATAR_PALETTE.length];
+};
 
 // Role tag constants for time division
 const ROLE_TAGS = [
@@ -503,6 +527,7 @@ const AllocationsPage = () => {
   const [allocatedEmployeesOther, setAllocatedEmployeesOther] = useState([]);
   const [filterTab, setFilterTab] = useState('unallocated');
   const [editingAllocation, setEditingAllocation] = useState(null);
+  const [confirmState, setConfirmState] = useState(null);
 
   // Time division state
   const [selectedRoleTags, setSelectedRoleTags] = useState([]);
@@ -669,21 +694,29 @@ const AllocationsPage = () => {
     const required = selectedProject.required_manpower || 0;
 
     if (newTotal > required) {
-      const confirmed = window.confirm(
-        `⚠️ Warning: Over-allocation detected!\n\n` +
-        `Required Manpower: ${required}\n` +
-        `Currently Allocated: ${currentAllocated}\n` +
-        `You're adding: ${selectedEmployees.length}\n` +
-        `Total will be: ${newTotal}\n\n` +
-        `This exceeds the required manpower by ${newTotal - required}.\n\n` +
-        `Do you want to proceed anyway?`
-      );
-
-      if (!confirmed) {
-        return;
-      }
+      setConfirmState({
+        variant: 'warning',
+        title: 'Over-allocation detected',
+        message: `This allocation will exceed the required manpower by ${newTotal - required}. Do you want to proceed anyway?`,
+        details: [
+          { label: 'Required manpower', value: required },
+          { label: 'Currently allocated', value: currentAllocated },
+          { label: "You're adding", value: selectedEmployees.length },
+          { label: 'Total will be', value: newTotal, highlight: true },
+        ],
+        confirmText: 'Proceed anyway',
+        onConfirm: () => {
+          setConfirmState(null);
+          performAllocation();
+        },
+      });
+      return;
     }
 
+    performAllocation();
+  };
+
+  const performAllocation = () => {
     // Create allocations for all selected employees
     selectedEmployees.forEach(emp => {
       const data = {
@@ -757,8 +790,22 @@ const AllocationsPage = () => {
     requiredManpower: project.required_manpower || 0,
   })).filter(pa => pa.allocations.length > 0 || pa.requiredManpower > 0);
 
-  const totalPages = Math.ceil(projectAllocations.length / PAGE_SIZE);
-  const paginatedAllocations = projectAllocations.slice((currentPage - 1) * PAGE_SIZE, currentPage * PAGE_SIZE);
+  const [searchQuery, setSearchQuery] = useState('');
+
+  const filteredProjectAllocations = useMemo(() => {
+    if (!searchQuery.trim()) return projectAllocations;
+    const q = searchQuery.toLowerCase();
+    return projectAllocations.filter(({ project, allocations: projectAllocs }) => {
+      if (project.name.toLowerCase().includes(q)) return true;
+      return projectAllocs.some(a => {
+        const empName = getEmployeeName(a.employee_id).toLowerCase();
+        return empName.includes(q);
+      });
+    });
+  }, [projectAllocations, searchQuery, employees]);
+
+  const totalPages = Math.ceil(filteredProjectAllocations.length / PAGE_SIZE);
+  const paginatedAllocations = filteredProjectAllocations.slice((currentPage - 1) * PAGE_SIZE, currentPage * PAGE_SIZE);
 
   return (
     <div className="space-y-6">
@@ -783,6 +830,15 @@ const AllocationsPage = () => {
 
 
 
+      {/* Search Filter */}
+      <div className="flex justify-between items-center mb-4">
+        <PageSearchBar
+          value={searchQuery}
+          onChange={(val) => { setSearchQuery(val); setCurrentPage(1); }}
+          placeholder="Search allocations by project or employee..."
+        />
+      </div>
+
       {/* Modern Card Container */}
       <div className="bg-white rounded-2xl border border-slate-200/60 shadow-[0_1px_3px_rgba(0,0,0,0.04)] overflow-hidden">
         <div className="overflow-x-auto">
@@ -805,12 +861,16 @@ const AllocationsPage = () => {
                     </div>
                   </td>
                 </tr>
-              ) : projectAllocations.length === 0 ? (
+              ) : filteredProjectAllocations.length === 0 ? (
                 <tr>
                   <td colSpan="4" className="px-5 py-16 text-center">
                     <div className="text-slate-400">
-                      <p className="text-lg font-medium mb-1">No allocations yet</p>
-                      <p className="text-sm">Create your first allocation to get started</p>
+                      <p className="text-lg font-medium mb-1">
+                        {searchQuery ? 'No matching allocations' : 'No allocations yet'}
+                      </p>
+                      <p className="text-sm">
+                        {searchQuery ? 'Try adjusting your search query.' : 'Create your first allocation to get started'}
+                      </p>
                     </div>
                   </td>
                 </tr>
@@ -827,73 +887,144 @@ const AllocationsPage = () => {
                       </span>
                     </td>
                     <td className="px-5 py-4">
-                      <div className="flex items-center gap-3">
-                        <div className="flex -space-x-2">
-                          {projectAllocs.slice(0, 3).map(alloc => {
-                            const emp = employees.find(e => e.id === alloc.employee_id);
-                            return (
-                              <div
-                                key={alloc.id}
-                                className="w-8 h-8 rounded-full bg-indigo-500 text-white flex items-center justify-center text-xs font-medium border-2 border-white"
-                                title={emp?.name}
-                              >
-                                {emp?.name?.charAt(0).toUpperCase()}
+                      <div className="flex items-center justify-between gap-4">
+                        {/* Left Side: Avatar stack & Add button */}
+                        <div className="flex items-center gap-2">
+                          <div className="flex -space-x-1.5 overflow-hidden">
+                            {projectAllocs.slice(0, 3).map(alloc => {
+                              const emp = employees.find(e => e.id === alloc.employee_id);
+                              const name = emp?.name || 'Unknown';
+                              const initials = name.split(/\s+/).slice(0, 2).map(p => p[0]).join('').toUpperCase();
+                              const gradient = getAvatarGradient(name);
+                              return (
+                                <div
+                                  key={alloc.id}
+                                  className={`w-8 h-8 rounded-full bg-gradient-to-br ${gradient} text-white flex items-center justify-center text-[10px] font-bold border-2 border-white shadow-sm ring-1 ring-slate-100/50 shrink-0`}
+                                  title={name}
+                                >
+                                  {initials}
+                                </div>
+                              );
+                            })}
+                            {projectAllocs.length > 3 && (
+                              <div className="w-8 h-8 rounded-full bg-slate-100 border-2 border-white text-[10px] font-bold text-slate-500 flex items-center justify-center shadow-sm ring-1 ring-slate-100/50 shrink-0">
+                                +{projectAllocs.length - 3}
                               </div>
-                            );
-                          })}
+                            )}
+                          </div>
+                          
+                          <button
+                            onClick={() => {
+                              setSelectedProject(project);
+                              setIsModalOpen(true);
+                            }}
+                            className="w-8 h-8 rounded-full border border-dashed border-slate-300 text-slate-400 hover:text-indigo-600 hover:border-indigo-500 hover:bg-indigo-50/50 flex items-center justify-center transition-all shrink-0"
+                            title="Add employees"
+                          >
+                            <UserPlus className="w-3.5 h-3.5" />
+                          </button>
                         </div>
-                        {projectAllocs.length > 3 && (
-                          <span className="text-xs text-slate-400">
-                            +{projectAllocs.length - 3} more
-                          </span>
-                        )}
-                        <button
-                          onClick={() => {
-                            setSelectedProject(project);
-                            setIsModalOpen(true);
-                          }}
-                          className="p-1.5 text-slate-500 hover:text-emerald-600 hover:bg-emerald-50 rounded-lg transition-colors"
-                          title="Add employees"
-                        >
-                          <UserPlus className="w-4 h-4" />
-                        </button>
-                        {(() => {
-                          const assignedCount = projectAllocs.length;
-                          // Count employees currently on approved leave (today)
-                          const todayStr = new Date().toISOString().slice(0, 10);
-                          const onLeaveToday = projectAllocs.filter(a =>
-                            leaves.some(l =>
-                              l.employee_id === a.employee_id &&
-                              l.status === 'approved' &&
-                              String(l.start_date).slice(0, 10) <= todayStr &&
-                              String(l.end_date).slice(0, 10) >= todayStr
-                            )
-                          ).length;
 
-                          return (
-                            <div className="flex flex-col items-end">
-                              <AllocationPopover
-                                project={project}
-                                allocations={projectAllocs}
-                                employees={employees}
-                                badgeContent={(
-                                  <span className={`text-sm font-medium px-2 py-0.5 rounded ${assignedCount >= requiredManpower
-                                    ? 'bg-emerald-50 text-emerald-700'
-                                    : 'bg-amber-50 text-amber-700'
-                                    }`}>
-                                    {assignedCount}/{requiredManpower}
-                                  </span>
+                        {/* Right Side: Allocation Popover Badge & Leave Pill */}
+                        <div className="flex items-center gap-2">
+                          {(() => {
+                            const assignedCount = projectAllocs.length;
+                            const todayStr = new Date().toISOString().slice(0, 10);
+                            const onLeaveDetails = projectAllocs
+                              .map(a => {
+                                const leave = leaves.find(l =>
+                                  l.employee_id === a.employee_id &&
+                                  l.status === 'approved' &&
+                                  String(l.start_date).slice(0, 10) <= todayStr &&
+                                  String(l.end_date).slice(0, 10) >= todayStr
+                                );
+                                if (!leave) return null;
+                                const name = getEmployeeName(a.employee_id);
+                                const initials = (name || '')
+                                  .split(' ')
+                                  .map(w => w[0])
+                                  .filter(Boolean)
+                                  .slice(0, 2)
+                                  .join('')
+                                  .toUpperCase();
+                                return {
+                                  employeeId: a.employee_id,
+                                  name,
+                                  initials,
+                                  leaveType: leave.leave_type || leave.type || null,
+                                };
+                              })
+                              .filter(Boolean);
+                            const onLeaveToday = onLeaveDetails.length;
+
+                            return (
+                              <>
+                                {onLeaveToday > 0 && (
+                                  <div className="relative group/leave shrink-0">
+                                    <span className="px-2.5 py-1 bg-amber-50 text-amber-700 border border-amber-200/50 rounded-full text-xs font-semibold flex items-center gap-1 cursor-default">
+                                      <span className="w-1.5 h-1.5 rounded-full bg-amber-500 animate-pulse" />
+                                      <span>{onLeaveToday} Leave</span>
+                                    </span>
+
+                                    {/* Hover card */}
+                                    <div className="absolute right-0 top-full mt-2 z-50 w-60 origin-top-right rounded-xl border border-slate-200 bg-white shadow-xl shadow-slate-900/10 opacity-0 invisible translate-y-1 group-hover/leave:opacity-100 group-hover/leave:visible group-hover/leave:translate-y-0 transition-all duration-150">
+                                      <div className="px-3.5 py-2.5 border-b border-slate-100 flex items-center gap-2">
+                                        <span className="w-1.5 h-1.5 rounded-full bg-amber-500" />
+                                        <span className="text-xs font-semibold text-slate-700">
+                                          On leave today
+                                        </span>
+                                        <span className="ml-auto text-[10px] font-semibold text-amber-700 bg-amber-50 border border-amber-200/60 rounded-full px-1.5 py-0.5">
+                                          {onLeaveToday}
+                                        </span>
+                                      </div>
+                                      <ul className="py-1.5 max-h-56 overflow-y-auto">
+                                        {onLeaveDetails.map(d => (
+                                          <li
+                                            key={d.employeeId}
+                                            className="px-3.5 py-1.5 flex items-center gap-2.5 hover:bg-slate-50"
+                                          >
+                                            <span className="w-7 h-7 rounded-full bg-gradient-to-br from-amber-400 to-orange-500 text-white text-[10px] font-bold flex items-center justify-center shrink-0">
+                                              {d.initials || '?'}
+                                            </span>
+                                            <div className="min-w-0">
+                                              <p className="text-xs font-medium text-slate-800 truncate">
+                                                {d.name}
+                                              </p>
+                                              {d.leaveType && (
+                                                <p className="text-[10px] text-slate-400 capitalize truncate">
+                                                  {String(d.leaveType).replace(/_/g, ' ')}
+                                                </p>
+                                              )}
+                                            </div>
+                                          </li>
+                                        ))}
+                                      </ul>
+                                    </div>
+                                  </div>
                                 )}
-                                onOpenAllocations={() => { setSelectedProject(project); setIsModalOpen(true); }}
-                              />
-                              {onLeaveToday > 0 && (
-                                <span className="text-xs text-amber-600 font-medium scale-90 origin-right">
-                                  ({onLeaveToday} on leave today)
-                                </span>
-                              )}
-                            </div>
-                          );
-                        })()}
+
+                                <AllocationPopover
+                                  project={project}
+                                  allocations={projectAllocs}
+                                  employees={employees}
+                                  badgeContent={(
+                                    <span className={`text-xs font-semibold px-2.5 py-1 rounded-lg border transition-all flex items-center gap-1.5 cursor-pointer select-none ${
+                                      assignedCount >= requiredManpower
+                                        ? 'bg-emerald-50/40 text-emerald-700 border-emerald-100/70 hover:bg-emerald-100/40'
+                                        : 'bg-amber-50/40 text-amber-700 border-amber-100/70 hover:bg-amber-100/40'
+                                      }`}>
+                                      <span className={`w-1.5 h-1.5 rounded-full ${
+                                        assignedCount >= requiredManpower ? 'bg-emerald-500' : 'bg-amber-500'
+                                      }`} />
+                                      <span>{assignedCount} / {requiredManpower}</span>
+                                    </span>
+                                  )}
+                                  onOpenAllocations={() => { setSelectedProject(project); setIsModalOpen(true); }}
+                                />
+                              </>
+                            );
+                          })()}
+                        </div>
                       </div>
                     </td>
                     <td className="px-5 py-4 text-right">
@@ -964,7 +1095,7 @@ const AllocationsPage = () => {
 
       {/* Create Allocation Modal */}
       {isModalOpen && (
-        <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50 p-2 sm:p-4">
+        <div className="fixed inset-0 bg-slate-900/40 backdrop-blur-sm flex items-center justify-center z-50 px-2 py-4 sm:px-4">
           <div
             className="bg-white rounded-lg shadow-xl w-full max-w-full sm:max-w-3xl max-h-[95vh] sm:max-h-[90vh] overflow-y-auto"
             onClick={(e) => e.stopPropagation()}
@@ -988,23 +1119,19 @@ const AllocationsPage = () => {
                 <label className="block text-sm font-medium text-gray-700 mb-1">
                   Select Project <span className="text-red-500">*</span>
                 </label>
-                <select
-                  value={selectedProject?.id || ''}
-                  onChange={(e) => {
-                    const project = visibleProjects.find(p => p.id === parseInt(e.target.value));
+                <Dropdown
+                  options={visibleProjects.map(project => ({
+                    value: project.id.toString(),
+                    label: `${project.name} - Required: ${project.required_manpower || 0}`
+                  }))}
+                  value={selectedProject?.id.toString() || ''}
+                  onChange={(val) => {
+                    const project = visibleProjects.find(p => p.id === parseInt(val));
                     setSelectedProject(project);
                     setSelectedEmployees([]);
                   }}
-                  className="input"
-                  required
-                >
-                  <option value="">Choose a project...</option>
-                  {visibleProjects.map(project => (
-                    <option key={project.id} value={project.id}>
-                      {project.name} - Required: {project.required_manpower || 0}
-                    </option>
-                  ))}
-                </select>
+                  placeholder="Choose a project..."
+                />
               </div>
 
               {selectedProject && (
@@ -1090,9 +1217,16 @@ const AllocationsPage = () => {
                                       onClick={(e) => {
                                         e.preventDefault();
                                         e.stopPropagation();
-                                        if (window.confirm(`Remove ${emp.name} from "${selectedProject.name}"?`)) {
-                                          deleteMutation.mutate(alloc.id);
-                                        }
+                                        setConfirmState({
+                                          variant: 'danger',
+                                          title: 'Remove team member',
+                                          message: `Remove ${emp.name} from "${selectedProject.name}"?`,
+                                          confirmText: 'Remove',
+                                          onConfirm: () => {
+                                            deleteMutation.mutate(alloc.id);
+                                            setConfirmState(null);
+                                          },
+                                        });
                                       }}
                                       className="ml-0.5 w-4 h-4 rounded-full text-slate-400 hover:text-white hover:bg-rose-500 flex items-center justify-center transition-colors disabled:cursor-not-allowed"
                                       title={`Remove ${emp.name}`}
@@ -1161,12 +1295,11 @@ const AllocationsPage = () => {
 
                     {/* Employee Search */}
                     <div className="mb-3">
-                      <input
-                        type="text"
-                        value={employeeSearch}
-                        onChange={(e) => setEmployeeSearch(e.target.value)}
+                      <SearchInput
                         placeholder="Search employees by name or email..."
-                        className="w-full px-3 py-2 border border-gray-300 rounded-md text-sm focus:outline-none focus:ring-2 focus:ring-indigo-500"
+                        value={employeeSearch}
+                        onChange={setEmployeeSearch}
+                        className="w-full"
                       />
                     </div>
 
@@ -1303,10 +1436,13 @@ const AllocationsPage = () => {
                         <label className="block text-sm font-medium text-gray-700 mb-1">
                           Total Daily Hours
                         </label>
-                        <select
-                          value={totalDailyHours}
-                          onChange={(e) => {
-                            const newHours = e.target.value === '' ? '' : parseInt(e.target.value);
+                        <Dropdown
+                          options={['', ...['4 hours', '6 hours', '8 hours', '10 hours', '12 hours']].map((h, i) =>
+                            h ? { value: (4 + i * 2).toString(), label: h } : { value: '', label: 'Not specified' }
+                          )}
+                          value={totalDailyHours.toString()}
+                          onChange={(val) => {
+                            const newHours = val === '' ? '' : parseInt(val);
                             setTotalDailyHours(newHours);
                             if (newHours !== '') {
                               const currentSum = Object.values(timeDistribution).reduce((a, b) => a + b, 0);
@@ -1315,13 +1451,8 @@ const AllocationsPage = () => {
                               }
                             }
                           }}
-                          className="input w-32"
-                        >
-                          <option value="">Not specified</option>
-                          {[4, 6, 8, 10, 12].map(h => (
-                            <option key={h} value={h}>{h} hours</option>
-                          ))}
-                        </select>
+                          placeholder="Not specified"
+                        />
                       </div>
 
                       {/* Role Tags Selection */}
@@ -1443,7 +1574,7 @@ const AllocationsPage = () => {
 
       {/* Edit Allocation Modal */}
       {editingAllocation && (
-        <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50 p-2 sm:p-4">
+        <div className="fixed inset-0 bg-slate-900/40 backdrop-blur-sm flex items-center justify-center z-50 px-2 py-4 sm:px-4">
           <div className="bg-white rounded-lg shadow-xl w-full max-w-full sm:max-w-2xl max-h-[95vh] sm:max-h-[90vh] overflow-y-auto">
             <div className="sticky top-0 bg-white border-b border-gray-200 px-6 py-4 flex justify-between items-center">
               <h2 className="text-xl font-semibold text-gray-900">
@@ -1473,10 +1604,17 @@ const AllocationsPage = () => {
                     </div>
                     <button
                       onClick={() => {
-                        if (window.confirm(`Remove ${emp?.name} from this project?`)) {
-                          deleteMutation.mutate(alloc.id);
-                          setEditingAllocation(null);
-                        }
+                        setConfirmState({
+                          variant: 'danger',
+                          title: 'Remove team member',
+                          message: `Remove ${emp?.name} from this project?`,
+                          confirmText: 'Remove',
+                          onConfirm: () => {
+                            deleteMutation.mutate(alloc.id);
+                            setEditingAllocation(null);
+                            setConfirmState(null);
+                          },
+                        });
                       }}
                       className="p-2 text-red-600 hover:bg-red-50 rounded"
                       title="Remove"
@@ -1499,7 +1637,17 @@ const AllocationsPage = () => {
           </div>
         </div>
       )}
-    </div>
+
+      <ConfirmDialog
+        isOpen={!!confirmState}
+        onClose={() => setConfirmState(null)}
+        onConfirm={confirmState?.onConfirm}
+        title={confirmState?.title}
+        message={confirmState?.message}
+        details={confirmState?.details}
+        variant={confirmState?.variant}
+        confirmText={confirmState?.confirmText}
+      />    </div>
   );
 };
 
