@@ -17,7 +17,11 @@ export const Table = ({
     variant = 'default',   // 'default' | 'compact' | 'striped' | 'borderless'
     onRowClick,
     rowClassName,          // (row, index) => string — for conditional row styles
-    className = ''
+    className = '',
+    // NEW
+    expandedRowId,
+    getRowId = (row) => row.id,
+    renderExpandedRow,
 }) => {
     const totalPages = Math.ceil((data?.length || 0) / pageSize);
     const startIndex = (currentPage - 1) * pageSize;
@@ -88,22 +92,41 @@ export const Table = ({
                                 const rowBg = isStriped && idx % 2 !== 0 ? 'bg-slate-50/50' : 'bg-white';
                                 const extraClass = rowClassName ? rowClassName(row, idx) : '';
                                 return (
-                                    <tr
-                                        key={row.id ?? idx}
-                                        onClick={onRowClick ? () => onRowClick(row, idx) : undefined}
-                                        className={`${rowBg} hover:bg-slate-50 transition-colors ${onRowClick ? 'cursor-pointer' : ''} ${extraClass}`}
-                                    >
-                                        {columns.map((col) => (
-                                            <td
-                                                key={col.key}
-                                                className={`${cellPad} text-sm ${
-                                                    col.align === 'center' ? 'text-center' : col.align === 'right' ? 'text-right' : 'text-left'
-                                                } ${col.sticky === 'right' ? `sticky ${col.stickyOffset || 'right-0'} ${rowBg} shadow-[-8px_0_8px_-8px_rgba(0,0,0,0.1)]` : ''}`}
-                                            >
-                                                {col.render ? col.render(row[col.key], row, context) : (row[col.key] ?? '—')}
-                                            </td>
-                                        ))}
-                                    </tr>
+                                    <React.Fragment key={getRowId(row) ?? idx}>
+                                        <tr
+                                            onClick={onRowClick ? () => onRowClick(row, idx) : undefined}
+                                            className={`${rowBg} hover:bg-slate-50 transition-colors ${
+                                                onRowClick ? 'cursor-pointer' : ''
+                                            } ${extraClass}`}
+                                        >
+                                            {columns.map((col) => (
+                                                <td
+                                                    key={col.key}
+                                                    className={`${cellPad} text-sm ${
+                                                        col.align === 'center'
+                                                            ? 'text-center'
+                                                            : col.align === 'right'
+                                                            ? 'text-right'
+                                                            : 'text-left'
+                                                    } ${
+                                                        col.sticky === 'right'
+                                                            ? `sticky ${col.stickyOffset || 'right-0'} ${rowBg} shadow-[-8px_0_8px_-8px_rgba(0,0,0,0.1)]`
+                                                            : ''
+                                                    }`}
+                                                >
+                                                    {col.render ? col.render(row[col.key], row, context) : row[col.key] ?? '—'}
+                                                </td>
+                                            ))}
+                                        </tr>
+                                        {renderExpandedRow &&
+                                            expandedRowId === getRowId(row) && (
+                                                <tr>
+                                                    <td colSpan={columns.length} className="p-0">
+                                                        {renderExpandedRow(row)}
+                                                    </td>
+                                                </tr>
+                                            )}
+                                    </React.Fragment>
                                 );
                             })
                         )}

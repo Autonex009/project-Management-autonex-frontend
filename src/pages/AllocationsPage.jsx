@@ -476,7 +476,6 @@ import { Plus, Edit, Trash2, X, UserPlus, UserMinus, CheckSquare, AlertTriangle,
 import toast from 'react-hot-toast';
 import ConfirmDialog from '../components/ui/ConfirmDialog';
 import { getPmEmployeeId, getPmSubProjects } from '../utils/pmScope';
-import SearchBar from '../components/ui/SearchBar';
 import Table from '../components/ui/Table';
 import Button from '../components/ui/Button';
 

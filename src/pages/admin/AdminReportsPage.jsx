@@ -2,7 +2,7 @@ import React, { useState, useEffect } from 'react';
 import { Download, Users, TrendingUp, CheckCircle2, ChevronDown, ChevronRight } from 'lucide-react';
 import Button from '../../components/ui/Button';
 import { onboardingApi } from '../../services/api';
-import Spinner from '../../components/ui/LoadingSpinner';
+import Table from '../../components/ui/Table';
 import SearchBar from '../../components/ui/SearchBar';
 
 export default function AdminReportsPage() {
@@ -10,6 +10,7 @@ export default function AdminReportsPage() {
   const [loading, setLoading] = useState(true);
   const [searchTerm, setSearchTerm] = useState('');
   const [expandedRow, setExpandedRow] = useState(null);
+  const [currentPage, setCurrentPage] = useState(1);
 
   useEffect(() => {
     onboardingApi.getReports()
@@ -45,7 +46,186 @@ export default function AdminReportsPage() {
     setExpandedRow(expandedRow === userId ? null : userId);
   };
 
+  useEffect(() => {
+    setExpandedRow(null);
+  }, [currentPage]);
+
+  const renderModuleBreakdown = (row) => (
+    <div className="bg-slate-50/70 px-6 sm:px-10 py-4 border-t border-slate-100 transition-all duration-300">
+      <p className="text-xs font-bold text-slate-500 uppercase tracking-widest mb-3">Per-Module Breakdown</p>
+      {row.moduleStats?.length > 0 ? (
+        <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-3">
+          {row.moduleStats.map((ms) => (
+            <div key={ms.moduleId} className="bg-white rounded-xl border border-slate-200 p-4 shadow-sm">
+              <p className="text-sm font-bold text-slate-800 truncate mb-2">{ms.moduleTitle}</p>
+              <div className="flex items-center justify-between text-xs mb-1.5 font-medium">
+                <span className="text-slate-500">Progress</span>
+                <span className="font-bold text-slate-700">{ms.progress}%</span>
+              </div>
+              <div className="w-full h-1.5 rounded-full overflow-hidden mb-3 bg-slate-100">
+                <div
+                  className="h-full rounded-full"
+                  style={{
+                    width: `${ms.progress}%`,
+                    background: ms.progress === 100 ? '#10B981' : '#1d3989',
+                  }}
+                />
+              </div>
+              <div className="flex items-center justify-between text-xs font-medium">
+                <span className="text-slate-500">Quiz Score</span>
+                <span
+                  className={`font-bold px-2 py-0.5 rounded-full text-[11px] ${
+                    ms.score >= 70
+                      ? 'bg-green-50 text-green-700'
+                      : ms.score >= 40
+                      ? 'bg-amber-50 text-amber-700'
+                      : ms.totalQuestions === 0
+                      ? 'bg-slate-50 text-slate-400'
+                      : 'bg-red-50 text-red-600'
+                  }`}
+                >
+                  {ms.totalQuestions === 0 ? 'No quiz' : `${ms.score}%`}
+                </span>
+              </div>
+              {ms.totalQuestions > 0 && (
+                <div className="flex items-center justify-between text-xs mt-1.5 font-medium">
+                  <span className="text-slate-500">Marks</span>
+                  <span className="font-bold text-slate-700">{ms.correctAnswers}/{ms.totalQuestions}</span>
+                </div>
+              )}
+            </div>
+          ))}
+        </div>
+      ) : (
+        <div className="text-center py-6 text-slate-400 text-sm">No module data available.</div>
+      )}
+    </div>
+  );
+
+  const columns = [
+  {
+    key: 'expand',
+    label: '',
+    align: 'center',
+    render: (_, row) => {
+      if (!row.moduleStats?.length) return null;
+
+      return expandedRow === row.userId ? (
+        <ChevronDown className="h-4 w-4 text-indigo-600 inline-block" />
+      ) : (
+        <ChevronRight className="h-4 w-4 text-slate-400 inline-block" />
+      );
+    },
+  },
+
+  {
+    key: 'name',
+    label: 'Candidate',
+    render: (_, row) => (
+      <div className="flex items-center gap-3">
+        <div className="h-9 w-9 rounded-xl flex items-center justify-center text-white text-xs font-bold bg-indigo-600">
+          {row.name
+            ? row.name
+                .split(' ')
+                .map((n) => n[0])
+                .join('')
+                .toUpperCase()
+            : 'C'}
+        </div>
+
+        <div>
+          <p className="text-sm font-bold text-slate-800">
+            {row.name}
+          </p>
+
+          <p className="text-xs text-slate-500">
+            {row.email}
+          </p>
+        </div>
+      </div>
+    ),
+  },
+
+  {
+    key: 'department',
+    label: 'Department',
+    render: (_, row) => (
+      <span className="inline-flex bg-slate-100 text-slate-600 px-2.5 py-1 rounded-md text-xs font-bold uppercase tracking-wide border border-slate-200">
+        {row.department || 'Annotator'}
+      </span>
+    ),
+  },
+
+  {
+    key: 'overallProgress',
+    label: 'Progress',
+    align: 'center',
+    render: (value) => (
+      <div className="flex flex-col items-center gap-1">
+        <span className="font-bold">
+          {value}%
+        </span>
+
+        <div className="w-24 h-1.5 rounded-full overflow-hidden bg-slate-100">
+          <div
+            className="h-full rounded-full"
+            style={{
+              width: `${value}%`,
+              background:
+                value === 100
+                  ? '#10B981'
+                  : '#1d3989',
+            }}
+          />
+        </div>
+      </div>
+    ),
+  },
+
+  {
+    key: 'overallScore',
+    label: 'Quiz Score',
+    align: 'center',
+    render: (value) => (
+      <span
+        className={`inline-flex items-center gap-1 text-sm font-bold px-3 py-1 rounded-full border ${
+          value >= 70
+            ? 'bg-green-50 text-green-700 border-green-100'
+            : value >= 40
+            ? 'bg-amber-50 text-amber-700 border-amber-100'
+            : 'bg-red-50 text-red-600 border-red-100'
+        }`}
+      >
+        {value}%
+      </span>
+    ),
+  },
+
+  {
+    key: 'marks',
+    label: 'Marks',
+    align: 'center',
+    render: (_, row) => (
+      <>
+        <span className="inline-flex items-center gap-1 text-sm font-bold bg-slate-100 text-slate-700 px-3 py-1 rounded-full border border-slate-200">
+          {row.correctAnswers}/{row.totalQuestions}
+        </span>
+
+        {row.attemptedQuestions > 0 &&
+          row.attemptedQuestions < row.totalQuestions && (
+            <p className="text-[11px] text-amber-600 mt-1 font-semibold">
+              {row.totalQuestions -
+                row.attemptedQuestions}{' '}
+              unattempted
+            </p>
+          )}
+      </>
+    ),
+  },
+];
+
   return (
+    
     <div className="space-y-6">
       {/* Header */}
       <div className="flex flex-col sm:flex-row items-start sm:items-center justify-between mb-8 gap-4">
@@ -53,8 +233,8 @@ export default function AdminReportsPage() {
           <h1 className="text-2xl sm:text-3xl font-extrabold text-slate-900">Candidate Reports</h1>
           <p className="text-sm text-slate-500">Track company-wide onboarding progress and quiz scores in one place.</p>
         </div>
-        <Button size="lg" onClick={handleExportCSV}>
-          <Download className="h-4 w-4" /> Export CSV
+        <Button size="lg" onClick={handleExportCSV} className="font-semibold">
+          <Download className="h-4 w-4 " /> Export CSV
         </Button>
       </div>
 
@@ -93,137 +273,33 @@ export default function AdminReportsPage() {
           <SearchBar
             placeholder="Search candidate..."
             value={searchTerm}
-            onChange={setSearchTerm}
+            onChange={(value) => {
+              setSearchTerm(value);
+              setCurrentPage(1);
+            }}
             className="max-w-sm w-full"
           />
           <p className="text-xs text-slate-400 font-medium">Click a row to see per-module quiz breakdown</p>
         </div>
 
-        <div className="overflow-x-auto">
-          <table className="w-full text-left border-collapse">
-            <thead>
-              <tr className="bg-slate-50/80 border-b border-slate-200 text-xs uppercase tracking-wider text-slate-500 font-bold">
-                <th className="py-3 px-6 font-semibold w-8"></th>
-                <th className="py-3 px-6 font-semibold">Candidate</th>
-                <th className="py-3 px-6 font-semibold hidden md:table-cell">Department</th>
-                <th className="py-3 px-6 font-semibold text-center">Progress</th>
-                <th className="py-3 px-6 font-semibold text-center">Quiz Score</th>
-                <th className="py-3 px-6 font-semibold text-center">Marks</th>
-              </tr>
-            </thead>
-            {loading ? (
-               <tbody className="divide-y divide-slate-100 bg-white">
-                 <tr>
-                   <td colSpan={6} className="py-10 text-center text-slate-500 font-medium">
-                     <Spinner size="sm" color="indigo" text="Loading reports data..." />
-                   </td>
-                 </tr>
-               </tbody>
-            ) : (
-              <tbody className="divide-y divide-slate-100 bg-white">
-                {filteredReports.map((r) => (
-                  <React.Fragment key={r.userId}>
-                    <tr onClick={() => toggleExpand(r.userId)} className="hover:bg-slate-50/80 transition-colors cursor-pointer">
-                      <td className="py-4 px-4 text-center">
-                        {expandedRow === r.userId ? (
-                          <ChevronDown className="h-4 w-4 text-indigo-600 inline-block" />
-                        ) : (
-                          <ChevronRight className="h-4 w-4 text-slate-400 inline-block" />
-                        )}
-                      </td>
-                      <td className="py-4 px-6">
-                        <div className="flex items-center gap-3">
-                          <div className="h-9 w-9 rounded-xl flex items-center justify-center text-white text-xs font-bold bg-indigo-600">
-                            {r.name ? r.name.split(' ').map((n) => n[0]).join('').toUpperCase() : 'C'}
-                          </div>
-                          <div>
-                            <p className="text-sm font-bold text-slate-800">{r.name}</p>
-                            <p className="text-xs text-slate-500">{r.email}</p>
-                          </div>
-                        </div>
-                      </td>
-                      <td className="py-4 px-6 text-sm font-medium text-slate-600 hidden md:table-cell">
-                        <span className="bg-slate-100 text-slate-600 px-2.5 py-1 rounded-md text-xs font-bold uppercase tracking-wide border border-slate-200">{r.department || 'Annotator'}</span>
-                      </td>
-                      <td className="py-4 px-6 text-center">
-                         <div className="flex flex-col items-center justify-center gap-1">
-                            <span className="text-sm font-bold text-slate-800">{r.overallProgress}%</span>
-                            <div className="w-24 h-1.5 rounded-full overflow-hidden bg-slate-100">
-                              <div className="h-full rounded-full transition-all" style={{ width: `${r.overallProgress}%`, background: r.overallProgress === 100 ? '#10B981' : '#1d3989' }} />
-                            </div>
-                         </div>
-                      </td>
-                      <td className="py-4 px-6 text-center">
-                         <span className={`inline-flex items-center gap-1 text-sm font-bold px-3 py-1 rounded-full border ${
-                           (r.overallScore || 0) >= 70 ? 'bg-green-50 text-green-700 border-green-100' :
-                           (r.overallScore || 0) >= 40 ? 'bg-amber-50 text-amber-700 border-amber-100' :
-                           'bg-red-50 text-red-600 border-red-100'
-                         }`}>
-                           {r.overallScore}%
-                         </span>
-                      </td>
-                      <td className="py-4 px-6 text-center">
-                        <span className="inline-flex items-center gap-1 text-sm font-bold bg-slate-100 text-slate-700 px-3 py-1 rounded-full border border-slate-200">
-                          {r.correctAnswers}/{r.totalQuestions}
-                        </span>
-                        {r.attemptedQuestions > 0 && r.attemptedQuestions < r.totalQuestions && (
-                          <p className="text-[11px] text-amber-550 mt-1 font-semibold">
-                            {r.totalQuestions - r.attemptedQuestions} unattempted
-                          </p>
-                        )}
-                      </td>
-                    </tr>
-
-                    {/* Expandable Per-Module Breakdown */}
-                    {expandedRow === r.userId && r.moduleStats && r.moduleStats.length > 0 && (
-                      <tr key={`${r.userId}-details`}>
-                        <td colSpan={6} className="p-0">
-                          <div className="bg-slate-50/70 px-6 sm:px-10 py-4 border-t border-slate-100 transition-all duration-300">
-                            <p className="text-xs font-bold text-slate-500 uppercase tracking-widest mb-3">Per-Module Breakdown</p>
-                            <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-3">
-                              {r.moduleStats.map((ms) => (
-                                <div key={ms.moduleId} className="bg-white rounded-xl border border-slate-200 p-4 shadow-sm">
-                                  <p className="text-sm font-bold text-slate-800 truncate mb-2">{ms.moduleTitle}</p>
-                                  <div className="flex items-center justify-between text-xs mb-1.5 font-medium">
-                                    <span className="text-slate-500">Progress</span>
-                                    <span className="font-bold text-slate-700">{ms.progress}%</span>
-                                  </div>
-                                  <div className="w-full h-1.5 rounded-full overflow-hidden mb-3 bg-slate-100">
-                                    <div className="h-full rounded-full transition-all" style={{ width: `${ms.progress}%`, background: ms.progress === 100 ? '#10B981' : '#1d3989' }} />
-                                  </div>
-                                  <div className="flex items-center justify-between text-xs font-medium">
-                                    <span className="text-slate-500">Quiz Score</span>
-                                    <span className={`font-bold px-2 py-0.5 rounded-full text-[11px] ${
-                                      ms.score >= 70 ? 'bg-green-50 text-green-700' :
-                                      ms.score >= 40 ? 'bg-amber-50 text-amber-700' :
-                                      ms.totalQuestions === 0 ? 'bg-slate-50 text-slate-400' :
-                                      'bg-red-50 text-red-650'
-                                    }`}>
-                                      {ms.totalQuestions === 0 ? 'No quiz' : `${ms.score}%`}
-                                    </span>
-                                  </div>
-                                  {ms.totalQuestions > 0 && (
-                                    <div className="flex items-center justify-between text-xs mt-1.5 font-medium">
-                                      <span className="text-slate-500">Marks</span>
-                                      <span className="font-bold text-slate-700">{ms.correctAnswers}/{ms.totalQuestions}</span>
-                                    </div>
-                                  )}
-                                </div>
-                              ))}
-                            </div>
-                          </div>
-                        </td>
-                      </tr>
-                    )}
-                  </React.Fragment>
-                ))}
-                {filteredReports.length === 0 && (
-                  <tr><td colSpan={6} className="py-10 text-center text-slate-500 font-medium italic">No candidates found.</td></tr>
-                )}
-              </tbody>
-            )}
-          </table>
-        </div>
+        <Table
+          columns={columns}
+          data={filteredReports}
+          loading={loading}
+          currentPage={currentPage}
+          pageSize={10}
+          onPageChange={setCurrentPage}
+          variant="borderless"
+          onRowClick={(row) => toggleExpand(row.userId)}
+          expandedRowId={expandedRow}
+          getRowId={(row) => row.userId}
+          skeletonRows={6}
+          emptyState={{
+            title: 'No candidates found',
+            description: 'Try adjusting your search query',
+          }}
+          renderExpandedRow={renderModuleBreakdown}
+        />
       </div>
     </div>
   );

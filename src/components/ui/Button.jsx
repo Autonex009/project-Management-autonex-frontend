@@ -15,7 +15,7 @@ const Button = ({
     disabled,
     ...props
 }) => {
-    const base = 'inline-flex items-center justify-center font-medium transition-all duration-200 focus:outline-none  disabled:opacity-60 disabled:cursor-not-allowed ';
+    const base = 'inline-flex items-center justify-center transition-all duration-200 outline-none focus:outline-none focus:ring-0 focus-visible:outline-none focus-visible:ring-0 focus-visible:ring-offset-0 ring-0 disabled:opacity-60 disabled:cursor-not-allowed ';
 
     const sizes = {
         sm:   'px-3 py-1.5 text-xs rounded-lg gap-1',
@@ -31,8 +31,8 @@ const Button = ({
         success:   'bg-emerald-600 text-white hover:bg-emerald-700 focus:ring-emerald-500 shadow-sm',
         warning:   'bg-amber-600 text-white hover:bg-amber-700 focus:ring-amber-500 shadow-sm',
         blue:      'bg-blue-600 text-white hover:bg-blue-700 focus:ring-blue-500 shadow-sm',
-        ghost:     'text-slate-600 hover:bg-slate-100 hover:text-slate-900 focus:ring-slate-200',
-        cancel:    'text-slate-600 hover:bg-slate-100 hover:text-slate-800 focus:ring-slate-200',
+        ghost:     'text-slate-600 hover:bg-slate-100 hover:text-slate-900',
+        cancel:    'text-slate-600 hover:bg-slate-100 hover:text-slate-800',
         link:      'text-indigo-600 hover:underline focus:ring-indigo-200 p-0',
     };
 

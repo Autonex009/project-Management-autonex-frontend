@@ -1,14 +1,14 @@
 import { useState, useMemo } from 'react';
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import { payrollApi } from '../services/api';
-import Spinner from '../components/ui/LoadingSpinner';
 import Button from '../components/ui/Button';
 import toast from 'react-hot-toast';
 import {
-    Download, CheckCircle2, XCircle, AlertTriangle, IndianRupee,
-    Users, TrendingDown, Wallet, X, ChevronDown, ChevronRight, ChevronLeft, Lock, Gift, PlusCircle, Search
+    Download, CheckCircle2, AlertTriangle, IndianRupee,
+    Users, TrendingDown, Wallet, X, Lock, Gift, PlusCircle
 } from 'lucide-react';
 import SearchBar from '../components/ui/SearchBar';
+import Table from '../components/ui/Table';
 
 const LEAVE_LABELS = {
     paid: 'Paid', casual_sick: 'Casual/Sick', floater: 'Floater',
@@ -28,6 +28,122 @@ const currentMonthStr = () => {
     const d = new Date();
     return `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}`;
 };
+
+// Extracted column builder to top-level to avoid recreating on every render.
+const getColumns = ({ bonuses, setBonuses, additionalPayments, setAdditionalPayments, setReviewModal }) => [
+    {
+        key: 'employee',
+        label: 'Employee',
+        render: (_, row) => (
+            <>
+                <p className="font-semibold text-slate-800">{row.employee_name}</p>
+                <p className="text-xs text-slate-400">{row.designation} · {row.employee_type}</p>
+            </>
+        ),
+    },
+
+    {
+        key: 'salary',
+        label: 'Base Salary / Per Day',
+        align: 'right',
+        render: (_, row) =>
+            row.salary_missing ? (
+                <p className="text-xs text-amber-600 flex items-center justify-end gap-1">
+                    <AlertTriangle className="w-3 h-3" />
+                    Set in Pay tab
+                </p>
+            ) : (
+                <div className="text-right">
+                    <p className="font-semibold">{fmtCurrency(row.base_salary)}</p>
+                    <p className="text-xs text-slate-400">{fmtCurrency(row.per_day_rate)}/day</p>
+                </div>
+            ),
+    },
+
+    {
+        key: 'leave',
+        label: 'Leaves',
+        align: 'right',
+        render: (_, row) =>
+            row.total_leave_days > 0 ? (
+                <span className="inline-flex items-center justify-center h-6 min-w-[24px] px-2 rounded-full text-xs font-bold bg-amber-100 text-amber-700">{row.total_leave_days}d</span>
+            ) : (
+                <span className="text-slate-300 text-xs">—</span>
+            ),
+    },
+
+    {
+        key: 'deduction',
+        label: 'Deducted',
+        align: 'right',
+        render: (_, row) =>
+            row.total_deduction > 0 ? (
+                <span className="text-red-600 font-medium">−{fmtCurrency(row.total_deduction)}</span>
+            ) : (
+                <span className="text-slate-300 text-xs">—</span>
+            ),
+    },
+
+    {
+        key: 'bonus',
+        label: 'Bonus',
+        align: 'right',
+        render: (_, row) => {
+            if (row.salary_missing || row.bonus_limit <= 0) return <span className="text-slate-300 text-xs">—</span>;
+            return (
+                <div className="flex items-center justify-end gap-2">
+                    <input type="checkbox" checked={row.bonus > 0} onClick={(e) => e.stopPropagation()} onChange={(e) => setBonuses((p) => ({ ...p, [row.employee_id]: e.target.checked ? row.bonus_limit : 0 }))} />
+                    {row.bonus > 0 ? (
+                        <div className="text-right">
+                            <div className="flex items-center justify-end gap-1">
+                                <span className="text-slate-400 text-xs">₹</span>
+                                <input type="number" min={0} max={row.bonus_limit} value={bonuses[row.employee_id] ?? row.bonus} onClick={(e) => e.stopPropagation()} onChange={(e) => setBonuses((p) => ({ ...p, [row.employee_id]: e.target.value }))} className="w-24 px-2 py-1 border border-indigo-300 rounded-lg text-sm text-right" />
+                            </div>
+                            <p className="text-[10px] text-slate-400">max {fmtCurrency(row.bonus_limit)}</p>
+                        </div>
+                    ) : (
+                        <span className="text-xs text-slate-400">up to {fmtCurrency(row.bonus_limit)}</span>
+                    )}
+                </div>
+            );
+        },
+    },
+
+    {
+        key: 'additional',
+        label: 'Additional Payments',
+        align: 'right',
+        render: (_, row) =>
+            row.salary_missing ? (
+                <span className="text-slate-300 text-xs">—</span>
+            ) : (
+                <div className="flex items-center justify-end gap-1">
+                    <span className="text-slate-400 text-xs">₹</span>
+                    <input type="number" min={0} value={additionalPayments[row.employee_id] ?? (row.additional_payment || '')} onClick={(e) => e.stopPropagation()} onChange={(e) => setAdditionalPayments((p) => ({ ...p, [row.employee_id]: e.target.value }))} placeholder="0" className="w-24 px-2 py-1 border border-slate-300 rounded-lg text-sm text-right focus:outline-none focus:ring-2 focus:ring-indigo-200" />
+                </div>
+            ),
+    },
+
+    {
+        key: 'final',
+        label: 'Final Salary',
+        align: 'right',
+        render: (_, row) => (
+            <span className={`font-bold text-base ${row.salary_missing ? 'text-slate-300' : 'text-emerald-700'}`}>{row.salary_missing ? '—' : fmtCurrency(row.final_salary)}</span>
+        ),
+    },
+
+    {
+        key: 'actions',
+        label: 'Actions',
+        render: (_, row) => row.leaves.length > 0 && (
+            <Button size="sm" variant="secondary" onClick={() => setReviewModal(row.employee_id)}>
+                Review Leaves
+                <span className="inline-flex items-center justify-center h-4 min-w-[16px] px-1 rounded-full bg-indigo-200 text-[10px] font-bold">{row.leaves.length}</span>
+            </Button>
+        ),
+    },
+];
 
 const PayrollPage = () => {
     const queryClient = useQueryClient();
@@ -199,10 +315,9 @@ const PayrollPage = () => {
         );
     }, [rows, search]);
 
-    const totalPages = Math.max(1, Math.ceil(filtered.length / PAGE_SIZE));
-    const safePage = Math.min(page, totalPages);
-    const pagedRows = filtered.slice((safePage - 1) * PAGE_SIZE, safePage * PAGE_SIZE);
     const onSearch = (v) => { setSearch(v); setPage(1); };
+
+    const columns = useMemo(() => getColumns({ bonuses, setBonuses, additionalPayments, setAdditionalPayments, setReviewModal }), [bonuses, additionalPayments]);
 
     const buildAdjustmentsPayload = () =>
         rows.flatMap(emp =>
@@ -320,13 +435,14 @@ const PayrollPage = () => {
                     <Button onClick={handleGenerate} disabled={isLoading} isLoading={isLoading}>
                         {!isLoading && 'Generate'}
                     </Button>
-                    <button
+                    <Button
+                        variant="ghost"
+                        size="icon"
                         onClick={handleLock}
                         title="Lock payroll"
-                        className="p-2 text-slate-400 hover:text-slate-700 hover:bg-slate-100 rounded-xl transition-colors"
-                    >
+                        >
                         <Lock className="w-4 h-4" />
-                    </button>
+                    </Button>
                 </div>
             </div>
 
@@ -365,9 +481,10 @@ const PayrollPage = () => {
             {/* Search */}
             {generated && rows.length > 0 && (
                 <div className="flex justify-between items-center mb-4">
-                    <SearchBar responsive
+                    <SearchBar
+                        responsive
                         value={search}
-                        onChange={setSearch}
+                        onChange={onSearch}
                         placeholder="Search by name, designation or type…"
                     />
                 </div>
@@ -385,169 +502,18 @@ const PayrollPage = () => {
                             No people match “{search}”.
                         </div>
                     ) : (
-                        <div className="overflow-x-auto">
-                            <table className="w-full text-sm">
-                                <thead className="bg-slate-50/80 border-b border-slate-100">
-                                    <tr>
-                                        {['Employee', 'Base Salary / Per Day', 'Leaves', 'Deducted', 'Bonus', 'Additional Payments', 'Final Salary', 'Actions'].map(h => (
-                                            <th key={h} className={`px-5 py-4 text-xs font-semibold text-slate-400 uppercase tracking-wider ${
-                                                ['Base Salary / Per Day', 'Leaves', 'Deducted', 'Bonus', 'Additional Payments', 'Final Salary'].includes(h) ? 'text-right' : 'text-left'
-                                            }`}>{h}</th>
-                                        ))}
-                                    </tr>
-                                </thead>
-                                <tbody className="divide-y divide-slate-100">
-                                    {pagedRows.map(row => {
-                                        return (
-                                            <tr key={row.employee_id} className="hover:bg-slate-50/50 transition-colors">
-                                                {/* Employee */}
-                                                <td className="px-5 py-4">
-                                                    <p className="font-semibold text-slate-800">{row.employee_name}</p>
-                                                    <p className="text-xs text-slate-400">{row.designation} · {row.employee_type}</p>
-                                                </td>
-
-                                                {/* Base salary / per day — sourced from the Pay tab (read-only here) */}
-                                                <td className="px-5 py-4 text-right">
-                                                    {row.salary_missing ? (
-                                                        <p className="text-xs text-amber-600 flex items-center justify-end gap-1">
-                                                            <AlertTriangle className="w-3 h-3" />Set in Pay tab
-                                                        </p>
-                                                    ) : (
-                                                        <div className="text-right">
-                                                            <p className="font-semibold text-slate-800">{fmtCurrency(row.base_salary)}</p>
-                                                            <p className="text-xs text-slate-400">{fmtCurrency(row.per_day_rate)}/day</p>
-                                                        </div>
-                                                    )}
-                                                </td>
-
-                                                {/* Leave days */}
-                                                <td className="px-5 py-4 text-right">
-                                                    {row.total_leave_days > 0 ? (
-                                                        <span className="inline-flex items-center justify-center h-6 min-w-[24px] px-2 rounded-full text-xs font-bold bg-amber-100 text-amber-700">
-                                                            {row.total_leave_days}d
-                                                        </span>
-                                                    ) : (
-                                                        <span className="text-slate-300 text-xs">—</span>
-                                                    )}
-                                                </td>
-
-                                                {/* Deducted */}
-                                                <td className="px-5 py-4 text-right">
-                                                    {row.total_deduction > 0 ? (
-                                                        <span className="text-red-600 font-medium">
-                                                            −{fmtCurrency(row.total_deduction)}
-                                                        </span>
-                                                    ) : (
-                                                        <span className="text-slate-300 text-xs">—</span>
-                                                    )}
-                                                </td>
-
-                                                {/* Bonus — granted up to the employee's limit (from the Pay tab) */}
-                                                <td className="px-5 py-4 text-right">
-                                                    {row.salary_missing || row.bonus_limit <= 0 ? (
-                                                        <span className="text-slate-300 text-xs">—</span>
-                                                    ) : (
-                                                        <div className="flex items-center justify-end gap-2">
-                                                            <input
-                                                                type="checkbox"
-                                                                checked={row.bonus > 0}
-                                                                onChange={(e) => setBonuses(p => ({ ...p, [row.employee_id]: e.target.checked ? row.bonus_limit : 0 }))}
-                                                                className="w-4 h-4 rounded border-slate-300 text-indigo-600 focus:ring-indigo-200 cursor-pointer"
-                                                                title={row.bonus > 0 ? 'Remove bonus' : 'Grant bonus'}
-                                                            />
-                                                            {row.bonus > 0 ? (
-                                                                <div className="text-right">
-                                                                    <div className="flex items-center justify-end gap-1">
-                                                                        <span className="text-slate-400 text-xs">₹</span>
-                                                                        <input
-                                                                            type="number"
-                                                                            min={0}
-                                                                            max={row.bonus_limit}
-                                                                            value={bonuses[row.employee_id] ?? row.bonus}
-                                                                            onChange={(e) => setBonuses(p => ({ ...p, [row.employee_id]: e.target.value }))}
-                                                                            className="w-24 px-2 py-1 border border-indigo-300 rounded-lg text-sm text-right focus:outline-none focus:ring-2 focus:ring-indigo-200"
-                                                                        />
-                                                                    </div>
-                                                                    <p className="text-[10px] text-slate-400 mt-0.5">max {fmtCurrency(row.bonus_limit)}</p>
-                                                                </div>
-                                                            ) : (
-                                                                <span className="text-xs text-slate-400">up to {fmtCurrency(row.bonus_limit)}</span>
-                                                            )}
-                                                        </div>
-                                                    )}
-                                                </td>
-
-                                                {/* Additional payments — free-form extra amount */}
-                                                <td className="px-5 py-4 text-right">
-                                                    {row.salary_missing ? (
-                                                        <span className="text-slate-300 text-xs">—</span>
-                                                    ) : (
-                                                        <div className="flex items-center justify-end gap-1">
-                                                            <span className="text-slate-400 text-xs">₹</span>
-                                                            <input
-                                                                type="number"
-                                                                min={0}
-                                                                value={additionalPayments[row.employee_id] ?? (row.additional_payment || '')}
-                                                                onChange={(e) => setAdditionalPayments(p => ({ ...p, [row.employee_id]: e.target.value }))}
-                                                                placeholder="0"
-                                                                className="w-24 px-2 py-1 border border-slate-300 rounded-lg text-sm text-right focus:outline-none focus:ring-2 focus:ring-indigo-200 focus:border-indigo-300"
-                                                            />
-                                                        </div>
-                                                    )}
-                                                </td>
-
-                                                {/* Final salary */}
-                                                <td className="px-5 py-4 text-right">
-                                                    <span className={`font-bold text-base ${row.salary_missing ? 'text-slate-300' : 'text-emerald-700'}`}>
-                                                        {row.salary_missing ? '—' : fmtCurrency(row.final_salary)}
-                                                    </span>
-                                                </td>
-
-                                                {/* Actions */}
-                                                <td className="px-5 py-4">
-                                                    {row.leaves.length > 0 && (
-                                                        <button
-                                                            onClick={() => setReviewModal(row.employee_id)}
-                                                            className="inline-flex items-center gap-1.5 px-3 py-1.5 text-xs font-medium bg-indigo-50 text-indigo-700 rounded-lg hover:bg-indigo-100 transition-colors"
-                                                        >
-                                                            Review Leaves
-                                                            <span className="inline-flex items-center justify-center h-4 min-w-[16px] px-1 rounded-full bg-indigo-200 text-[10px] font-bold">
-                                                                {row.leaves.length}
-                                                            </span>
-                                                        </button>
-                                                    )}
-                                                </td>
-                                            </tr>
-                                        );
-                                    })}
-                                </tbody>
-                            </table>
-                            {/* Pagination */}
-                            <div className="flex items-center justify-between px-5 py-3 border-t border-slate-100 text-sm text-slate-500">
-                                <span>
-                                    Showing {(safePage - 1) * PAGE_SIZE + 1}–{Math.min(safePage * PAGE_SIZE, filtered.length)} of {filtered.length}
-                                </span>
-                                <div className="flex items-center gap-2">
-                                    <button
-                                        onClick={() => setPage(safePage - 1)}
-                                        disabled={safePage <= 1}
-                                        className="p-1.5 rounded-lg hover:bg-slate-100 disabled:opacity-30 disabled:hover:bg-transparent transition-colors"
-                                        title="Previous page"
-                                    >
-                                        <ChevronLeft className="w-4 h-4" />
-                                    </button>
-                                    <span className="text-xs font-medium text-slate-600">Page {safePage} / {totalPages}</span>
-                                    <button
-                                        onClick={() => setPage(safePage + 1)}
-                                        disabled={safePage >= totalPages}
-                                        className="p-1.5 rounded-lg hover:bg-slate-100 disabled:opacity-30 disabled:hover:bg-transparent transition-colors"
-                                        title="Next page"
-                                    >
-                                        <ChevronRight className="w-4 h-4" />
-                                    </button>
-                                </div>
-                            </div>
-                        </div>
+                       <Table
+                            columns={columns}
+                            data={filtered}
+                            loading={isLoading}
+                            currentPage={page}
+                            pageSize={PAGE_SIZE}
+                            onPageChange={setPage}
+                            emptyState={{
+                                title: "No employees found",
+                                description: "Try adjusting your search.",
+                            }}
+                        />
                     )}
 
                     {/* Footer actions */}
@@ -557,12 +523,13 @@ const PayrollPage = () => {
                             {' '}across <span className="font-semibold">{totals.employeesWithSalary}</span> employees
                         </div>
                         <div className="flex items-center gap-3">
-                            <button
+                            <Button
+                                variant="secondary"
                                 onClick={handleExportCSV}
-                                className="inline-flex items-center gap-2 px-4 py-2 text-sm font-medium border border-slate-200 bg-white text-slate-700 rounded-xl hover:bg-slate-50 transition-colors"
                             >
-                                <Download className="w-4 h-4" /> Export CSV
-                            </button>
+                                <Download className="w-4 h-4" />
+                                Export CSV
+                            </Button>
                             <Button variant="secondary" onClick={() => handleSave('draft')} disabled={saveMutation.isPending}>
                                 Save Draft
                             </Button>
@@ -595,9 +562,14 @@ const PayrollPage = () => {
                                     {modalRow.employee_name} · {month}
                                 </p>
                             </div>
-                            <button onClick={() => setReviewModal(null)} className="text-slate-400 hover:text-slate-600 p-1">
+                            <Button
+                                variant="ghost"
+                                size="icon"
+                                onClick={() => setReviewModal(null)}
+                            >
                                 <X className="w-5 h-5" />
-                            </button>
+                            </Button>
+                            
                         </div>
 
                         {/* Annual paid-leave balances (computed locally; Razorpay has no balance API) */}

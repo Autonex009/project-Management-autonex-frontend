@@ -42,7 +42,7 @@ const SearchBar = ({
           sizeClass,
           "bg-white border border-slate-200",
           "placeholder:text-slate-400",
-          "focus:outline-none focus:ring-2 focus:ring-indigo-100 focus:border-indigo-300",
+          "outline-none focus:outline-none focus-visible:outline-none focus:ring-0 focus-visible:ring-0 focus:border-indigo-300",
           "disabled:bg-slate-50 disabled:text-slate-500 disabled:cursor-not-allowed",
           "transition-all shadow-sm",
         ]
