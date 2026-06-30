@@ -13,7 +13,56 @@ const SUGGESTED_QUESTIONS = [
     { text: "What's the leave policy?", icon: "📋" },
 ];
 
-const ChatWidget = () => {
+// ── Role-based color themes ────────────────────────────────────────
+const ROLE_THEMES = {
+    admin: {
+        // Dark navy/blue — matches AdminLayout sidebar
+        fab: 'from-blue-600 to-indigo-700',
+        fabShadow: 'shadow-blue-300/40 hover:shadow-blue-400/50',
+        fabPulse: 'from-blue-500 to-indigo-500',
+        header: 'from-slate-800 via-slate-900 to-blue-950',
+        headerGlow: 'rgba(59,130,246,0.15)',
+        iconBg: 'bg-blue-500/20',
+        sendBtn: 'from-blue-600 to-indigo-600',
+        sendShadow: 'shadow-blue-200/50',
+        focusRing: 'focus:border-blue-300 focus:ring-blue-100',
+        suggestHover: 'hover:bg-blue-50 hover:border-blue-200 hover:text-blue-700',
+        welcomeGrad: 'from-blue-500 to-indigo-600',
+        welcomeShadow: 'shadow-blue-200/60',
+    },
+    pm: {
+        // Blue theme — matches PM accent
+        fab: 'from-blue-500 to-blue-700',
+        fabShadow: 'shadow-blue-300/40 hover:shadow-blue-400/50',
+        fabPulse: 'from-blue-400 to-blue-600',
+        header: 'from-blue-600 via-blue-700 to-indigo-700',
+        headerGlow: 'rgba(59,130,246,0.18)',
+        iconBg: 'bg-white/20',
+        sendBtn: 'from-blue-500 to-blue-700',
+        sendShadow: 'shadow-blue-200/50',
+        focusRing: 'focus:border-blue-300 focus:ring-blue-100',
+        suggestHover: 'hover:bg-blue-50 hover:border-blue-200 hover:text-blue-700',
+        welcomeGrad: 'from-blue-500 to-blue-700',
+        welcomeShadow: 'shadow-blue-200/60',
+    },
+    employee: {
+        // Emerald/green theme — matches Employee accent
+        fab: 'from-emerald-500 to-teal-600',
+        fabShadow: 'shadow-emerald-300/40 hover:shadow-emerald-400/50',
+        fabPulse: 'from-emerald-400 to-teal-500',
+        header: 'from-emerald-600 via-teal-600 to-cyan-700',
+        headerGlow: 'rgba(16,185,129,0.15)',
+        iconBg: 'bg-white/20',
+        sendBtn: 'from-emerald-500 to-teal-600',
+        sendShadow: 'shadow-emerald-200/50',
+        focusRing: 'focus:border-emerald-300 focus:ring-emerald-100',
+        suggestHover: 'hover:bg-emerald-50 hover:border-emerald-200 hover:text-emerald-700',
+        welcomeGrad: 'from-emerald-500 to-teal-600',
+        welcomeShadow: 'shadow-emerald-200/60',
+    },
+};
+
+const ChatWidget = ({ role: roleProp }) => {
     const [isOpen, setIsOpen] = useState(false);
     const [messages, setMessages] = useState([]);
     const [input, setInput] = useState('');
@@ -22,6 +71,10 @@ const ChatWidget = () => {
     const [pendingAction, setPendingAction] = useState(null);
     const [actionLoading, setActionLoading] = useState(false);
     const [showPulse, setShowPulse] = useState(true);
+
+    // Determine role from prop or localStorage
+    const detectedRole = roleProp || localStorage.getItem('role') || 'employee';
+    const theme = ROLE_THEMES[detectedRole] || ROLE_THEMES.employee;
 
     const messagesEndRef = useRef(null);
     const inputRef = useRef(null);
@@ -196,9 +249,9 @@ const ChatWidget = () => {
                 >
                     <div className="relative">
                         {showPulse && (
-                            <div className="absolute -inset-1 bg-gradient-to-r from-violet-500 to-indigo-500 rounded-2xl opacity-30 blur-lg animate-pulse" />
+                            <div className={`absolute -inset-1 bg-gradient-to-r ${theme.fabPulse} rounded-2xl opacity-30 blur-lg animate-pulse`} />
                         )}
-                        <div className="relative flex items-center gap-2.5 px-5 py-3.5 rounded-2xl bg-gradient-to-r from-violet-600 to-indigo-600 text-white shadow-xl shadow-violet-300/40 hover:shadow-2xl hover:shadow-violet-400/50 transition-all duration-300 hover:scale-105 active:scale-95">
+                        <div className={`relative flex items-center gap-2.5 px-5 py-3.5 rounded-2xl bg-gradient-to-r ${theme.fab} text-white shadow-xl ${theme.fabShadow} transition-all duration-300 hover:scale-105 active:scale-95`}>
                             <Sparkles className="w-5 h-5" />
                             <span className="font-semibold text-sm">Ask AI</span>
                         </div>
@@ -215,10 +268,10 @@ const ChatWidget = () => {
                     }}
                 >
                     {/* Header */}
-                    <div className="relative flex items-center justify-between px-5 py-4 bg-gradient-to-r from-violet-600 via-indigo-600 to-blue-600 text-white">
-                        <div className="absolute inset-0 bg-[radial-gradient(circle_at_top_right,_rgba(255,255,255,0.15),_transparent_70%)]" />
+                    <div className={`relative flex items-center justify-between px-5 py-4 bg-gradient-to-r ${theme.header} text-white`}>
+                        <div className={`absolute inset-0 bg-[radial-gradient(circle_at_top_right,_${theme.headerGlow},_transparent_70%)]`} />
                         <div className="relative flex items-center gap-3">
-                            <div className="w-9 h-9 rounded-xl bg-white/20 backdrop-blur flex items-center justify-center">
+                            <div className={`w-9 h-9 rounded-xl ${theme.iconBg} backdrop-blur flex items-center justify-center`}>
                                 <Sparkles className="w-5 h-5" />
                             </div>
                             <div>
@@ -251,7 +304,7 @@ const ChatWidget = () => {
                         {messages.length === 0 ? (
                             /* Welcome screen with suggested questions */
                             <div className="flex flex-col items-center justify-center h-full px-2">
-                                <div className="w-16 h-16 rounded-2xl bg-gradient-to-br from-violet-500 to-indigo-600 flex items-center justify-center mb-4 shadow-lg shadow-violet-200/60">
+                                <div className={`w-16 h-16 rounded-2xl bg-gradient-to-br ${theme.welcomeGrad} flex items-center justify-center mb-4 shadow-lg ${theme.welcomeShadow}`}>
                                     <Sparkles className="w-8 h-8 text-white" />
                                 </div>
                                 <h3 className="text-lg font-bold text-slate-800 mb-1">Hi there! 👋</h3>
@@ -263,7 +316,7 @@ const ChatWidget = () => {
                                         <button
                                             key={i}
                                             onClick={() => handleSend(q.text)}
-                                            className="flex items-center gap-2 px-3 py-2.5 rounded-xl bg-white border border-slate-100 text-left text-xs text-slate-600 hover:bg-violet-50 hover:border-violet-200 hover:text-violet-700 transition-all duration-200 shadow-sm hover:shadow-md active:scale-[0.97]"
+                                            className={`flex items-center gap-2 px-3 py-2.5 rounded-xl bg-white border border-slate-100 text-left text-xs text-slate-600 ${theme.suggestHover} transition-all duration-200 shadow-sm hover:shadow-md active:scale-[0.97]`}
                                         >
                                             <span className="text-base">{q.icon}</span>
                                             <span className="font-medium leading-tight">{q.text}</span>
@@ -310,7 +363,7 @@ const ChatWidget = () => {
                                     onKeyDown={handleKeyDown}
                                     placeholder="Ask me anything..."
                                     rows={1}
-                                    className="w-full resize-none rounded-2xl border border-slate-200 bg-slate-50/80 px-4 py-3 pr-12 text-sm text-slate-700 placeholder:text-slate-400 focus:outline-none focus:border-violet-300 focus:ring-2 focus:ring-violet-100 focus:bg-white transition-all"
+                                    className={`w-full resize-none rounded-2xl border border-slate-200 bg-slate-50/80 px-4 py-3 pr-12 text-sm text-slate-700 placeholder:text-slate-400 focus:outline-none ${theme.focusRing} focus:bg-white transition-all`}
                                     style={{ maxHeight: '120px' }}
                                     onInput={(e) => {
                                         e.target.style.height = 'auto';
@@ -323,16 +376,13 @@ const ChatWidget = () => {
                                 disabled={!input.trim() || isLoading}
                                 className={`flex-shrink-0 w-11 h-11 rounded-2xl flex items-center justify-center transition-all duration-200 ${
                                     input.trim() && !isLoading
-                                        ? 'bg-gradient-to-r from-violet-600 to-indigo-600 text-white shadow-lg shadow-violet-200/50 hover:shadow-xl hover:scale-105 active:scale-95'
+                                        ? `bg-gradient-to-r ${theme.sendBtn} text-white shadow-lg ${theme.sendShadow} hover:shadow-xl hover:scale-105 active:scale-95`
                                         : 'bg-slate-100 text-slate-400 cursor-not-allowed'
                                 }`}
                             >
                                 <Send className="w-4.5 h-4.5" />
                             </button>
                         </div>
-                        <p className="text-[10px] text-slate-400 text-center mt-2 font-medium">
-                            Powered by Gemini 2.5 Flash • Responses may be inaccurate
-                        </p>
                     </div>
                 </div>
             )}
