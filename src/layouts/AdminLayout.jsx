@@ -8,6 +8,7 @@ import { useQuery, useQueryClient } from '@tanstack/react-query';
 import { subProjectApi, employeeApi } from '../services/api';
 import BrandLockup from '../components/brand/BrandLockup';
 import NotificationBell from '../components/NotificationBell';
+import ChatWidget from '../components/chat/ChatWidget';
 
 const onboardingNavigation = [
   { name: 'Training Modules', href: '/admin/modules', icon: GraduationCap },
@@ -325,6 +326,9 @@ const AdminLayout = () => {
           onClick={() => setSidebarOpen(false)}
         />
       )}
+
+      {/* AI Chat Widget */}
+      <ChatWidget />
     </div>
   );
 };

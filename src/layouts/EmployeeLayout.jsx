@@ -5,6 +5,7 @@ import { LayoutDashboard, FolderKanban, Calendar, CalendarCheck, Rocket, LogOut,
 import BrandLockup from '../components/brand/BrandLockup';
 import NotificationBell from '../components/NotificationBell';
 import { authApi } from '../services/api';
+import ChatWidget from '../components/chat/ChatWidget';
 
 const accentTheme = {
     pm: {
@@ -244,6 +245,9 @@ const EmployeeLayout = () => {
                     <Outlet />
                 </main>
             </div>
+
+            {/* AI Chat Widget */}
+            <ChatWidget />
         </div>
     );
 };
