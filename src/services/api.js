@@ -135,6 +135,7 @@ export const leaveApi = {
 export const signupRequestApi = {
     submit: (data) => api.post('/signup-requests', data).then(res => res.data),
     getAll: (params) => api.get('/signup-requests', { params }).then(res => res.data),
+    getCounts: () => api.get('/signup-requests/counts').then(res => res.data),
     approve: (id, reviewedBy) => api.patch(`/signup-requests/${id}/approve`, null, { params: { reviewed_by: reviewedBy } }).then(res => res.data),
     reject: (id, reviewedBy, reason) => api.patch(`/signup-requests/${id}/reject`, { reason: reason || null }, { params: { reviewed_by: reviewedBy } }).then(res => res.data),
     undoReject: (id, reviewedBy) => api.patch(`/signup-requests/${id}/undo-reject`, null, { params: { reviewed_by: reviewedBy } }).then(res => res.data),

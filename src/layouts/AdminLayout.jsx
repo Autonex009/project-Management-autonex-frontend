@@ -40,13 +40,25 @@ const AdminLayout = () => {
     });
   };
 
-  const { data: pendingSignups = [] } = useQuery({
-    queryKey: ['signup-requests', 'pending'],
-    queryFn: () => signupRequestApi.getAll({ status: 'pending' }),
+  // Fetch data for global search (background)
+  const { data: searchEmployees = [] } = useQuery({
+    queryKey: ['employees'],
+    queryFn: employeeApi.getAll,
+    staleTime: 5 * 60 * 1000
+  });
+  const { data: searchProjects = [] } = useQuery({
+    queryKey: ['sub-projects'],
+    queryFn: subProjectApi.getAll,
+    staleTime: 5 * 60 * 1000
+  });
+
+  const { data: signupCounts } = useQuery({
+    queryKey: ['signup-requests-counts'],
+    queryFn: () => signupRequestApi.getCounts(),
     refetchInterval: 60_000,
     staleTime: 30_000,
   });
-  const pendingSignupCount = pendingSignups.length;
+  const pendingSignupCount = signupCounts?.pending || 0;
 
   // Get user info from localStorage
   const user = JSON.parse(localStorage.getItem('user') || '{}');
