@@ -1,5 +1,5 @@
 import React, { useState, useEffect } from 'react';
-import { Send, Calendar, Building2, ShieldCheck, Sparkles, MapPin, Wifi, Copy, Check, Globe, Cpu, Bot, Layers } from 'lucide-react';
+import { Send, Calendar, Building2, ShieldCheck, Sparkles, MapPin, Wifi, Copy, Check, Globe, Cpu, Bot, Layers, LogOut, FileText, AlertTriangle } from 'lucide-react';
 import Spinner from '../../components/ui/LoadingSpinner';
 import { wifiNetworksApi, companySettingsApi } from '../../services/api';
 import toast from 'react-hot-toast';
@@ -45,6 +45,7 @@ const CompanyInfoPage = () => {
         { id: 'slack', label: 'Slack Guidelines', icon: Send },
         { id: 'leaves', label: 'Leaves Policy', icon: Calendar },
         { id: 'office', label: 'Office & Connectivity', icon: Building2 },
+        { id: 'exit', label: 'Exit Policy', icon: LogOut },
     ];
 
     const focusAreas = [
@@ -55,6 +56,56 @@ const CompanyInfoPage = () => {
         { icon: Layers, label: 'Sensor Fusion & Multimodal AI Datasets' },
         { icon: Bot, label: 'Physical AI Infrastructure & Deployment' },
     ];
+
+    const renderExitPolicy = () => (
+        <div className="space-y-6">
+            <h3 className="text-lg font-bold text-slate-800 flex items-center gap-2">
+                <LogOut className="w-5 h-5 text-rose-500" />
+                Notice Period & Exit Documentation Policy
+            </h3>
+
+            {/* 1. Mandatory notice period highlight */}
+            <div className="bg-gradient-to-br from-indigo-50/70 to-blue-50/50 border border-indigo-100/60 rounded-2xl p-6 flex flex-col sm:flex-row sm:items-center gap-5">
+                <div className="flex-shrink-0 text-center sm:border-r sm:border-indigo-100 sm:pr-6">
+                    <p className="text-4xl font-extrabold text-indigo-600 leading-none">30</p>
+                    <p className="text-xs text-slate-500 font-bold uppercase tracking-wider mt-1">Days Notice</p>
+                </div>
+                <p className="text-sm text-slate-600 leading-relaxed">
+                    All employees are required to serve a mandatory <strong className="text-slate-800">30-day notice period</strong> upon submitting their resignation, unless otherwise <strong className="text-slate-800">approved in writing by the management</strong>.
+                </p>
+            </div>
+
+            {/* 2. Expectations during notice period */}
+            <div className="bg-slate-50 border border-slate-100 rounded-2xl p-5 space-y-3">
+                <h4 className="font-bold text-slate-800 text-sm flex items-center gap-2">
+                    <FileText className="w-4 h-4 text-emerald-500" />
+                    During the Notice Period
+                </h4>
+                <p className="text-sm text-slate-600 leading-relaxed">
+                    Employees are expected to complete all assigned responsibilities, hand over ongoing work, and fulfill all exit formalities during the notice period to ensure a smooth transition.
+                </p>
+            </div>
+
+            {/* 3. Consequences of not serving notice */}
+            <div className="bg-amber-50/50 border border-amber-200/60 rounded-2xl p-5 space-y-3">
+                <h4 className="font-bold text-amber-800 text-sm flex items-center gap-2">
+                    <AlertTriangle className="w-4 h-4 text-amber-600" />
+                    Failure to Serve the Notice Period
+                </h4>
+                <p className="text-sm text-amber-900/80 leading-relaxed">
+                    Failure to serve the mandatory notice period without prior written approval from the company will be considered a <strong>breach of the company's exit process</strong>. In such cases, the employee may <strong>not be eligible to receive exit documentation</strong>, including the:
+                </p>
+                <ul className="list-disc list-inside text-sm text-amber-900/80 space-y-1.5 pl-1">
+                    <li><strong>Experience Letter</strong></li>
+                    <li><strong>Relieving Letter</strong></li>
+                    <li>Other applicable exit documents</li>
+                </ul>
+                <p className="text-xs text-amber-800/70 italic pt-1">
+                    Subject to applicable laws and the terms of employment.
+                </p>
+            </div>
+        </div>
+    );
 
     const renderContent = () => {
         switch (activeTab) {
@@ -275,6 +326,11 @@ const CompanyInfoPage = () => {
                                 </p>
                             </div>
                         </div>
+
+                        {/* 5. Notice Period & Exit Documentation */}
+                        <div className="border-t border-slate-100 pt-6">
+                            {renderExitPolicy()}
+                        </div>
                     </div>
                 );
             case 'office':
@@ -361,6 +417,12 @@ const CompanyInfoPage = () => {
                                 <p className="text-sm text-slate-400 italic">Company perks not configured yet.</p>
                             )}
                         </div>
+                    </div>
+                );
+            case 'exit':
+                return (
+                    <div className="animate-in fade-in duration-300">
+                        {renderExitPolicy()}
                     </div>
                 );
             default:
