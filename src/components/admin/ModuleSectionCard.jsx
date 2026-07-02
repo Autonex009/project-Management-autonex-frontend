@@ -1,5 +1,6 @@
 import React, { useState } from 'react';
 import { GripVertical, Trash2, Video, FileText, CheckCircle2, Circle, Plus, Upload } from 'lucide-react';
+import Button from '../ui/Button';
 import { onboardingApi } from '../../services/api';
 import Dropdown from '../ui/Dropdown';
 
@@ -130,7 +131,7 @@ export default function ModuleSectionCard({ index, section, onChange, onRemove }
 
         <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
           <div>
-            <label className="block text-sm font-medium text-slate-700 mb-1 flex items-center gap-1"><Video className="h-4 w-4 text-slate-400"/> Video URL (Google Drive)</label>
+            <label className="block text-sm font-medium text-slate-700 mb-1 tems-center gap-1"><Video className="h-4 w-4 text-slate-400"/> Video URL (Google Drive)</label>
             <input type="text" value={section.videoUrl} onChange={e => onChange({ ...section, videoUrl: e.target.value, ...(e.target.value.trim() ? {} : { videoDuration: '' }) })}
               className="w-full px-3 py-2 border border-slate-300 rounded-md text-sm focus:ring-2 focus:border-indigo-500 focus:outline-none placeholder-slate-400"
               placeholder="https://drive.google.com/file/d/.../view" />
@@ -165,7 +166,7 @@ export default function ModuleSectionCard({ index, section, onChange, onRemove }
 
         {/* Document Section — Real Inputs */}
         <div>
-          <label className="block text-sm font-medium text-slate-700 mb-1 flex items-center gap-1"><FileText className="h-4 w-4 text-slate-400"/> Attached Document</label>
+          <label className="block text-sm font-medium text-slate-700 mb-1 items-center gap-1"><FileText className="h-4 w-4 text-slate-400"/> Attached Document</label>
           {section.document ? (
             <div className="flex items-center justify-between p-3 border border-slate-200 rounded-lg bg-slate-50">
               <div className="flex flex-col">
@@ -187,8 +188,8 @@ export default function ModuleSectionCard({ index, section, onChange, onRemove }
                   value={docType}
                   onChange={(value) => setDocType(value)}
                 />
-                <button type="button" onClick={handleAddDocument} className="px-3 py-1.5 text-sm font-medium bg-indigo-600 text-white rounded-md hover:bg-indigo-700">Add</button>
-                <button type="button" onClick={() => setShowDocForm(false)} className="px-3 py-1.5 text-sm font-medium text-slate-500 hover:text-slate-700">Cancel</button>
+                <Button type="button" size="sm" onClick={handleAddDocument}>Add</Button>
+                <Button type="button" size="sm" variant="cancel" onClick={() => setShowDocForm(false)}>Cancel</Button>
               </div>
             </div>
           ) : (

@@ -1,5 +1,6 @@
 import React, { useState, useEffect } from 'react';
 import { Send, Calendar, Building2, ShieldCheck, Sparkles, MapPin, Wifi, Copy, Check, Globe, Cpu, Bot, Layers } from 'lucide-react';
+import Spinner from '../../components/ui/LoadingSpinner';
 import { wifiNetworksApi, companySettingsApi } from '../../services/api';
 import toast from 'react-hot-toast';
 
@@ -307,8 +308,7 @@ const CompanyInfoPage = () => {
                             </h3>
                             {wifiLoading ? (
                                 <div className="flex items-center gap-2 text-sm text-slate-400">
-                                    <div className="w-4 h-4 border-2 border-blue-300 border-t-transparent rounded-full animate-spin" />
-                                    Loading WiFi details...
+                                    <Spinner size="sm" color="slate" text="Loading WiFi details..." />
                                 </div>
                             ) : wifiNetworks.length > 0 ? (
                                 <div className="space-y-4">
@@ -325,13 +325,10 @@ const CompanyInfoPage = () => {
                                                         <span className="text-sm font-mono text-slate-800 bg-slate-50 px-2.5 py-1 rounded border border-slate-200">
                                                             {network.password}
                                                         </span>
-                                                        <button
-                                                            onClick={() => handleCopyPassword(network)}
-                                                            className="flex items-center gap-1.5 px-3 py-1.5 text-xs font-semibold rounded-lg bg-blue-50 text-blue-600 hover:bg-blue-100 transition-colors cursor-pointer"
-                                                        >
+                                                        <Button variant="blue" size="sm" onClick={() => handleCopyPassword(network)}>
                                                             {copiedId === network.id ? <Check className="w-3.5 h-3.5" /> : <Copy className="w-3.5 h-3.5" />}
                                                             {copiedId === network.id ? 'Copied!' : 'Copy'}
-                                                        </button>
+                                                        </Button>
                                                     </div>
                                                 ) : (
                                                     <span className="text-sm text-slate-500 italic">Open Network (No password)</span>

@@ -1,6 +1,9 @@
 import { useState } from 'react';
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import { leaveApi, allocationApi, employeeApi, subProjectApi, wfhApi, parentProjectApi } from '../../services/api';
+import Spinner from '../../components/ui/LoadingSpinner';
+import Button from '../../components/ui/Button';
+import Table from '../../components/ui/Table';
 import { Calendar, CheckCircle, XCircle, Clock, AlertTriangle, Home, BarChart2 } from 'lucide-react';
 import { format, parseISO } from 'date-fns';
 import toast from 'react-hot-toast';
@@ -8,6 +11,7 @@ import { getPmEmployeeId, getPmSubProjects } from '../../utils/pmScope';
 import { getLeaveTypeLabel } from '../../utils/leaveTypes';
 import LeaveCalendar from '../../components/LeaveCalendar';
 import EmployeeKPIPanel from '../../components/EmployeeKPIPanel';
+import Modal from '../../components/ui/Modal';
 
 const TABS = ['Leave Requests', 'Calendar', 'WFH Requests', 'Employee KPI'];
 
@@ -30,7 +34,7 @@ const PMLeavesPage = () => {
     const { data: employees = [] } = useQuery({ queryKey: ['employees'], queryFn: employeeApi.getAll });
     const { data: projects = [] } = useQuery({ queryKey: ['sub-projects'], queryFn: subProjectApi.getAll });
     const { data: parentProjects = [] } = useQuery({ queryKey: ['parent-projects'], queryFn: parentProjectApi.getAll });
-    const { data: wfhRequests = [] } = useQuery({ queryKey: ['wfh'], queryFn: () => wfhApi.getAll() });
+    const { data: wfhRequests = [], isLoading: wfhLoading } = useQuery({ queryKey: ['wfh'], queryFn: () => wfhApi.getAll() });
 
     const scopedProjects = getPmSubProjects(projects, parentProjects, employeeId, allocations);
     const myProjectIds = new Set(scopedProjects.map(p => p.id));
@@ -96,86 +100,86 @@ const PMLeavesPage = () => {
 
             {/* ── Leave Requests ── */}
             {activeTab === 'Leave Requests' && (
-                isLoading ? (
-                    <div className="text-center py-12 text-slate-400 animate-pulse">Loading...</div>
-                ) : teamLeaves.length === 0 ? (
-                    <div className="bg-white rounded-2xl border border-slate-200 p-12 text-center">
-                        <Calendar className="w-12 h-12 text-slate-300 mx-auto mb-4" />
-                        <p className="text-slate-500 font-medium">No leave requests</p>
-                    </div>
-                ) : (
-                    <div className="bg-white rounded-2xl border border-slate-200/60 shadow-sm overflow-hidden">
-                        <div className="overflow-x-auto">
-                            <table className="w-full">
-                                <thead>
-                                    <tr className="border-b border-slate-100">
-                                        <th className="px-5 py-3 text-left text-xs font-semibold text-slate-500 uppercase">Employee</th>
-                                        <th className="px-5 py-3 text-left text-xs font-semibold text-slate-500 uppercase">Type</th>
-                                        <th className="px-5 py-3 text-center text-xs font-semibold text-slate-500 uppercase">Dates</th>
-                                        <th className="px-5 py-3 text-center text-xs font-semibold text-slate-500 uppercase">Status</th>
-                                        <th className="px-5 py-3 text-right text-xs font-semibold text-slate-500 uppercase">Actions</th>
-                                    </tr>
-                                </thead>
-                                <tbody className="divide-y divide-slate-50">
-                                    {teamLeaves.map(leave => {
-                                        const emp = employees.find(e => e.id === leave.employee_id);
-                                        const status = leave.status || 'pending';
-                                        return (
-                                            <tr key={leave.leave_id} className="hover:bg-slate-50/50 transition-colors">
-                                                <td className="px-5 py-3.5">
-                                                    <div className="flex items-center gap-2">
-                                                        <div>
-                                                            <p className="font-medium text-slate-800">{emp?.name || `#${leave.employee_id}`}</p>
-                                                            <p className="text-xs text-slate-400">{emp?.designation || ''}</p>
-                                                        </div>
-                                                        {leave.flagged && (
-                                                            <span className="inline-flex items-center gap-1 px-2 py-0.5 rounded-full text-[10px] font-semibold bg-orange-100 text-orange-700 border border-orange-200">
-                                                                <AlertTriangle className="w-2.5 h-2.5"/>Over limit
-                                                            </span>
-                                                        )}
-                                                    </div>
-                                                    {leave.approval_remark && (
-                                                        <p className="text-xs text-slate-400 mt-0.5">Remark: {leave.approval_remark}</p>
-                                                    )}
-                                                </td>
-                                                <td className="px-5 py-3.5 text-sm text-slate-600">{getLeaveTypeLabel(leave.leave_type)}</td>
-                                                <td className="px-5 py-3.5 text-center text-sm text-slate-600 font-mono">
-                                                    {leave.is_half_day ? (
-                                                        <span>{format(parseISO(leave.start_date), 'MMM dd, yyyy')} (0.5d - {leave.half_day_slot === 'first_half' ? 'First Half' : 'Second Half'})</span>
-                                                    ) : (
-                                                        <span>{format(parseISO(leave.start_date), 'MMM dd')} — {format(parseISO(leave.end_date), 'MMM dd')}</span>
-                                                    )}
-                                                </td>
-                                                <td className="px-5 py-3.5 text-center">
-                                                    <span className={`inline-flex items-center gap-1 px-2.5 py-0.5 rounded-full text-xs font-medium border ${STATUS_STYLES[status]}`}>
-                                                        {status === 'pending' && <Clock className="w-3 h-3"/>}
-                                                        {status === 'approved' && <CheckCircle className="w-3 h-3"/>}
-                                                        {status === 'rejected' && <XCircle className="w-3 h-3"/>}
-                                                        {status}
-                                                    </span>
-                                                </td>
-                                                <td className="px-5 py-3.5 text-right">
-                                                    {status === 'pending' ? (
-                                                        <div className="flex items-center justify-end gap-2">
-                                                            <button onClick={() => handleApprove(leave)}
-                                                                className="px-3 py-1.5 text-xs font-medium bg-emerald-600 text-white rounded-lg hover:bg-emerald-700 transition-colors">
-                                                                Approve
-                                                            </button>
-                                                            <button onClick={() => rejectMutation.mutate(leave.leave_id)}
-                                                                className="px-3 py-1.5 text-xs font-medium bg-red-500 text-white rounded-lg hover:bg-red-600 transition-colors">
-                                                                Reject
-                                                            </button>
-                                                        </div>
-                                                    ) : <span className="text-xs text-slate-400">—</span>}
-                                                </td>
-                                            </tr>
-                                        );
-                                    })}
-                                </tbody>
-                            </table>
-                        </div>
-                    </div>
-                )
+                <Table
+                    loading={isLoading}
+                    columns={[
+                        {
+                            key: 'employee_id',
+                            label: 'Employee',
+                            render: (_, leave) => {
+                                const emp = employees.find(e => e.id === leave.employee_id);
+                                return (
+                                    <div>
+                                        <div className="flex items-center gap-2">
+                                            <div>
+                                                <p className="font-medium text-slate-800">{emp?.name || `#${leave.employee_id}`}</p>
+                                                <p className="text-xs text-slate-400">{emp?.designation || ''}</p>
+                                            </div>
+                                            {leave.flagged && (
+                                                <span className="inline-flex items-center gap-1 px-2 py-0.5 rounded-full text-[10px] font-semibold bg-orange-100 text-orange-700 border border-orange-200">
+                                                    <AlertTriangle className="w-2.5 h-2.5"/>Over limit
+                                                </span>
+                                            )}
+                                        </div>
+                                        {leave.approval_remark && (
+                                            <p className="text-xs text-slate-400 mt-0.5">Remark: {leave.approval_remark}</p>
+                                        )}
+                                    </div>
+                                );
+                            },
+                        },
+                        {
+                            key: 'leave_type',
+                            label: 'Type',
+                            render: (value) => <span className="text-sm text-slate-600">{getLeaveTypeLabel(value)}</span>,
+                        },
+                        {
+                            key: 'start_date',
+                            label: 'Dates',
+                            align: 'center',
+                            render: (_, leave) => (
+                                <span className="text-sm text-slate-600 font-mono">
+                                    {leave.is_half_day
+                                        ? `${format(parseISO(leave.start_date), 'MMM dd, yyyy')} (0.5d - ${leave.half_day_slot === 'first_half' ? 'First Half' : 'Second Half'})`
+                                        : `${format(parseISO(leave.start_date), 'MMM dd')} — ${format(parseISO(leave.end_date), 'MMM dd')}`
+                                    }
+                                </span>
+                            ),
+                        },
+                        {
+                            key: 'status',
+                            label: 'Status',
+                            align: 'center',
+                            render: (value) => {
+                                const s = value || 'pending';
+                                return (
+                                    <span className={`inline-flex items-center gap-1 px-2.5 py-0.5 rounded-full text-xs font-medium border ${STATUS_STYLES[s]}`}>
+                                        {s === 'pending' && <Clock className="w-3 h-3"/>}
+                                        {s === 'approved' && <CheckCircle className="w-3 h-3"/>}
+                                        {s === 'rejected' && <XCircle className="w-3 h-3"/>}
+                                        {s}
+                                    </span>
+                                );
+                            },
+                        },
+                        {
+                            key: '_actions',
+                            label: 'Actions',
+                            align: 'right',
+                            render: (_, leave) => {
+                                const status = leave.status || 'pending';
+                                return status === 'pending' ? (
+                                    <div className="flex items-center justify-end gap-2">
+                                                        <Button variant="success" size="sm" onClick={() => handleApprove(leave)}>Approve</Button>
+                                        <Button variant="danger" size="sm" onClick={() => rejectMutation.mutate(leave.leave_id)}>Reject</Button>
+                                    </div>
+                                ) : <span className="text-xs text-slate-400">—</span>;
+                            },
+                        },
+                    ]}
+                    data={teamLeaves}
+                    emptyState={{ title: 'No leave requests', description: 'No leave requests from your team' }}
+                />
             )}
 
             {/* ── Calendar ── */}
@@ -185,53 +189,55 @@ const PMLeavesPage = () => {
 
             {/* ── WFH Requests ── */}
             {activeTab === 'WFH Requests' && (
-                teamWfh.length === 0 ? (
-                    <div className="bg-white rounded-2xl border border-slate-200 p-12 text-center">
-                        <Home className="w-12 h-12 text-slate-300 mx-auto mb-4" />
-                        <p className="text-slate-500 font-medium">No WFH requests from your team</p>
-                    </div>
-                ) : (
-                    <div className="bg-white rounded-2xl border border-slate-200/60 shadow-sm overflow-hidden">
-                        <div className="overflow-x-auto">
-                            <table className="w-full">
-                                <thead>
-                                    <tr className="border-b border-slate-100">
-                                        {['Employee', 'Date', 'Reason', 'Status', 'Actions'].map(h => (
-                                            <th key={h} className={`px-5 py-3 text-xs font-semibold text-slate-500 uppercase ${h === 'Status' ? 'text-center' : h === 'Actions' ? 'text-right' : 'text-left'}`}>{h}</th>
-                                        ))}
-                                    </tr>
-                                </thead>
-                                <tbody className="divide-y divide-slate-50">
-                                    {teamWfh.map(w => (
-                                        <tr key={w.id} className="hover:bg-slate-50/50 transition-colors">
-                                            <td className="px-5 py-3.5 font-medium text-slate-800">{w.employee_name}</td>
-                                            <td className="px-5 py-3.5 text-sm text-slate-600">{format(new Date(w.wfh_date + 'T00:00:00'), 'MMM d, yyyy')}</td>
-                                            <td className="px-5 py-3.5 text-sm text-slate-500">{w.reason || '—'}</td>
-                                            <td className="px-5 py-3.5 text-center">
-                                                <span className={`inline-flex items-center gap-1 px-2.5 py-0.5 rounded-full text-xs font-medium border ${STATUS_STYLES[w.status] || STATUS_STYLES.pending}`}>
-                                                    {w.status === 'pending' && <Clock className="w-3 h-3"/>}
-                                                    {w.status === 'approved' && <CheckCircle className="w-3 h-3"/>}
-                                                    {w.status === 'rejected' && <XCircle className="w-3 h-3"/>}
-                                                    {w.status}
-                                                </span>
-                                            </td>
-                                            <td className="px-5 py-3.5 text-right">
-                                                {w.status === 'pending' ? (
-                                                    <div className="flex items-center justify-end gap-2">
-                                                        <button onClick={() => wfhApproveMutation.mutate(w.id)}
-                                                            className="px-3 py-1.5 text-xs font-medium bg-emerald-600 text-white rounded-lg hover:bg-emerald-700 transition-colors">Approve</button>
-                                                        <button onClick={() => wfhRejectMutation.mutate(w.id)}
-                                                            className="px-3 py-1.5 text-xs font-medium bg-red-500 text-white rounded-lg hover:bg-red-600 transition-colors">Reject</button>
-                                                    </div>
-                                                ) : <span className="text-xs text-slate-400">—</span>}
-                                            </td>
-                                        </tr>
-                                    ))}
-                                </tbody>
-                            </table>
-                        </div>
-                    </div>
-                )
+                <Table
+                    loading={wfhLoading}
+                    columns={[
+                        {
+                            key: 'employee_name',
+                            label: 'Employee',
+                            render: (value) => <span className="font-medium text-slate-800">{value}</span>,
+                        },
+                        {
+                            key: 'wfh_date',
+                            label: 'Date',
+                            render: (value) => <span className="text-sm text-slate-600">{format(new Date(value + 'T00:00:00'), 'MMM d, yyyy')}</span>,
+                        },
+                        {
+                            key: 'reason',
+                            label: 'Reason',
+                            render: (value) => <span className="text-sm text-slate-500">{value || '—'}</span>,
+                        },
+                        {
+                            key: 'status',
+                            label: 'Status',
+                            align: 'center',
+                            render: (value) => {
+                                const s = value || 'pending';
+                                return (
+                                    <span className={`inline-flex items-center gap-1 px-2.5 py-0.5 rounded-full text-xs font-medium border ${STATUS_STYLES[s] || STATUS_STYLES.pending}`}>
+                                        {s === 'pending' && <Clock className="w-3 h-3"/>}
+                                        {s === 'approved' && <CheckCircle className="w-3 h-3"/>}
+                                        {s === 'rejected' && <XCircle className="w-3 h-3"/>}
+                                        {s}
+                                    </span>
+                                );
+                            },
+                        },
+                        {
+                            key: '_wfh_actions',
+                            label: 'Actions',
+                            align: 'right',
+                            render: (_, w) => w.status === 'pending' ? (
+                                <div className="flex items-center justify-end gap-2">
+                                    <Button variant="success" size="sm" onClick={() => wfhApproveMutation.mutate(w.id)}>Approve</Button>
+                                    <Button variant="danger" size="sm" onClick={() => wfhRejectMutation.mutate(w.id)}>Reject</Button>
+                                </div>
+                            ) : <span className="text-xs text-slate-400">—</span>,
+                        },
+                    ]}
+                    data={teamWfh}
+                    emptyState={{ title: 'No WFH requests from your team', description: 'WFH requests will appear here' }}
+                />
             )}
 
             {/* ── Employee KPI ── */}
@@ -245,8 +251,8 @@ const PMLeavesPage = () => {
 
             {/* ── Flagged leave remark modal ── */}
             {remarkModal && (
-                <div className="fixed inset-0 bg-black/50 flex items-center justify-center z-50 p-4">
-                    <div className="bg-white rounded-2xl shadow-xl w-full max-w-md p-6">
+                <Modal isOpen onClose={() => { setRemarkModal(null); setRemark(''); }} size="md">
+                    <Modal.Body>
                         <div className="flex items-start gap-3 mb-4">
                             <div className="p-2 bg-orange-100 rounded-lg shrink-0"><AlertTriangle className="w-5 h-5 text-orange-600"/></div>
                             <div>
@@ -258,17 +264,14 @@ const PMLeavesPage = () => {
                             placeholder="Enter justification for approving this additional leave..."
                             className="w-full rounded-xl border border-slate-200 p-3 text-sm resize-none focus:outline-none focus:ring-2 focus:ring-indigo-500"
                             rows={4} />
-                        <div className="flex justify-end gap-3 mt-4">
-                            <button onClick={() => { setRemarkModal(null); setRemark(''); }}
-                                className="px-4 py-2 text-sm font-medium text-slate-600 hover:bg-slate-100 rounded-lg transition-colors">Cancel</button>
-                            <button onClick={() => approveMutation.mutate({ id: remarkModal.leaveId, remark })}
-                                disabled={!remark.trim() || approveMutation.isPending}
-                                className="px-4 py-2 text-sm font-medium bg-emerald-600 text-white rounded-lg hover:bg-emerald-700 transition-colors disabled:opacity-50">
-                                {approveMutation.isPending ? 'Approving...' : 'Approve with Remark'}
-                            </button>
-                        </div>
-                    </div>
-                </div>
+                    </Modal.Body>
+                    <Modal.Footer>
+                        <Button variant="cancel" onClick={() => { setRemarkModal(null); setRemark(''); }}>Cancel</Button>
+                        <Button variant="success" onClick={() => approveMutation.mutate({ id: remarkModal.leaveId, remark })} disabled={!remark.trim() || approveMutation.isPending} isLoading={approveMutation.isPending}>
+                            {!approveMutation.isPending && 'Approve with Remark'}
+                        </Button>
+                    </Modal.Footer>
+                </Modal>
             )}
         </div>
     );
