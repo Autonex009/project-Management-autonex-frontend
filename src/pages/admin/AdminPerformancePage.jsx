@@ -1,4 +1,4 @@
-import React, { useMemo, useState } from 'react';
+import React, { useMemo, useState, useEffect } from 'react';
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import { employeeApi, perfReviewApi } from '../../services/api';
 import { ChevronDown, ChevronUp, ClipboardList, Plus, Search, X } from 'lucide-react';
@@ -38,6 +38,7 @@ const EmployeePanel = ({ employee, reviews, reviewerId }) => {
     });
 
     const sorted = [...reviews].sort((a, b) => (b.period || '').localeCompare(a.period || ''));
+    const latestReview = sorted.length > 0 ? sorted[0] : null;
 
     return (
         <article className="overflow-hidden rounded-3xl border border-slate-200/70 bg-white shadow-sm">
@@ -58,8 +59,16 @@ const EmployeePanel = ({ employee, reviews, reviewerId }) => {
                     </div>
                 </div>
                 <div className="flex items-center gap-3 shrink-0">
-                    <span className="rounded-full bg-blue-50 px-3 py-1 text-xs font-medium text-blue-700">
-                        {reviews.length} {reviews.length === 1 ? 'review' : 'reviews'}
+                    <span
+                        className={`rounded-full px-3 py-1 text-xs font-semibold ${
+                            latestReview
+                                ? 'bg-amber-50 text-amber-700'
+                                : 'bg-slate-100 text-slate-500'
+                        }`}
+                    >
+                        {latestReview
+                            ? `★ ${Number(latestReview.average).toFixed(2)} / 5`
+                            : 'No Reviews'}
                     </span>
                     {expanded ? <ChevronUp className="h-4 w-4 text-slate-400" /> : <ChevronDown className="h-4 w-4 text-slate-400" />}
                 </div>
@@ -141,6 +150,9 @@ const AdminPerformancePage = () => {
 
     const [search, setSearch] = useState('');
     const [filter, setFilter] = useState('all'); // all | pm | employee
+    const [ratingFilter, setRatingFilter] = useState('all');
+    const [currentPage, setCurrentPage] = useState(1);
+    const [rowsPerPage, setRowsPerPage] = useState(20);
 
     const reviewsByEmployee = (employeeId) => allReviews.filter((r) => r.employee_id === employeeId);
 
@@ -154,12 +166,72 @@ const AdminPerformancePage = () => {
                 return true;
             })
             .filter((e) => !term || (e.name || '').toLowerCase().includes(term))
+            .filter((employee) => {
+                if (ratingFilter === 'all') return true;
+
+                const reviews = reviewsByEmployee(employee.id);
+
+                if (reviews.length === 0) return false;
+
+                const latest = [...reviews].sort(
+                    (a, b) => (b.period || '').localeCompare(a.period || '')
+                )[0];
+
+                const avg = Number(latest.average);
+
+                switch (ratingFilter) {
+                    case '5':
+                        return avg >= 4.5;
+                    case '4':
+                        return avg >= 3.5 && avg < 4.5;
+                    case '3':
+                        return avg >= 2.5 && avg < 3.5;
+                    case '2':
+                        return avg >= 1.5 && avg < 2.5;
+                    case '1':
+                        return avg < 1.5;
+                    default:
+                        return true;
+                }
+            })
             .sort((a, b) => a.name.localeCompare(b.name));
-    }, [employees, search, filter]);
+    }, [employees, search, filter, ratingFilter, allReviews]);
+
+    useEffect(() => {
+        setCurrentPage(1);
+    }, [search, filter, ratingFilter]);
+    
+    const totalEmployees = filtered.length;
+
+    const totalPages = Math.ceil(totalEmployees / rowsPerPage);
+
+    const startIndex = (currentPage - 1) * rowsPerPage;
+
+    const endIndex = Math.min(
+        startIndex + rowsPerPage,
+        totalEmployees
+    );
+
+    const paginatedEmployees = filtered.slice(
+        startIndex,
+        endIndex
+    );
 
     const pmCount = employees.filter((e) => isPmDesignation(e.designation) && e.status !== 'archived').length;
     const isLoading = empLoading || reviewsLoading;
 
+    const maxVisiblePages = 5;
+
+    let startPage = Math.max(
+        1,
+        Math.min(currentPage - 2, totalPages - maxVisiblePages + 1)
+    );
+
+    let endPage = Math.min(
+        totalPages,
+        startPage + maxVisiblePages - 1
+    );
+    
     return (
         <div className="space-y-8">
             <section className="overflow-hidden rounded-[28px] border border-indigo-100 bg-[linear-gradient(135deg,rgba(79,70,229,0.12),rgba(255,255,255,0.94)_42%,rgba(238,242,255,1))] p-6 shadow-sm">
@@ -210,10 +282,22 @@ const AdminPerformancePage = () => {
                             <option value="pm">Program Managers</option>
                             <option value="employee">Employees</option>
                         </select>
-                        {(search || filter !== 'all') && (
+                        <select
+                            value={ratingFilter}
+                            onChange={(e) => setRatingFilter(e.target.value)}
+                            className="rounded-xl border border-slate-200 bg-slate-50 px-3 py-2.5 text-sm text-slate-700 outline-none transition focus:border-indigo-300 focus:bg-white focus:ring-2 focus:ring-indigo-100"
+                        >
+                            <option value="all">All Ratings</option>
+                            <option value="5">Outstanding (5)</option>
+                            <option value="4">Exceeds Expectations (4)</option>
+                            <option value="3">Meets Expectations (3)</option>
+                            <option value="2">Needs Improvement (2)</option>
+                            <option value="1">Poor (1)</option>
+                        </select>
+                        {(search || filter !== 'all'|| ratingFilter !== 'all') && (
                             <button
                                 type="button"
-                                onClick={() => { setSearch(''); setFilter('all'); }}
+                                onClick={() => { setSearch(''); setFilter('all'); setRatingFilter('all');}}
                                 className="inline-flex items-center justify-center gap-1.5 rounded-xl border border-slate-200 bg-white px-3 py-2.5 text-sm font-medium text-slate-600 transition hover:bg-slate-50"
                             >
                                 <X className="h-4 w-4" /> Clear
@@ -236,7 +320,7 @@ const AdminPerformancePage = () => {
                 </div>
             ) : (
                 <div className="space-y-4">
-                    {filtered.map((emp) => (
+                    {paginatedEmployees.map((emp) => (
                         <EmployeePanel
                             key={emp.id}
                             employee={emp}
@@ -244,8 +328,80 @@ const AdminPerformancePage = () => {
                             reviewerId={user.id}
                         />
                     ))}
-                </div>
+                </div> 
             )}
+            <div className="mt-8 flex flex-col gap-4 border-t border-slate-200 pt-5 lg:flex-row lg:items-center lg:justify-between">
+
+                <div className="flex items-center gap-2 text-sm text-slate-500">
+                    <span>Showing</span>
+
+                    <span className="font-medium">
+                        {startIndex + 1}
+                    </span>
+
+                    <span>–</span>
+
+                    <select
+                        value={rowsPerPage}
+                        onChange={(e) => {
+                            setRowsPerPage(Number(e.target.value));
+                            setCurrentPage(1);
+                        }}
+                        className="rounded-lg border border-slate-200 bg-white px-2 py-1"
+                    >
+                        <option value={10}>10</option>
+                        <option value={20}>20</option>
+                        <option value={50}>50</option>
+                        <option value={100}>100</option>
+                    </select>
+
+                    <span>of</span>
+
+                    <span className="font-medium">
+                        {totalEmployees}
+                    </span>
+
+                    <span>employees</span>
+                </div>
+
+                <div className="flex items-center gap-2">
+
+                    <button
+                        disabled={currentPage === 1}
+                        onClick={() => setCurrentPage((p) => p - 1)}
+                        className="rounded-lg border px-3 py-1.5 disabled:opacity-40"
+                    >
+                        Prev
+                    </button>
+
+                    {Array.from(
+                        { length: endPage - startPage + 1 },
+                        (_, i) => startPage + i
+                    ).map((page) => (
+                        <button
+                            key={page}
+                            onClick={() => setCurrentPage(page)}
+                            className={`h-9 w-9 rounded-lg ${
+                                currentPage === page
+                                    ? 'bg-indigo-600 text-white'
+                                    : 'border'
+                            }`}
+                        >
+                            {page}
+                        </button>
+                    ))}
+
+                    <button
+                        disabled={currentPage === totalPages}
+                        onClick={() => setCurrentPage((p) => p + 1)}
+                        className="rounded-lg border px-3 py-1.5 disabled:opacity-40"
+                    >
+                        Next
+                    </button>
+
+                </div>
+
+            </div>
         </div>
     );
 };

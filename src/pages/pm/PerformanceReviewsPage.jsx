@@ -36,7 +36,8 @@ const EmployeePanel = ({ employee, reviews, reviewerId }) => {
     });
 
     const sorted = [...reviews].sort((a, b) => (b.period || '').localeCompare(a.period || ''));
-
+    const latestReview = sorted.length > 0 ? sorted[0] : null;
+    
     return (
         <article className="overflow-hidden rounded-3xl border border-slate-200/70 bg-white shadow-sm">
             <button
@@ -53,8 +54,16 @@ const EmployeePanel = ({ employee, reviews, reviewerId }) => {
                     </div>
                 </div>
                 <div className="flex items-center gap-3 shrink-0">
-                    <span className="rounded-full bg-blue-50 px-3 py-1 text-xs font-medium text-blue-700">
-                        {reviews.length} {reviews.length === 1 ? 'review' : 'reviews'}
+                    <span
+                        className={`rounded-full px-3 py-1 text-xs font-semibold ${
+                            latestReview
+                                ? 'bg-amber-50 text-amber-700'
+                                : 'bg-slate-100 text-slate-500'
+                        }`}
+                    >
+                        {latestReview
+                            ? `★ ${Number(latestReview.average).toFixed(2)} / 5`
+                            : 'No Reviews'}
                     </span>
                     {expanded ? <ChevronUp className="h-4 w-4 text-slate-400" /> : <ChevronDown className="h-4 w-4 text-slate-400" />}
                 </div>
