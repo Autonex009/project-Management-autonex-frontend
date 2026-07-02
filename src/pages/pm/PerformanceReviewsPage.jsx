@@ -6,6 +6,7 @@ import { ChevronDown, ChevronUp, ClipboardList, Plus } from 'lucide-react';
 import toast from 'react-hot-toast';
 import PerfReviewForm from '../../components/perf/PerfReviewForm';
 import PerfReviewCard from '../../components/perf/PerfReviewCard';
+import PerfRatingPopover from '../../components/perf/PerfRatingPopover';
 import ConfirmDialog from '../../components/ui/ConfirmDialog';
 
 const EmployeePanel = ({ employee, reviews, reviewerId }) => {
@@ -54,17 +55,15 @@ const EmployeePanel = ({ employee, reviews, reviewerId }) => {
                     </div>
                 </div>
                 <div className="flex items-center gap-3 shrink-0">
-                    <span
-                        className={`rounded-full px-3 py-1 text-xs font-semibold ${
-                            latestReview
-                                ? 'bg-amber-50 text-amber-700'
-                                : 'bg-slate-100 text-slate-500'
-                        }`}
-                    >
-                        {latestReview
-                            ? `★ ${Number(latestReview.average).toFixed(2)} / 5`
-                            : 'No Reviews'}
-                    </span>
+                    {latestReview ? (
+                        <PerfRatingPopover review={latestReview}>
+                            <span className="cursor-default rounded-full bg-amber-50 px-3 py-1 text-xs font-semibold text-amber-700 transition-colors hover:bg-amber-100">
+                                ★ {Number(latestReview.average).toFixed(2)} / 5
+                            </span>
+                        </PerfRatingPopover>
+                    ) : (
+                        <span className="rounded-full bg-slate-100 px-3 py-1 text-xs font-semibold text-slate-500">No Reviews</span>
+                    )}
                     {expanded ? <ChevronUp className="h-4 w-4 text-slate-400" /> : <ChevronDown className="h-4 w-4 text-slate-400" />}
                 </div>
             </button>
