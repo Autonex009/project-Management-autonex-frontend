@@ -2,11 +2,13 @@ import React, { useRef, useState } from 'react';
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import Button from '../../components/ui/Button';
 import { guidelineApi, projectApi, subProjectApi } from '../../services/api';
-import { FileText, Plus, Trash2, Edit3, X, Save, Download, FolderOpen, UploadCloud } from 'lucide-react';
+import { FileText, Plus, Trash2, Edit3, Save, Download, FolderOpen, UploadCloud } from 'lucide-react';
 import toast from 'react-hot-toast';
 import { getPmEmployeeId, getPmProjects, getPmSubProjects } from '../../utils/pmScope';
 import SearchBar from '../../components/ui/SearchBar';
 import Dropdown from '../../components/ui/Dropdown';
+import Modal from '../../components/ui/Modal';
+import ConfirmDialog from '../../components/ui/ConfirmDialog';
 
 const GuidelinesPage = () => {
     const queryClient = useQueryClient();
@@ -24,6 +26,7 @@ const GuidelinesPage = () => {
     const [isDragActive, setIsDragActive] = useState(false);
     const fileInputRef = useRef(null);
     const [searchQuery, setSearchQuery] = useState('');
+    const [deleteTarget, setDeleteTarget] = useState(null);
 
     // Fetch guidelines
     const params = {};
@@ -84,6 +87,7 @@ const GuidelinesPage = () => {
         onSuccess: () => {
             queryClient.invalidateQueries({ queryKey: ['guidelines'] });
             toast.success('Guideline deleted');
+            setDeleteTarget(null);
         },
         onError: () => toast.error('Failed to delete'),
     });
@@ -174,14 +178,13 @@ const GuidelinesPage = () => {
                 />
             </div>
 
-            {/* Create/Edit Form */}
-            {showForm && canEdit && (
-                <div className="bg-white rounded-2xl border border-slate-200 shadow-sm p-6">
-                    <div className="flex items-center justify-between mb-4">
-                        <h3 className="font-semibold text-slate-800">{editingId ? 'Edit Guideline' : 'New Guideline'}</h3>
-                        <button onClick={resetForm} className="p-1 text-slate-400 hover:text-slate-600"><X className="w-5 h-5" /></button>
-                    </div>
-                    <form onSubmit={handleSubmit} className="space-y-4">
+            {/* Create/Edit Modal */}
+            <Modal isOpen={showForm && canEdit} onClose={resetForm} size="lg">
+                <Modal.Header onClose={resetForm}>
+                    <h3 className="font-semibold text-slate-800">{editingId ? 'Edit Guideline' : 'New Guideline'}</h3>
+                </Modal.Header>
+                <form onSubmit={handleSubmit} className="flex-1 flex flex-col min-h-0">
+                    <Modal.Body className="space-y-4">
                         <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
                             <div>
                                 <label className="block text-sm font-medium text-slate-700 mb-1">Title</label>
@@ -280,13 +283,13 @@ const GuidelinesPage = () => {
                                 </div>
                             </>
                         )}
-                        <div className="flex justify-end gap-3">
-                            <Button type="button" variant="cancel" onClick={resetForm}>Cancel</Button>
-                            <Button type="submit" variant="blue"><Save className="w-4 h-4" /> {editingId ? 'Update' : 'Upload'}</Button>
-                        </div>
-                    </form>
-                </div>
-            )}
+                    </Modal.Body>
+                    <Modal.Footer>
+                        <Button type="button" variant="cancel" onClick={resetForm}>Cancel</Button>
+                        <Button type="submit" variant="blue"><Save className="w-4 h-4" /> {editingId ? 'Update' : 'Upload'}</Button>
+                    </Modal.Footer>
+                </form>
+            </Modal>
 
             {/* Guidelines List */}
             {isLoading ? (
@@ -328,7 +331,7 @@ const GuidelinesPage = () => {
                                                 <button onClick={() => startEdit(g)} className="p-1.5 text-slate-400 hover:text-blue-600 hover:bg-blue-50 rounded-lg transition-colors">
                                                     <Edit3 className="w-4 h-4" />
                                                 </button>
-                                                <button onClick={() => deleteMutation.mutate(g.id)} className="p-1.5 text-slate-400 hover:text-red-600 hover:bg-red-50 rounded-lg transition-colors">
+                                                <button onClick={() => setDeleteTarget(g)} className="p-1.5 text-slate-400 hover:text-red-600 hover:bg-red-50 rounded-lg transition-colors">
                                                     <Trash2 className="w-4 h-4" />
                                                 </button>
                                             </div>
@@ -359,6 +362,16 @@ const GuidelinesPage = () => {
                     })}
                 </div>
             )}
+
+            <ConfirmDialog
+                isOpen={!!deleteTarget}
+                onClose={() => setDeleteTarget(null)}
+                onConfirm={() => deleteMutation.mutate(deleteTarget.id)}
+                isPending={deleteMutation.isPending}
+                variant="danger"
+                title="Delete Guideline"
+                message={`Are you sure you want to delete "${deleteTarget?.title || 'this guideline'}"? This action cannot be undone.`}
+            />
         </div>
     );
 };
