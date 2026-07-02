@@ -2,6 +2,7 @@ import React, { useState, useEffect } from 'react';
 import { Users, BookOpen, Award, CheckCircle, HelpCircle } from 'lucide-react';
 import { onboardingApi } from '../../services/api';
 import Table from '../../components/ui/Table';
+import Spinner from '../../components/ui/LoadingSpinner';
 
 const PMOnboardingDashboard = ({ embedded = false }) => {
     const [mentees, setMentees] = useState([]);
