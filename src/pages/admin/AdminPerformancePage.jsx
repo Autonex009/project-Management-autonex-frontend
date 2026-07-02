@@ -1,12 +1,13 @@
-import React, { useState } from 'react';
+import React, { useMemo, useState } from 'react';
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
-import { employeeApi, allocationApi, parentProjectApi, subProjectApi, perfReviewApi } from '../../services/api';
-import { getPmEmployeeId, getPmSubProjects } from '../../utils/pmScope';
-import { ChevronDown, ChevronUp, ClipboardList, Plus } from 'lucide-react';
+import { employeeApi, perfReviewApi } from '../../services/api';
+import { ChevronDown, ChevronUp, ClipboardList, Plus, Search, X } from 'lucide-react';
 import toast from 'react-hot-toast';
 import PerfReviewForm from '../../components/perf/PerfReviewForm';
 import PerfReviewCard from '../../components/perf/PerfReviewCard';
 import ConfirmDialog from '../../components/ui/ConfirmDialog';
+
+const isPmDesignation = (d) => (d || '').toLowerCase().includes('program manager') || (d || '').toLowerCase().includes('project manager');
 
 const EmployeePanel = ({ employee, reviews, reviewerId }) => {
     const [expanded, setExpanded] = useState(false);
@@ -14,11 +15,12 @@ const EmployeePanel = ({ employee, reviews, reviewerId }) => {
     const [editing, setEditing] = useState(null);
     const [confirmId, setConfirmId] = useState(null);
     const queryClient = useQueryClient();
+    const isPm = isPmDesignation(employee.designation);
 
     const invalidate = () => queryClient.invalidateQueries({ queryKey: ['perf-reviews'] });
 
     const createMutation = useMutation({
-        mutationFn: (data) => perfReviewApi.create({ ...data, employee_id: employee.id, reviewer_id: reviewerId, reviewer_role: 'pm' }),
+        mutationFn: (data) => perfReviewApi.create({ ...data, employee_id: employee.id, reviewer_id: reviewerId, reviewer_role: 'admin' }),
         onSuccess: () => { invalidate(); setShowForm(false); toast.success('Review saved'); },
         onError: () => toast.error('Failed to save review'),
     });
@@ -44,11 +46,14 @@ const EmployeePanel = ({ employee, reviews, reviewerId }) => {
                 className="flex w-full items-center justify-between gap-4 p-5 text-left transition-colors hover:bg-slate-50/60"
             >
                 <div className="flex items-center gap-4">
-                    <div className="flex h-12 w-12 items-center justify-center rounded-2xl bg-blue-100 text-base font-bold text-blue-700 shrink-0">
+                    <div className={`flex h-12 w-12 items-center justify-center rounded-2xl text-base font-bold shrink-0 ${isPm ? 'bg-indigo-100 text-indigo-700' : 'bg-blue-100 text-blue-700'}`}>
                         {(employee.name || 'U').charAt(0)}
                     </div>
                     <div>
-                        <p className="font-semibold text-slate-900">{employee.name}</p>
+                        <div className="flex items-center gap-2">
+                            <p className="font-semibold text-slate-900">{employee.name}</p>
+                            {isPm && <span className="rounded-full bg-indigo-50 px-2 py-0.5 text-[10px] font-semibold uppercase tracking-wide text-indigo-600">PM</span>}
+                        </div>
                         <p className="text-xs text-slate-400">{employee.designation || 'Team Member'} · {employee.email}</p>
                     </div>
                 </div>
@@ -86,7 +91,7 @@ const EmployeePanel = ({ employee, reviews, reviewerId }) => {
                     )}
 
                     {sorted.length === 0 && !showForm && (
-                        <p className="py-4 text-center text-sm text-slate-400">No reviews yet — add the first one below.</p>
+                        <p className="py-4 text-center text-sm text-slate-400">No reviews yet.</p>
                     )}
                     {sorted.length > 0 && (
                         <div className="space-y-3">
@@ -125,73 +130,117 @@ const EmployeePanel = ({ employee, reviews, reviewerId }) => {
     );
 };
 
-const PerformanceReviewsPage = () => {
+const AdminPerformancePage = () => {
     const user = JSON.parse(localStorage.getItem('user') || '{}');
-    const pmEmployeeId = getPmEmployeeId(user);
 
-    const { data: parentProjects = [] } = useQuery({ queryKey: ['parent-projects'], queryFn: parentProjectApi.getAll });
-    const { data: projects = [] } = useQuery({ queryKey: ['sub-projects'], queryFn: subProjectApi.getAll });
     const { data: employees = [], isLoading: empLoading } = useQuery({ queryKey: ['employees'], queryFn: employeeApi.getAll });
-    const { data: allocations = [] } = useQuery({ queryKey: ['allocations'], queryFn: allocationApi.getAll });
     const { data: allReviews = [], isLoading: reviewsLoading } = useQuery({
         queryKey: ['perf-reviews'],
         queryFn: () => perfReviewApi.getAll(),
     });
 
-    const scopedProjects = getPmSubProjects(projects, parentProjects, pmEmployeeId, allocations);
-    const scopedProjectIds = new Set(scopedProjects.map((p) => p.id));
-    const scopedAllocations = allocations.filter((a) => scopedProjectIds.has(a.sub_project_id));
-    const teamEmployeeIds = new Set(scopedAllocations.map((a) => a.employee_id));
-    const teamMembers = employees.filter((e) => teamEmployeeIds.has(e.id)).sort((a, b) => a.name.localeCompare(b.name));
+    const [search, setSearch] = useState('');
+    const [filter, setFilter] = useState('all'); // all | pm | employee
 
     const reviewsByEmployee = (employeeId) => allReviews.filter((r) => r.employee_id === employeeId);
-    const totalReviews = allReviews.filter((r) => teamEmployeeIds.has(r.employee_id)).length;
 
+    const filtered = useMemo(() => {
+        const term = search.trim().toLowerCase();
+        return employees
+            .filter((e) => e.status !== 'archived')
+            .filter((e) => {
+                if (filter === 'pm') return isPmDesignation(e.designation);
+                if (filter === 'employee') return !isPmDesignation(e.designation);
+                return true;
+            })
+            .filter((e) => !term || (e.name || '').toLowerCase().includes(term))
+            .sort((a, b) => a.name.localeCompare(b.name));
+    }, [employees, search, filter]);
+
+    const pmCount = employees.filter((e) => isPmDesignation(e.designation) && e.status !== 'archived').length;
     const isLoading = empLoading || reviewsLoading;
 
     return (
         <div className="space-y-8">
-            <section className="overflow-hidden rounded-[28px] border border-blue-100 bg-[linear-gradient(135deg,rgba(37,99,235,0.12),rgba(255,255,255,0.94)_42%,rgba(239,246,255,1))] p-6 shadow-sm">
+            <section className="overflow-hidden rounded-[28px] border border-indigo-100 bg-[linear-gradient(135deg,rgba(79,70,229,0.12),rgba(255,255,255,0.94)_42%,rgba(238,242,255,1))] p-6 shadow-sm">
                 <div className="flex flex-col gap-5 lg:flex-row lg:items-end lg:justify-between">
                     <div>
-                        <p className="text-sm font-medium uppercase tracking-[0.18em] text-blue-700">Performance</p>
-                        <h1 className="mt-1 text-2xl font-bold tracking-tight text-slate-900">Monthly Performance Reviews</h1>
+                        <p className="text-sm font-medium uppercase tracking-[0.18em] text-indigo-700">Performance</p>
+                        <h1 className="mt-1 text-2xl font-bold tracking-tight text-slate-900">Employee & PM Performance</h1>
                         <p className="mt-2 max-w-2xl text-sm text-slate-500">
-                            Rate your team members each month across five criteria. Reviews are visible to admins.
+                            View every employee's monthly reviews and rate Program Managers across five criteria.
                         </p>
                     </div>
-                    <div className="grid gap-3 sm:grid-cols-2">
+                    <div className="grid gap-3 sm:grid-cols-3">
                         <div className="rounded-2xl border border-white/70 bg-white/80 px-4 py-3 shadow-sm">
-                            <p className="text-xs font-medium uppercase tracking-[0.14em] text-slate-400">Team Members</p>
-                            <p className="text-xl font-semibold text-slate-900">{teamMembers.length}</p>
+                            <p className="text-xs font-medium uppercase tracking-[0.14em] text-slate-400">Employees</p>
+                            <p className="text-xl font-semibold text-slate-900">{employees.filter((e) => e.status !== 'archived').length}</p>
+                        </div>
+                        <div className="rounded-2xl border border-white/70 bg-white/80 px-4 py-3 shadow-sm">
+                            <p className="text-xs font-medium uppercase tracking-[0.14em] text-slate-400">Program Managers</p>
+                            <p className="text-xl font-semibold text-slate-900">{pmCount}</p>
                         </div>
                         <div className="rounded-2xl border border-white/70 bg-white/80 px-4 py-3 shadow-sm">
                             <p className="text-xs font-medium uppercase tracking-[0.14em] text-slate-400">Total Reviews</p>
-                            <p className="text-xl font-semibold text-slate-900">{totalReviews}</p>
+                            <p className="text-xl font-semibold text-slate-900">{allReviews.length}</p>
                         </div>
                     </div>
                 </div>
             </section>
 
+            {!isLoading && employees.length > 0 && (
+                <section className="rounded-2xl border border-slate-200/70 bg-white p-4 shadow-sm">
+                    <div className="flex flex-col gap-3 lg:flex-row lg:items-center">
+                        <div className="relative flex-1">
+                            <Search className="pointer-events-none absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-slate-400" />
+                            <input
+                                type="text"
+                                value={search}
+                                onChange={(e) => setSearch(e.target.value)}
+                                placeholder="Search by name..."
+                                className="w-full rounded-xl border border-slate-200 bg-slate-50 py-2.5 pl-10 pr-3 text-sm text-slate-700 outline-none transition focus:border-indigo-300 focus:bg-white focus:ring-2 focus:ring-indigo-100"
+                            />
+                        </div>
+                        <select
+                            value={filter}
+                            onChange={(e) => setFilter(e.target.value)}
+                            className="rounded-xl border border-slate-200 bg-slate-50 px-3 py-2.5 text-sm text-slate-700 outline-none transition focus:border-indigo-300 focus:bg-white focus:ring-2 focus:ring-indigo-100"
+                        >
+                            <option value="all">All people</option>
+                            <option value="pm">Program Managers</option>
+                            <option value="employee">Employees</option>
+                        </select>
+                        {(search || filter !== 'all') && (
+                            <button
+                                type="button"
+                                onClick={() => { setSearch(''); setFilter('all'); }}
+                                className="inline-flex items-center justify-center gap-1.5 rounded-xl border border-slate-200 bg-white px-3 py-2.5 text-sm font-medium text-slate-600 transition hover:bg-slate-50"
+                            >
+                                <X className="h-4 w-4" /> Clear
+                            </button>
+                        )}
+                    </div>
+                    <p className="mt-3 text-xs font-medium text-slate-400">Showing {filtered.length} of {employees.filter((e) => e.status !== 'archived').length} people</p>
+                </section>
+            )}
+
             {isLoading ? (
                 <div className="rounded-2xl border border-slate-200 bg-white p-10 text-center text-sm text-slate-400 shadow-sm">
                     Loading performance data…
                 </div>
-            ) : teamMembers.length === 0 ? (
+            ) : filtered.length === 0 ? (
                 <div className="rounded-3xl border border-dashed border-slate-200 bg-white p-12 text-center shadow-sm">
                     <ClipboardList className="mx-auto h-10 w-10 text-slate-300" />
-                    <h2 className="mt-4 text-lg font-semibold text-slate-800">No team members found</h2>
-                    <p className="mt-2 text-sm text-slate-500">
-                        Team members appear once employees are allocated to your scoped projects.
-                    </p>
+                    <h2 className="mt-4 text-lg font-semibold text-slate-800">No people match your filters</h2>
+                    <p className="mt-2 text-sm text-slate-500">Try adjusting your search or clearing the filters.</p>
                 </div>
             ) : (
                 <div className="space-y-4">
-                    {teamMembers.map((member) => (
+                    {filtered.map((emp) => (
                         <EmployeePanel
-                            key={member.id}
-                            employee={member}
-                            reviews={reviewsByEmployee(member.id)}
+                            key={emp.id}
+                            employee={emp}
+                            reviews={reviewsByEmployee(emp.id)}
                             reviewerId={user.id}
                         />
                     ))}
@@ -201,4 +250,4 @@ const PerformanceReviewsPage = () => {
     );
 };
 
-export default PerformanceReviewsPage;
+export default AdminPerformancePage;
