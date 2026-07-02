@@ -6,6 +6,7 @@ import { useState, useEffect } from 'react';
 import { useQuery, useQueryClient } from '@tanstack/react-query';
 import BrandLockup from '../components/brand/BrandLockup';
 import NotificationBell from '../components/NotificationBell';
+import ChatWidget from '../components/chat/ChatWidget';
 
 const onboardingNavigation = [
   { name: 'Training Modules', href: '/admin/modules', icon: GraduationCap },
@@ -272,6 +273,9 @@ const AdminLayout = () => {
           onClick={() => setSidebarOpen(false)}
         />
       )}
+
+      {/* AI Chat Widget */}
+      <ChatWidget role="admin" />
     </div>
   );
 };
