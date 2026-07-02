@@ -6,6 +6,7 @@ import { Rocket, Plus, X, Trash2, Edit3, Save } from 'lucide-react';
 import toast from 'react-hot-toast';
 import { getEndDateValidationMessage, isEndDateBeforeStartDate } from '../../utils/dateValidation';
 import Dropdown from '../../components/ui/Dropdown';
+import ConfirmDialog from '../../components/ui/ConfirmDialog';
 
 const SideProjectsPage = () => {
     const queryClient = useQueryClient();
@@ -14,6 +15,7 @@ const SideProjectsPage = () => {
     const [showForm, setShowForm] = useState(false);
     const [editingId, setEditingId] = useState(null);
     const [form, setForm] = useState({ name: '', description: '', status: 'active', start_date: '', end_date: '' });
+    const [deleteConfirm, setDeleteConfirm] = useState(null);
 
     const { data: sideProjects = [], isLoading } = useQuery({
         queryKey: ['side-projects', employeeId],
@@ -58,6 +60,7 @@ const SideProjectsPage = () => {
     const statusColors = { active: 'bg-emerald-50 text-emerald-700 border-emerald-200', completed: 'bg-blue-50 text-blue-700 border-blue-200', paused: 'bg-amber-50 text-amber-700 border-amber-200' };
 
     return (
+        <>
         <div className="space-y-6">
             <div className="flex items-center justify-between">
                 <div>
@@ -131,7 +134,7 @@ const SideProjectsPage = () => {
                                 </div>
                                 <div className="flex items-center gap-1">
                                     <button onClick={() => startEdit(sp)} className="p-1 text-slate-400 hover:text-blue-600"><Edit3 className="w-3.5 h-3.5" /></button>
-                                    <button onClick={() => { if (window.confirm(`Delete "${sp.name}"?`)) deleteMutation.mutate(sp.id); }} className="p-1 text-slate-400 hover:text-red-600"><Trash2 className="w-3.5 h-3.5" /></button>
+                                    <button onClick={() => setDeleteConfirm({ id: sp.id, name: sp.name })} className="p-1 text-slate-400 hover:text-red-600"><Trash2 className="w-3.5 h-3.5" /></button>
                                 </div>
                             </div>
                             <span className={`inline-flex px-2 py-0.5 text-xs font-medium rounded-full border capitalize ${statusColors[sp.status] || statusColors.active}`}>{sp.status}</span>
@@ -140,6 +143,15 @@ const SideProjectsPage = () => {
                 </div>
             )}
         </div>
+        <ConfirmDialog
+            isOpen={deleteConfirm !== null}
+            onClose={() => setDeleteConfirm(null)}
+            onConfirm={() => { deleteMutation.mutate(deleteConfirm.id); setDeleteConfirm(null); }}
+            title="Delete Side Project"
+            message={`Are you sure you want to delete "${deleteConfirm?.name}"? This action cannot be undone.`}
+            isPending={deleteMutation.isPending}
+        />
+        </>
     );
 };
 

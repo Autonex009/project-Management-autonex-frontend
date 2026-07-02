@@ -1,5 +1,4 @@
 import React, { useState, useEffect } from 'react';
-import { createPortal } from 'react-dom';
 import { Plus, BookOpen, Trash2, Layers, GripVertical, AlertTriangle } from 'lucide-react';
 import Spinner from '../../components/ui/LoadingSpinner';
 import Button from '../../components/ui/Button';
@@ -7,6 +6,7 @@ import { useNavigate } from 'react-router-dom';
 import toast from 'react-hot-toast';
 import { onboardingApi } from '../../services/api';
 import SearchBar from '../../components/ui/SearchBar';
+import Modal from '../../components/ui/Modal';
 
 export default function AdminModulesList() {
   const [modules, setModules] = useState([]);
@@ -178,15 +178,9 @@ export default function AdminModulesList() {
         )}
       </div>
 
-      {pendingDelete && createPortal(
-        <div
-          className="fixed inset-0 bg-slate-900/60 backdrop-blur-sm z-[100] flex items-center justify-center px-4 py-8"
-          onClick={() => setPendingDelete(null)}
-        >
-          <div
-            className="bg-white rounded-2xl max-w-md w-full shadow-2xl border border-slate-100 p-6"
-            onClick={(e) => e.stopPropagation()}
-          >
+      {pendingDelete && (
+        <Modal isOpen onClose={() => setPendingDelete(null)} size="md">
+          <Modal.Body>
             <div className="flex items-start gap-4">
               <div className="h-11 w-11 rounded-xl flex items-center justify-center flex-shrink-0 bg-red-50 text-red-600">
                 <AlertTriangle className="h-5 w-5" />
@@ -198,13 +192,12 @@ export default function AdminModulesList() {
                 </p>
               </div>
             </div>
-            <div className="flex justify-end gap-3 mt-6">
-              <Button variant="cancel" onClick={() => setPendingDelete(null)}>Cancel</Button>
-              <Button variant="danger" onClick={confirmDelete}>Delete Module</Button>
-            </div>
-          </div>
-        </div>,
-        document.body
+          </Modal.Body>
+          <Modal.Footer>
+            <Button variant="cancel" onClick={() => setPendingDelete(null)}>Cancel</Button>
+            <Button variant="danger" onClick={confirmDelete}>Delete Module</Button>
+          </Modal.Footer>
+        </Modal>
       )}
     </div>
   );

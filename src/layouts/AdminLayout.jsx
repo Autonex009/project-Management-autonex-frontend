@@ -1,7 +1,7 @@
 import { Link, useLocation, Outlet } from 'react-router-dom';
 import { LogOut, Menu, GraduationCap, FileSpreadsheet, ChevronLeft, ChevronRight, Sparkles } from 'lucide-react';
 import { navigation } from '../config/navigation';
-import api, { signupRequestApi } from '../services/api';
+import api, { signupRequestApi, employeeApi, subProjectApi } from '../services/api';
 import { useState, useEffect } from 'react';
 import { useQuery, useQueryClient } from '@tanstack/react-query';
 import BrandLockup from '../components/brand/BrandLockup';

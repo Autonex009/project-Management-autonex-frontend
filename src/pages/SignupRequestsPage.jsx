@@ -1,12 +1,14 @@
-import { useState } from 'react';
+import { useState, useEffect } from 'react';
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import { signupRequestApi } from '../services/api';
 import Spinner from '../components/ui/LoadingSpinner';
 import Button from '../components/ui/Button';
-import { CheckCircle, XCircle, Clock, User, Mail, Phone, Briefcase, AlertTriangle, X, RotateCcw } from 'lucide-react';
+import { CheckCircle, XCircle, Clock, User, Mail, Phone, Briefcase, AlertTriangle, RotateCcw } from 'lucide-react';
 import { format, parseISO } from 'date-fns';
 import toast from 'react-hot-toast';
 import Dropdown from '../components/ui/Dropdown';
+import Modal from '../components/ui/Modal';
+import SearchBar from '../components/ui/SearchBar';
 
 const EMPLOYEE_TYPES = ['Full-time', 'Part-time', 'Intern', 'Contractor'];
 
@@ -27,14 +29,25 @@ const SignupRequestsPage = () => {
     const [expandedId, setExpandedId] = useState(null);
     const [currentPage, setCurrentPage] = useState(1);
     const [localEmployeeTypes, setLocalEmployeeTypes] = useState({});
+    const [search, setSearch] = useState('');
+    const [debouncedSearch, setDebouncedSearch] = useState('');
     const PAGE_SIZE = 10;
 
+    useEffect(() => {
+        const timer = setTimeout(() => {
+            setDebouncedSearch(search);
+            setCurrentPage(1);
+        }, 500);
+        return () => clearTimeout(timer);
+    }, [search]);
+
     const { data: listData, isLoading } = useQuery({
-        queryKey: ['signup-requests', activeTab, currentPage],
+        queryKey: ['signup-requests', activeTab, currentPage, debouncedSearch],
         queryFn: () => signupRequestApi.getAll({
             page: currentPage,
             page_size: PAGE_SIZE,
             ...(activeTab !== 'All' && { status: activeTab.toLowerCase() }),
+            ...(debouncedSearch.trim() && { search: debouncedSearch.trim() }),
         }),
         refetchInterval: 30_000,
     });
@@ -126,21 +139,30 @@ const SignupRequestsPage = () => {
                 </p>
             </div>
 
-            {/* Tabs */}
-            <div className="flex gap-1 bg-slate-100 rounded-xl p-1 w-fit">
-                {TABS.map(tab => (
-                    <button key={tab} onClick={() => handleTabChange(tab)}
-                        className={`px-4 py-2 rounded-lg text-sm font-medium transition-all ${
-                            activeTab === tab ? 'bg-white text-slate-800 shadow-sm' : 'text-slate-500 hover:text-slate-700'
-                        }`}>
-                        {tab}
-                        {tab === 'Pending' && pendingCount > 0 && (
-                            <span className="ml-1.5 inline-flex items-center justify-center h-4 min-w-[16px] px-1 rounded-full text-[10px] font-bold bg-amber-500 text-white">
-                                {pendingCount}
-                            </span>
-                        )}
-                    </button>
-                ))}
+            {/* Tabs + Search */}
+            <div className="flex items-center justify-between gap-4">
+                <div className="flex gap-1 bg-slate-100 rounded-xl p-1 w-fit">
+                    {TABS.map(tab => (
+                        <button key={tab} onClick={() => handleTabChange(tab)}
+                            className={`px-4 py-2 rounded-lg text-sm font-medium transition-all ${
+                                activeTab === tab ? 'bg-white text-slate-800 shadow-sm' : 'text-slate-500 hover:text-slate-700'
+                            }`}>
+                            {tab}
+                            {tab === 'Pending' && pendingCount > 0 && (
+                                <span className="ml-1.5 inline-flex items-center justify-center h-4 min-w-[16px] px-1 rounded-full text-[10px] font-bold bg-amber-500 text-white">
+                                    {pendingCount}
+                                </span>
+                            )}
+                        </button>
+                    ))}
+                </div>
+                <SearchBar
+                    value={search}
+                    onChange={setSearch}
+                    placeholder="Search by name, email or designation..."
+                    clearable
+                    width="w-full sm:w-80"
+                />
             </div>
 
             {/* Table */}
@@ -329,9 +351,9 @@ const SignupRequestsPage = () => {
 
             {/* Reject modal */}
             {rejectModal && (
-                <div className="fixed inset-0 bg-black/50 flex items-center justify-center z-50 px-4 py-8">
-                    <div className="bg-white rounded-2xl shadow-xl w-full max-w-md p-6">
-                        <div className="flex items-start gap-3 mb-4">
+                <Modal isOpen onClose={() => setRejectModal(null)} size="md">
+                    <Modal.Header onClose={() => setRejectModal(null)}>
+                        <div className="flex items-start gap-3">
                             <div className="p-2 bg-red-100 rounded-lg shrink-0">
                                 <AlertTriangle className="w-5 h-5 text-red-600"/>
                             </div>
@@ -341,38 +363,35 @@ const SignupRequestsPage = () => {
                                     Rejecting <strong>{rejectModal.name}</strong>'s request. They will receive an email notification.
                                 </p>
                             </div>
-                            <button onClick={() => setRejectModal(null)} className="text-slate-400 hover:text-slate-600">
-                                <X className="w-5 h-5"/>
-                            </button>
                         </div>
-                        <div>
-                            <label className="block text-sm font-medium text-slate-700 mb-1.5">
-                                Reason <span className="text-slate-400 font-normal">(optional — sent to applicant)</span>
-                            </label>
-                            <textarea value={rejectReason} onChange={e => setRejectReason(e.target.value)}
-                                placeholder="e.g. Position currently filled, incomplete information..."
-                                className="w-full rounded-xl border border-slate-200 p-3 text-sm resize-none focus:outline-none focus:ring-2 focus:ring-red-500 focus:border-transparent"
-                                rows={3} />
-                        </div>
-                        <div className="flex justify-end gap-3 mt-4">
-                            <Button variant="cancel" onClick={() => setRejectModal(null)}>Cancel</Button>
-                            <Button
-                                variant="danger"
-                                onClick={() => {
-                                    if (rejectModal.mode === 'undoApprove') {
-                                        undoApproveMutation.mutate({ id: rejectModal.requestId, reason: rejectReason });
-                                    } else {
-                                        rejectMutation.mutate({ id: rejectModal.requestId, reason: rejectReason });
-                                    }
-                                }}
-                                disabled={rejectModal.mode === 'undoApprove' ? undoApproveMutation.isPending : rejectMutation.isPending}
-                                isLoading={rejectModal.mode === 'undoApprove' ? undoApproveMutation.isPending : rejectMutation.isPending}
-                            >
-                                {!(rejectModal.mode === 'undoApprove' ? undoApproveMutation.isPending : rejectMutation.isPending) && 'Confirm Reject'}
-                            </Button>
-                        </div>
-                    </div>
-                </div>
+                    </Modal.Header>
+                    <Modal.Body>
+                        <label className="block text-sm font-medium text-slate-700 mb-1.5">
+                            Reason <span className="text-slate-400 font-normal">(optional — sent to applicant)</span>
+                        </label>
+                        <textarea value={rejectReason} onChange={e => setRejectReason(e.target.value)}
+                            placeholder="e.g. Position currently filled, incomplete information..."
+                            className="w-full rounded-xl border border-slate-200 p-3 text-sm resize-none focus:outline-none focus:ring-2 focus:ring-red-500 focus:border-transparent"
+                            rows={3} />
+                    </Modal.Body>
+                    <Modal.Footer>
+                        <Button variant="cancel" onClick={() => setRejectModal(null)}>Cancel</Button>
+                        <Button
+                            variant="danger"
+                            onClick={() => {
+                                if (rejectModal.mode === 'undoApprove') {
+                                    undoApproveMutation.mutate({ id: rejectModal.requestId, reason: rejectReason });
+                                } else {
+                                    rejectMutation.mutate({ id: rejectModal.requestId, reason: rejectReason });
+                                }
+                            }}
+                            disabled={rejectModal.mode === 'undoApprove' ? undoApproveMutation.isPending : rejectMutation.isPending}
+                            isLoading={rejectModal.mode === 'undoApprove' ? undoApproveMutation.isPending : rejectMutation.isPending}
+                        >
+                            {!(rejectModal.mode === 'undoApprove' ? undoApproveMutation.isPending : rejectMutation.isPending) && 'Confirm Reject'}
+                        </Button>
+                    </Modal.Footer>
+                </Modal>
             )}
         </div>
     );

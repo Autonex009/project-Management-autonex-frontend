@@ -10,7 +10,7 @@ import Dropdown from './ui/Dropdown';
 import { getEndDateValidationMessage, isEndDateBeforeStartDate } from '../utils/dateValidation';
 import { getLeaveTypeLabel, LEAVE_TYPE_OPTIONS, RAZORPAY_NEGATIVE_BALANCE_NOTE, FLOATER_DATES_2026, isValidFloaterDate, getFloaterDateLabel, isNonWorkingDay, getNonWorkingDayLabel, getWorkingDayCount, countNonWorkingDaysInRange, toLocalISODate, ANNUAL_LEAVE_QUOTA, INTERN_MONTHLY_PAID_QUOTA, isIntern, normalizeLeaveType, validateConsecutiveLeaves } from '../utils/leaveTypes';
 import LeaveCalendar from './LeaveCalendar';
-import DeleteConfirmModal from './ui/DeleteConfirmModal';
+import ConfirmDialog from './ui/ConfirmDialog';
 
 const TABS = ['My Leaves', 'Calendar', 'Work From Home'];
 
@@ -180,6 +180,7 @@ const MyLeavesPanel = ({
     const [editingWfh, setEditingWfh] = useState(null);
     const [editWfhForm, setEditWfhForm] = useState({ wfh_date: '', end_date: '', reason: '' });
     const [deleteTarget, setDeleteTarget] = useState(null);
+    const [wfhDeleteConfirm, setWfhDeleteConfirm] = useState(null);
     const [formLeaveType, setFormLeaveType] = useState('paid');
     const [editFormLeaveType, setEditFormLeaveType] = useState('paid');
 
@@ -486,8 +487,7 @@ const MyLeavesPanel = ({
     };
 
     const handleWfhDelete = (wfh) => {
-        if (!window.confirm(`Delete WFH request for ${wfh.wfh_date}?`)) return;
-        deleteWfhMutation.mutate(wfh.id);
+        setWfhDeleteConfirm(wfh);
     };
 
     const myEmployeeIdSet = employeeId ? new Set([employeeId]) : null;
@@ -940,7 +940,7 @@ const MyLeavesPanel = ({
                 </>
             )}
             {deleteTarget && (
-                <DeleteConfirmModal
+                <ConfirmDialog
                     isOpen={!!deleteTarget}
                     onClose={() => setDeleteTarget(null)}
                     onConfirm={() => {
@@ -953,8 +953,23 @@ const MyLeavesPanel = ({
                     isPending={deleteLeaveMutation.isPending}
                     title="Delete Leave Request"
                     message={`Are you sure you want to delete this ${getLeaveTypeLabel(deleteTarget.leave_type)} request (${deleteTarget.start_date} — ${deleteTarget.end_date})?`}
+                    variant="danger"
+                    confirmText="Delete"
                 />
             )}
+            <ConfirmDialog
+                isOpen={wfhDeleteConfirm !== null}
+                onClose={() => setWfhDeleteConfirm(null)}
+                onConfirm={() => {
+                    deleteWfhMutation.mutate(wfhDeleteConfirm.id);
+                    setWfhDeleteConfirm(null);
+                }}
+                title="Delete WFH Request"
+                message={`Delete WFH request for ${wfhDeleteConfirm?.wfh_date}?`}
+                variant="danger"
+                confirmText="Delete"
+                isPending={deleteWfhMutation.isPending}
+            />
         </div>
     );
 };

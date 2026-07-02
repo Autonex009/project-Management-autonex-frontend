@@ -3,17 +3,18 @@ import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import { leaveApi, employeeApi, wfhApi } from '../services/api';
 import Spinner from '../components/ui/LoadingSpinner';
 import Button from '../components/ui/Button';
-import { Plus, X, Calendar, Trash2, CheckCircle, XCircle, Clock, AlertTriangle, Home, BarChart2 } from 'lucide-react';
+import { Plus, Calendar, Trash2, CheckCircle, XCircle, Clock, AlertTriangle, Home, BarChart2, RotateCcw } from 'lucide-react';
 import { format } from 'date-fns';
 import toast from 'react-hot-toast';
 import { getEndDateValidationMessage, isEndDateBeforeStartDate } from '../utils/dateValidation';
 import { getLeaveTypeBadgeClass, getLeaveTypeLabel, LEAVE_TYPE_OPTIONS, getWorkingDayCount, validateConsecutiveLeaves } from '../utils/leaveTypes';
 import LeaveCalendar from '../components/LeaveCalendar';
-import DeleteConfirmModal from '../components/ui/DeleteConfirmModal';
+import ConfirmDialog from '../components/ui/ConfirmDialog';
 import SearchBar from '../components/ui/SearchBar';
 import Dropdown from '../components/ui/Dropdown';
 import Table from '../components/ui/Table';
 import EmployeeKPIPanel from '../components/EmployeeKPIPanel';
+import Modal from '../components/ui/Modal';
 
 const TABS = ['Leave List', 'Calendar', 'WFH Requests', 'Employee KPI'];
 
@@ -68,6 +69,7 @@ const LeavesPage = () => {
   const [remarkModal, setRemarkModal] = useState(null); // { leaveId }
   const [remark, setRemark] = useState('');
   const [deleteTarget, setDeleteTarget] = useState(null);
+  const [wfhDeleteConfirm, setWfhDeleteConfirm] = useState(null);
   const [formEmployeeId, setFormEmployeeId] = useState('');
   const user = JSON.parse(localStorage.getItem('user') || '{}');
 
@@ -104,6 +106,18 @@ const LeavesPage = () => {
     onError: (err) => toast.error(err.response?.data?.detail || 'Failed to reject leave'),
   });
 
+  const undoApproveMutation = useMutation({
+    mutationFn: (id) => leaveApi.undoApprove(id, user.id),
+    onSuccess: () => { queryClient.invalidateQueries(['leaves']); queryClient.invalidateQueries(['leave-calendar']); toast.success('Leave approval undone'); },
+    onError: (err) => toast.error(err.response?.data?.detail || 'Failed to undo approval'),
+  });
+
+  const undoRejectMutation = useMutation({
+    mutationFn: (id) => leaveApi.undoReject(id, user.id),
+    onSuccess: () => { queryClient.invalidateQueries(['leaves']); queryClient.invalidateQueries(['leave-calendar']); toast.success('Leave rejection undone'); },
+    onError: (err) => toast.error(err.response?.data?.detail || 'Failed to undo rejection'),
+  });
+
   const createMutation = useMutation({
     mutationFn: leaveApi.create,
     onSuccess: () => {
@@ -133,6 +147,18 @@ const LeavesPage = () => {
     mutationFn: (id) => wfhApi.reject(id, user.id),
     onSuccess: () => { queryClient.invalidateQueries(['wfh']); toast.success('WFH rejected'); },
     onError: (err) => toast.error(err.response?.data?.detail || 'Failed to reject WFH'),
+  });
+
+  const wfhUndoApproveMutation = useMutation({
+    mutationFn: (id) => wfhApi.undoApprove(id, user.id),
+    onSuccess: () => { queryClient.invalidateQueries(['wfh']); queryClient.invalidateQueries(['leave-calendar']); toast.success('WFH approval undone'); },
+    onError: (err) => toast.error(err.response?.data?.detail || 'Failed to undo approval'),
+  });
+
+  const wfhUndoRejectMutation = useMutation({
+    mutationFn: (id) => wfhApi.undoReject(id, user.id),
+    onSuccess: () => { queryClient.invalidateQueries(['wfh']); toast.success('WFH rejection undone'); },
+    onError: (err) => toast.error(err.response?.data?.detail || 'Failed to undo rejection'),
   });
 
   const wfhDeleteMutation = useMutation({
@@ -352,6 +378,16 @@ const LeavesPage = () => {
                         </Button>
                       </>
                     )}
+                    {leave.status === 'approved' && (
+                      <Button variant="secondary" size="sm" onClick={() => undoApproveMutation.mutate(leave.leave_id)} disabled={undoApproveMutation.isPending}>
+                        <RotateCcw className="w-3.5 h-3.5"/>Undo
+                      </Button>
+                    )}
+                    {leave.status === 'rejected' && (
+                      <Button variant="secondary" size="sm" onClick={() => undoRejectMutation.mutate(leave.leave_id)} disabled={undoRejectMutation.isPending}>
+                        <RotateCcw className="w-3.5 h-3.5"/>Undo
+                      </Button>
+                    )}
                     <button onClick={() => setDeleteTarget(leave)}
                       className="p-2 text-slate-400 hover:text-red-600 hover:bg-red-50 rounded-lg transition-colors">
                       <Trash2 className="w-4 h-4"/>
@@ -415,7 +451,17 @@ const LeavesPage = () => {
                       </Button>
                     </>
                   )}
-                  <button onClick={() => { if (window.confirm('Delete this WFH request?')) wfhDeleteMutation.mutate(w.id); }}
+                  {w.status === 'approved' && (
+                    <Button variant="secondary" size="sm" onClick={() => wfhUndoApproveMutation.mutate(w.id)} disabled={wfhUndoApproveMutation.isPending}>
+                      <RotateCcw className="w-3.5 h-3.5"/>Undo
+                    </Button>
+                  )}
+                  {w.status === 'rejected' && (
+                    <Button variant="secondary" size="sm" onClick={() => wfhUndoRejectMutation.mutate(w.id)} disabled={wfhUndoRejectMutation.isPending}>
+                      <RotateCcw className="w-3.5 h-3.5"/>Undo
+                    </Button>
+                  )}
+                  <button onClick={() => setWfhDeleteConfirm(w.id)}
                     className="p-2 text-slate-400 hover:text-red-600 hover:bg-red-50 rounded-lg transition-colors">
                     <Trash2 className="w-4 h-4"/>
                   </button>
@@ -439,8 +485,8 @@ const LeavesPage = () => {
 
       {/* ── Flagged leave remark modal ── */}
       {remarkModal && (
-        <div className="fixed inset-0 bg-slate-900/40 backdrop-blur-sm flex items-center justify-center z-50 p-4">
-          <div className="bg-white rounded-2xl shadow-xl w-full max-w-md p-6">
+        <Modal isOpen onClose={() => { setRemarkModal(null); setRemark(''); }} size="md">
+          <Modal.Body>
             <div className="flex items-start gap-3 mb-4">
               <div className="p-2 bg-orange-100 rounded-lg shrink-0"><AlertTriangle className="w-5 h-5 text-orange-600"/></div>
               <div>
@@ -458,27 +504,23 @@ const LeavesPage = () => {
               className="w-full rounded-xl border border-slate-200 p-3 text-sm resize-none focus:outline-none focus:ring-2 focus:ring-indigo-500 focus:border-transparent"
               rows={4}
             />
-            <div className="flex justify-end gap-3 mt-4">
-              <Button variant="cancel" onClick={() => { setRemarkModal(null); setRemark(''); }}>Cancel</Button>
-              <Button variant="success" onClick={() => approveMutation.mutate({ id: remarkModal.leaveId, remark })} disabled={!remark.trim() || approveMutation.isPending} isLoading={approveMutation.isPending}>
-                {!approveMutation.isPending && 'Approve with Remark'}
-              </Button>
-            </div>
-          </div>
-        </div>
+          </Modal.Body>
+          <Modal.Footer>
+            <Button variant="cancel" onClick={() => { setRemarkModal(null); setRemark(''); }}>Cancel</Button>
+            <Button variant="success" onClick={() => approveMutation.mutate({ id: remarkModal.leaveId, remark })} disabled={!remark.trim() || approveMutation.isPending} isLoading={approveMutation.isPending}>
+              {!approveMutation.isPending && 'Approve with Remark'}
+            </Button>
+          </Modal.Footer>
+        </Modal>
       )}
 
       {/* ── Add Leave Modal ── */}
-      {isModalOpen && (
-        <div className="fixed inset-0 bg-slate-900/40 backdrop-blur-sm flex items-center justify-center z-50 p-2 sm:p-4">
-          <div className="bg-white rounded-2xl shadow-xl w-full max-w-full sm:max-w-md">
-            <div className="px-6 py-4 border-b border-gray-200 flex justify-between items-center">
-              <h2 className="text-xl font-semibold text-gray-900">Add Leave</h2>
-              <button onClick={() => { setIsModalOpen(false); setFormEmployeeId(''); }} className="text-gray-400 hover:text-gray-600">
-                <X className="w-5 h-5"/>
-              </button>
-            </div>
-            <form onSubmit={handleSubmit} className="p-6 space-y-4">
+      <Modal isOpen={isModalOpen} onClose={() => { setIsModalOpen(false); setFormEmployeeId(''); }} size="md">
+        <Modal.Header onClose={() => { setIsModalOpen(false); setFormEmployeeId(''); }}>
+          <h2 className="text-xl font-semibold text-gray-900">Add Leave</h2>
+        </Modal.Header>
+        <form onSubmit={handleSubmit} className="flex-1 flex flex-col min-h-0">
+          <Modal.Body className="space-y-4">
               <div>
                 <label className="block text-sm font-medium text-gray-700 mb-1">Employee <span className="text-red-500">*</span></label>
                 <input type="hidden" name="employee_id" value={formEmployeeId} />
@@ -533,18 +575,17 @@ const LeavesPage = () => {
                   </div>
                 </div>
               )}
-              <div className="flex justify-end gap-3 pt-4 border-t border-gray-200">
-                <Button type="button" variant="cancel" onClick={() => { setIsModalOpen(false); setSelectedLeaveType(''); setFormEmployeeId(''); }}>Cancel</Button>
-                <Button type="submit" disabled={createMutation.isPending || activeEmployees.length === 0} isLoading={createMutation.isPending}>
-                  {!createMutation.isPending && 'Create Leave'}
-                </Button>
-              </div>
-            </form>
-          </div>
-        </div>
-      )}
+          </Modal.Body>
+          <Modal.Footer>
+            <Button type="button" variant="cancel" onClick={() => { setIsModalOpen(false); setSelectedLeaveType(''); setFormEmployeeId(''); }}>Cancel</Button>
+            <Button type="submit" disabled={createMutation.isPending || activeEmployees.length === 0} isLoading={createMutation.isPending}>
+              {!createMutation.isPending && 'Create Leave'}
+            </Button>
+          </Modal.Footer>
+        </form>
+      </Modal>
       {deleteTarget && (
-        <DeleteConfirmModal
+        <ConfirmDialog
           isOpen={!!deleteTarget}
           onClose={() => setDeleteTarget(null)}
           onConfirm={() => {
@@ -557,8 +598,21 @@ const LeavesPage = () => {
           isPending={deleteMutation.isPending}
           title="Delete Leave Record"
           message={`Are you sure you want to delete the ${getLeaveTypeLabel(deleteTarget.leave_type)} record for ${getEmployeeName(deleteTarget.employee_id)} (${deleteTarget.start_date} — ${deleteTarget.end_date})?`}
+          variant="danger"
+          confirmText="Delete"
+          cancelText="Cancel"
         />
       )}
+      <ConfirmDialog
+        isOpen={wfhDeleteConfirm !== null}
+        onClose={() => setWfhDeleteConfirm(null)}
+        onConfirm={() => { wfhDeleteMutation.mutate(wfhDeleteConfirm); setWfhDeleteConfirm(null); }}
+        title="Delete WFH Request"
+        message="Are you sure you want to delete this WFH request? This action cannot be undone."
+        variant="danger"
+        confirmText="Delete"
+        isPending={wfhDeleteMutation.isPending}
+      />
     </div>
   );
 };

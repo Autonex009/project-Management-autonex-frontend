@@ -3,6 +3,7 @@ import { useParams, useNavigate } from 'react-router-dom';
 import { ArrowLeft, Award, HelpCircle, FileText, ExternalLink, Check, Circle, CheckCircle, ArrowRight, Video } from 'lucide-react';
 import Button from '../../components/ui/Button';
 import Spinner from '../../components/ui/LoadingSpinner';
+import Modal from '../../components/ui/Modal';
 import { onboardingApi } from '../../services/api';
 import toast from 'react-hot-toast';
 
@@ -456,8 +457,8 @@ const ModuleView = () => {
             </aside>
 
             {showScoreModal && modalData && (
-                <div className="fixed inset-0 bg-slate-900/60 backdrop-blur-sm z-50 flex items-center justify-center px-4 py-8">
-                    <div className="bg-white rounded-3xl max-w-md w-full overflow-hidden shadow-2xl border border-slate-100 animate-in zoom-in-95 duration-200 p-8 text-center flex flex-col items-center">
+                <Modal isOpen onClose={() => setShowScoreModal(false)} size="md">
+                    <Modal.Body className="!p-8 text-center flex flex-col items-center">
                         <div className={`h-20 w-20 rounded-full flex items-center justify-center mb-6 ${
                             modalData.passed 
                                 ? 'bg-emerald-50 text-emerald-600 border-2 border-emerald-100/50 animate-pulse' 
@@ -522,8 +523,8 @@ const ModuleView = () => {
                                 </>
                             )}
                         </div>
-                    </div>
-                </div>
+                    </Modal.Body>
+                </Modal>
             )}
         </div>
     );

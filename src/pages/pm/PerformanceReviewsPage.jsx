@@ -6,6 +6,7 @@ import { getPmEmployeeId, getPmSubProjects } from '../../utils/pmScope';
 import { ChevronDown, ChevronUp, MessageSquare, Star, ClipboardList, Plus, Pencil, Trash2, X, Check } from 'lucide-react';
 import toast from 'react-hot-toast';
 import Dropdown from '../../components/ui/Dropdown';
+import ConfirmDialog from '../../components/ui/ConfirmDialog';
 
 const REVIEW_TYPES = [
     { value: 'feedback', label: 'Feedback', icon: MessageSquare, color: 'text-blue-600', bg: 'bg-blue-50', border: 'border-blue-200', badge: 'bg-blue-50 text-blue-700 border-blue-200' },
@@ -155,6 +156,7 @@ const EmployeePanel = ({ employee, reviews, reviewerId, onReviewCreated }) => {
     const [expanded, setExpanded] = useState(false);
     const [showForm, setShowForm] = useState(false);
     const [editing, setEditing] = useState(null);
+    const [deleteConfirm, setDeleteConfirm] = useState(null);
     const queryClient = useQueryClient();
 
     const createMutation = useMutation({
@@ -188,7 +190,7 @@ const EmployeePanel = ({ employee, reviews, reviewerId, onReviewCreated }) => {
     });
 
     const handleDelete = (id) => {
-        if (window.confirm('Delete this review?')) deleteMutation.mutate(id);
+        setDeleteConfirm(id);
     };
 
     return (
@@ -268,6 +270,14 @@ const EmployeePanel = ({ employee, reviews, reviewerId, onReviewCreated }) => {
                     )}
                 </div>
             )}
+            <ConfirmDialog
+                isOpen={deleteConfirm !== null}
+                onClose={() => setDeleteConfirm(null)}
+                onConfirm={() => { deleteMutation.mutate(deleteConfirm); setDeleteConfirm(null); }}
+                title="Delete Review"
+                message="Are you sure you want to delete this review? This action cannot be undone."
+                isPending={deleteMutation.isPending}
+            />
         </article>
     );
 };

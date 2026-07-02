@@ -14,6 +14,8 @@ import { getEndDateValidationMessage, isEndDateBeforeStartDate } from '../utils/
 import AllocationPopover from '../components/AllocationPopover';
 import Table, { ColumnTemplates } from '../components/ui/Table';
 import Dropdown from '../components/ui/Dropdown';
+import ConfirmDialog from '../components/ui/ConfirmDialog';
+import Modal from '../components/ui/Modal';
 
 const SkillMultiSelect = ({ options, value, onChange }) => {
   const [isOpen, setIsOpen] = useState(false);
@@ -583,6 +585,7 @@ toast.success(wasEditing ? 'Project updated successfully' : 'Project created suc
   const statusParam = searchParams.get('status');
   const recommendationParam = searchParams.get('recommendation');
   const [subProjectSearch, setSubProjectSearch] = useState('');
+  const [deleteConfirm, setDeleteConfirm] = useState(null);
   const [currentPage, setCurrentPage] = useState(1);
   const PAGE_SIZE = 10;
 
@@ -884,7 +887,7 @@ toast.success(wasEditing ? 'Project updated successfully' : 'Project created suc
                   <Copy className="w-4 h-4" />
                 </button>
                 <button
-                  onClick={() => { if (window.confirm(`Delete "${project.name}"?`)) deleteMutation.mutate(project.id); }}
+                  onClick={() => setDeleteConfirm({ id: project.id, name: project.name })}
                   className="p-2 text-slate-500 hover:text-red-600 hover:bg-red-50 rounded-lg transition-colors"
                   title="Delete"
                 >
@@ -904,25 +907,14 @@ toast.success(wasEditing ? 'Project updated successfully' : 'Project created suc
         }}
       />
 
-      {isModalOpen && (
-        <div className="fixed inset-0 bg-slate-900/40 backdrop-blur-sm flex items-center justify-center z-50 p-2 sm:p-4">
-          <div className="bg-white rounded-lg shadow-xl w-full max-w-full sm:max-w-3xl max-h-[95vh] sm:max-h-[90vh] flex flex-col">
-            <div className="px-6 py-4 border-b border-gray-200 flex-shrink-0">
-              <div className="flex justify-between items-center">
-                <h2 className="text-xl font-semibold text-gray-900">
-                  {editingProject ? 'Edit Project' : copyingProject ? 'Copy Project' : 'Create New Project'}
-                </h2>
-                <button
-                  onClick={resetModalState}
-                  className="text-gray-400 hover:text-gray-600"
-                >
-                  <X className="w-5 h-5" />
-                </button>
-              </div>
-            </div>
-
-            <div className="overflow-y-auto flex-1">
-              <form onSubmit={handleSubmit} className="p-4 sm:p-6 space-y-5" id="project-form">
+      <Modal isOpen={isModalOpen} onClose={resetModalState} size="3xl" maxHeight="95vh">
+        <Modal.Header onClose={resetModalState}>
+          <h2 className="text-xl font-semibold text-gray-900">
+            {editingProject ? 'Edit Project' : copyingProject ? 'Copy Project' : 'Create New Project'}
+          </h2>
+        </Modal.Header>
+        <form onSubmit={handleSubmit} className="flex-1 flex flex-col min-h-0" id="project-form">
+          <Modal.Body className="space-y-5">
                 <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
                   <div>
                     <label className="block text-sm font-medium text-gray-700 mb-1">
@@ -1203,23 +1195,28 @@ toast.success(wasEditing ? 'Project updated successfully' : 'Project created suc
                     </div>
                   )}
                 </div>
-              </form>
-            </div>
-
-            <div className="flex justify-end gap-3 px-6 py-4 border-t border-gray-200 flex-shrink-0">
-              <Button type="button" variant="cancel" onClick={resetModalState}>Cancel</Button>
-              <Button
-                type="submit"
-                form="project-form"
-                disabled={createMutation.isPending || updateMutation.isPending}
-                isLoading={createMutation.isPending || updateMutation.isPending}
-              >
-                {!(createMutation.isPending || updateMutation.isPending) && (editingProject ? 'Update Sub-Project' : 'Create Sub-Project')}
-              </Button>
-            </div>
-          </div>
-        </div>
-      )}
+          </Modal.Body>
+          <Modal.Footer>
+            <Button type="button" variant="cancel" onClick={resetModalState}>Cancel</Button>
+            <Button
+              type="submit"
+              form="project-form"
+              disabled={createMutation.isPending || updateMutation.isPending}
+              isLoading={createMutation.isPending || updateMutation.isPending}
+            >
+              {!(createMutation.isPending || updateMutation.isPending) && (editingProject ? 'Update Sub-Project' : 'Create Sub-Project')}
+            </Button>
+          </Modal.Footer>
+        </form>
+      </Modal>
+      <ConfirmDialog
+        isOpen={deleteConfirm !== null}
+        onClose={() => setDeleteConfirm(null)}
+        onConfirm={() => { deleteMutation.mutate(deleteConfirm.id); setDeleteConfirm(null); }}
+        title="Delete Sub-Project"
+        message={`Are you sure you want to delete "${deleteConfirm?.name}"? This action cannot be undone.`}
+        isPending={deleteMutation.isPending}
+      />
     </div>
   );
 };

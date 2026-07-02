@@ -15,7 +15,7 @@ const Button = ({
     disabled,
     ...props
 }) => {
-    const base = 'inline-flex items-center justify-center transition-all duration-200 outline-none focus:outline-none focus:ring-0 focus-visible:outline-none focus-visible:ring-0 focus-visible:ring-offset-0 ring-0 disabled:opacity-60 disabled:cursor-not-allowed ';
+    const base = 'inline-flex items-center justify-center transition-all duration-200 outline-none focus:outline-none focus:ring-0 focus-visible:outline-none focus-visible:ring-0 focus-visible:ring-offset-0 ring-0 disabled:opacity-60 disabled:cursor-not-allowed active:scale-[0.97] ';
 
     const sizes = {
         sm:   'px-3 py-1.5 text-xs rounded-lg gap-1',

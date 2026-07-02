@@ -1,7 +1,7 @@
 import { useState, useRef, useEffect } from 'react';
 import { ChevronDown, X } from 'lucide-react';
 
-const Dropdown = ({ options = [], value, onChange, placeholder = 'Select', disabled = false, className = '', editable = false, optionsClassName = 'w-full' }) => {
+const Dropdown = ({ options = [], value, onChange, placeholder = 'Select', disabled = false, className = '', editable = false, allowCreate = true, optionsClassName = 'w-full' }) => {
     const [open, setOpen] = useState(false);
     const [searchText, setSearchText] = useState('');
     const ref = useRef(null);
@@ -56,6 +56,7 @@ const Dropdown = ({ options = [], value, onChange, placeholder = 'Select', disab
                             }
                             setOpen(true);
                         }}
+                        onMouseDown={() => { if (open) setOpen(false); }}
                         onFocus={() => setOpen(true)}
                         disabled={disabled}
                         className="flex-1 outline-none bg-transparent text-slate-700 placeholder:text-slate-400"
@@ -93,7 +94,7 @@ const Dropdown = ({ options = [], value, onChange, placeholder = 'Select', disab
                             })
                         ) : (
                             <div className="px-3 py-2 text-sm text-slate-400">
-                                {searchText && `Create "${searchText}"`}
+                                {searchText ? (allowCreate ? `Create "${searchText}"` : 'No matches found') : 'No options'}
                             </div>
                         )}
                     </div>

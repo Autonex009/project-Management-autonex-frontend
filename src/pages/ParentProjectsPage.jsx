@@ -11,10 +11,14 @@ import { Link } from 'react-router-dom';
 import { format } from 'date-fns';
 import toast from 'react-hot-toast';
 import { getPmEmployeeId, getPmProjects } from '../utils/pmScope';
+import ConfirmDialog from '../components/ui/ConfirmDialog';
+import Modal from '../components/ui/Modal';
 
 const ParentProjectsPage = () => {
     const [isModalOpen, setIsModalOpen] = useState(false);
     const [editingProject, setEditingProject] = useState(null);
+    const [projectTypeConfirm, setProjectTypeConfirm] = useState(null);
+    const [programDeleteConfirm, setProgramDeleteConfirm] = useState(null);
     const [selectedPmIds, setSelectedPmIds] = useState([]);
     const [formProjectType, setFormProjectType] = useState('Full');
     const [formStatus, setFormStatus] = useState('active');
@@ -180,8 +184,12 @@ const ParentProjectsPage = () => {
 
         const config = actionConfig[nextProjectType];
         if (!config) return;
-        if (!window.confirm(config.confirmMessage)) return;
+        setProjectTypeConfirm({ nextProjectType, config });
+    };
 
+    const handleProjectTypeExecute = async () => {
+        const { nextProjectType, config } = projectTypeConfirm;
+        setProjectTypeConfirm(null);
         try {
             await parentProjectApi.update(editingProject.id, { project_type: nextProjectType });
             queryClient.invalidateQueries(['parent-projects']);
@@ -371,11 +379,7 @@ const ParentProjectsPage = () => {
                                         <Edit className="w-4 h-4" />
                                     </button>
                                     <button
-                                        onClick={() => {
-                                            if (window.confirm(`Delete "${program.name}"? Its projects will be unlinked.`)) {
-                                                deleteMutation.mutate(program.id);
-                                            }
-                                        }}
+                                        onClick={() => setProgramDeleteConfirm(program)}
                                         className="p-2 text-slate-400 hover:text-red-600 hover:bg-red-50 rounded-lg transition-all"
                                         title="Delete"
                                     >
@@ -399,30 +403,14 @@ const ParentProjectsPage = () => {
             )}
 
             {/* Modal */}
-            {isModalOpen && (
-                <div className="fixed inset-0 z-50 flex items-center justify-center bg-slate-900/50 backdrop-blur-sm px-2 py-4 sm:px-4">
-                    <div className="bg-white rounded-2xl shadow-2xl w-full max-w-full sm:max-w-2xl max-h-[95vh] sm:max-h-[90vh] flex flex-col overflow-hidden">
-                        {/* Modal Header */}
-                        <div className="px-6 py-4 border-b border-slate-100 bg-gradient-to-r from-slate-50 to-white flex-shrink-0">
-                            <div className="flex justify-between items-center">
-                                <h2 className="text-xl font-bold text-slate-900">
-                                    {editingProject ? 'Edit Project' : 'Create Project'}
-                                </h2>
-                                <button
-                                    onClick={() => {
-                                        setIsModalOpen(false);
-                                        setEditingProject(null);
-                                    }}
-                                    className="p-2 hover:bg-slate-100 rounded-lg transition-colors"
-                                >
-                                    <X className="w-5 h-5 text-slate-500" />
-                                </button>
-                            </div>
-                        </div>
-
-                        {/* Modal Body */}
-                        <form onSubmit={handleSubmit} className="flex flex-col min-h-0">
-                            <div className="flex-1 overflow-y-auto p-6 space-y-4">
+            <Modal isOpen={isModalOpen} onClose={() => { setIsModalOpen(false); setEditingProject(null); }} size="2xl" maxHeight="95vh">
+                <Modal.Header onClose={() => { setIsModalOpen(false); setEditingProject(null); }}>
+                    <h2 className="text-base font-semibold text-slate-800">
+                        {editingProject ? 'Edit Project' : 'Create Project'}
+                    </h2>
+                </Modal.Header>
+                <form onSubmit={handleSubmit} className="flex-1 flex flex-col min-h-0">
+                    <Modal.Body className="space-y-4">
                             <div>
                                 <label className="block text-sm font-medium text-slate-700 mb-1">
                                     Project Name *
@@ -525,13 +513,13 @@ const ParentProjectsPage = () => {
                                     </div>
                                 )}
                                 <Dropdown
+                                    editable={true}
+                                    allowCreate={false}
                                     value=""
-                                    options={[
-                                        { value: '', label: '+ Add Program Manager' },
-                                        ...employees
-                                            .filter(e => e.status === 'active' && !selectedPmIds.includes(e.id))
-                                            .map((emp) => ({ value: emp.id, label: emp.name }))
-                                    ]}
+                                    placeholder="+ Add Program Manager"
+                                    options={employees
+                                        .filter(e => e.status === 'active' && !selectedPmIds.includes(e.id))
+                                        .map((emp) => ({ value: emp.id, label: emp.name }))}
                                     onChange={(id) => {
                                         if (id && !selectedPmIds.includes(id)) {
                                             setSelectedPmIds(prev => [...prev, id]);
@@ -596,19 +584,31 @@ const ParentProjectsPage = () => {
                                 />
                             </div>
 
-                            </div>
-
-                            {/* Submit Buttons */}
-                            <div className="flex justify-end gap-3 px-6 py-4 border-t border-slate-100 bg-white flex-shrink-0">
-                                <Button type="button" variant="cancel" onClick={() => { setIsModalOpen(false); setEditingProject(null); }}>Cancel</Button>
-                                <Button type="submit" disabled={createMutation.isPending || updateMutation.isPending} isLoading={createMutation.isPending || updateMutation.isPending} className="bg-gradient-to-r from-indigo-600 to-blue-600 shadow-lg shadow-indigo-200 hover:shadow-xl hover:brightness-105">
-                                    {!(createMutation.isPending || updateMutation.isPending) && (editingProject ? 'Update Project' : 'Create Project')}
-                                </Button>
-                            </div>
-                        </form>
-                    </div>
-                </div>
-            )}
+                    </Modal.Body>
+                    <Modal.Footer>
+                        <Button type="button" variant="cancel" onClick={() => { setIsModalOpen(false); setEditingProject(null); }}>Cancel</Button>
+                        <Button type="submit" disabled={createMutation.isPending || updateMutation.isPending} isLoading={createMutation.isPending || updateMutation.isPending}>
+                            {!(createMutation.isPending || updateMutation.isPending) && (editingProject ? 'Update Project' : 'Create Project')}
+                        </Button>
+                    </Modal.Footer>
+                </form>
+            </Modal>
+            <ConfirmDialog
+                isOpen={projectTypeConfirm !== null}
+                onClose={() => setProjectTypeConfirm(null)}
+                onConfirm={handleProjectTypeExecute}
+                title="Confirm Project Type Change"
+                message={projectTypeConfirm?.config.confirmMessage}
+                variant="warning"
+            />
+            <ConfirmDialog
+                isOpen={programDeleteConfirm !== null}
+                onClose={() => setProgramDeleteConfirm(null)}
+                onConfirm={() => { deleteMutation.mutate(programDeleteConfirm.id); setProgramDeleteConfirm(null); }}
+                title="Delete Program"
+                message={`Delete "${programDeleteConfirm?.name}"? Its projects will be unlinked.`}
+                isPending={deleteMutation.isPending}
+            />
         </div>
     );
 };

@@ -1,6 +1,7 @@
 import React, { useState, useEffect } from 'react';
 import { Wifi, Plus, Trash2, Loader2, Settings, Save, Edit2, Building2, MapPin, Sparkles } from 'lucide-react';
 import Button from '../../components/ui/Button';
+import ConfirmDialog from '../../components/ui/ConfirmDialog';
 import { wifiNetworksApi, companySettingsApi } from '../../services/api';
 import toast from 'react-hot-toast';
 
@@ -24,6 +25,7 @@ const AdminCompanySettingsPage = () => {
     const [formData, setFormData] = useState({ name: '', password: '' });
     const [savingWifi, setSavingWifi] = useState(false);
     const [deletingId, setDeletingId] = useState(null);
+    const [wifiDeleteConfirm, setWifiDeleteConfirm] = useState(null);
 
     useEffect(() => {
         fetchData();
@@ -122,8 +124,6 @@ const AdminCompanySettingsPage = () => {
     };
 
     const handleDeleteWifi = async (id) => {
-        if (!window.confirm('Are you sure you want to delete this WiFi network?')) return;
-        
         setDeletingId(id);
         try {
             await wifiNetworksApi.delete(id);
@@ -149,6 +149,7 @@ const AdminCompanySettingsPage = () => {
     }
 
     return (
+        <>
         <div className="space-y-6 max-w-4xl">
             {/* Page Header */}
             <div>
@@ -321,7 +322,7 @@ const AdminCompanySettingsPage = () => {
                                         <Edit2 className="w-4 h-4" />
                                     </button>
                                     <button
-                                        onClick={() => handleDeleteWifi(network.id)}
+                                        onClick={() => setWifiDeleteConfirm(network.id)}
                                         className="p-2 text-slate-400 hover:text-red-600 hover:bg-red-50 rounded-lg transition-colors"
                                         title="Delete"
                                         disabled={deletingId === network.id || isFormOpen}
@@ -339,6 +340,15 @@ const AdminCompanySettingsPage = () => {
                 </div>
             </div>
         </div>
+        <ConfirmDialog
+            isOpen={wifiDeleteConfirm !== null}
+            onClose={() => setWifiDeleteConfirm(null)}
+            onConfirm={() => { handleDeleteWifi(wifiDeleteConfirm); setWifiDeleteConfirm(null); }}
+            title="Delete WiFi Network"
+            message="Are you sure you want to delete this WiFi network? This action cannot be undone."
+            isPending={deletingId !== null}
+        />
+        </>
     );
 };
 

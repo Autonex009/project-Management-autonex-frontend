@@ -11,6 +11,7 @@ import { getPmEmployeeId, getPmSubProjects } from '../../utils/pmScope';
 import { getLeaveTypeLabel } from '../../utils/leaveTypes';
 import LeaveCalendar from '../../components/LeaveCalendar';
 import EmployeeKPIPanel from '../../components/EmployeeKPIPanel';
+import Modal from '../../components/ui/Modal';
 
 const TABS = ['Leave Requests', 'Calendar', 'WFH Requests', 'Employee KPI'];
 
@@ -250,8 +251,8 @@ const PMLeavesPage = () => {
 
             {/* ── Flagged leave remark modal ── */}
             {remarkModal && (
-                <div className="fixed inset-0 bg-black/50 flex items-center justify-center z-50 p-4">
-                    <div className="bg-white rounded-2xl shadow-xl w-full max-w-md p-6">
+                <Modal isOpen onClose={() => { setRemarkModal(null); setRemark(''); }} size="md">
+                    <Modal.Body>
                         <div className="flex items-start gap-3 mb-4">
                             <div className="p-2 bg-orange-100 rounded-lg shrink-0"><AlertTriangle className="w-5 h-5 text-orange-600"/></div>
                             <div>
@@ -263,14 +264,14 @@ const PMLeavesPage = () => {
                             placeholder="Enter justification for approving this additional leave..."
                             className="w-full rounded-xl border border-slate-200 p-3 text-sm resize-none focus:outline-none focus:ring-2 focus:ring-indigo-500"
                             rows={4} />
-                        <div className="flex justify-end gap-3 mt-4">
-                            <Button variant="cancel" onClick={() => { setRemarkModal(null); setRemark(''); }}>Cancel</Button>
-                            <Button variant="success" onClick={() => approveMutation.mutate({ id: remarkModal.leaveId, remark })} disabled={!remark.trim() || approveMutation.isPending} isLoading={approveMutation.isPending}>
-                                {!approveMutation.isPending && 'Approve with Remark'}
-                            </Button>
-                        </div>
-                    </div>
-                </div>
+                    </Modal.Body>
+                    <Modal.Footer>
+                        <Button variant="cancel" onClick={() => { setRemarkModal(null); setRemark(''); }}>Cancel</Button>
+                        <Button variant="success" onClick={() => approveMutation.mutate({ id: remarkModal.leaveId, remark })} disabled={!remark.trim() || approveMutation.isPending} isLoading={approveMutation.isPending}>
+                            {!approveMutation.isPending && 'Approve with Remark'}
+                        </Button>
+                    </Modal.Footer>
+                </Modal>
             )}
         </div>
     );

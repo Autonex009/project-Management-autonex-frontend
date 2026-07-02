@@ -5,10 +5,11 @@ import Button from '../components/ui/Button';
 import toast from 'react-hot-toast';
 import {
     Download, CheckCircle2, AlertTriangle, IndianRupee,
-    Users, TrendingDown, Wallet, X, Lock, Gift, PlusCircle
+    Users, TrendingDown, Wallet, Lock, Gift, PlusCircle
 } from 'lucide-react';
 import SearchBar from '../components/ui/SearchBar';
 import Table from '../components/ui/Table';
+import Modal from '../components/ui/Modal';
 
 const LEAVE_LABELS = {
     paid: 'Paid', casual_sick: 'Casual/Sick', floater: 'Floater',
@@ -552,26 +553,15 @@ const PayrollPage = () => {
 
             {/* Leave Review Modal */}
             {reviewModal && modalRow && (
-                <div className="fixed inset-0 bg-black/50 flex items-center justify-center z-50 p-2 sm:p-4 overflow-y-auto">
-                    <div className="bg-white rounded-2xl shadow-xl w-full max-w-full sm:max-w-lg my-2 sm:my-4">
-                        {/* Modal header */}
-                        <div className="flex items-start justify-between px-6 py-5 border-b border-slate-100">
-                            <div>
-                                <h3 className="font-bold text-lg text-slate-800">Leave Adjustments</h3>
-                                <p className="text-sm text-slate-500 mt-0.5">
-                                    {modalRow.employee_name} · {month}
-                                </p>
-                            </div>
-                            <Button
-                                variant="ghost"
-                                size="icon"
-                                onClick={() => setReviewModal(null)}
-                            >
-                                <X className="w-5 h-5" />
-                            </Button>
-                            
-                        </div>
+                <Modal isOpen onClose={() => setReviewModal(null)} size="lg">
+                    <Modal.Header onClose={() => setReviewModal(null)}>
+                        <h3 className="font-bold text-lg text-slate-800">Leave Adjustments</h3>
+                        <p className="text-sm text-slate-500 mt-0.5">
+                            {modalRow.employee_name} · {month}
+                        </p>
+                    </Modal.Header>
 
+                    <Modal.Body className="!p-0">
                         {/* Annual paid-leave balances (computed locally; Razorpay has no balance API) */}
                         {modalRow.leave_balances && (
                             <div className="px-6 py-3 bg-slate-50/70 border-b border-slate-100 flex flex-wrap gap-2">
@@ -588,7 +578,7 @@ const PayrollPage = () => {
                         )}
 
                         {/* Leave list */}
-                        <div className="divide-y divide-slate-100 max-h-80 overflow-y-auto">
+                        <div className="divide-y divide-slate-100">
                             {modalRow.leaves.map(l => {
                                 const badge = l.classification === 'paid'
                                     ? { txt: 'Paid', cls: 'bg-emerald-100 text-emerald-700' }
@@ -678,29 +668,27 @@ const PayrollPage = () => {
                                 );
                             })}
                         </div>
+                    </Modal.Body>
 
-                        {/* Modal summary */}
-                        <div className="px-6 py-4 border-t border-slate-100 bg-slate-50 rounded-b-2xl">
-                            <div className="flex items-center justify-between text-sm">
-                                <div className="space-y-0.5">
-                                    <p className="text-slate-500">
-                                        Deducted: <span className="font-semibold text-red-600">
-                                            −{fmtCurrency(modalRow.total_deduction)}
-                                        </span>
-                                    </p>
-                                    <p className="text-slate-500">
-                                        Final salary: <span className="font-bold text-emerald-700">
-                                            {fmtCurrency(modalRow.final_salary)}
-                                        </span>
-                                    </p>
-                                </div>
-                                <Button onClick={() => setReviewModal(null)}>
-                                    Done
-                                </Button>
-                            </div>
+                    {/* Modal summary */}
+                    <Modal.Footer align="between">
+                        <div className="space-y-0.5 text-sm">
+                            <p className="text-slate-500">
+                                Deducted: <span className="font-semibold text-red-600">
+                                    −{fmtCurrency(modalRow.total_deduction)}
+                                </span>
+                            </p>
+                            <p className="text-slate-500">
+                                Final salary: <span className="font-bold text-emerald-700">
+                                    {fmtCurrency(modalRow.final_salary)}
+                                </span>
+                            </p>
                         </div>
-                    </div>
-                </div>
+                        <Button onClick={() => setReviewModal(null)}>
+                            Done
+                        </Button>
+                    </Modal.Footer>
+                </Modal>
             )}
         </div>
     );

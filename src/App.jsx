@@ -68,7 +68,7 @@ const queryClient = new QueryClient({
 function App() {
   return (
     <QueryClientProvider client={queryClient}>
-      <Toaster position="top-right" toastOptions={{ duration: 4000, style: { background: '#333', color: '#fff' } }} />
+      <Toaster position="top-right" containerStyle={{ zIndex: 100000 }} toastOptions={{ duration: 4000, style: { background: '#333', color: '#fff' } }} />
       <Router>
         <Suspense fallback={<div className="flex items-center justify-center min-h-screen text-slate-500 font-medium">Loading Application...</div>}>
           <Routes>
