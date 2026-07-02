@@ -92,10 +92,20 @@ const Dropdown = ({ options = [], value, onChange, placeholder = 'Select', disab
                                     </button>
                                 );
                             })
+                        ) : searchText ? (
+                            allowCreate ? (
+                                <button
+                                    type="button"
+                                    onClick={(e) => { e.preventDefault(); e.stopPropagation(); onChange(searchText); setSearchText(''); setOpen(false); }}
+                                    className="w-full text-left px-3 py-2 text-sm text-indigo-600 hover:bg-indigo-50 transition-colors"
+                                >
+                                    Create "{searchText}"
+                                </button>
+                            ) : (
+                                <div className="px-3 py-2 text-sm text-slate-400">No matches found</div>
+                            )
                         ) : (
-                            <div className="px-3 py-2 text-sm text-slate-400">
-                                {searchText ? (allowCreate ? `Create "${searchText}"` : 'No matches found') : 'No options'}
-                            </div>
+                            <div className="px-3 py-2 text-sm text-slate-400">No options</div>
                         )}
                     </div>
                 )}
