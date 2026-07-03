@@ -1,5 +1,5 @@
 import React, { useState, useEffect } from 'react';
-import { Send, Calendar, Building2, ShieldCheck, Sparkles, MapPin, Wifi, Copy, Check, Globe, Cpu, Bot, Layers, LogOut, FileText, AlertTriangle } from 'lucide-react';
+import { Send, Calendar, Building2, ShieldCheck, Sparkles, MapPin, Wifi, Copy, Check, Globe, Cpu, Bot, Layers, LogOut, AlertTriangle, Linkedin, Youtube } from 'lucide-react';
 import Spinner from '../../components/ui/LoadingSpinner';
 import { wifiNetworksApi, companySettingsApi } from '../../services/api';
 import toast from 'react-hot-toast';
@@ -64,36 +64,47 @@ const CompanyInfoPage = () => {
                 Notice Period & Exit Documentation Policy
             </h3>
 
-            {/* 1. Mandatory notice period highlight */}
-            <div className="bg-gradient-to-br from-indigo-50/70 to-blue-50/50 border border-indigo-100/60 rounded-2xl p-6 flex flex-col sm:flex-row sm:items-center gap-5">
-                <div className="flex-shrink-0 text-center sm:border-r sm:border-indigo-100 sm:pr-6">
-                    <p className="text-4xl font-extrabold text-indigo-600 leading-none">30</p>
-                    <p className="text-xs text-slate-500 font-bold uppercase tracking-wider mt-1">Days Notice</p>
+            {/* 1. Mandatory notice periods by employment type */}
+            <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+                <div className="bg-gradient-to-br from-amber-50/70 to-orange-50/40 border border-amber-100/60 rounded-2xl p-6 flex items-center gap-5">
+                    <div className="flex-shrink-0 text-center border-r border-amber-100 pr-5">
+                        <p className="text-4xl font-extrabold text-amber-600 leading-none">14</p>
+                        <p className="text-xs text-slate-500 font-bold uppercase tracking-wider mt-1">Days Notice</p>
+                    </div>
+                    <p className="text-sm text-slate-600 leading-relaxed">
+                        <strong className="text-slate-800">Interns</strong> are required to serve a <strong className="text-slate-800">14-day notice period</strong> upon submitting their resignation.
+                    </p>
                 </div>
-                <p className="text-sm text-slate-600 leading-relaxed">
-                    All employees are required to serve a mandatory <strong className="text-slate-800">30-day notice period</strong> upon submitting their resignation, unless otherwise <strong className="text-slate-800">approved in writing by the management</strong>.
-                </p>
+                <div className="bg-gradient-to-br from-indigo-50/70 to-blue-50/50 border border-indigo-100/60 rounded-2xl p-6 flex items-center gap-5">
+                    <div className="flex-shrink-0 text-center border-r border-indigo-100 pr-5">
+                        <p className="text-4xl font-extrabold text-indigo-600 leading-none">30</p>
+                        <p className="text-xs text-slate-500 font-bold uppercase tracking-wider mt-1">Days Notice</p>
+                    </div>
+                    <p className="text-sm text-slate-600 leading-relaxed">
+                        <strong className="text-slate-800">Full-time employees</strong> are required to serve a <strong className="text-slate-800">30-day notice period</strong> upon submitting their resignation.
+                    </p>
+                </div>
             </div>
 
-            {/* 2. Expectations during notice period */}
+            {/* 2. Leave & WFH restriction during notice period */}
             <div className="bg-slate-50 border border-slate-100 rounded-2xl p-5 space-y-3">
                 <h4 className="font-bold text-slate-800 text-sm flex items-center gap-2">
-                    <FileText className="w-4 h-4 text-emerald-500" />
-                    During the Notice Period
+                    <Calendar className="w-4 h-4 text-rose-500" />
+                    Leave & WFH During the Notice Period
                 </h4>
                 <p className="text-sm text-slate-600 leading-relaxed">
-                    Employees are expected to complete all assigned responsibilities, hand over ongoing work, and fulfill all exit formalities during the notice period to ensure a smooth transition.
+                    Employees are <strong className="text-slate-800">not permitted to take Leave or Work From Home (WFH)</strong> during their notice period. If any Leave or WFH is taken, the notice period will be <strong className="text-slate-800">extended by the corresponding number of days</strong>.
                 </p>
             </div>
 
-            {/* 3. Consequences of not serving notice */}
+            {/* 3. Consequences of not completing notice */}
             <div className="bg-amber-50/50 border border-amber-200/60 rounded-2xl p-5 space-y-3">
                 <h4 className="font-bold text-amber-800 text-sm flex items-center gap-2">
                     <AlertTriangle className="w-4 h-4 text-amber-600" />
-                    Failure to Serve the Notice Period
+                    Failure to Complete the Notice Period
                 </h4>
                 <p className="text-sm text-amber-900/80 leading-relaxed">
-                    Failure to serve the mandatory notice period without prior written approval from the company will be considered a <strong>breach of the company's exit process</strong>. In such cases, the employee may <strong>not be eligible to receive exit documentation</strong>, including the:
+                    Failure to complete the required notice period will result in <strong>exit documents not being issued</strong>, including the:
                 </p>
                 <ul className="list-disc list-inside text-sm text-amber-900/80 space-y-1.5 pl-1">
                     <li><strong>Experience Letter</strong></li>
@@ -125,6 +136,31 @@ const CompanyInfoPage = () => {
                                 <p>
                                     The company provides domain-expert annotation services for high-stakes AI applications, particularly in robotics, manufacturing, automation, and sensor-heavy environments where accuracy is critical.
                                 </p>
+                            </div>
+
+                            {/* Social Links */}
+                            <div className="mt-5 pt-5 border-t border-indigo-100/60">
+                                <p className="text-xs font-bold text-slate-500 uppercase tracking-wider mb-3">Connect With Us</p>
+                                <div className="flex flex-wrap gap-3">
+                                    <a
+                                        href="https://www.linkedin.com/company/autonex-ai/"
+                                        target="_blank"
+                                        rel="noopener noreferrer"
+                                        className="inline-flex items-center gap-2 bg-white border border-slate-200/80 rounded-xl px-4 py-2.5 text-sm font-semibold text-slate-700 shadow-[0_1px_2px_rgba(0,0,0,0.02)] hover:border-[#0A66C2]/40 hover:text-[#0A66C2] transition-colors"
+                                    >
+                                        <Linkedin className="w-4 h-4 text-[#0A66C2]" />
+                                        LinkedIn
+                                    </a>
+                                    <a
+                                        href="https://youtube.com/@AutonexAI360"
+                                        target="_blank"
+                                        rel="noopener noreferrer"
+                                        className="inline-flex items-center gap-2 bg-white border border-slate-200/80 rounded-xl px-4 py-2.5 text-sm font-semibold text-slate-700 shadow-[0_1px_2px_rgba(0,0,0,0.02)] hover:border-[#FF0000]/40 hover:text-[#FF0000] transition-colors"
+                                    >
+                                        <Youtube className="w-4 h-4 text-[#FF0000]" />
+                                        YouTube
+                                    </a>
+                                </div>
                             </div>
                         </div>
 
@@ -327,10 +363,6 @@ const CompanyInfoPage = () => {
                             </div>
                         </div>
 
-                        {/* 5. Notice Period & Exit Documentation */}
-                        <div className="border-t border-slate-100 pt-6">
-                            {renderExitPolicy()}
-                        </div>
                     </div>
                 );
             case 'office':
