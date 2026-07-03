@@ -3,6 +3,7 @@ import { useNavigate, useLocation } from 'react-router-dom';
 import { useMutation } from '@tanstack/react-query';
 import { Lock, Mail, User, Shield } from 'lucide-react';
 import { authApi } from '../../services/api';
+import Spinner from '../../components/ui/LoadingSpinner';
 import toast from 'react-hot-toast';
 import AuthBrandPanel from '../../components/brand/AuthBrandPanel';
 
@@ -113,12 +114,7 @@ const PMLogin = () => {
                             disabled={loginMutation.isPending}
                             className="flex w-full items-center justify-center gap-2 rounded-2xl bg-[#123fa9] px-4 py-3 font-semibold text-white shadow-[0_16px_38px_rgba(18,63,169,0.26)] transition-all hover:bg-[#0f348a] disabled:cursor-not-allowed disabled:opacity-70"
                         >
-                            {loginMutation.isPending ? (
-                                <span className="flex items-center gap-2">
-                                    <span className="h-5 w-5 animate-spin rounded-full border-2 border-white/30 border-t-white" />
-                                    Signing in...
-                                </span>
-                            ) : 'Sign In'}
+                            {loginMutation.isPending ? <Spinner size="sm" color="white" text="Signing in..." /> : 'Sign In'}
                         </button>
                     </form>
 

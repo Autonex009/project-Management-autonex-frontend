@@ -1,9 +1,11 @@
 import React, { useState, useEffect, useRef } from 'react';
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
+import Button from '../../components/ui/Button';
 import { authApi, employeeApi, skillsApi } from '../../services/api';
 import {
     BadgeCheck, Briefcase, Check, ChevronDown, Clock3, Hash,
     Info, Mail, Pencil, Phone, Save, ShieldCheck, UserRound, X,
+    Camera, Trash2, Loader2, MessageSquare,
 } from 'lucide-react';
 
 /* ── colour accent map for field cards ─────────────────────────── */
@@ -190,6 +192,7 @@ const ProfilePage = () => {
         weeklyAvailability: employee?.weekly_availability,
         skills: employee?.skills || account?.skills || localUser.skills || [],
         slackUserId: employee?.slack_user_id || '',
+        avatarUrl: employee?.avatar_url || account?.avatar_url || localUser.avatar_url || '',
     };
 
     /* ── edit mode state ───────────────────────────────────────── */
@@ -239,6 +242,52 @@ const ProfilePage = () => {
         });
     };
 
+    /* ── avatar (profile picture) ──────────────────────────────── */
+    const fileInputRef = useRef(null);
+    const [avatarError, setAvatarError] = useState('');
+
+    const onAvatarSuccess = () => {
+        queryClient.invalidateQueries({ queryKey: ['employee-profile', employeeId] });
+        queryClient.invalidateQueries({ queryKey: ['auth-me'] });
+        setAvatarError('');
+    };
+    const onAvatarError = (err) =>
+        setAvatarError(err?.response?.data?.detail || 'Failed to update profile picture.');
+
+    const uploadAvatarMutation = useMutation({
+        mutationFn: (formData) => employeeApi.uploadAvatar(employeeId, formData),
+        onSuccess: onAvatarSuccess,
+        onError: onAvatarError,
+    });
+    const slackAvatarMutation = useMutation({
+        mutationFn: () => employeeApi.setAvatarFromSlack(employeeId),
+        onSuccess: onAvatarSuccess,
+        onError: onAvatarError,
+    });
+    const deleteAvatarMutation = useMutation({
+        mutationFn: () => employeeApi.deleteAvatar(employeeId),
+        onSuccess: onAvatarSuccess,
+        onError: onAvatarError,
+    });
+
+    const handleAvatarFile = (e) => {
+        const file = e.target.files?.[0];
+        if (!file) return;
+        if (file.size > 5 * 1024 * 1024) {
+            setAvatarError('Image is too large (max 5 MB).');
+            return;
+        }
+        const formData = new FormData();
+        formData.append('file', file);
+        uploadAvatarMutation.mutate(formData);
+        e.target.value = '';
+    };
+
+    const avatarBusy =
+        uploadAvatarMutation.isPending ||
+        slackAvatarMutation.isPending ||
+        deleteAvatarMutation.isPending;
+
     /* ── render ─────────────────────────────────────────────────── */
     return (
         <div className="space-y-8">
@@ -246,13 +295,83 @@ const ProfilePage = () => {
             <section className="overflow-hidden rounded-[28px] border border-emerald-100 bg-[linear-gradient(135deg,rgba(16,185,129,0.12),rgba(255,255,255,0.92)_45%,rgba(236,253,245,1))] p-6 shadow-sm">
                 <div className="flex flex-col gap-6 lg:flex-row lg:items-center lg:justify-between">
                     <div className="flex items-center gap-4">
-                        <div className="flex h-16 w-16 items-center justify-center rounded-3xl bg-emerald-600 text-xl font-semibold text-white shadow-[0_16px_40px_rgba(5,150,105,0.24)]">
-                            {(mergedProfile.name || 'U').charAt(0)}
+                        <div className="group/avatar relative h-20 w-20 shrink-0">
+                            {/* hidden file input */}
+                            <input
+                                ref={fileInputRef}
+                                type="file"
+                                accept="image/png,image/jpeg,image/gif,image/webp"
+                                className="hidden"
+                                onChange={handleAvatarFile}
+                            />
+                            {mergedProfile.avatarUrl ? (
+                                <img
+                                    src={mergedProfile.avatarUrl}
+                                    alt={mergedProfile.name || 'Profile'}
+                                    className="h-20 w-20 rounded-3xl object-cover shadow-[0_16px_40px_rgba(5,150,105,0.24)]"
+                                />
+                            ) : (
+                                <div className="flex h-20 w-20 items-center justify-center rounded-3xl bg-emerald-600 text-2xl font-semibold text-white shadow-[0_16px_40px_rgba(5,150,105,0.24)]">
+                                    {(mergedProfile.name || 'U').charAt(0)}
+                                </div>
+                            )}
+
+                            {/* hover overlay to change picture */}
+                            <button
+                                type="button"
+                                onClick={() => fileInputRef.current?.click()}
+                                disabled={avatarBusy || !employeeId}
+                                title="Change profile picture"
+                                className="absolute inset-0 flex items-center justify-center rounded-3xl bg-slate-900/55 text-white opacity-0 transition-opacity group-hover/avatar:opacity-100 disabled:cursor-not-allowed"
+                            >
+                                {avatarBusy ? (
+                                    <Loader2 className="h-5 w-5 animate-spin" />
+                                ) : (
+                                    <Camera className="h-5 w-5" />
+                                )}
+                            </button>
                         </div>
                         <div>
                             <p className="text-sm font-medium uppercase tracking-[0.18em] text-emerald-700">Profile</p>
                             <h1 className="mt-1 text-2xl font-bold tracking-tight text-slate-900">{mergedProfile.name || 'Employee'}</h1>
                             <p className="mt-1 text-sm text-slate-500">Your account and work details in one place.</p>
+
+                            {/* avatar actions */}
+                            <div className="mt-3 flex flex-wrap items-center gap-2">
+                                <button
+                                    type="button"
+                                    onClick={() => fileInputRef.current?.click()}
+                                    disabled={avatarBusy || !employeeId}
+                                    className="inline-flex items-center gap-1.5 rounded-lg border border-emerald-200 bg-white px-3 py-1.5 text-xs font-semibold text-emerald-700 transition-all hover:bg-emerald-50 disabled:cursor-not-allowed disabled:opacity-50"
+                                >
+                                    <Camera className="h-3.5 w-3.5" />
+                                    Upload photo
+                                </button>
+                                <button
+                                    type="button"
+                                    onClick={() => slackAvatarMutation.mutate()}
+                                    disabled={avatarBusy || !employeeId}
+                                    title="Fetch your photo from Slack"
+                                    className="inline-flex items-center gap-1.5 rounded-lg border border-violet-200 bg-white px-3 py-1.5 text-xs font-semibold text-violet-700 transition-all hover:bg-violet-50 disabled:cursor-not-allowed disabled:opacity-50"
+                                >
+                                    <MessageSquare className="h-3.5 w-3.5" />
+                                    Use Slack photo
+                                </button>
+                                {mergedProfile.avatarUrl && (
+                                    <button
+                                        type="button"
+                                        onClick={() => deleteAvatarMutation.mutate()}
+                                        disabled={avatarBusy}
+                                        className="inline-flex items-center gap-1.5 rounded-lg border border-slate-200 bg-white px-3 py-1.5 text-xs font-semibold text-slate-500 transition-all hover:bg-rose-50 hover:text-rose-600 disabled:cursor-not-allowed disabled:opacity-50"
+                                    >
+                                        <Trash2 className="h-3.5 w-3.5" />
+                                        Remove
+                                    </button>
+                                )}
+                            </div>
+                            {avatarError && (
+                                <p className="mt-2 text-xs font-medium text-rose-600">{avatarError}</p>
+                            )}
                         </div>
                     </div>
 
@@ -278,15 +397,10 @@ const ProfilePage = () => {
                                     <X className="h-4 w-4" />
                                     Cancel
                                 </button>
-                                <button
-                                    type="button"
-                                    onClick={handleSave}
-                                    disabled={saveMutation.isPending}
-                                    className="inline-flex items-center gap-2 rounded-xl bg-emerald-600 px-5 py-2.5 text-sm font-semibold text-white shadow-sm transition-all hover:bg-emerald-700 disabled:opacity-60"
-                                >
-                                    <Save className="h-4 w-4" />
+                                <Button variant="success" type="button" onClick={handleSave} disabled={saveMutation.isPending} isLoading={saveMutation.isPending}>
+                                    {!saveMutation.isPending && <Save className="h-4 w-4" />}
                                     {saveMutation.isPending ? 'Saving…' : 'Save'}
-                                </button>
+                                </Button>
                             </>
                         )}
 

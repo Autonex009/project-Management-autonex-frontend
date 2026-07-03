@@ -1,5 +1,5 @@
 import { useState, useRef, useEffect } from 'react';
-import { useNavigate } from 'react-router-dom';
+import { useNavigate, useLocation } from 'react-router-dom';
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import { 
   Bell, 
@@ -83,20 +83,34 @@ const getNotificationRoute = (notification, userRole) => {
 
 const NotificationBell = () => {
   const navigate = useNavigate();
+  const location = useLocation();
   const [open, setOpen] = useState(false);
   const panelRef = useRef(null);
+  const didMountRef = useRef(false);
   const queryClient = useQueryClient();
 
   const user = JSON.parse(localStorage.getItem('user') || '{}');
   const userId = user.id;
   const role = localStorage.getItem('role') || user.role || 'employee';
 
-  const { data: notifications = [] } = useQuery({
+  // Event-driven (no polling): React Query refetches on mount + tab refocus; we add
+  // refetch-on-navigation and refetch-on-open below. Cuts the constant 15s drumbeat.
+  const { data: notifications = [], refetch } = useQuery({
     queryKey: ['notifications', userId],
     queryFn: () => notificationApi.getAll(userId),
     enabled: !!userId,
-    refetchInterval: 15_000, // poll every 15s for high responsiveness
+    staleTime: 15_000,
+    refetchOnWindowFocus: true, // global default is false; enable just for notifications
   });
+
+  // Refetch when the route changes (skip the initial mount — the query already fetches then)
+  useEffect(() => {
+    if (!didMountRef.current) {
+      didMountRef.current = true;
+      return;
+    }
+    if (userId) refetch();
+  }, [location.pathname]); // eslint-disable-line react-hooks/exhaustive-deps
 
   const unreadCount = notifications.filter(n => !n.is_read).length;
   const readCount = notifications.filter(n => n.is_read).length;
@@ -132,7 +146,7 @@ const NotificationBell = () => {
   return (
     <div className="relative" ref={panelRef}>
       <button
-        onClick={() => setOpen(o => !o)}
+        onClick={() => setOpen(o => { const next = !o; if (next && userId) refetch(); return next; })}
         className={`relative p-2 text-slate-500 hover:text-slate-700 hover:bg-slate-100/80 rounded-xl transition-all duration-200 ${open ? 'bg-slate-100 text-slate-800' : ''}`}
         aria-label="Notifications"
       >
@@ -172,7 +186,7 @@ const NotificationBell = () => {
               {readCount > 0 && (
                 <button
                   onClick={() => clearReadMutation.mutate()}
-                  className="flex items-center gap-1 rounded-lg border border-slate-200 bg-slate-50 px-2.5 py-1.5 text-xs font-semibold text-slate-600 transition-all hover:bg-slate-100 hover:text-red-600 hover:border-red-100 hover:bg-red-50"
+                  className="flex items-center gap-1 rounded-lg border border-slate-200 bg-slate-50 px-2.5 py-1.5 text-xs font-semibold text-slate-600 transition-all  hover:text-red-600 hover:border-red-100 hover:bg-red-50"
                   title="Clear all read notifications"
                 >
                   <Trash2 className="w-3.5 h-3.5" />

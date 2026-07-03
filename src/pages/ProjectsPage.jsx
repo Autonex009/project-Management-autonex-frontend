@@ -1,17 +1,21 @@
 import { useState, useEffect, useRef, useMemo } from 'react';
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import { useNavigate, useSearchParams } from 'react-router-dom';
+import Button from '../components/ui/Button';
+import Spinner from '../components/ui/LoadingSpinner';
 import { subProjectApi, parentProjectApi, employeeApi, allocationApi, skillApi, leaveApi, guidelineApi } from '../services/api';
-import { Plus, Edit, Trash2, X, UserCheck, Users, ChevronDown, ArrowRight, Copy, Settings, UploadCloud, FileText, Search } from 'lucide-react';
+import { Plus, Edit, Trash2, X, UserCheck, Users, ChevronDown, ArrowRight, Copy, Settings, UploadCloud, FileText } from 'lucide-react';
 import { Link } from 'react-router-dom';
 import { format } from 'date-fns';
 import toast from 'react-hot-toast';
-import PageSearchBar from '../components/ui/PageSearchBar';
+import SearchBar from '../components/ui/SearchBar';
 import { getPmEmployeeId, getPmProjects, getPmSubProjects } from '../utils/pmScope';
 import { getEndDateValidationMessage, isEndDateBeforeStartDate } from '../utils/dateValidation';
 import AllocationPopover from '../components/AllocationPopover';
 import Table, { ColumnTemplates } from '../components/ui/Table';
 import Dropdown from '../components/ui/Dropdown';
+import ConfirmDialog from '../components/ui/ConfirmDialog';
+import Modal from '../components/ui/Modal';
 
 const SkillMultiSelect = ({ options, value, onChange }) => {
   const [isOpen, setIsOpen] = useState(false);
@@ -590,6 +594,7 @@ toast.success(wasEditing ? 'Project updated successfully' : 'Project created suc
   const statusParam = searchParams.get('status');
   const recommendationParam = searchParams.get('recommendation');
   const [subProjectSearch, setSubProjectSearch] = useState('');
+  const [deleteConfirm, setDeleteConfirm] = useState(null);
   const [currentPage, setCurrentPage] = useState(1);
   const PAGE_SIZE = 10;
 
@@ -615,13 +620,6 @@ toast.success(wasEditing ? 'Project updated successfully' : 'Project created suc
 
   const currentMainProject = visibleMainProjects.find(p => p.id === parseInt(filterMainProjectId));
 
-  if (isLoading) {
-    return (
-      <div className="flex items-center justify-center py-12">
-        <div className="text-gray-500">Loading projects...</div>
-      </div>
-    );
-  }
 
   return (
     <div className="space-y-6 p-2">
@@ -637,7 +635,7 @@ toast.success(wasEditing ? 'Project updated successfully' : 'Project created suc
           </p>
         </div>
         <div className="flex flex-wrap items-center gap-2">
-          <PageSearchBar
+          <SearchBar responsive
             value={subProjectSearch}
             onChange={setSubProjectSearch}
             placeholder="Search projects..."
@@ -649,21 +647,10 @@ toast.success(wasEditing ? 'Project updated successfully' : 'Project created suc
             <Settings className="w-4 h-4" />
             Organizations
           </Link>
-          <button
-            onClick={() => {
-              setEditingProject(null);
-              setSelectedSkills([]);
-              setGuidelineFiles([]);
-              setFormMainProjectId(filterMainProjectId || '');
-              setFormPriority('medium');
-              setFormProjectStatus('active');
-              setIsModalOpen(true);
-            }}
-            className="inline-flex items-center gap-2 px-4 py-2.5 bg-indigo-600 hover:bg-indigo-700 text-white font-medium text-sm rounded-xl shadow-sm transition-colors"
-          >
+          <Button onClick={() => { setEditingProject(null); setSelectedSkills([]); setGuidelineFiles([]); setFormMainProjectId(filterMainProjectId || ''); setFormPriority('medium'); setFormProjectStatus('active'); setIsModalOpen(true); }}>
             <Plus className="w-4 h-4" />
             Add Project
-          </button>
+          </Button>
         </div>
       </div>
 
@@ -674,48 +661,27 @@ toast.success(wasEditing ? 'Project updated successfully' : 'Project created suc
           {statusParam && (
             <span className="inline-flex items-center gap-1.5 px-2.5 py-1 rounded-full text-xs font-medium bg-indigo-50 text-indigo-700 border border-indigo-200">
               Status: {statusParam}
-              <button 
-                onClick={() => {
-                  const params = new URLSearchParams(searchParams);
-                  params.delete('status');
-                  setSearchParams(params);
-                }} 
-                className="hover:bg-indigo-100 rounded-full p-0.5"
-              >
+              <Button variant="ghost" size="icon" onClick={() => { const params = new URLSearchParams(searchParams); params.delete('status'); setSearchParams(params); }} className="rounded-full p-0.5">
                 <X className="w-3 h-3" />
-              </button>
+              </Button>
             </span>
           )}
           {recommendationParam && (
             <span className="inline-flex items-center gap-1.5 px-2.5 py-1 rounded-full text-xs font-medium bg-red-50 text-red-700 border border-red-200">
               Recommendation: {recommendationParam}
-              <button 
-                onClick={() => {
-                  const params = new URLSearchParams(searchParams);
-                  params.delete('recommendation');
-                  setSearchParams(params);
-                }} 
-                className="hover:bg-red-100 rounded-full p-0.5"
-              >
+              <Button variant="ghost" size="icon" onClick={() => { const params = new URLSearchParams(searchParams); params.delete('recommendation'); setSearchParams(params); }} className="rounded-full p-0.5">
                 <X className="w-3 h-3" />
-              </button>
+              </Button>
             </span>
           )}
-          <button
-            onClick={() => {
-              const params = new URLSearchParams(searchParams);
-              params.delete('status');
-              params.delete('recommendation');
-              setSearchParams(params);
-            }}
-            className="text-xs font-medium text-slate-500 hover:text-slate-800 transition-colors ml-auto"
-          >
+          <Button variant="link" onClick={() => { const params = new URLSearchParams(searchParams); params.delete('status'); params.delete('recommendation'); setSearchParams(params); }} className="ml-auto text-xs text-slate-500 hover:text-slate-800">
             Clear all
-          </button>
+          </Button>
         </div>
       )}
 
       <Table
+        loading={isLoading}
         columns={[
           {
             key: 'name',
@@ -930,7 +896,7 @@ toast.success(wasEditing ? 'Project updated successfully' : 'Project created suc
                   <Copy className="w-4 h-4" />
                 </button>
                 <button
-                  onClick={() => { if (window.confirm(`Delete "${project.name}"?`)) deleteMutation.mutate(project.id); }}
+                  onClick={() => setDeleteConfirm({ id: project.id, name: project.name })}
                   className="p-2 text-slate-500 hover:text-red-600 hover:bg-red-50 rounded-lg transition-colors"
                   title="Delete"
                 >
@@ -950,25 +916,14 @@ toast.success(wasEditing ? 'Project updated successfully' : 'Project created suc
         }}
       />
 
-      {isModalOpen && (
-        <div className="fixed inset-0 bg-slate-900/40 backdrop-blur-sm flex items-center justify-center z-50 p-2 sm:p-4">
-          <div className="bg-white rounded-lg shadow-xl w-full max-w-full sm:max-w-3xl max-h-[95vh] sm:max-h-[90vh] flex flex-col">
-            <div className="px-6 py-4 border-b border-gray-200 flex-shrink-0">
-              <div className="flex justify-between items-center">
-                <h2 className="text-xl font-semibold text-gray-900">
-                  {editingProject ? 'Edit Project' : copyingProject ? 'Copy Project' : 'Create New Project'}
-                </h2>
-                <button
-                  onClick={resetModalState}
-                  className="text-gray-400 hover:text-gray-600"
-                >
-                  <X className="w-5 h-5" />
-                </button>
-              </div>
-            </div>
-
-            <div className="overflow-y-auto flex-1">
-              <form onSubmit={handleSubmit} className="p-4 sm:p-6 space-y-5" id="project-form">
+      <Modal isOpen={isModalOpen} onClose={resetModalState} size="3xl" maxHeight="95vh">
+        <Modal.Header onClose={resetModalState}>
+          <h2 className="text-xl font-semibold text-gray-900">
+            {editingProject ? 'Edit Project' : copyingProject ? 'Copy Project' : 'Create New Project'}
+          </h2>
+        </Modal.Header>
+        <form onSubmit={handleSubmit} className="flex-1 flex flex-col min-h-0" id="project-form">
+          <Modal.Body className="space-y-5">
                 <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
                   <div>
                     <label className="block text-sm font-medium text-gray-700 mb-1">
@@ -1249,33 +1204,28 @@ toast.success(wasEditing ? 'Project updated successfully' : 'Project created suc
                     </div>
                   )}
                 </div>
-              </form>
-            </div>
-
-            <div className="flex justify-end gap-3 px-6 py-4 border-t border-gray-200 flex-shrink-0">
-              <button
-                type="button"
-                onClick={resetModalState}
-                className="btn btn-secondary"
-              >
-                Cancel
-              </button>
-              <button
-                type="submit"
-                form="project-form"
-                disabled={createMutation.isPending || updateMutation.isPending}
-                className="btn btn-primary"
-              >
-                {createMutation.isPending || updateMutation.isPending
-                  ? 'Saving...'
-                  : editingProject
-                    ? 'Update Sub-Project'
-                    : 'Create Sub-Project'}
-              </button>
-            </div>
-          </div>
-        </div>
-      )}
+          </Modal.Body>
+          <Modal.Footer>
+            <Button type="button" variant="cancel" onClick={resetModalState}>Cancel</Button>
+            <Button
+              type="submit"
+              form="project-form"
+              disabled={createMutation.isPending || updateMutation.isPending}
+              isLoading={createMutation.isPending || updateMutation.isPending}
+            >
+              {!(createMutation.isPending || updateMutation.isPending) && (editingProject ? 'Update Sub-Project' : 'Create Sub-Project')}
+            </Button>
+          </Modal.Footer>
+        </form>
+      </Modal>
+      <ConfirmDialog
+        isOpen={deleteConfirm !== null}
+        onClose={() => setDeleteConfirm(null)}
+        onConfirm={() => { deleteMutation.mutate(deleteConfirm.id); setDeleteConfirm(null); }}
+        title="Delete Sub-Project"
+        message={`Are you sure you want to delete "${deleteConfirm?.name}"? This action cannot be undone.`}
+        isPending={deleteMutation.isPending}
+      />
     </div>
   );
 };

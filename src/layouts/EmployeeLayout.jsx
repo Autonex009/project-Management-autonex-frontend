@@ -1,8 +1,11 @@
 import React, { useState, useEffect } from 'react';
 import { Outlet, NavLink, useNavigate } from 'react-router-dom';
+import { useQuery } from '@tanstack/react-query';
 import { LayoutDashboard, FolderKanban, Calendar, CalendarCheck, Rocket, LogOut, Menu, X, FileText, Layers, UserCog, UserRound, Users, Users2, TrendingUp, GraduationCap, Info, ChevronLeft, ChevronRight } from 'lucide-react';
 import BrandLockup from '../components/brand/BrandLockup';
 import NotificationBell from '../components/NotificationBell';
+import { authApi } from '../services/api';
+import ChatWidget from '../components/chat/ChatWidget';
 
 const accentTheme = {
     pm: {
@@ -47,14 +50,18 @@ const EmployeeLayout = () => {
     const user = JSON.parse(localStorage.getItem('user') || '{}');
     const role = localStorage.getItem('role') || 'employee';
     const isPm = role === 'pm';
+
+    // Live account data (for profile picture, name, etc.)
+    const { data: account } = useQuery({
+        queryKey: ['auth-me'],
+        queryFn: authApi.me,
+        staleTime: 5 * 60 * 1000,
+    });
+    const avatarUrl = account?.avatar_url || user.avatar_url || '';
+    const displayName = account?.name || user.name || 'User';
     const prefix = isPm ? '/pm' : '/employee';
     const portalLabel = isPm ? 'PM Portal' : 'Employee Portal';
     const theme = isPm ? accentTheme.pm : accentTheme.employee;
-
-    const isAnnotator = user.designation && (
-        user.designation.toLowerCase().includes('annotator') ||
-        user.designation.toLowerCase().includes('reviewer')
-    );
 
     const navItems = isPm
         ? [
@@ -69,6 +76,7 @@ const EmployeeLayout = () => {
             { to: `${prefix}/side-projects`, label: 'Side Projects', icon: Rocket },
             { to: `${prefix}/guidelines`, label: 'Guidelines', icon: FileText },
             { to: `${prefix}/onboarding-mentor`, label: 'Mentorship', icon: GraduationCap },
+            { to: `${prefix}/profile`, label: 'Profile', icon: UserRound },
         ]
         : [
             { to: `${prefix}/dashboard`, label: 'Dashboard', icon: LayoutDashboard },
@@ -78,7 +86,7 @@ const EmployeeLayout = () => {
             { to: `${prefix}/guidelines`, label: 'Guidelines', icon: FileText },
             { to: `${prefix}/referrals`, label: 'Referrals', icon: Users2 },
             { to: `${prefix}/company-info`, label: 'Company Info', icon: Info },
-            ...(isAnnotator ? [{ to: `${prefix}/onboarding`, label: 'Onboarding', icon: GraduationCap }] : []),
+            { to: `${prefix}/onboarding`, label: 'Onboarding', icon: GraduationCap },
             { to: `${prefix}/profile`, label: 'Profile', icon: UserRound },
         ];
 
@@ -143,23 +151,39 @@ const EmployeeLayout = () => {
                     <div className={`border-t border-slate-100 p-4 transition-all flex flex-col gap-3 items-center ${isSidebarCollapsed ? 'lg:px-2 lg:py-4' : ''}`}>
                         {isSidebarCollapsed ? (
                             <div className="group relative">
-                                <div className={`flex h-10 w-10 items-center justify-center rounded-xl font-bold text-sm shrink-0 border border-slate-100 bg-slate-50 cursor-pointer ${theme.avatar}`}>
-                                    {(user.name || 'U').charAt(0)}
-                                </div>
+                                <button
+                                    type="button"
+                                    onClick={() => navigate(`${prefix}/profile`)}
+                                    className={`flex h-10 w-10 items-center justify-center overflow-hidden rounded-xl font-bold text-sm shrink-0 border border-slate-100 bg-slate-50 cursor-pointer ${theme.avatar}`}
+                                >
+                                    {avatarUrl ? (
+                                        <img src={avatarUrl} alt={displayName} className="h-full w-full object-cover" />
+                                    ) : (
+                                        (displayName || 'U').charAt(0)
+                                    )}
+                                </button>
                                 <div className="absolute left-16 top-1/2 -translate-y-1/2 bg-slate-900 text-white text-xs px-2.5 py-1.5 rounded-lg border border-slate-700 opacity-0 group-hover:opacity-100 transition-opacity duration-200 whitespace-nowrap pointer-events-none z-50 shadow-xl">
-                                    {user.name || 'User'} ({portalLabel})
+                                    {displayName} ({portalLabel})
                                 </div>
                             </div>
                         ) : (
-                            <div className="w-full flex items-center gap-3 p-3 rounded-2xl border border-slate-100 bg-slate-50/90">
-                                <div className={`flex h-10 w-10 items-center justify-center rounded-full font-bold text-sm shrink-0 ${theme.avatar}`}>
-                                    {(user.name || 'U').charAt(0)}
+                            <button
+                                type="button"
+                                onClick={() => navigate(`${prefix}/profile`)}
+                                className="w-full flex items-center gap-3 p-3 rounded-2xl border border-slate-100 bg-slate-50/90 text-left transition-colors hover:bg-slate-100"
+                            >
+                                <div className={`flex h-10 w-10 items-center justify-center overflow-hidden rounded-full font-bold text-sm shrink-0 ${theme.avatar}`}>
+                                    {avatarUrl ? (
+                                        <img src={avatarUrl} alt={displayName} className="h-full w-full object-cover" />
+                                    ) : (
+                                        (displayName || 'U').charAt(0)
+                                    )}
                                 </div>
                                 <div className="min-w-0 flex-1">
-                                    <p className="truncate text-sm font-medium text-slate-900">{user.name || 'User'}</p>
-                                    <p className="truncate text-xs text-slate-400">{user.email || ''}</p>
+                                    <p className="truncate text-sm font-medium text-slate-900">{displayName}</p>
+                                    <p className="truncate text-xs text-slate-400">{account?.email || user.email || ''}</p>
                                 </div>
-                            </div>
+                            </button>
                         )}
 
                         <button
@@ -195,6 +219,18 @@ const EmployeeLayout = () => {
                     <div className="flex items-center gap-3">
                         <NotificationBell />
                         <div className={`rounded-full px-3 py-1 text-xs font-medium capitalize ${theme.chip}`}>{role}</div>
+                        <button
+                            type="button"
+                            onClick={() => navigate(`${prefix}/profile`)}
+                            title={`${displayName} — View profile`}
+                            className={`flex h-9 w-9 items-center justify-center overflow-hidden rounded-full font-semibold text-sm shrink-0 transition-all hover:ring-2 hover:ring-offset-2 ${isPm ? 'hover:ring-blue-300' : 'hover:ring-emerald-300'} ${theme.avatar}`}
+                        >
+                            {avatarUrl ? (
+                                <img src={avatarUrl} alt={displayName} className="h-full w-full object-cover" />
+                            ) : (
+                                (displayName || 'U').charAt(0)
+                            )}
+                        </button>
                     </div>
                 </header>
 
@@ -202,6 +238,9 @@ const EmployeeLayout = () => {
                     <Outlet />
                 </main>
             </div>
+
+            {/* AI Chat Widget */}
+            <ChatWidget />
         </div>
     );
 };

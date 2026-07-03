@@ -1,5 +1,6 @@
 import React, { useState, useRef, useEffect, useMemo, useLayoutEffect, useCallback } from 'react';
 import { createPortal } from 'react-dom';
+import Button from './ui/Button';
 import { UserPlus, Users, Mail, ArrowRight } from 'lucide-react';
 
 const POPOVER_WIDTH = 320;
@@ -287,15 +288,11 @@ const AllocationPopover = ({
 
             {/* Footer / CTA */}
             <div className="px-3 py-2.5 border-t border-slate-100 bg-slate-50/60">
-              <button
-                type="button"
-                onClick={handleAdd}
-                className="w-full inline-flex items-center justify-center gap-2 px-3 py-2 bg-indigo-600 hover:bg-indigo-700 text-white text-sm font-medium rounded-lg shadow-sm transition-colors"
-              >
+              <Button type="button" onClick={handleAdd} className="w-full justify-center">
                 <UserPlus className="w-4 h-4" />
                 <span>Add employee</span>
                 <ArrowRight className="w-3.5 h-3.5 opacity-80" />
-              </button>
+              </Button>
             </div>
           </div>
 

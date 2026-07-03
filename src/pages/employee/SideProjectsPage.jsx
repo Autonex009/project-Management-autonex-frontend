@@ -1,10 +1,12 @@
 import React, { useState } from 'react';
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
+import Button from '../../components/ui/Button';
 import { sideProjectApi } from '../../services/api';
 import { Rocket, Plus, X, Trash2, Edit3, Save } from 'lucide-react';
 import toast from 'react-hot-toast';
 import { getEndDateValidationMessage, isEndDateBeforeStartDate } from '../../utils/dateValidation';
 import Dropdown from '../../components/ui/Dropdown';
+import ConfirmDialog from '../../components/ui/ConfirmDialog';
 
 const SideProjectsPage = () => {
     const queryClient = useQueryClient();
@@ -13,6 +15,7 @@ const SideProjectsPage = () => {
     const [showForm, setShowForm] = useState(false);
     const [editingId, setEditingId] = useState(null);
     const [form, setForm] = useState({ name: '', description: '', status: 'active', start_date: '', end_date: '' });
+    const [deleteConfirm, setDeleteConfirm] = useState(null);
 
     const { data: sideProjects = [], isLoading } = useQuery({
         queryKey: ['side-projects', employeeId],
@@ -57,15 +60,16 @@ const SideProjectsPage = () => {
     const statusColors = { active: 'bg-emerald-50 text-emerald-700 border-emerald-200', completed: 'bg-blue-50 text-blue-700 border-blue-200', paused: 'bg-amber-50 text-amber-700 border-amber-200' };
 
     return (
+        <>
         <div className="space-y-6">
             <div className="flex items-center justify-between">
                 <div>
                     <h1 className="text-2xl font-bold text-slate-900">Side Projects</h1>
                     <p className="text-slate-500 text-sm mt-1">Personal projects and learning initiatives</p>
                 </div>
-                <button onClick={() => { resetForm(); setShowForm(true); }} className="flex items-center gap-2 px-4 py-2.5 bg-indigo-600 text-white rounded-xl text-sm font-medium hover:bg-indigo-700 transition-colors shadow-sm">
+                <Button onClick={() => { resetForm(); setShowForm(true); }}>
                     <Plus className="w-4 h-4" /> Add Project
-                </button>
+                </Button>
             </div>
 
             {showForm && (
@@ -105,9 +109,7 @@ const SideProjectsPage = () => {
                             <input type="date" value={form.end_date} onChange={e => setForm({ ...form, end_date: e.target.value })} className="w-full px-3 py-2 border border-slate-200 rounded-lg text-sm" />
                         </div>
                         <div className="md:col-span-2 flex justify-end">
-                            <button type="submit" className="flex items-center gap-2 px-4 py-2 bg-indigo-600 text-white rounded-lg text-sm font-medium hover:bg-indigo-700">
-                                <Save className="w-4 h-4" /> {editingId ? 'Update' : 'Create'}
-                            </button>
+                            <Button type="submit"><Save className="w-4 h-4" /> {editingId ? 'Update' : 'Create'}</Button>
                         </div>
                     </form>
                 </div>
@@ -132,7 +134,7 @@ const SideProjectsPage = () => {
                                 </div>
                                 <div className="flex items-center gap-1">
                                     <button onClick={() => startEdit(sp)} className="p-1 text-slate-400 hover:text-blue-600"><Edit3 className="w-3.5 h-3.5" /></button>
-                                    <button onClick={() => { if (window.confirm(`Delete "${sp.name}"?`)) deleteMutation.mutate(sp.id); }} className="p-1 text-slate-400 hover:text-red-600"><Trash2 className="w-3.5 h-3.5" /></button>
+                                    <button onClick={() => setDeleteConfirm({ id: sp.id, name: sp.name })} className="p-1 text-slate-400 hover:text-red-600"><Trash2 className="w-3.5 h-3.5" /></button>
                                 </div>
                             </div>
                             <span className={`inline-flex px-2 py-0.5 text-xs font-medium rounded-full border capitalize ${statusColors[sp.status] || statusColors.active}`}>{sp.status}</span>
@@ -141,6 +143,15 @@ const SideProjectsPage = () => {
                 </div>
             )}
         </div>
+        <ConfirmDialog
+            isOpen={deleteConfirm !== null}
+            onClose={() => setDeleteConfirm(null)}
+            onConfirm={() => { deleteMutation.mutate(deleteConfirm.id); setDeleteConfirm(null); }}
+            title="Delete Side Project"
+            message={`Are you sure you want to delete "${deleteConfirm?.name}"? This action cannot be undone.`}
+            isPending={deleteMutation.isPending}
+        />
+        </>
     );
 };
 

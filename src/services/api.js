@@ -97,6 +97,11 @@ export const employeeApi = {
     convertToFulltime: (id, data) => api.post(`/employees/${id}/convert-to-fulltime`, data).then(res => res.data),
     restore: (id) => api.post(`/employees/${id}/restore`).then(res => res.data),
     getSlackLink: (id) => api.get(`/employees/${id}/slack-link`).then(res => res.data),
+    uploadAvatar: (id, formData) => api.post(`/employees/${id}/avatar`, formData, {
+        headers: { 'Content-Type': 'multipart/form-data' },
+    }).then(res => res.data),
+    setAvatarFromSlack: (id) => api.post(`/employees/${id}/avatar/from-slack`).then(res => res.data),
+    deleteAvatar: (id) => api.delete(`/employees/${id}/avatar`).then(res => res.data),
     getActive: () => api.get('/employees/status/active').then(res => res.data),
     getInactive: () => api.get('/employees/status/inactive').then(res => res.data),
     getIdle: () => api.get('/employees/status/idle').then(res => res.data),
@@ -123,6 +128,8 @@ export const leaveApi = {
     delete: (id) => api.delete(`/leaves/${id}`).then(res => res.data),
     approve: (id, approvedBy, remark) => api.patch(`/leaves/${id}/approve`, { remark: remark || null }, { params: { approved_by: approvedBy } }).then(res => res.data),
     reject: (id, approvedBy) => api.patch(`/leaves/${id}/reject`, null, { params: { approved_by: approvedBy } }).then(res => res.data),
+    undoApprove: (id, approvedBy) => api.patch(`/leaves/${id}/undo-approve`, null, { params: { approved_by: approvedBy } }).then(res => res.data),
+    undoReject: (id, approvedBy) => api.patch(`/leaves/${id}/undo-reject`, null, { params: { approved_by: approvedBy } }).then(res => res.data),
     applyToRazorpay: (id) => api.post(`/leaves/${id}/apply-to-razorpay`).then(res => res.data),
     getCalendar: (month) => api.get('/leaves/calendar', { params: { month } }).then(res => res.data),
 };
@@ -130,8 +137,11 @@ export const leaveApi = {
 export const signupRequestApi = {
     submit: (data) => api.post('/signup-requests', data).then(res => res.data),
     getAll: (params) => api.get('/signup-requests', { params }).then(res => res.data),
+    getCounts: () => api.get('/signup-requests/counts').then(res => res.data),
     approve: (id, reviewedBy) => api.patch(`/signup-requests/${id}/approve`, null, { params: { reviewed_by: reviewedBy } }).then(res => res.data),
     reject: (id, reviewedBy, reason) => api.patch(`/signup-requests/${id}/reject`, { reason: reason || null }, { params: { reviewed_by: reviewedBy } }).then(res => res.data),
+    undoReject: (id, reviewedBy) => api.patch(`/signup-requests/${id}/undo-reject`, null, { params: { reviewed_by: reviewedBy } }).then(res => res.data),
+    undoApprove: (id, reviewedBy, reason) => api.patch(`/signup-requests/${id}/undo-approve`, { reason: reason || null }, { params: { reviewed_by: reviewedBy } }).then(res => res.data),
     update: (id, data) => api.patch(`/signup-requests/${id}`, data).then(res => res.data),
 };
 
@@ -141,6 +151,8 @@ export const wfhApi = {
     update: (id, data) => api.put(`/wfh/${id}`, data).then(res => res.data),
     approve: (id, approvedBy, remark) => api.patch(`/wfh/${id}/approve`, { remark: remark || null }, { params: { approved_by: approvedBy } }).then(res => res.data),
     reject: (id, approvedBy, remark) => api.patch(`/wfh/${id}/reject`, { remark: remark || null }, { params: { approved_by: approvedBy } }).then(res => res.data),
+    undoApprove: (id, approvedBy) => api.patch(`/wfh/${id}/undo-approve`, null, { params: { approved_by: approvedBy } }).then(res => res.data),
+    undoReject: (id, approvedBy) => api.patch(`/wfh/${id}/undo-reject`, null, { params: { approved_by: approvedBy } }).then(res => res.data),
     delete: (id) => api.delete(`/wfh/${id}`).then(res => res.data),
 };
 
@@ -198,6 +210,16 @@ export const payrollApi = {
     save: (data) => api.post('/payroll/save', data, { headers: payrollHeaders() }).then(res => res.data),
     getSaved: (month) => api.get('/payroll/saved', { params: { month }, headers: payrollHeaders() }).then(res => res.data),
     exportCsvUrl: (month) => `${apiBaseUrl}/payroll/export.csv?month=${month}&passcode=${encodeURIComponent(sessionStorage.getItem('payroll_passcode') || '')}`,
+    // Pay — ground-truth salary records (the source the Monthly Pay calc derives from)
+    getSalaries: () => api.get('/payroll/salaries', { headers: payrollHeaders() }).then(res => res.data),
+    updateSalary: (employeeId, baseSalary) =>
+        api.put(`/payroll/salaries/${employeeId}`, { base_salary: baseSalary }, { headers: payrollHeaders() }).then(res => res.data),
+    // Salary table — list of actual pay values (the Pay tab's source of truth)
+    getSalaryRecords: () => api.get('/payroll/salary-records', { headers: payrollHeaders() }).then(res => res.data),
+    updateSalaryRecord: (id, { baseMonthly, bonusMonthly }) =>
+        api.put(`/payroll/salary-records/${id}`, { base_pay_monthly: baseMonthly, opt_bonus_monthly: bonusMonthly ?? null }, { headers: payrollHeaders() }).then(res => res.data),
+    setSalaryRecordStatus: (id, status) =>
+        api.patch(`/payroll/salary-records/${id}/status`, { status }, { headers: payrollHeaders() }).then(res => res.data),
 };
 
 // === Referrals API ===
@@ -245,9 +267,18 @@ export const onboardingApi = {
     getProgress: (userId) => api.get(`/onboarding/progress/${userId}`).then(res => res.data),
     submitQuiz: (sectionId, answers, userId = null) => api.post('/onboarding/quiz/submit', { section_id: sectionId, answers, user_id: userId }).then(res => res.data),
     getCandidateDashboard: (userId) => api.get(`/onboarding/candidates/${userId}/dashboard`).then(res => res.data),
+    getMentees: (mentorId) => api.get(`/onboarding/mentors/${mentorId}/mentees`).then(res => res.data),
+    getNewlyOnboarded: () => api.get('/onboarding/newly-onboarded').then(res => res.data),
+    getTeam: () => api.get('/onboarding/team').then(res => res.data),
+    createTeamMember: (data) => api.post('/onboarding/team', data).then(res => res.data),
+    updateTeamMember: (id, data) => api.put(`/onboarding/team/${id}`, data).then(res => res.data),
+    deleteTeamMember: (id) => api.delete(`/onboarding/team/${id}`).then(res => res.data),
+    importTeam: (formData) => api.post('/onboarding/team/bulk-import', formData, {
+        headers: { 'Content-Type': 'multipart/form-data' },
+    }).then(res => res.data),
+    getTeamSampleUrl: () => `${apiBaseUrl}/onboarding/team/sample-excel`,
     getAnalyticsDashboard: () => api.get('/onboarding/analytics/dashboard').then(res => res.data),
     getFullAnalytics: () => api.get('/onboarding/analytics/full').then(res => res.data),
-    getMentees: (mentorId) => api.get(`/onboarding/mentors/${mentorId}/mentees`).then(res => res.data),
     getReports: () => api.get('/onboarding/reports').then(res => res.data),
     getReportsExportUrl: () => `${apiBaseUrl}/onboarding/reports/export`,
     exportReports: () => api.get('/onboarding/reports/export', { responseType: 'blob' }).then(res => res.data),

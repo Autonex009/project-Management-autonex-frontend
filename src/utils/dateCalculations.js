@@ -31,15 +31,6 @@ export const getWorkingDays = (startDate, endDate) => {
 };
 
 /**
- * Calculate working days remaining from today
- * @param {Date|string} endDate - End date
- * @returns {number} Number of working days remaining
- */
-export const getWorkingDaysRemaining = (endDate) => {
-    return getWorkingDays(new Date(), endDate);
-};
-
-/**
  * Check if a date is a weekend
  * @param {Date} date - Date to check
  * @returns {boolean} True if Saturday or Sunday

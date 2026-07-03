@@ -2,6 +2,7 @@ import { useMemo, useState } from 'react';
 import { Link, useSearchParams } from 'react-router-dom';
 import { useMutation } from '@tanstack/react-query';
 import { ArrowLeft, Mail, Send } from 'lucide-react';
+import Spinner from '../../components/ui/LoadingSpinner';
 import toast from 'react-hot-toast';
 import AuthBrandPanel from '../../components/brand/AuthBrandPanel';
 import { authApi } from '../../services/api';
@@ -128,12 +129,7 @@ const ForgotPassword = () => {
                             disabled={forgotPasswordMutation.isPending}
                             className={`flex w-full items-center justify-center gap-2 rounded-2xl px-4 py-3 font-semibold text-white transition-all disabled:cursor-not-allowed disabled:opacity-70 ${theme.button}`}
                         >
-                            {forgotPasswordMutation.isPending ? (
-                                <>
-                                    <span className="h-5 w-5 animate-spin rounded-full border-2 border-white/30 border-t-white" />
-                                    Sending reset link...
-                                </>
-                            ) : (
+                            {forgotPasswordMutation.isPending ? <Spinner size="sm" color="white" text="Sending reset link..." /> : (
                                 <>
                                     Send reset link
                                     <Send className="h-4 w-4" />
