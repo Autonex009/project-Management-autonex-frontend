@@ -241,6 +241,15 @@ export const performanceReviewApi = {
     delete: (id) => api.delete(`/performance-reviews/${id}`).then(res => res.data),
 };
 
+// === Monthly Structured Performance Reviews API (perf_reviews) ===
+export const perfReviewApi = {
+    getAll: (params) => api.get('/perf-reviews', { params }).then(res => res.data),
+    getOne: (id) => api.get(`/perf-reviews/${id}`).then(res => res.data),
+    create: (data) => api.post('/perf-reviews', data).then(res => res.data),
+    update: (id, data) => api.put(`/perf-reviews/${id}`, data).then(res => res.data),
+    delete: (id) => api.delete(`/perf-reviews/${id}`).then(res => res.data),
+};
+
 // === Notifications API ===
 export const notificationApi = {
     getAll: (userId) => api.get('/notifications', { params: { user_id: userId } }).then(res => res.data),
