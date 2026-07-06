@@ -4,8 +4,9 @@
   "private": true,
   "type": "module",
   "scripts": {
-    "dev": "vite",
-    "build": "vite build",
+    "dev": "node server.js",
+    "build": "vite build --outDir dist/client && vite build --ssr src/entry-server.jsx --outDir dist/server",
+    "serve": "node server.js --prod",
     "preview": "vite preview"
   },
   "dependencies": {
@@ -13,6 +14,8 @@
     "@tanstack/react-query": "^5.90.16",
     "axios": "^1.6.0",
     "date-fns": "^2.30.0",
+    "express": "^5.2.1",
+    "http-proxy-middleware": "^4.2.0",
     "lucide-react": "^0.294.0",
     "react": "^18.2.0",
     "react-dom": "^18.2.0",
@@ -21,6 +24,7 @@
     "react-router-dom": "^6.20.0",
     "recharts": "^3.8.1",
     "remark-gfm": "^4.0.1",
+    "sirv": "^3.0.2",
     "xlsx": "^0.18.5",
     "zustand": "^5.0.14"
   },
