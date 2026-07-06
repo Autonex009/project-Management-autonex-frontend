@@ -5,7 +5,7 @@
   "outputDirectory": "dist/client",
   "functions": {
     "api/ssr.js": {
-      "includeFiles": "dist/server/**"
+      "includeFiles": "dist/**"
     }
   },
   "rewrites": [
