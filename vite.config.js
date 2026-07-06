@@ -1,30 +1,30 @@
 import { defineConfig } from 'vite'
 import react from '@vitejs/plugin-react'
 
-export default defineConfig({
+export default defineConfig(({ isSsrBuild }) => ({
   plugins: [react()],
-  server: {
-    port: 3000,
-    host: true,
-    proxy: {
-      '/api': {
-        target: process.env.VITE_PROXY_TARGET || 'http://localhost:8000',
-        changeOrigin: true,
-      }
-    }
-  },
+  // Note: the dev server port and the /api proxy are now owned by server.js
+  // (the Express SSR server), which runs Vite in middleware mode. Vite's own
+  // server.proxy no longer applies since Express handles the top-level request.
   build: {
     // Production optimizations - using esbuild (built-in, no extra deps)
     minify: 'esbuild',
     rollupOptions: {
-      output: {
-        // Code splitting for better caching
-        manualChunks: {
-          vendor: ['react', 'react-dom', 'react-router-dom'],
-          tanstack: ['@tanstack/react-query'],
-          ui: ['lucide-react', 'date-fns']
-        }
-      }
+      // manualChunks only applies to the client build. In the SSR build,
+      // react/react-dom are externalized (required from node_modules at
+      // runtime, not bundled), so listing them in manualChunks throws
+      // "react cannot be included in manualChunks". The SSR bundle is a
+      // single entry and needs no chunk splitting anyway.
+      output: isSsrBuild
+        ? {}
+        : {
+            // Code splitting for better caching
+            manualChunks: {
+              vendor: ['react', 'react-dom', 'react-router-dom'],
+              tanstack: ['@tanstack/react-query'],
+              ui: ['lucide-react', 'date-fns']
+            }
+          }
     },
     // Increase chunk warning limit
     chunkSizeWarningLimit: 500,
@@ -35,4 +35,4 @@ export default defineConfig({
   optimizeDeps: {
     include: ['react', 'react-dom', 'react-router-dom', '@tanstack/react-query']
   }
-})
+}))

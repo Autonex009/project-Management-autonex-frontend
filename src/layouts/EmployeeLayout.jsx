@@ -30,7 +30,7 @@ const EmployeeLayout = () => {
         return saved === null ? true : saved === 'true';
     });
     const [isHovered, setIsHovered] = useState(false);
-    const [isMobile, setIsMobile] = useState(window.innerWidth < 1024);
+    const [isMobile, setIsMobile] = useState(() => typeof window !== 'undefined' ? window.innerWidth < 1024 : false);
 
     useEffect(() => {
         const handleResize = () => {
