@@ -1,6 +1,8 @@
 import { useState, useMemo, useEffect, useRef } from 'react';
 import { createPortal } from 'react-dom';
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
+import Spinner from './ui/LoadingSpinner';
+import Button from './ui/Button';
 import { ChevronLeft, ChevronRight, Calendar, AlertTriangle, Clock, CheckCircle, XCircle, Send, X } from 'lucide-react';
 import { leaveApi, wfhApi } from '../services/api';
 import toast from 'react-hot-toast';
@@ -964,29 +966,20 @@ export default function LeaveCalendar({ filterEmployeeIds = null }) {
                                 >
                                     Cancel
                                 </button>
-                                <button
+                                <Button
                                     type="submit"
                                     disabled={isSubmitDisabled}
+                                    isLoading={createLeaveMutation.isPending || createWfhMutation.isPending}
+                                    loadingText="Applying..."
                                     style={{
                                         flex: 2,
-                                        padding: '10px',
-                                        border: 'none',
-                                        borderRadius: '8px',
                                         background: buttonBg,
                                         color: buttonText,
-                                        fontSize: '14px',
-                                        fontWeight: 600,
                                         cursor: buttonCursor,
-                                        transition: 'background-color 0.25s, color 0.25s',
-                                        display: 'flex',
-                                        alignItems: 'center',
-                                        justifyContent: 'center',
-                                        gap: '6px',
                                     }}
                                 >
-                                    <Send size={14} />
-                                    {createLeaveMutation.isPending || createWfhMutation.isPending ? 'Applying...' : 'Apply'}
-                                </button>
+                                    <Send size={14} /> Apply
+                                </Button>
                             </div>
                         </form>
                     )}

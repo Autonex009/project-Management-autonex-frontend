@@ -1,6 +1,8 @@
 import { useMemo, useState } from 'react';
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
+import Button from './ui/Button';
 import { leaveApi, wfhApi } from '../services/api';
+import Spinner from './ui/LoadingSpinner';
 import { Calendar, Plus, X, CheckCircle, XCircle, Clock, Home, AlertTriangle, Pencil, Trash2 } from 'lucide-react';
 import { format, parseISO } from 'date-fns';
 import toast from 'react-hot-toast';
@@ -8,7 +10,7 @@ import Dropdown from './ui/Dropdown';
 import { getEndDateValidationMessage, isEndDateBeforeStartDate } from '../utils/dateValidation';
 import { getLeaveTypeLabel, LEAVE_TYPE_OPTIONS, RAZORPAY_NEGATIVE_BALANCE_NOTE, FLOATER_DATES_2026, isValidFloaterDate, getFloaterDateLabel, isNonWorkingDay, getNonWorkingDayLabel, getWorkingDayCount, countNonWorkingDaysInRange, toLocalISODate, ANNUAL_LEAVE_QUOTA, INTERN_MONTHLY_PAID_QUOTA, isIntern, normalizeLeaveType, validateConsecutiveLeaves } from '../utils/leaveTypes';
 import LeaveCalendar from './LeaveCalendar';
-import DeleteConfirmModal from './ui/DeleteConfirmModal';
+import ConfirmDialog from './ui/ConfirmDialog';
 
 const TABS = ['My Leaves', 'Calendar', 'Work From Home'];
 
@@ -178,6 +180,7 @@ const MyLeavesPanel = ({
     const [editingWfh, setEditingWfh] = useState(null);
     const [editWfhForm, setEditWfhForm] = useState({ wfh_date: '', end_date: '', reason: '' });
     const [deleteTarget, setDeleteTarget] = useState(null);
+    const [wfhDeleteConfirm, setWfhDeleteConfirm] = useState(null);
     const [formLeaveType, setFormLeaveType] = useState('paid');
     const [editFormLeaveType, setEditFormLeaveType] = useState('paid');
 
@@ -484,8 +487,7 @@ const MyLeavesPanel = ({
     };
 
     const handleWfhDelete = (wfh) => {
-        if (!window.confirm(`Delete WFH request for ${wfh.wfh_date}?`)) return;
-        deleteWfhMutation.mutate(wfh.id);
+        setWfhDeleteConfirm(wfh);
     };
 
     const myEmployeeIdSet = employeeId ? new Set([employeeId]) : null;
@@ -499,16 +501,14 @@ const MyLeavesPanel = ({
                 </div>
                 <div className="flex gap-2">
                     {activeTab === 'My Leaves' && (
-                        <button onClick={() => setShowLeaveForm(true)}
-                            className="flex items-center gap-2 px-4 py-2.5 bg-emerald-600 text-white rounded-xl text-sm font-medium hover:bg-emerald-700 transition-colors shadow-sm">
+                        <Button variant="success" onClick={() => setShowLeaveForm(true)}>
                             <Plus className="w-4 h-4"/> Request Leave
-                        </button>
+                        </Button>
                     )}
                     {activeTab === 'Work From Home' && (
-                        <button onClick={() => setShowWfhForm(true)}
-                            className="flex items-center gap-2 px-4 py-2.5 bg-purple-600 text-white rounded-xl text-sm font-medium hover:bg-purple-700 transition-colors shadow-sm">
+                        <Button onClick={() => setShowWfhForm(true)} className="bg-purple-600 hover:bg-purple-700">
                             <Plus className="w-4 h-4"/> Request WFH
-                        </button>
+                        </Button>
                     )}
                 </div>
             </div>
@@ -625,10 +625,9 @@ const MyLeavesPanel = ({
                                     {RAZORPAY_NEGATIVE_BALANCE_NOTE}
                                 </div>
                                 <div className="md:col-span-2 flex justify-end">
-                                    <button type="submit" disabled={createLeaveMutation.isPending}
-                                        className="px-4 py-2 bg-emerald-600 text-white rounded-lg text-sm font-medium hover:bg-emerald-700 disabled:opacity-50">
-                                        {createLeaveMutation.isPending ? 'Submitting...' : 'Apply Leave'}
-                                    </button>
+                                    <Button type="submit" variant="success" disabled={createLeaveMutation.isPending} isLoading={createLeaveMutation.isPending}>
+                                        {!createLeaveMutation.isPending && 'Apply Leave'}
+                                    </Button>
                                 </div>
                             </form>
                         </div>
@@ -711,14 +710,10 @@ const MyLeavesPanel = ({
                                     Editing will reset the approval status back to <strong>pending</strong> so your manager can re-review.
                                 </div>
                                 <div className="md:col-span-2 flex justify-end gap-2">
-                                    <button type="button" onClick={() => setEditingLeave(null)}
-                                        className="px-4 py-2 border border-slate-200 text-slate-600 rounded-lg text-sm font-medium hover:bg-slate-50">
-                                        Cancel
-                                    </button>
-                                    <button type="submit" disabled={updateLeaveMutation.isPending}
-                                        className="px-4 py-2 bg-blue-600 text-white rounded-lg text-sm font-medium hover:bg-blue-700 disabled:opacity-50">
-                                        {updateLeaveMutation.isPending ? 'Saving...' : 'Save Changes'}
-                                    </button>
+                                    <Button type="button" variant="cancel" onClick={() => setEditingLeave(null)}>Cancel</Button>
+                                    <Button type="submit" variant="blue" disabled={updateLeaveMutation.isPending} isLoading={updateLeaveMutation.isPending}>
+                                        {!updateLeaveMutation.isPending && 'Save Changes'}
+                                    </Button>
                                 </div>
                             </form>
                         </div>
@@ -838,10 +833,9 @@ const MyLeavesPanel = ({
                                         className="w-full px-3 py-2 border border-slate-200 rounded-lg text-sm" placeholder="Optional reason"/>
                                 </div>
                                 <div className="md:col-span-2 flex justify-end">
-                                    <button type="submit" disabled={createWfhMutation.isPending}
-                                        className="px-4 py-2 bg-purple-600 text-white rounded-lg text-sm font-medium hover:bg-purple-700 disabled:opacity-50">
-                                        {createWfhMutation.isPending ? 'Submitting...' : 'Submit WFH Request'}
-                                    </button>
+                                    <Button type="submit" className="bg-purple-600 hover:bg-purple-700" disabled={createWfhMutation.isPending} isLoading={createWfhMutation.isPending}>
+                                        {!createWfhMutation.isPending && 'Submit WFH Request'}
+                                    </Button>
                                 </div>
                             </form>
                         </div>
@@ -875,14 +869,10 @@ const MyLeavesPanel = ({
                                     Editing will reset the approval status back to <strong>pending</strong> so your manager can re-review.
                                 </div>
                                 <div className="md:col-span-2 flex justify-end gap-2">
-                                    <button type="button" onClick={() => setEditingWfh(null)}
-                                        className="px-4 py-2 border border-slate-200 text-slate-600 rounded-lg text-sm font-medium hover:bg-slate-50">
-                                        Cancel
-                                    </button>
-                                    <button type="submit" disabled={updateWfhMutation.isPending}
-                                        className="px-4 py-2 bg-blue-600 text-white rounded-lg text-sm font-medium hover:bg-blue-700 disabled:opacity-50">
-                                        {updateWfhMutation.isPending ? 'Saving...' : 'Save Changes'}
-                                    </button>
+                                    <Button type="button" variant="cancel" onClick={() => setEditingWfh(null)}>Cancel</Button>
+                                    <Button type="submit" variant="blue" disabled={updateWfhMutation.isPending} isLoading={updateWfhMutation.isPending}>
+                                        {!updateWfhMutation.isPending && 'Save Changes'}
+                                    </Button>
                                 </div>
                             </form>
                         </div>
@@ -950,7 +940,7 @@ const MyLeavesPanel = ({
                 </>
             )}
             {deleteTarget && (
-                <DeleteConfirmModal
+                <ConfirmDialog
                     isOpen={!!deleteTarget}
                     onClose={() => setDeleteTarget(null)}
                     onConfirm={() => {
@@ -963,8 +953,23 @@ const MyLeavesPanel = ({
                     isPending={deleteLeaveMutation.isPending}
                     title="Delete Leave Request"
                     message={`Are you sure you want to delete this ${getLeaveTypeLabel(deleteTarget.leave_type)} request (${deleteTarget.start_date} — ${deleteTarget.end_date})?`}
+                    variant="danger"
+                    confirmText="Delete"
                 />
             )}
+            <ConfirmDialog
+                isOpen={wfhDeleteConfirm !== null}
+                onClose={() => setWfhDeleteConfirm(null)}
+                onConfirm={() => {
+                    deleteWfhMutation.mutate(wfhDeleteConfirm.id);
+                    setWfhDeleteConfirm(null);
+                }}
+                title="Delete WFH Request"
+                message={`Delete WFH request for ${wfhDeleteConfirm?.wfh_date}?`}
+                variant="danger"
+                confirmText="Delete"
+                isPending={deleteWfhMutation.isPending}
+            />
         </div>
     );
 };

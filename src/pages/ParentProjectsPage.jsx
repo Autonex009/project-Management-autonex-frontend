@@ -1,18 +1,24 @@
 /* eslint-disable react/prop-types */
 import { useState, useEffect } from 'react';
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
+import Spinner from '../components/ui/LoadingSpinner';
+import Button from '../components/ui/Button';
 import { parentProjectApi, employeeApi, subProjectApi, allocationApi } from '../services/api';
 import Dropdown from '../components/ui/Dropdown';
-import SearchInput from '../components/ui/SearchInput';
+import SearchBar from '../components/ui/SearchBar';
 import { Plus, X, Edit, Trash2, FolderTree, Users, Calendar, Clock, ChevronRight, Layers, Building2 } from 'lucide-react';
 import { Link } from 'react-router-dom';
 import { format } from 'date-fns';
 import toast from 'react-hot-toast';
 import { getPmEmployeeId, getPmProjects } from '../utils/pmScope';
+import ConfirmDialog from '../components/ui/ConfirmDialog';
+import Modal from '../components/ui/Modal';
 
 const ParentProjectsPage = () => {
     const [isModalOpen, setIsModalOpen] = useState(false);
     const [editingProject, setEditingProject] = useState(null);
+    const [projectTypeConfirm, setProjectTypeConfirm] = useState(null);
+    const [programDeleteConfirm, setProgramDeleteConfirm] = useState(null);
     const [selectedPmIds, setSelectedPmIds] = useState([]);
     const [formProjectType, setFormProjectType] = useState('Full');
     const [formStatus, setFormStatus] = useState('active');
@@ -178,8 +184,12 @@ const ParentProjectsPage = () => {
 
         const config = actionConfig[nextProjectType];
         if (!config) return;
-        if (!window.confirm(config.confirmMessage)) return;
+        setProjectTypeConfirm({ nextProjectType, config });
+    };
 
+    const handleProjectTypeExecute = async () => {
+        const { nextProjectType, config } = projectTypeConfirm;
+        setProjectTypeConfirm(null);
         try {
             await parentProjectApi.update(editingProject.id, { project_type: nextProjectType });
             queryClient.invalidateQueries(['parent-projects']);
@@ -215,7 +225,7 @@ const ParentProjectsPage = () => {
     if (isLoading) {
         return (
             <div className="flex items-center justify-center py-20">
-                <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-indigo-600"></div>
+                <Spinner size="lg" color="indigo" />
             </div>
         );
     }
@@ -244,22 +254,16 @@ const ParentProjectsPage = () => {
                     </p>
                 </div>
                 <div className="flex items-center gap-3">
-                    <SearchInput
+                    <SearchBar
                         placeholder="Search organizations..."
                         value={searchQuery}
                         onChange={setSearchQuery}
                         className="w-52"
                     />
-                    <button
-                        onClick={() => {
-                            setEditingProject(null);
-                            setIsModalOpen(true);
-                        }}
-                        className="inline-flex items-center gap-2 px-4 py-2.5 bg-indigo-600 hover:bg-indigo-700 text-white font-medium text-sm rounded-xl shadow-sm transition-colors"
-                    >
+                    <Button onClick={() => { setEditingProject(null); setIsModalOpen(true); }}>
                         <Plus className="w-4 h-4" />
                         New Organization
-                    </button>
+                    </Button>
                 </div>
             </div>
 
@@ -269,13 +273,10 @@ const ParentProjectsPage = () => {
                     <Layers className="w-12 h-12 mx-auto text-slate-300 mb-4" />
                     <h3 className="text-lg font-semibold text-slate-700 mb-2">{searchQuery ? 'No organizations match your search' : 'No Organizations Yet'}</h3>
                     <p className="text-slate-500 mb-6">{searchQuery ? `No results for "${searchQuery}". Try a different name.` : 'Create your first organization to group related projects.'}</p>
-                    <button
-                        onClick={() => setIsModalOpen(true)}
-                        className="inline-flex items-center gap-2 px-4 py-2 bg-indigo-600 text-white rounded-lg font-medium text-sm hover:bg-indigo-700 transition-colors"
-                    >
+                    <Button onClick={() => setIsModalOpen(true)}>
                         <Plus className="w-4 h-4" />
                         Create Organization
-                    </button>
+                    </Button>
                 </div>
             ) : (
                 <div className="space-y-8">
@@ -378,11 +379,7 @@ const ParentProjectsPage = () => {
                                         <Edit className="w-4 h-4" />
                                     </button>
                                     <button
-                                        onClick={() => {
-                                            if (window.confirm(`Delete "${program.name}"? Its projects will be unlinked.`)) {
-                                                deleteMutation.mutate(program.id);
-                                            }
-                                        }}
+                                        onClick={() => setProgramDeleteConfirm(program)}
                                         className="p-2 text-slate-400 hover:text-red-600 hover:bg-red-50 rounded-lg transition-all"
                                         title="Delete"
                                     >
@@ -406,30 +403,14 @@ const ParentProjectsPage = () => {
             )}
 
             {/* Modal */}
-            {isModalOpen && (
-                <div className="fixed inset-0 z-50 flex items-center justify-center bg-slate-900/50 backdrop-blur-sm px-2 py-4 sm:px-4">
-                    <div className="bg-white rounded-2xl shadow-2xl w-full max-w-full sm:max-w-2xl max-h-[95vh] sm:max-h-[90vh] flex flex-col overflow-hidden">
-                        {/* Modal Header */}
-                        <div className="px-6 py-4 border-b border-slate-100 bg-gradient-to-r from-slate-50 to-white flex-shrink-0">
-                            <div className="flex justify-between items-center">
-                                <h2 className="text-xl font-bold text-slate-900">
-                                    {editingProject ? 'Edit Project' : 'Create Project'}
-                                </h2>
-                                <button
-                                    onClick={() => {
-                                        setIsModalOpen(false);
-                                        setEditingProject(null);
-                                    }}
-                                    className="p-2 hover:bg-slate-100 rounded-lg transition-colors"
-                                >
-                                    <X className="w-5 h-5 text-slate-500" />
-                                </button>
-                            </div>
-                        </div>
-
-                        {/* Modal Body */}
-                        <form onSubmit={handleSubmit} className="flex flex-col min-h-0">
-                            <div className="flex-1 overflow-y-auto p-6 space-y-4">
+            <Modal isOpen={isModalOpen} onClose={() => { setIsModalOpen(false); setEditingProject(null); }} size="2xl" maxHeight="95vh">
+                <Modal.Header onClose={() => { setIsModalOpen(false); setEditingProject(null); }}>
+                    <h2 className="text-base font-semibold text-slate-800">
+                        {editingProject ? 'Edit Project' : 'Create Project'}
+                    </h2>
+                </Modal.Header>
+                <form onSubmit={handleSubmit} className="flex-1 flex flex-col min-h-0">
+                    <Modal.Body className="space-y-4">
                             <div>
                                 <label className="block text-sm font-medium text-slate-700 mb-1">
                                     Project Name *
@@ -483,22 +464,12 @@ const ParentProjectsPage = () => {
                                 <div className="rounded-xl border border-amber-200 bg-amber-50 p-4 space-y-3">
                                     <p className="text-sm font-medium text-amber-900">POC Actions</p>
                                     <div className="flex flex-wrap gap-3">
-                                        <button
-                                            type="button"
-                                            onClick={() => handleProjectTypeAction('Full')}
-                                            disabled={updateMutation.isPending}
-                                            className="px-4 py-2 text-sm font-medium rounded-lg bg-blue-600 text-white hover:bg-blue-700 disabled:opacity-50"
-                                        >
+                                        <Button type="button" variant="blue" onClick={() => handleProjectTypeAction('Full')} disabled={updateMutation.isPending}>
                                             Convert to Full
-                                        </button>
-                                        <button
-                                            type="button"
-                                            onClick={() => handleProjectTypeAction('POC Rejected')}
-                                            disabled={updateMutation.isPending}
-                                            className="px-4 py-2 text-sm font-medium rounded-lg bg-rose-600 text-white hover:bg-rose-700 disabled:opacity-50"
-                                        >
+                                        </Button>
+                                        <Button type="button" variant="danger" onClick={() => handleProjectTypeAction('POC Rejected')} disabled={updateMutation.isPending}>
                                             POC Rejected
-                                        </button>
+                                        </Button>
                                     </div>
                                     <p className="text-xs text-amber-700">
                                         Rejecting a POC will update its badge and release employees allocated to its sub-projects.
@@ -542,13 +513,13 @@ const ParentProjectsPage = () => {
                                     </div>
                                 )}
                                 <Dropdown
+                                    editable={true}
+                                    allowCreate={false}
                                     value=""
-                                    options={[
-                                        { value: '', label: '+ Add Program Manager' },
-                                        ...employees
-                                            .filter(e => e.status === 'active' && !selectedPmIds.includes(e.id))
-                                            .map((emp) => ({ value: emp.id, label: emp.name }))
-                                    ]}
+                                    placeholder="+ Add Program Manager"
+                                    options={employees
+                                        .filter(e => e.status === 'active' && !selectedPmIds.includes(e.id))
+                                        .map((emp) => ({ value: emp.id, label: emp.name }))}
                                     onChange={(id) => {
                                         if (id && !selectedPmIds.includes(id)) {
                                             setSelectedPmIds(prev => [...prev, id]);
@@ -613,36 +584,31 @@ const ParentProjectsPage = () => {
                                 />
                             </div>
 
-                            </div>
-
-                            {/* Submit Buttons */}
-                            <div className="flex justify-end gap-3 px-6 py-4 border-t border-slate-100 bg-white flex-shrink-0">
-                                <button
-                                    type="button"
-                                    onClick={() => {
-                                        setIsModalOpen(false);
-                                        setEditingProject(null);
-                                    }}
-                                    className="px-4 py-2.5 text-slate-600 font-medium rounded-xl hover:bg-slate-100 transition-colors"
-                                >
-                                    Cancel
-                                </button>
-                                <button
-                                    type="submit"
-                                    disabled={createMutation.isPending || updateMutation.isPending}
-                                    className="px-6 py-2.5 bg-gradient-to-r from-indigo-600 to-blue-600 text-white font-semibold rounded-xl shadow-lg shadow-indigo-200 hover:shadow-xl transition-all disabled:opacity-50"
-                                >
-                                    {createMutation.isPending || updateMutation.isPending
-                                        ? 'Saving...'
-                                        : editingProject
-                                            ? 'Update Project'
-                                            : 'Create Project'}
-                                </button>
-                            </div>
-                        </form>
-                    </div>
-                </div>
-            )}
+                    </Modal.Body>
+                    <Modal.Footer>
+                        <Button type="button" variant="cancel" onClick={() => { setIsModalOpen(false); setEditingProject(null); }}>Cancel</Button>
+                        <Button type="submit" disabled={createMutation.isPending || updateMutation.isPending} isLoading={createMutation.isPending || updateMutation.isPending}>
+                            {!(createMutation.isPending || updateMutation.isPending) && (editingProject ? 'Update Project' : 'Create Project')}
+                        </Button>
+                    </Modal.Footer>
+                </form>
+            </Modal>
+            <ConfirmDialog
+                isOpen={projectTypeConfirm !== null}
+                onClose={() => setProjectTypeConfirm(null)}
+                onConfirm={handleProjectTypeExecute}
+                title="Confirm Project Type Change"
+                message={projectTypeConfirm?.config.confirmMessage}
+                variant="warning"
+            />
+            <ConfirmDialog
+                isOpen={programDeleteConfirm !== null}
+                onClose={() => setProgramDeleteConfirm(null)}
+                onConfirm={() => { deleteMutation.mutate(programDeleteConfirm.id); setProgramDeleteConfirm(null); }}
+                title="Delete Program"
+                message={`Delete "${programDeleteConfirm?.name}"? Its projects will be unlinked.`}
+                isPending={deleteMutation.isPending}
+            />
         </div>
     );
 };

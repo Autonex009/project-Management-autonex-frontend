@@ -1,5 +1,7 @@
 import React, { useState, useEffect } from 'react';
 import { Wifi, Plus, Trash2, Loader2, Settings, Save, Edit2, Building2, MapPin, Sparkles } from 'lucide-react';
+import Button from '../../components/ui/Button';
+import ConfirmDialog from '../../components/ui/ConfirmDialog';
 import { wifiNetworksApi, companySettingsApi } from '../../services/api';
 import toast from 'react-hot-toast';
 
@@ -23,6 +25,7 @@ const AdminCompanySettingsPage = () => {
     const [formData, setFormData] = useState({ name: '', password: '' });
     const [savingWifi, setSavingWifi] = useState(false);
     const [deletingId, setDeletingId] = useState(null);
+    const [wifiDeleteConfirm, setWifiDeleteConfirm] = useState(null);
 
     useEffect(() => {
         fetchData();
@@ -121,8 +124,6 @@ const AdminCompanySettingsPage = () => {
     };
 
     const handleDeleteWifi = async (id) => {
-        if (!window.confirm('Are you sure you want to delete this WiFi network?')) return;
-        
         setDeletingId(id);
         try {
             await wifiNetworksApi.delete(id);
@@ -148,6 +149,7 @@ const AdminCompanySettingsPage = () => {
     }
 
     return (
+        <>
         <div className="space-y-6 max-w-4xl">
             {/* Page Header */}
             <div>
@@ -217,14 +219,10 @@ const AdminCompanySettingsPage = () => {
                 </div>
 
                 <div className="px-6 py-4 bg-slate-50/50 border-t border-slate-100 flex justify-end">
-                    <button
-                        type="submit"
-                        disabled={savingGeneral}
-                        className="flex items-center gap-2 px-5 py-2.5 bg-emerald-600 text-white text-sm font-semibold rounded-xl hover:bg-emerald-700 disabled:opacity-50 disabled:cursor-not-allowed transition-colors"
-                    >
-                        {savingGeneral ? <Loader2 className="w-4 h-4 animate-spin" /> : <Save className="w-4 h-4" />}
+                    <Button type="submit" variant="success" size="lg" disabled={savingGeneral} isLoading={savingGeneral}>
+                        {!savingGeneral && <Save className="w-4 h-4" />}
                         Save General Settings
-                    </button>
+                    </Button>
                 </div>
             </form>
 
@@ -241,13 +239,10 @@ const AdminCompanySettingsPage = () => {
                         </p>
                     </div>
                     {!isFormOpen && (
-                        <button
-                            onClick={openAddForm}
-                            className="flex items-center gap-1.5 px-4 py-2 bg-blue-600 text-white text-sm font-semibold rounded-lg hover:bg-blue-700 transition-colors"
-                        >
+                        <Button variant="blue" onClick={openAddForm}>
                             <Plus className="w-4 h-4" />
                             Add Network
-                        </button>
+                        </Button>
                     )}
                 </div>
 
@@ -281,22 +276,18 @@ const AdminCompanySettingsPage = () => {
                                 </div>
                             </div>
                             <div className="flex justify-end gap-2 pt-2 border-t border-slate-100">
-                                <button
+                                <Button
                                     type="button"
+                                    variant="cancel"
                                     onClick={closeForm}
-                                    className="px-4 py-2 text-slate-600 text-sm font-medium hover:bg-slate-100 rounded-lg transition-colors"
                                     disabled={savingWifi}
                                 >
                                     Cancel
-                                </button>
-                                <button
-                                    type="submit"
-                                    disabled={savingWifi}
-                                    className="flex items-center gap-2 px-4 py-2 bg-blue-600 text-white text-sm font-semibold rounded-lg hover:bg-blue-700 disabled:opacity-50 transition-colors"
-                                >
-                                    {savingWifi ? <Loader2 className="w-4 h-4 animate-spin" /> : <Save className="w-4 h-4" />}
+                                </Button>
+                                <Button type="submit" disabled={savingWifi} isLoading={savingWifi} className="bg-blue-600 hover:bg-blue-700">
+                                    {!savingWifi && <Save className="w-4 h-4" />}
                                     {editingId ? 'Save Changes' : 'Add Network'}
-                                </button>
+                                </Button>
                             </div>
                         </form>
                     </div>
@@ -331,7 +322,7 @@ const AdminCompanySettingsPage = () => {
                                         <Edit2 className="w-4 h-4" />
                                     </button>
                                     <button
-                                        onClick={() => handleDeleteWifi(network.id)}
+                                        onClick={() => setWifiDeleteConfirm(network.id)}
                                         className="p-2 text-slate-400 hover:text-red-600 hover:bg-red-50 rounded-lg transition-colors"
                                         title="Delete"
                                         disabled={deletingId === network.id || isFormOpen}
@@ -349,6 +340,15 @@ const AdminCompanySettingsPage = () => {
                 </div>
             </div>
         </div>
+        <ConfirmDialog
+            isOpen={wifiDeleteConfirm !== null}
+            onClose={() => setWifiDeleteConfirm(null)}
+            onConfirm={() => { handleDeleteWifi(wifiDeleteConfirm); setWifiDeleteConfirm(null); }}
+            title="Delete WiFi Network"
+            message="Are you sure you want to delete this WiFi network? This action cannot be undone."
+            isPending={deletingId !== null}
+        />
+        </>
     );
 };
 

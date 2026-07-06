@@ -1,6 +1,8 @@
 import React, { useState, useEffect } from 'react';
 import { useNavigate, useSearchParams } from 'react-router-dom';
 import { Save, Plus, ArrowLeft, Link2, Loader2 } from 'lucide-react';
+import Spinner from '../../components/ui/LoadingSpinner';
+import Button from '../../components/ui/Button';
 import toast from 'react-hot-toast';
 import ModuleSectionCard from '../../components/admin/ModuleSectionCard';
 import { onboardingApi } from '../../services/api';
@@ -184,9 +186,9 @@ export default function AdminModulesBuilder() {
   return (
     <div className="min-h-full px-4 py-6 sm:px-6 lg:px-10 max-w-4xl mx-auto">
       <div className="mb-6">
-        <button onClick={() => navigate('/admin/modules')} className="text-sm font-medium text-slate-500 hover:text-slate-800 flex items-center gap-1 mb-4 transition-colors">
+        <Button variant="link" onClick={() => navigate('/admin/modules')} className="mb-4 text-sm text-slate-500 hover:text-slate-800">
           <ArrowLeft className="h-4 w-4" /> Back to Modules
-        </button>
+        </Button>
         
         <div className="flex flex-col sm:flex-row items-start sm:items-center justify-between gap-4">
           <div>
@@ -197,19 +199,15 @@ export default function AdminModulesBuilder() {
               {editId ? 'Update this module\'s content and settings.' : 'Build interactive onboarding courses with real content.'}
             </p>
           </div>
-          <button 
-            onClick={handleSave} 
-            disabled={isSaving} 
-            className="flex items-center gap-2 px-5 py-2.5 rounded-xl text-white text-sm font-semibold transition-all hover:bg-indigo-700 shadow-md bg-indigo-600 disabled:opacity-50"
-          >
-            <Save className="h-4 w-4" /> {isSaving ? 'Saving...' : (editId ? 'Update Module' : 'Save Module')}
-          </button>
+          <Button size="lg" onClick={handleSave} disabled={isSaving} isLoading={isSaving}>
+            {!isSaving && <><Save className="h-4 w-4" /> {editId ? 'Update Module' : 'Save Module'}</>}
+          </Button>
         </div>
       </div>
 
       <div className="space-y-6">
         {/* Module Meta */}
-        <div className="bg-white p-6 rounded-2xl shadow-[0_1px_3px_rgba(0,0,0,0.04)] border border-slate-200/60 p-6 border-t-4 border-t-indigo-650">
+        <div className="bg-white rounded-2xl shadow-[0_1px_3px_rgba(0,0,0,0.04)] border border-slate-200/60 p-6 border-t-4 border-t-indigo-650">
           <div className="space-y-4">
             <div>
               <label className="block text-sm font-bold text-slate-700 mb-1">Module Title <span className="text-red-500">*</span></label>
@@ -226,7 +224,7 @@ export default function AdminModulesBuilder() {
 
             {/* Assessment URL */}
             <div>
-              <label className="block text-sm font-bold text-slate-700 mb-1 flex items-center gap-1">
+              <label className="text-sm font-bold text-slate-700 mb-1 flex items-center gap-1">
                 <Link2 className="h-4 w-4 text-indigo-500" /> Assessment Link (Optional)
               </label>
               <input type="url" value={assessmentUrl} onChange={e => setAssessmentUrl(e.target.value)}

@@ -1,10 +1,14 @@
-import { useState } from 'react';
+import { useState, useEffect } from 'react';
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import { signupRequestApi } from '../services/api';
-import { CheckCircle, XCircle, Clock, User, Mail, Phone, Briefcase, AlertTriangle, X } from 'lucide-react';
+import Spinner from '../components/ui/LoadingSpinner';
+import Button from '../components/ui/Button';
+import { CheckCircle, XCircle, Clock, User, Mail, Phone, Briefcase, AlertTriangle, RotateCcw } from 'lucide-react';
 import { format, parseISO } from 'date-fns';
 import toast from 'react-hot-toast';
 import Dropdown from '../components/ui/Dropdown';
+import Modal from '../components/ui/Modal';
+import SearchBar from '../components/ui/SearchBar';
 
 const EMPLOYEE_TYPES = ['Full-time', 'Part-time', 'Intern', 'Contractor'];
 
@@ -25,18 +29,44 @@ const SignupRequestsPage = () => {
     const [expandedId, setExpandedId] = useState(null);
     const [currentPage, setCurrentPage] = useState(1);
     const [localEmployeeTypes, setLocalEmployeeTypes] = useState({});
+    const [search, setSearch] = useState('');
+    const [debouncedSearch, setDebouncedSearch] = useState('');
     const PAGE_SIZE = 10;
 
-    const { data: requests = [], isLoading } = useQuery({
-        queryKey: ['signup-requests'],
-        queryFn: () => signupRequestApi.getAll(),
+    useEffect(() => {
+        const timer = setTimeout(() => {
+            setDebouncedSearch(search);
+            setCurrentPage(1);
+        }, 500);
+        return () => clearTimeout(timer);
+    }, [search]);
+
+    const { data: listData, isLoading } = useQuery({
+        queryKey: ['signup-requests', activeTab, currentPage, debouncedSearch],
+        queryFn: () => signupRequestApi.getAll({
+            page: currentPage,
+            page_size: PAGE_SIZE,
+            ...(activeTab !== 'All' && { status: activeTab.toLowerCase() }),
+            ...(debouncedSearch.trim() && { search: debouncedSearch.trim() }),
+        }),
         refetchInterval: 30_000,
     });
+
+    const { data: counts } = useQuery({
+        queryKey: ['signup-requests-counts'],
+        queryFn: () => signupRequestApi.getCounts(),
+        refetchInterval: 30_000,
+    });
+
+    const requests = listData?.items || [];
+    const totalPages = listData?.total_pages || 1;
+    const pendingCount = counts?.pending || 0;
 
     const approveMutation = useMutation({
         mutationFn: (id) => signupRequestApi.approve(id, user.id),
         onSuccess: (data) => {
             queryClient.invalidateQueries(['signup-requests']);
+            queryClient.invalidateQueries(['signup-requests-counts']);
             queryClient.invalidateQueries(['employees']);
             toast.success(data.message || 'Account created and credentials emailed');
         },
@@ -47,6 +77,7 @@ const SignupRequestsPage = () => {
         mutationFn: ({ id, data }) => signupRequestApi.update(id, data),
         onSuccess: () => {
             queryClient.invalidateQueries(['signup-requests']);
+            queryClient.invalidateQueries(['signup-requests-counts']);
             toast.success('Employment type updated');
         },
         onError: (err) => toast.error(err.response?.data?.detail || 'Failed to update employment type'),
@@ -56,6 +87,7 @@ const SignupRequestsPage = () => {
         mutationFn: ({ id, reason }) => signupRequestApi.reject(id, user.id, reason),
         onSuccess: () => {
             queryClient.invalidateQueries(['signup-requests']);
+            queryClient.invalidateQueries(['signup-requests-counts']);
             setRejectModal(null);
             setRejectReason('');
             toast.success('Request rejected and applicant notified');
@@ -63,14 +95,27 @@ const SignupRequestsPage = () => {
         onError: (err) => toast.error(err.response?.data?.detail || 'Failed to reject request'),
     });
 
-    const filtered = requests.filter(r => {
-        if (activeTab === 'All') return true;
-        return r.status === activeTab.toLowerCase();
+    const undoRejectMutation = useMutation({
+        mutationFn: (id) => signupRequestApi.undoReject(id, user.id),
+        onSuccess: () => {
+            queryClient.invalidateQueries(['signup-requests']);
+            queryClient.invalidateQueries(['signup-requests-counts']);
+            toast.success('Rejection undone — request is pending again');
+        },
+        onError: (err) => toast.error(err.response?.data?.detail || 'Failed to undo rejection'),
     });
 
-    const pendingCount = requests.filter(r => r.status === 'pending').length;
-    const totalPages = Math.ceil(filtered.length / PAGE_SIZE);
-    const paginatedRequests = filtered.slice((currentPage - 1) * PAGE_SIZE, currentPage * PAGE_SIZE);
+    const undoApproveMutation = useMutation({
+        mutationFn: ({ id, reason }) => signupRequestApi.undoApprove(id, user.id, reason),
+        onSuccess: () => {
+            queryClient.invalidateQueries(['signup-requests']);
+            queryClient.invalidateQueries(['signup-requests-counts']);
+            setRejectModal(null);
+            setRejectReason('');
+            toast.success('Approval undone — request is pending again');
+        },
+        onError: (err) => toast.error(err.response?.data?.detail || 'Failed to undo approval'),
+    });
 
     const handleTabChange = (tab) => {
         setActiveTab(tab);
@@ -94,28 +139,37 @@ const SignupRequestsPage = () => {
                 </p>
             </div>
 
-            {/* Tabs */}
-            <div className="flex gap-1 bg-slate-100 rounded-xl p-1 w-fit">
-                {TABS.map(tab => (
-                    <button key={tab} onClick={() => handleTabChange(tab)}
-                        className={`px-4 py-2 rounded-lg text-sm font-medium transition-all ${
-                            activeTab === tab ? 'bg-white text-slate-800 shadow-sm' : 'text-slate-500 hover:text-slate-700'
-                        }`}>
-                        {tab}
-                        {tab === 'Pending' && pendingCount > 0 && (
-                            <span className="ml-1.5 inline-flex items-center justify-center h-4 min-w-[16px] px-1 rounded-full text-[10px] font-bold bg-amber-500 text-white">
-                                {pendingCount}
-                            </span>
-                        )}
-                    </button>
-                ))}
+            {/* Tabs + Search */}
+            <div className="flex items-center justify-between gap-4">
+                <div className="flex gap-1 bg-slate-100 rounded-xl p-1 w-fit">
+                    {TABS.map(tab => (
+                        <button key={tab} onClick={() => handleTabChange(tab)}
+                            className={`px-4 py-2 rounded-lg text-sm font-medium transition-all ${
+                                activeTab === tab ? 'bg-white text-slate-800 shadow-sm' : 'text-slate-500 hover:text-slate-700'
+                            }`}>
+                            {tab}
+                            {tab === 'Pending' && pendingCount > 0 && (
+                                <span className="ml-1.5 inline-flex items-center justify-center h-4 min-w-[16px] px-1 rounded-full text-[10px] font-bold bg-amber-500 text-white">
+                                    {pendingCount}
+                                </span>
+                            )}
+                        </button>
+                    ))}
+                </div>
+                <SearchBar
+                    value={search}
+                    onChange={setSearch}
+                    placeholder="Search by name, email or designation..."
+                    clearable
+                    width="w-full sm:w-80"
+                />
             </div>
 
             {/* Table */}
             <div className="bg-white rounded-2xl border border-slate-200/60 shadow-sm">
                 {isLoading ? (
                     <div className="flex items-center justify-center py-16 text-slate-400">Loading...</div>
-                ) : filtered.length === 0 ? (
+                ) : requests.length === 0 ? (
                     <div className="flex flex-col items-center justify-center py-16 text-slate-400">
                         <User className="w-10 h-10 mb-3 text-slate-300" />
                         <p className="font-medium">No {activeTab.toLowerCase()} requests</p>
@@ -125,7 +179,7 @@ const SignupRequestsPage = () => {
                     </div>
                 ) : (
                     <div className="divide-y divide-slate-100">
-                        {paginatedRequests.map(req => {
+                        {requests.map(req => {
                             const isExpanded = expandedId === req.id;
                             return (
                                 <div key={req.id} className="hover:bg-slate-50/50 transition-colors">
@@ -165,23 +219,27 @@ const SignupRequestsPage = () => {
 
                                         {/* Right — actions */}
                                         <div className="flex items-center gap-2 shrink-0">
-                                            <button onClick={() => setExpandedId(isExpanded ? null : req.id)}
-                                                className="px-3 py-1.5 text-xs font-medium text-slate-600 bg-slate-100 hover:bg-slate-200 rounded-lg transition-colors">
+                                            {req.status === 'rejected' && (
+                                                <Button variant="secondary" size="sm" onClick={() => undoRejectMutation.mutate(req.id)} disabled={undoRejectMutation.isPending}>
+                                                    <RotateCcw className="w-3.5 h-3.5"/>Undo
+                                                </Button>
+                                            )}
+                                            {req.status === 'approved' && (
+                                                <Button variant="secondary" size="sm" onClick={() => { setRejectModal({ requestId: req.id, name: req.name, mode: 'undoApprove' }); setRejectReason(''); }}>
+                                                    <RotateCcw className="w-3.5 h-3.5"/>Undo
+                                                </Button>
+                                            )}
+                                            <Button variant="secondary" size="sm" onClick={() => setExpandedId(isExpanded ? null : req.id)}>
                                                 {isExpanded ? 'Less' : 'Details'}
-                                            </button>
+                                            </Button>
                                             {req.status === 'pending' && (
                                                 <>
-                                                    <button
-                                                        onClick={() => approveMutation.mutate(req.id)}
-                                                        disabled={approveMutation.isPending}
-                                                        className="inline-flex items-center gap-1.5 px-3 py-1.5 text-xs font-medium bg-emerald-600 text-white rounded-lg hover:bg-emerald-700 transition-colors disabled:opacity-50">
+                                                    <Button variant="success" size="sm" onClick={() => approveMutation.mutate(req.id)} disabled={approveMutation.isPending}>
                                                         <CheckCircle className="w-3.5 h-3.5"/>Approve
-                                                    </button>
-                                                    <button
-                                                        onClick={() => { setRejectModal({ requestId: req.id, name: req.name }); setRejectReason(''); }}
-                                                        className="inline-flex items-center gap-1.5 px-3 py-1.5 text-xs font-medium bg-red-500 text-white rounded-lg hover:bg-red-600 transition-colors">
+                                                    </Button>
+                                                    <Button variant="danger" size="sm" onClick={() => { setRejectModal({ requestId: req.id, name: req.name, mode: 'reject' }); setRejectReason(''); }}>
                                                         <XCircle className="w-3.5 h-3.5"/>Reject
-                                                    </button>
+                                                    </Button>
                                                 </>
                                             )}
                                         </div>
@@ -293,9 +351,9 @@ const SignupRequestsPage = () => {
 
             {/* Reject modal */}
             {rejectModal && (
-                <div className="fixed inset-0 bg-black/50 flex items-center justify-center z-50 px-4 py-8">
-                    <div className="bg-white rounded-2xl shadow-xl w-full max-w-md p-6">
-                        <div className="flex items-start gap-3 mb-4">
+                <Modal isOpen onClose={() => setRejectModal(null)} size="md">
+                    <Modal.Header onClose={() => setRejectModal(null)}>
+                        <div className="flex items-start gap-3">
                             <div className="p-2 bg-red-100 rounded-lg shrink-0">
                                 <AlertTriangle className="w-5 h-5 text-red-600"/>
                             </div>
@@ -305,33 +363,35 @@ const SignupRequestsPage = () => {
                                     Rejecting <strong>{rejectModal.name}</strong>'s request. They will receive an email notification.
                                 </p>
                             </div>
-                            <button onClick={() => setRejectModal(null)} className="text-slate-400 hover:text-slate-600">
-                                <X className="w-5 h-5"/>
-                            </button>
                         </div>
-                        <div>
-                            <label className="block text-sm font-medium text-slate-700 mb-1.5">
-                                Reason <span className="text-slate-400 font-normal">(optional — sent to applicant)</span>
-                            </label>
-                            <textarea value={rejectReason} onChange={e => setRejectReason(e.target.value)}
-                                placeholder="e.g. Position currently filled, incomplete information..."
-                                className="w-full rounded-xl border border-slate-200 p-3 text-sm resize-none focus:outline-none focus:ring-2 focus:ring-red-500 focus:border-transparent"
-                                rows={3} />
-                        </div>
-                        <div className="flex justify-end gap-3 mt-4">
-                            <button onClick={() => setRejectModal(null)}
-                                className="px-4 py-2 text-sm font-medium text-slate-600 hover:bg-slate-100 rounded-lg transition-colors">
-                                Cancel
-                            </button>
-                            <button
-                                onClick={() => rejectMutation.mutate({ id: rejectModal.requestId, reason: rejectReason })}
-                                disabled={rejectMutation.isPending}
-                                className="px-4 py-2 text-sm font-medium bg-red-500 text-white rounded-lg hover:bg-red-600 transition-colors disabled:opacity-50">
-                                {rejectMutation.isPending ? 'Rejecting...' : 'Confirm Reject'}
-                            </button>
-                        </div>
-                    </div>
-                </div>
+                    </Modal.Header>
+                    <Modal.Body>
+                        <label className="block text-sm font-medium text-slate-700 mb-1.5">
+                            Reason <span className="text-slate-400 font-normal">(optional — sent to applicant)</span>
+                        </label>
+                        <textarea value={rejectReason} onChange={e => setRejectReason(e.target.value)}
+                            placeholder="e.g. Position currently filled, incomplete information..."
+                            className="w-full rounded-xl border border-slate-200 p-3 text-sm resize-none focus:outline-none focus:ring-2 focus:ring-red-500 focus:border-transparent"
+                            rows={3} />
+                    </Modal.Body>
+                    <Modal.Footer>
+                        <Button variant="cancel" onClick={() => setRejectModal(null)}>Cancel</Button>
+                        <Button
+                            variant="danger"
+                            onClick={() => {
+                                if (rejectModal.mode === 'undoApprove') {
+                                    undoApproveMutation.mutate({ id: rejectModal.requestId, reason: rejectReason });
+                                } else {
+                                    rejectMutation.mutate({ id: rejectModal.requestId, reason: rejectReason });
+                                }
+                            }}
+                            disabled={rejectModal.mode === 'undoApprove' ? undoApproveMutation.isPending : rejectMutation.isPending}
+                            isLoading={rejectModal.mode === 'undoApprove' ? undoApproveMutation.isPending : rejectMutation.isPending}
+                        >
+                            {!(rejectModal.mode === 'undoApprove' ? undoApproveMutation.isPending : rejectMutation.isPending) && 'Confirm Reject'}
+                        </Button>
+                    </Modal.Footer>
+                </Modal>
             )}
         </div>
     );

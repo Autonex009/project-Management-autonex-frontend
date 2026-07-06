@@ -1,474 +1,4 @@
-// import { useState } from 'react';
-import AllocationPopover from '../components/AllocationPopover';
-import Dropdown from '../components/ui/Dropdown';
-// import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
-// import { allocationApi, projectApi, employeeApi } from '../services/api';
-// import { Plus, X, Edit, Trash2 } from 'lucide-react';
-// import { format } from 'date-fns';
-import SearchInput from '../components/ui/SearchInput';
-
-// const AllocationsPage = () => {
-//   const queryClient = useQueryClient();
-//   const [isModalOpen, setIsModalOpen] = useState(false);
-//   const [editingAllocation, setEditingAllocation] = useState(null);
-//   const [error, setError] = useState('');
-
-//   const { data: allocations = [], isLoading } = useQuery({
-//     queryKey: ['allocations'],
-//     queryFn: allocationApi.getAll,
-//   });
-
-//   const { data: projects = [] } = useQuery({
-//     queryKey: ['projects'],
-//     queryFn: projectApi.getAll,
-//   });
-
-//   const { data: employees = [] } = useQuery({
-//     queryKey: ['employees'],
-//     queryFn: employeeApi.getAll,
-//   });
-
-//   const createMutation = useMutation({
-//     mutationFn: allocationApi.create,
-//     onSuccess: () => {
-//       queryClient.invalidateQueries(['allocations']);
-//       queryClient.invalidateQueries(['projects']);
-//       setIsModalOpen(false);
-//       setEditingAllocation(null);
-//       setError('');
-//     },
-//     onError: (err) => {
-//       console.error('Create allocation error:', err);
-//       const errorMessage = err.response?.data?.detail || err.message || 'Failed to create allocation. Please check all fields and try again.';
-//       setError(errorMessage);
-//     }
-//   });
-
-//   const updateMutation = useMutation({
-//     mutationFn: ({ id, data }) => allocationApi.update(id, data),
-//     onSuccess: () => {
-//       queryClient.invalidateQueries(['allocations']);
-//       queryClient.invalidateQueries(['projects']);
-//       setIsModalOpen(false);
-//       setEditingAllocation(null);
-//       setError('');
-//     },
-//     onError: (err) => {
-//       console.error('Update allocation error:', err);
-//       const errorMessage = err.response?.data?.detail || err.message || 'Failed to update allocation. Please check all fields and try again.';
-//       setError(errorMessage);
-//     }
-//   });
-
-//   const deleteMutation = useMutation({
-//     mutationFn: allocationApi.delete,
-//     onSuccess: () => {
-//       queryClient.invalidateQueries(['allocations']);
-//       queryClient.invalidateQueries(['projects']);
-//     },
-//   });
-
-//   const handleSubmit = async (e) => {
-//     e.preventDefault();
-//     setError('');
-
-//     const formData = new FormData(e.target);
-
-//     // Get all field values
-//     const employeeId = formData.get('employee_id');
-//     const projectId = formData.get('project_id');
-//     const weeklyHours = formData.get('weekly_hours_allocated');
-//     const weeklyTasks = formData.get('weekly_tasks_allocated');
-//     const productivity = formData.get('productivity_override');
-//     const effectiveWeek = formData.get('effective_week');
-
-//     console.log('Form values:', {
-//       employeeId, projectId, weeklyHours, weeklyTasks, productivity, effectiveWeek
-//     });
-
-//     // Client-side validation
-//     if (!employeeId || employeeId === '') {
-//       setError('Please select an employee');
-//       return;
-//     }
-//     if (!projectId || projectId === '') {
-//       setError('Please select a project');
-//       return;
-//     }
-//     if (!weeklyHours || parseFloat(weeklyHours) <= 0) {
-//       setError('Weekly hours must be greater than 0');
-//       return;
-//     }
-//     if (!weeklyTasks || parseInt(weeklyTasks) < 0) {
-//       setError('Weekly tasks must be 0 or greater');
-//       return;
-//     }
-//     if (!productivity || parseFloat(productivity) <= 0) {
-//       setError('Productivity must be greater than 0');
-//       return;
-//     }
-//     if (!effectiveWeek) {
-//       setError('Please select an effective week date');
-//       return;
-//     }
-
-//     // Ensure date is in YYYY-MM-DD format
-//     const dateObj = new Date(effectiveWeek);
-//     const formattedDate = dateObj.toISOString().split('T')[0];
-
-//     const data = {
-//       employee_id: parseInt(employeeId),
-//       project_id: parseInt(projectId),
-//       weekly_hours_allocated: parseFloat(weeklyHours),
-//       weekly_tasks_allocated: parseInt(weeklyTasks),
-//       productivity_override: parseFloat(productivity),
-//       effective_week: formattedDate,
-//     };
-
-//     console.log('Submitting allocation data:', data);
-
-//     try {
-//       if (editingAllocation) {
-//         await updateMutation.mutateAsync({ id: editingAllocation.id, data });
-//       } else {
-//         await createMutation.mutateAsync(data);
-//       }
-//     } catch (err) {
-//       console.error('Mutation error:', err);
-//       // Error is handled by onError callback
-//     }
-//   };
-
-//   const getProjectName = (projectId) => {
-//     const project = projects.find(p => p.id === projectId);
-//     return project ? project.name : `Project #${projectId}`;
-//   };
-
-//   const getEmployeeName = (employeeId) => {
-//     const employee = employees.find(e => e.id === employeeId);
-//     return employee ? employee.name : `Employee #${employeeId}`;
-//   };
-
-//   const activeEmployees = employees.filter(e => e.status === 'active');
-//   const activeProjects = projects.filter(p => p.project_status === 'active');
-
-//   if (isLoading) {
-//     return (
-//       <div className="flex items-center justify-center py-12">
-//         <div className="text-gray-500">Loading allocations...</div>
-//       </div>
-//     );
-//   }
-
-//   return (
-//     <div className="space-y-6">
-//       <div className="flex justify-between items-center">
-//         <div>
-//           <h1 className="text-2xl font-semibold text-gray-900">Allocations</h1>
-//           <p className="mt-1 text-sm text-gray-500">Assign employees to projects</p>
-//         </div>
-//         <button
-//           onClick={() => {
-//             setEditingAllocation(null);
-//             setError('');
-//             setIsModalOpen(true);
-//           }}
-//           className="btn btn-primary flex items-center gap-2"
-//         >
-//           <Plus className="w-4 h-4" />
-//           Add Allocation
-//         </button>
-//       </div>
-
-//       {/* Warning if no employees or projects */}
-//       {(activeEmployees.length === 0 || activeProjects.length === 0) && (
-//         <div className="bg-yellow-50 border border-yellow-200 rounded-md p-4">
-//           <p className="text-sm text-yellow-800">
-//             {activeEmployees.length === 0 && activeProjects.length === 0 &&
-//               '⚠️ Please create at least one active employee and one active project before creating allocations.'}
-//             {activeEmployees.length === 0 && activeProjects.length > 0 &&
-//               '⚠️ Please create at least one active employee before creating allocations.'}
-//             {activeEmployees.length > 0 && activeProjects.length === 0 &&
-//               '⚠️ Please create at least one active project before creating allocations.'}
-//           </p>
-//         </div>
-//       )}
-
-//       <div className="card p-0">
-//         <div className="overflow-x-auto">
-//           <table className="w-full">
-//             <thead className="bg-gray-50 border-b border-gray-200">
-//               <tr>
-//                 <th className="px-4 py-3 text-left text-xs font-semibold text-gray-600 uppercase tracking-wider">Employee</th>
-//                 <th className="px-4 py-3 text-left text-xs font-semibold text-gray-600 uppercase tracking-wider">Project</th>
-//                 <th className="px-4 py-3 text-center text-xs font-semibold text-gray-600 uppercase tracking-wider">Weekly Hours</th>
-//                 <th className="px-4 py-3 text-center text-xs font-semibold text-gray-600 uppercase tracking-wider">Weekly Tasks</th>
-//                 <th className="px-4 py-3 text-center text-xs font-semibold text-gray-600 uppercase tracking-wider">Productivity</th>
-//                 <th className="px-4 py-3 text-left text-xs font-semibold text-gray-600 uppercase tracking-wider">Effective Week</th>
-//                 <th className="px-4 py-3 text-center text-xs font-semibold text-gray-600 uppercase tracking-wider">Actions</th>
-//               </tr>
-//             </thead>
-//             <tbody className="bg-white divide-y divide-gray-100">
-//               {allocations.length === 0 ? (
-//                 <tr>
-//                   <td colSpan="7" className="px-4 py-12 text-center">
-//                     <div className="text-gray-400">
-//                       <p className="mb-2">No allocations yet</p>
-//                       <p className="text-sm">Create your first allocation to get started</p>
-//                     </div>
-//                   </td>
-//                 </tr>
-//               ) : (
-//                 allocations.map((allocation) => (
-//                   <tr key={allocation.id} className="hover:bg-gray-50 transition-colors">
-//                     <td className="px-4 py-3">
-//                       <span className="font-medium text-sm text-gray-900">
-//                         {getEmployeeName(allocation.employee_id)}
-//                       </span>
-//                     </td>
-//                     <td className="px-4 py-3">
-//                       <span className="text-sm text-gray-700">
-//                         {getProjectName(allocation.project_id)}
-//                       </span>
-//                     </td>
-//                     <td className="px-4 py-3 text-center">
-//                       <span className="font-medium text-sm text-gray-900">
-//                         {allocation.weekly_hours_allocated}h
-//                       </span>
-//                     </td>
-//                     <td className="px-4 py-3 text-center">
-//                       <span className="text-sm text-gray-700">
-//                         {allocation.weekly_tasks_allocated}
-//                       </span>
-//                     </td>
-//                     <td className="px-4 py-3 text-center">
-//                       <span className={`badge ${allocation.productivity_override === 1.0 ? 'badge-blue' : 'badge-green'}`}>
-//                         {allocation.productivity_override}x
-//                       </span>
-//                     </td>
-//                     <td className="px-4 py-3">
-//                       <span className="text-sm text-gray-700">
-//                         {format(new Date(allocation.effective_week), 'MMM d, yyyy')}
-//                       </span>
-//                     </td>
-//                     <td className="px-4 py-3">
-//                       <div className="flex items-center justify-center gap-1">
-//                         <button
-//                           onClick={() => {
-//                             setEditingAllocation(allocation);
-//                             setError('');
-//                             setIsModalOpen(true);
-//                           }}
-//                           className="p-2 text-blue-600 hover:bg-blue-50 rounded transition-colors"
-//                           title="Edit"
-//                         >
-//                           <Edit className="w-4 h-4" />
-//                         </button>
-//                         <button
-//                           onClick={() => {
-//                             if (window.confirm('Delete this allocation?')) {
-//                               deleteMutation.mutate(allocation.id);
-//                             }
-//                           }}
-//                           className="p-2 text-red-600 hover:bg-red-50 rounded transition-colors"
-//                           title="Delete"
-//                         >
-//                           <Trash2 className="w-4 h-4" />
-//                         </button>
-//                       </div>
-//                     </td>
-//                   </tr>
-//                 ))
-//               )}
-//             </tbody>
-//           </table>
-//         </div>
-//       </div>
-
-//       {/* Modal */}
-//       {isModalOpen && (
-//         <div className="fixed inset-0 bg-gray-900 bg-opacity-50 flex items-center justify-center z-50 p-4">
-//           <div className="bg-white rounded-lg shadow-xl w-full max-w-2xl max-h-[90vh] overflow-y-auto">
-//             <div className="px-6 py-4 border-b border-gray-200">
-//               <div className="flex justify-between items-center">
-//                 <h2 className="text-xl font-semibold text-gray-900">
-//                   {editingAllocation ? 'Edit Allocation' : 'Create Allocation'}
-//                 </h2>
-//                 <button
-//                   onClick={() => {
-//                     setIsModalOpen(false);
-//                     setEditingAllocation(null);
-//                     setError('');
-//                   }}
-//                   className="text-gray-400 hover:text-gray-600 transition-colors"
-//                 >
-//                   <X className="w-5 h-5" />
-//                 </button>
-//               </div>
-//             </div>
-
-//             <form onSubmit={handleSubmit} className="p-6">
-//               {error && (
-//                 <div className="mb-4 p-4 bg-red-50 border border-red-200 rounded-md">
-//                   <p className="text-sm text-red-800 font-medium">Failed to create allocation</p>
-//                   <p className="text-sm text-red-700 mt-1">{error}</p>
-//                 </div>
-//               )}
-
-//               {(activeEmployees.length === 0 || activeProjects.length === 0) && (
-//                 <div className="mb-4 p-4 bg-yellow-50 border border-yellow-200 rounded-md">
-//                   <p className="text-sm text-yellow-800">
-//                     {activeEmployees.length === 0 && 'No active employees available. Please create an active employee first.'}
-//                     {activeProjects.length === 0 && 'No active projects available. Please create an active project first.'}
-//                   </p>
-//                 </div>
-//               )}
-
-//               <div className="space-y-4">
-//                 <div className="grid grid-cols-2 gap-4">
-//                   <div>
-//                     <label className="block text-sm font-medium text-gray-700 mb-1">
-//                       Employee <span className="text-red-500">*</span>
-//                     </label>
-//                     <select
-//                       name="employee_id"
-//                       required
-//                       defaultValue={editingAllocation?.employee_id || ''}
-//                       className="input"
-//                       disabled={activeEmployees.length === 0}
-//                     >
-//                       <option value="">Select employee</option>
-//                       {activeEmployees.map((employee) => (
-//                         <option key={employee.id} value={employee.id}>
-//                           {employee.name} - {employee.employee_type}
-//                         </option>
-//                       ))}
-//                     </select>
-//                   </div>
-//                   <div>
-//                     <label className="block text-sm font-medium text-gray-700 mb-1">
-//                       Project <span className="text-red-500">*</span>
-//                     </label>
-//                     <select
-//                       name="project_id"
-//                       required
-//                       defaultValue={editingAllocation?.project_id || ''}
-//                       className="input"
-//                       disabled={activeProjects.length === 0}
-//                     >
-//                       <option value="">Select project</option>
-//                       {activeProjects.map((project) => (
-//                         <option key={project.id} value={project.id}>
-//                           {project.name}
-//                         </option>
-//                       ))}
-//                     </select>
-//                   </div>
-//                 </div>
-
-//                 <div className="grid grid-cols-2 gap-4">
-//                   <div>
-//                     <label className="block text-sm font-medium text-gray-700 mb-1">
-//                       Weekly Hours <span className="text-red-500">*</span>
-//                     </label>
-//                     <input
-//                       type="number"
-//                       name="weekly_hours_allocated"
-//                       required
-//                       step="0.5"
-//                       min="0.5"
-//                       max="168"
-//                       defaultValue={editingAllocation?.weekly_hours_allocated || '40'}
-//                       className="input"
-//                       placeholder="40"
-//                     />
-//                     <p className="mt-1 text-xs text-gray-500">Hours per week (max 168)</p>
-//                   </div>
-//                   <div>
-//                     <label className="block text-sm font-medium text-gray-700 mb-1">
-//                       Weekly Tasks <span className="text-red-500">*</span>
-//                     </label>
-//                     <input
-//                       type="number"
-//                       name="weekly_tasks_allocated"
-//                       required
-//                       min="0"
-//                       defaultValue={editingAllocation?.weekly_tasks_allocated || '20'}
-//                       className="input"
-//                       placeholder="20"
-//                     />
-//                     <p className="mt-1 text-xs text-gray-500">Number of tasks per week</p>
-//                   </div>
-//                 </div>
-
-//                 <div className="grid grid-cols-2 gap-4">
-//                   <div>
-//                     <label className="block text-sm font-medium text-gray-700 mb-1">
-//                       Productivity <span className="text-red-500">*</span>
-//                     </label>
-//                     <input
-//                       type="number"
-//                       name="productivity_override"
-//                       required
-//                       step="0.1"
-//                       min="0.1"
-//                       max="2.0"
-//                       defaultValue={editingAllocation?.productivity_override || '1.0'}
-//                       className="input"
-//                       placeholder="1.0"
-//                     />
-//                     <p className="mt-1 text-xs text-gray-500">Multiplier: 0.1 - 2.0</p>
-//                   </div>
-//                   <div>
-//                     <label className="block text-sm font-medium text-gray-700 mb-1">
-//                       Effective Week <span className="text-red-500">*</span>
-//                     </label>
-//                     <input
-//                       type="date"
-//                       name="effective_week"
-//                       required
-//                       defaultValue={editingAllocation?.effective_week || new Date().toISOString().split('T')[0]}
-//                       className="input"
-//                     />
-//                     <p className="mt-1 text-xs text-gray-500">Start date for allocation</p>
-//                   </div>
-//                 </div>
-//               </div>
-
-//               <div className="flex justify-end gap-3 mt-6 pt-4 border-t border-gray-200">
-//                 <button
-//                   type="button"
-//                   onClick={() => {
-//                     setIsModalOpen(false);
-//                     setEditingAllocation(null);
-//                     setError('');
-//                   }}
-//                   className="btn btn-secondary"
-//                 >
-//                   Cancel
-//                 </button>
-//                 <button
-//                   type="submit"
-//                   disabled={createMutation.isPending || updateMutation.isPending || activeEmployees.length === 0 || activeProjects.length === 0}
-//                   className="btn btn-primary"
-//                 >
-//                   {createMutation.isPending || updateMutation.isPending
-//                     ? 'Saving...'
-//                     : editingAllocation
-//                       ? 'Update Allocation'
-//                       : 'Create Allocation'}
-//                 </button>
-//               </div>
-//             </form>
-//           </div>
-//         </div>
-//       )}
-//     </div>
-//   );
-// };
-
-// export default AllocationsPage;
-import { useState, useEffect, useRef, useMemo } from 'react';
+﻿import { useState, useEffect, useRef, useMemo } from 'react';
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import { useLocation } from 'react-router-dom';
 import { allocationApi, subProjectApi, employeeApi, leaveApi, parentProjectApi } from '../services/api';
@@ -476,7 +6,12 @@ import { Plus, Edit, Trash2, X, UserPlus, UserMinus, CheckSquare, AlertTriangle,
 import toast from 'react-hot-toast';
 import ConfirmDialog from '../components/ui/ConfirmDialog';
 import { getPmEmployeeId, getPmSubProjects } from '../utils/pmScope';
-import PageSearchBar from '../components/ui/PageSearchBar';
+import Table from '../components/ui/Table';
+import Button from '../components/ui/Button';
+import Modal from '../components/ui/Modal';
+import AllocationPopover from '../components/AllocationPopover';
+import Dropdown from '../components/ui/Dropdown';
+import SearchBar from '../components/ui/SearchBar';
 
 // Stable color palette for avatars based on the employee name
 const AVATAR_PALETTE = [
@@ -804,8 +339,6 @@ const AllocationsPage = () => {
     });
   }, [projectAllocations, searchQuery, employees]);
 
-  const totalPages = Math.ceil(filteredProjectAllocations.length / PAGE_SIZE);
-  const paginatedAllocations = filteredProjectAllocations.slice((currentPage - 1) * PAGE_SIZE, currentPage * PAGE_SIZE);
 
   return (
     <div className="space-y-6">
@@ -815,305 +348,152 @@ const AllocationsPage = () => {
           <h1 className="text-2xl font-bold text-slate-800">Allocations</h1>
           <p className="mt-1 text-sm text-slate-500">Assign employees to projects</p>
         </div>
-        <button
-          onClick={() => {
-            setSelectedProject(null);
-            setSelectedEmployees([]);
-            setIsModalOpen(true);
-          }}
-          className="inline-flex items-center gap-2 px-4 py-2.5 bg-indigo-600 hover:bg-indigo-700 text-white font-medium rounded-lg transition-colors shadow-sm"
-        >
+        <Button onClick={() => { setSelectedProject(null); setSelectedEmployees([]); setIsModalOpen(true); }}>
           <Plus className="w-4 h-4" />
           Create Allocation
-        </button>
+        </Button>
       </div>
 
 
 
       {/* Search Filter */}
       <div className="flex justify-between items-center mb-4">
-        <PageSearchBar
+        <SearchBar responsive
           value={searchQuery}
           onChange={(val) => { setSearchQuery(val); setCurrentPage(1); }}
           placeholder="Search allocations by project or employee..."
         />
       </div>
 
-      {/* Modern Card Container */}
-      <div className="bg-white rounded-2xl border border-slate-200/60 shadow-[0_1px_3px_rgba(0,0,0,0.04)] overflow-hidden">
-        <div className="overflow-x-auto">
-          <table className="w-full">
-            <thead className="bg-slate-50/80 border-b border-slate-100">
-              <tr>
-                <th className="px-5 py-4 text-left text-xs font-medium text-slate-400 uppercase tracking-wider">Project Name</th>
-                <th className="px-5 py-4 text-center text-xs font-medium text-slate-400 uppercase tracking-wider">Required</th>
-                <th className="px-5 py-4 text-left text-xs font-medium text-slate-400 uppercase tracking-wider">Allocated Employees</th>
-                <th className="px-5 py-4 text-right text-xs font-medium text-slate-400 uppercase tracking-wider">Actions</th>
-              </tr>
-            </thead>
-            <tbody className="divide-y divide-slate-100">
-              {isDataLoading ? (
-                <tr>
-                  <td colSpan="4" className="px-5 py-16 text-center">
-                    <div className="flex flex-col items-center gap-2 text-slate-400">
-                      <div className="animate-spin h-8 w-8 border-4 border-indigo-500 border-t-transparent rounded-full"></div>
-                      <p className="text-sm">Loading allocations...</p>
-                    </div>
-                  </td>
-                </tr>
-              ) : filteredProjectAllocations.length === 0 ? (
-                <tr>
-                  <td colSpan="4" className="px-5 py-16 text-center">
-                    <div className="text-slate-400">
-                      <p className="text-lg font-medium mb-1">
-                        {searchQuery ? 'No matching allocations' : 'No allocations yet'}
-                      </p>
-                      <p className="text-sm">
-                        {searchQuery ? 'Try adjusting your search query.' : 'Create your first allocation to get started'}
-                      </p>
-                    </div>
-                  </td>
-                </tr>
-              ) : (
-                paginatedAllocations.map(({ project, allocations: projectAllocs, requiredManpower }) => (
-                  <tr key={project.id} className="hover:bg-slate-50 transition-colors">
-                    <td className="px-5 py-4">
-                      <div className="font-semibold text-slate-800">{project.name}</div>
-                      <div className="text-xs text-slate-400">{project.project_type}</div>
-                    </td>
-                    <td className="px-5 py-4 text-center">
-                      <span className="inline-flex items-center px-2.5 py-1 bg-slate-100 text-slate-700 rounded-lg font-semibold text-sm">
-                        {requiredManpower}
-                      </span>
-                    </td>
-                    <td className="px-5 py-4">
-                      <div className="flex items-center justify-between gap-4">
-                        {/* Left Side: Avatar stack & Add button */}
-                        <div className="flex items-center gap-2">
-                          <div className="flex -space-x-1.5 overflow-hidden">
-                            {projectAllocs.slice(0, 3).map(alloc => {
-                              const emp = employees.find(e => e.id === alloc.employee_id);
-                              const name = emp?.name || 'Unknown';
-                              const initials = name.split(/\s+/).slice(0, 2).map(p => p[0]).join('').toUpperCase();
-                              const gradient = getAvatarGradient(name);
-                              return (
-                                <div
-                                  key={alloc.id}
-                                  className={`w-8 h-8 rounded-full bg-gradient-to-br ${gradient} text-white flex items-center justify-center text-[10px] font-bold border-2 border-white shadow-sm ring-1 ring-slate-100/50 shrink-0`}
-                                  title={name}
-                                >
-                                  {initials}
-                                </div>
-                              );
-                            })}
-                            {projectAllocs.length > 3 && (
-                              <div className="w-8 h-8 rounded-full bg-slate-100 border-2 border-white text-[10px] font-bold text-slate-500 flex items-center justify-center shadow-sm ring-1 ring-slate-100/50 shrink-0">
-                                +{projectAllocs.length - 3}
-                              </div>
-                            )}
+      <Table
+        loading={isDataLoading}
+        columns={[
+          {
+            key: 'project',
+            label: 'Project Name',
+            render: (project) => (
+              <div>
+                <div className="font-semibold text-slate-800">{project.name}</div>
+                <div className="text-xs text-slate-400">{project.project_type}</div>
+              </div>
+            ),
+          },
+          {
+            key: 'requiredManpower',
+            label: 'Required',
+            align: 'center',
+            render: (value) => (
+              <span className="inline-flex items-center px-2.5 py-1 bg-slate-100 text-slate-700 rounded-lg font-semibold text-sm">
+                {value}
+              </span>
+            ),
+          },
+          {
+            key: 'allocations',
+            label: 'Allocated Employees',
+            render: (projectAllocs, row) => {
+              const project = row.project;
+              const requiredManpower = row.requiredManpower;
+              return (
+                <div className="flex items-center justify-between gap-4">
+                  <div className="flex items-center gap-2">
+                    <div className="flex -space-x-1.5 overflow-hidden">
+                      {projectAllocs.slice(0, 3).map(alloc => {
+                        const emp = employees.find(e => e.id === alloc.employee_id);
+                        const name = emp?.name || 'Unknown';
+                        const initials = name.split(/\s+/).slice(0, 2).map(p => p[0]).join('').toUpperCase();
+                        const gradient = getAvatarGradient(name);
+                        return (
+                          <div key={alloc.id} className={`w-8 h-8 rounded-full bg-gradient-to-br ${gradient} text-white flex items-center justify-center text-[10px] font-bold border-2 border-white shadow-sm ring-1 ring-slate-100/50 shrink-0`} title={name}>
+                            {initials}
                           </div>
-                          
-                          <button
-                            onClick={() => {
-                              setSelectedProject(project);
-                              setIsModalOpen(true);
-                            }}
-                            className="w-8 h-8 rounded-full border border-dashed border-slate-300 text-slate-400 hover:text-indigo-600 hover:border-indigo-500 hover:bg-indigo-50/50 flex items-center justify-center transition-all shrink-0"
-                            title="Add employees"
-                          >
-                            <UserPlus className="w-3.5 h-3.5" />
-                          </button>
+                        );
+                      })}
+                      {projectAllocs.length > 3 && (
+                        <div className="w-8 h-8 rounded-full bg-slate-100 border-2 border-white text-[10px] font-bold text-slate-500 flex items-center justify-center shadow-sm ring-1 ring-slate-100/50 shrink-0">
+                          +{projectAllocs.length - 3}
                         </div>
-
-                        {/* Right Side: Allocation Popover Badge & Leave Pill */}
-                        <div className="flex items-center gap-2">
-                          {(() => {
-                            const assignedCount = projectAllocs.length;
-                            const todayStr = new Date().toISOString().slice(0, 10);
-                            const onLeaveDetails = projectAllocs
-                              .map(a => {
-                                const leave = leaves.find(l =>
-                                  l.employee_id === a.employee_id &&
-                                  l.status === 'approved' &&
-                                  String(l.start_date).slice(0, 10) <= todayStr &&
-                                  String(l.end_date).slice(0, 10) >= todayStr
-                                );
-                                if (!leave) return null;
-                                const name = getEmployeeName(a.employee_id);
-                                const initials = (name || '')
-                                  .split(' ')
-                                  .map(w => w[0])
-                                  .filter(Boolean)
-                                  .slice(0, 2)
-                                  .join('')
-                                  .toUpperCase();
-                                return {
-                                  employeeId: a.employee_id,
-                                  name,
-                                  initials,
-                                  leaveType: leave.leave_type || leave.type || null,
-                                };
-                              })
-                              .filter(Boolean);
-                            const onLeaveToday = onLeaveDetails.length;
-
-                            return (
-                              <>
-                                {onLeaveToday > 0 && (
-                                  <div className="relative group/leave shrink-0">
-                                    <span className="px-2.5 py-1 bg-amber-50 text-amber-700 border border-amber-200/50 rounded-full text-xs font-semibold flex items-center gap-1 cursor-default">
-                                      <span className="w-1.5 h-1.5 rounded-full bg-amber-500 animate-pulse" />
-                                      <span>{onLeaveToday} Leave</span>
-                                    </span>
-
-                                    {/* Hover card */}
-                                    <div className="absolute right-0 top-full mt-2 z-50 w-60 origin-top-right rounded-xl border border-slate-200 bg-white shadow-xl shadow-slate-900/10 opacity-0 invisible translate-y-1 group-hover/leave:opacity-100 group-hover/leave:visible group-hover/leave:translate-y-0 transition-all duration-150">
-                                      <div className="px-3.5 py-2.5 border-b border-slate-100 flex items-center gap-2">
-                                        <span className="w-1.5 h-1.5 rounded-full bg-amber-500" />
-                                        <span className="text-xs font-semibold text-slate-700">
-                                          On leave today
-                                        </span>
-                                        <span className="ml-auto text-[10px] font-semibold text-amber-700 bg-amber-50 border border-amber-200/60 rounded-full px-1.5 py-0.5">
-                                          {onLeaveToday}
-                                        </span>
-                                      </div>
-                                      <ul className="py-1.5 max-h-56 overflow-y-auto">
-                                        {onLeaveDetails.map(d => (
-                                          <li
-                                            key={d.employeeId}
-                                            className="px-3.5 py-1.5 flex items-center gap-2.5 hover:bg-slate-50"
-                                          >
-                                            <span className="w-7 h-7 rounded-full bg-gradient-to-br from-amber-400 to-orange-500 text-white text-[10px] font-bold flex items-center justify-center shrink-0">
-                                              {d.initials || '?'}
-                                            </span>
-                                            <div className="min-w-0">
-                                              <p className="text-xs font-medium text-slate-800 truncate">
-                                                {d.name}
-                                              </p>
-                                              {d.leaveType && (
-                                                <p className="text-[10px] text-slate-400 capitalize truncate">
-                                                  {String(d.leaveType).replace(/_/g, ' ')}
-                                                </p>
-                                              )}
-                                            </div>
-                                          </li>
-                                        ))}
-                                      </ul>
-                                    </div>
-                                  </div>
-                                )}
-
-                                <AllocationPopover
-                                  project={project}
-                                  allocations={projectAllocs}
-                                  employees={employees}
-                                  badgeContent={(
-                                    <span className={`text-xs font-semibold px-2.5 py-1 rounded-lg border transition-all flex items-center gap-1.5 cursor-pointer select-none ${
-                                      assignedCount >= requiredManpower
-                                        ? 'bg-emerald-50/40 text-emerald-700 border-emerald-100/70 hover:bg-emerald-100/40'
-                                        : 'bg-amber-50/40 text-amber-700 border-amber-100/70 hover:bg-amber-100/40'
-                                      }`}>
-                                      <span className={`w-1.5 h-1.5 rounded-full ${
-                                        assignedCount >= requiredManpower ? 'bg-emerald-500' : 'bg-amber-500'
-                                      }`} />
-                                      <span>{assignedCount} / {requiredManpower}</span>
-                                    </span>
-                                  )}
-                                  onOpenAllocations={() => { setSelectedProject(project); setIsModalOpen(true); }}
-                                />
-                              </>
-                            );
-                          })()}
-                        </div>
-                      </div>
-                    </td>
-                    <td className="px-5 py-4 text-right">
-                      <button
-                        onClick={() => {
-                          setEditingAllocation({ project, allocations: projectAllocs });
-                        }}
-                        className="p-2 text-slate-500 hover:text-indigo-600 hover:bg-indigo-50 rounded-lg transition-colors"
-                        title="Edit"
-                      >
-                        <Edit className="w-4 h-4" />
-                      </button>
-                    </td>
-                  </tr>
-                ))
-              )}
-            </tbody>
-          </table>
-        </div>
-        {totalPages > 1 && (
-          <div className="flex items-center justify-between px-5 py-3 border-t border-slate-100">
-            <p className="text-sm text-slate-500">
-              Showing {(currentPage - 1) * PAGE_SIZE + 1}–{Math.min(currentPage * PAGE_SIZE, projectAllocations.length)} of {projectAllocations.length} items
-            </p>
-            <div className="flex items-center gap-1">
-              <button
-                onClick={() => setCurrentPage(p => Math.max(1, p - 1))}
-                disabled={currentPage === 1}
-                className="px-3 py-1.5 text-sm rounded-lg border border-slate-200 text-slate-600 hover:bg-slate-50 disabled:opacity-40 disabled:cursor-not-allowed transition-colors"
-              >
-                Previous
-              </button>
-              {Array.from({ length: totalPages }, (_, i) => i + 1)
-                .filter(p => p === 1 || p === totalPages || Math.abs(p - currentPage) <= 1)
-                .reduce((acc, p, idx, arr) => {
-                  if (idx > 0 && p - arr[idx - 1] > 1) acc.push('...');
-                  acc.push(p);
-                  return acc;
-                }, [])
-                .map((p, idx) =>
-                  p === '...' ? (
-                    <span key={`ellipsis-${idx}`} className="px-2 text-slate-400 text-sm">…</span>
-                  ) : (
-                    <button
-                      key={p}
-                      onClick={() => setCurrentPage(p)}
-                      className={`px-3 py-1.5 text-sm rounded-lg border transition-colors ${
-                        currentPage === p
-                          ? 'bg-indigo-600 border-indigo-600 text-white font-medium'
-                          : 'border-slate-200 text-slate-600 hover:bg-slate-50'
-                      }`}
-                    >
-                      {p}
+                      )}
+                    </div>
+                    <button onClick={() => { setSelectedProject(project); setIsModalOpen(true); }} className="w-8 h-8 rounded-full border border-dashed border-slate-300 text-slate-400 hover:text-indigo-600 hover:border-indigo-500 hover:bg-indigo-50/50 flex items-center justify-center transition-all shrink-0" title="Add employees">
+                      <UserPlus className="w-3.5 h-3.5" />
                     </button>
-                  )
-                )}
+                  </div>
+                  <div className="flex items-center gap-2">
+                    {(() => {
+                      const assignedCount = projectAllocs.length;
+                      const todayStr = new Date().toISOString().slice(0, 10);
+                      const onLeaveToday = projectAllocs.filter(a =>
+                        leaves.some(l =>
+                          l.employee_id === a.employee_id &&
+                          l.status === 'approved' &&
+                          String(l.start_date).slice(0, 10) <= todayStr &&
+                          String(l.end_date).slice(0, 10) >= todayStr
+                        )
+                      ).length;
+                      return (
+                        <>
+                          {onLeaveToday > 0 && (
+                            <span className="px-2.5 py-1 bg-amber-50 text-amber-700 border border-amber-200/50 rounded-full text-xs font-semibold flex items-center gap-1 shrink-0" title={`${onLeaveToday} employee${onLeaveToday > 1 ? 's' : ''} on approved leave today`}>
+                              <span className="w-1.5 h-1.5 rounded-full bg-amber-500 animate-pulse" />
+                              <span>{onLeaveToday} Leave</span>
+                            </span>
+                          )}
+                          <AllocationPopover
+                            project={project}
+                            allocations={projectAllocs}
+                            employees={employees}
+                            badgeContent={(
+                              <span className={`text-xs font-semibold px-2.5 py-1 rounded-lg border transition-all flex items-center gap-1.5 cursor-pointer select-none ${assignedCount >= requiredManpower ? 'bg-emerald-50/40 text-emerald-700 border-emerald-100/70 hover:bg-emerald-100/40' : 'bg-amber-50/40 text-amber-700 border-amber-100/70 hover:bg-amber-100/40'}`}>
+                                <span className={`w-1.5 h-1.5 rounded-full ${assignedCount >= requiredManpower ? 'bg-emerald-500' : 'bg-amber-500'}`} />
+                                <span>{assignedCount} / {requiredManpower}</span>
+                              </span>
+                            )}
+                            onOpenAllocations={() => { setSelectedProject(project); setIsModalOpen(true); }}
+                          />
+                        </>
+                      );
+                    })()}
+                  </div>
+                </div>
+              );
+            },
+          },
+          {
+            key: '_edit',
+            label: 'Actions',
+            align: 'right',
+            render: (_, row) => (
               <button
-                onClick={() => setCurrentPage(p => Math.min(totalPages, p + 1))}
-                disabled={currentPage === totalPages}
-                className="px-3 py-1.5 text-sm rounded-lg border border-slate-200 text-slate-600 hover:bg-slate-50 disabled:opacity-40 disabled:cursor-not-allowed transition-colors"
+                onClick={() => setEditingAllocation({ project: row.project, allocations: row.allocations })}
+                className="p-2 text-slate-500 hover:text-indigo-600 hover:bg-indigo-50 rounded-lg transition-colors"
+                title="Edit"
               >
-                Next
+                <Edit className="w-4 h-4" />
               </button>
-            </div>
-          </div>
-        )}
-      </div>
+            ),
+          },
+        ]}
+        data={filteredProjectAllocations}
+        currentPage={currentPage}
+        pageSize={PAGE_SIZE}
+        onPageChange={setCurrentPage}
+        emptyState={{
+          title: searchQuery ? 'No matching allocations' : 'No allocations yet',
+          description: searchQuery ? 'Try adjusting your search query.' : 'Create your first allocation to get started',
+        }}
+      />
 
       {/* Create Allocation Modal */}
-      {isModalOpen && (
-        <div className="fixed inset-0 bg-slate-900/40 backdrop-blur-sm flex items-center justify-center z-50 px-2 py-4 sm:px-4">
-          <div
-            className="bg-white rounded-lg shadow-xl w-full max-w-full sm:max-w-3xl max-h-[95vh] sm:max-h-[90vh] overflow-y-auto"
-            onClick={(e) => e.stopPropagation()}
-          >
-            <div className="sticky top-0 bg-white border-b border-gray-200 px-6 py-4 flex justify-between items-center">
-              <h2 className="text-xl font-semibold text-gray-900">
-                Create Allocation
-              </h2>
-              <button
-                type="button"
-                onClick={closeCreateModal}
-                className="text-gray-400 hover:text-gray-600"
-              >
-                <X className="w-5 h-5" />
-              </button>
-            </div>
+      <Modal isOpen={isModalOpen} onClose={closeCreateModal} size="3xl" maxHeight="95vh">
+        <Modal.Header onClose={closeCreateModal}>
+          <h2 className="text-xl font-semibold text-gray-900">
+            Create Allocation
+          </h2>
+        </Modal.Header>
 
-            <form onSubmit={handleSubmit} className="p-6 space-y-5">
+        <form onSubmit={handleSubmit} className="flex-1 flex flex-col min-h-0">
+          <Modal.Body className="space-y-5">
               {/* Project Selection */}
               <div>
                 <label className="block text-sm font-medium text-gray-700 mb-1">
@@ -1204,7 +584,7 @@ const AllocationsPage = () => {
                                 return (
                                   <div
                                     key={alloc.id}
-                                    title={`${emp.name}${alloc.total_daily_hours ? ` · ${alloc.total_daily_hours}h/day` : ''}`}
+                                    title={`${emp.name}${alloc.total_daily_hours ? ` Â· ${alloc.total_daily_hours}h/day` : ''}`}
                                     className={`group inline-flex items-center gap-1.5 pl-1 pr-1 py-0.5 bg-white border border-slate-200 rounded-full shadow-sm transition-opacity ${isRemoving ? 'opacity-50' : ''}`}
                                   >
                                     <span className="w-5 h-5 rounded-full bg-indigo-500 text-white text-[10px] font-semibold flex items-center justify-center">
@@ -1295,7 +675,7 @@ const AllocationsPage = () => {
 
                     {/* Employee Search */}
                     <div className="mb-3">
-                      <SearchInput
+                      <SearchBar
                         placeholder="Search employees by name or email..."
                         value={employeeSearch}
                         onChange={setEmployeeSearch}
@@ -1372,7 +752,7 @@ const AllocationsPage = () => {
                                   </div>
                                   <div className="flex items-center gap-2 mt-1">
                                     <span className="text-xs text-gray-500">{employee.email}</span>
-                                    <span className="text-xs text-gray-400">•</span>
+                                    <span className="text-xs text-gray-400">â€¢</span>
                                     <span className="text-xs text-gray-500">{employee.weekly_availability}h/week</span>
                                   </div>
                                   {/* Show current projects if allocated */}
@@ -1536,8 +916,8 @@ const AllocationsPage = () => {
                                 : 'bg-red-50 text-red-700 border border-red-200'
                                 }`}>
                                 {isValid
-                                  ? `✓ Hours correctly distributed: ${totalAssigned}/${totalDailyHours}`
-                                  : `⚠ Hours mismatch: ${totalAssigned}/${totalDailyHours} (adjust to match)`
+                                  ? `âœ“ Hours correctly distributed: ${totalAssigned}/${totalDailyHours}`
+                                  : `âš  Hours mismatch: ${totalAssigned}/${totalDailyHours} (adjust to match)`
                                 }
                               </div>
                             );
@@ -1549,46 +929,30 @@ const AllocationsPage = () => {
                 </>
               )}
 
-              <div className="flex justify-end gap-3 pt-4 border-t border-gray-200">
-                <button
-                  type="button"
-                  onClick={closeCreateModal}
-                  className="btn btn-secondary"
-                >
-                  Cancel
-                </button>
-                <button
-                  type="submit"
-                  disabled={!selectedProject || selectedEmployees.length === 0 || createMutation.isPending}
-                  className="btn btn-primary disabled:opacity-50 disabled:cursor-not-allowed"
-                >
-                  {createMutation.isPending
-                    ? 'Allocating...'
-                    : `Allocate ${selectedEmployees.length} Employee${selectedEmployees.length !== 1 ? 's' : ''}`}
-                </button>
-              </div>
-            </form>
-          </div>
-        </div>
-      )}
+          </Modal.Body>
+          <Modal.Footer>
+            <Button type="button" variant="cancel" onClick={closeCreateModal}>Cancel</Button>
+            <Button
+              type="submit"
+              disabled={!selectedProject || selectedEmployees.length === 0 || createMutation.isPending}
+              isLoading={createMutation.isPending}
+            >
+              {!createMutation.isPending && `Allocate ${selectedEmployees.length} Employee${selectedEmployees.length !== 1 ? 's' : ''}`}
+            </Button>
+          </Modal.Footer>
+        </form>
+      </Modal>
 
       {/* Edit Allocation Modal */}
       {editingAllocation && (
-        <div className="fixed inset-0 bg-slate-900/40 backdrop-blur-sm flex items-center justify-center z-50 px-2 py-4 sm:px-4">
-          <div className="bg-white rounded-lg shadow-xl w-full max-w-full sm:max-w-2xl max-h-[95vh] sm:max-h-[90vh] overflow-y-auto">
-            <div className="sticky top-0 bg-white border-b border-gray-200 px-6 py-4 flex justify-between items-center">
-              <h2 className="text-xl font-semibold text-gray-900">
-                Manage Allocations - {editingAllocation.project.name}
-              </h2>
-              <button
-                onClick={() => setEditingAllocation(null)}
-                className="text-gray-400 hover:text-gray-600"
-              >
-                <X className="w-5 h-5" />
-              </button>
-            </div>
+        <Modal isOpen onClose={() => setEditingAllocation(null)} size="2xl" maxHeight="95vh">
+          <Modal.Header onClose={() => setEditingAllocation(null)}>
+            <h2 className="text-xl font-semibold text-gray-900">
+              Manage Allocations - {editingAllocation.project.name}
+            </h2>
+          </Modal.Header>
 
-            <div className="p-6 space-y-4">
+          <Modal.Body className="space-y-4">
               {editingAllocation.allocations.map(alloc => {
                 const emp = employees.find(e => e.id === alloc.employee_id);
                 return (
@@ -1624,18 +988,13 @@ const AllocationsPage = () => {
                   </div>
                 );
               })}
-
-              <div className="pt-4 border-t border-gray-200">
-                <button
-                  onClick={() => setEditingAllocation(null)}
-                  className="w-full btn btn-secondary"
-                >
-                  Close
-                </button>
-              </div>
-            </div>
-          </div>
-        </div>
+          </Modal.Body>
+          <Modal.Footer>
+            <Button variant="cancel" onClick={() => setEditingAllocation(null)} className="w-full">
+              Close
+            </Button>
+          </Modal.Footer>
+        </Modal>
       )}
 
       <ConfirmDialog

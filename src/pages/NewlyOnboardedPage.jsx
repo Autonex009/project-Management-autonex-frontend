@@ -3,7 +3,7 @@ import { Users, Award, Sparkles, UserPlus, ChevronDown, ChevronRight } from 'luc
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import toast from 'react-hot-toast';
 import { onboardingApi, allocationApi, subProjectApi, parentProjectApi } from '../services/api';
-import SearchInput from '../components/ui/SearchInput';
+import SearchBar from '../components/ui/SearchBar';
 import AllocationModalV2 from '../components/AllocationModalV2';
 import CandidateAllocationsPopover from '../components/CandidateAllocationsPopover';
 import { getPmSubProjects, getPmEmployeeId } from '../utils/pmScope';
@@ -127,7 +127,7 @@ const NewlyOnboardedPage = ({ embedded = false }) => {
                         <h3 className="text-lg font-bold text-slate-900">Unassigned Pool</h3>
                         <p className="text-[11px] text-slate-400 font-medium mt-0.5">Click a row to see the per-module breakdown.</p>
                     </div>
-                    <SearchInput value={search} onChange={setSearch} placeholder="Search name, email, role..." clearable className="w-full sm:w-72" />
+                    <SearchBar value={search} onChange={setSearch} placeholder="Search name, email, role..." clearable width="w-full sm:w-72" />
                 </div>
 
                 {filtered.length === 0 ? (

@@ -1,5 +1,6 @@
 import React, { useState, useEffect, useRef } from 'react';
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
+import Button from '../../components/ui/Button';
 import { authApi, employeeApi, skillsApi } from '../../services/api';
 import {
     BadgeCheck, Briefcase, Check, ChevronDown, Clock3, Hash,
@@ -396,15 +397,10 @@ const ProfilePage = () => {
                                     <X className="h-4 w-4" />
                                     Cancel
                                 </button>
-                                <button
-                                    type="button"
-                                    onClick={handleSave}
-                                    disabled={saveMutation.isPending}
-                                    className="inline-flex items-center gap-2 rounded-xl bg-emerald-600 px-5 py-2.5 text-sm font-semibold text-white shadow-sm transition-all hover:bg-emerald-700 disabled:opacity-60"
-                                >
-                                    <Save className="h-4 w-4" />
+                                <Button variant="success" type="button" onClick={handleSave} disabled={saveMutation.isPending} isLoading={saveMutation.isPending}>
+                                    {!saveMutation.isPending && <Save className="h-4 w-4" />}
                                     {saveMutation.isPending ? 'Saving…' : 'Save'}
-                                </button>
+                                </Button>
                             </>
                         )}
 

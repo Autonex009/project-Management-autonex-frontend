@@ -1,12 +1,15 @@
 import { useState } from 'react';
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import { referralApi } from '../../services/api';
+import Spinner from '../../components/ui/LoadingSpinner';
+import Button from '../../components/ui/Button';
 import toast from 'react-hot-toast';
 import {
-    Users2, Plus, X, Trash2, Clock, Search, Briefcase, CheckCircle2,
+    Users2, Plus, Trash2, Clock, Search, Briefcase, CheckCircle2,
     XCircle, ChevronDown, ChevronUp, Linkedin, Phone, Mail, Link2
 } from 'lucide-react';
 import Dropdown from '../../components/ui/Dropdown';
+import Modal from '../../components/ui/Modal';
 
 const STATUS_CONFIG = {
     pending:             { label: 'Pending Review',        color: 'bg-amber-50 text-amber-700 border-amber-200' },
@@ -130,12 +133,9 @@ const EmployeeReferralsPage = () => {
                         Refer talented people you know for open roles at Autonex.
                     </p>
                 </div>
-                <button
-                    onClick={() => { setShowForm(true); setErrors({}); }}
-                    className="inline-flex items-center gap-2 px-4 py-2.5 rounded-xl bg-emerald-600 text-white text-sm font-semibold shadow-sm hover:bg-emerald-700 transition-colors"
-                >
+                <Button variant="success" onClick={() => { setShowForm(true); setErrors({}); }}>
                     <Plus className="w-4 h-4" /> Refer Someone
-                </button>
+                </Button>
             </div>
 
             {/* Stats */}
@@ -163,12 +163,9 @@ const EmployeeReferralsPage = () => {
                         <Users2 className="w-10 h-10 mb-3 text-slate-300" />
                         <p className="font-medium text-slate-500">No referrals yet</p>
                         <p className="text-sm mt-1">Know someone who'd be a great fit? Refer them!</p>
-                        <button
-                            onClick={() => { setShowForm(true); setErrors({}); }}
-                            className="mt-4 inline-flex items-center gap-2 px-4 py-2 rounded-xl bg-emerald-50 text-emerald-700 text-sm font-medium hover:bg-emerald-100 transition-colors"
-                        >
+                        <Button variant="success" onClick={() => { setShowForm(true); setErrors({}); }} className="mt-4">
                             <Plus className="w-4 h-4" /> Submit your first referral
-                        </button>
+                        </Button>
                     </div>
                 ) : (
                     <div className="divide-y divide-slate-100">
@@ -273,20 +270,14 @@ const EmployeeReferralsPage = () => {
             </div>
 
             {/* Submit referral modal */}
-            {showForm && (
-                <div className="fixed inset-0 bg-black/50 flex items-center justify-center z-50 p-4 overflow-y-auto">
-                    <div className="bg-white rounded-2xl shadow-xl w-full max-w-lg p-6 my-4">
-                        <div className="flex items-center justify-between mb-5">
-                            <div>
-                                <h3 className="font-bold text-lg text-slate-800">Refer a Candidate</h3>
-                                <p className="text-sm text-slate-500 mt-0.5">Fill in the candidate's details below</p>
-                            </div>
-                            <button onClick={() => setShowForm(false)} className="text-slate-400 hover:text-slate-600">
-                                <X className="w-5 h-5" />
-                            </button>
-                        </div>
+            <Modal isOpen={showForm} onClose={() => setShowForm(false)} size="lg">
+                <Modal.Header onClose={() => setShowForm(false)}>
+                    <h3 className="font-bold text-lg text-slate-800">Refer a Candidate</h3>
+                    <p className="text-sm text-slate-500 mt-0.5">Fill in the candidate's details below</p>
+                </Modal.Header>
 
-                        <form onSubmit={handleSubmit} className="space-y-4">
+                <form onSubmit={handleSubmit} className="flex-1 flex flex-col min-h-0">
+                    <Modal.Body className="space-y-4">
                             <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
                                 <div>
                                     <label className="block text-sm font-medium text-slate-700 mb-1">
@@ -378,49 +369,32 @@ const EmployeeReferralsPage = () => {
                                 </div>
                             </div>
 
-                            <div className="flex justify-end gap-3 pt-2">
-                                <button
-                                    type="button"
-                                    onClick={() => setShowForm(false)}
-                                    className="px-4 py-2 text-sm font-medium text-slate-600 hover:bg-slate-100 rounded-xl transition-colors"
-                                >
-                                    Cancel
-                                </button>
-                                <button
-                                    type="submit"
-                                    disabled={createMutation.isPending}
-                                    className="px-5 py-2 text-sm font-semibold bg-emerald-600 text-white rounded-xl hover:bg-emerald-700 transition-colors disabled:opacity-60"
-                                >
-                                    {createMutation.isPending ? 'Submitting...' : 'Submit Referral'}
-                                </button>
-                            </div>
-                        </form>
-                    </div>
-                </div>
-            )}
+                    </Modal.Body>
+                    <Modal.Footer>
+                        <Button type="button" variant="cancel" onClick={() => setShowForm(false)}>Cancel</Button>
+                        <Button type="submit" variant="success" disabled={createMutation.isPending} isLoading={createMutation.isPending}>
+                            {!createMutation.isPending && 'Submit Referral'}
+                        </Button>
+                    </Modal.Footer>
+                </form>
+            </Modal>
 
             {/* Withdraw confirm modal */}
             {deleteConfirm && (
-                <div className="fixed inset-0 bg-black/50 flex items-center justify-center z-50 p-4">
-                    <div className="bg-white rounded-2xl shadow-xl w-full max-w-sm p-6">
+                <Modal isOpen onClose={() => setDeleteConfirm(null)} size="sm">
+                    <Modal.Body>
                         <h3 className="font-semibold text-slate-800 mb-2">Withdraw Referral?</h3>
                         <p className="text-sm text-slate-500">
                             This will remove your referral for <strong>{deleteConfirm.candidate_name}</strong>. This action cannot be undone.
                         </p>
-                        <div className="flex justify-end gap-3 mt-5">
-                            <button onClick={() => setDeleteConfirm(null)}
-                                className="px-4 py-2 text-sm font-medium text-slate-600 hover:bg-slate-100 rounded-xl transition-colors">
-                                Cancel
-                            </button>
-                            <button
-                                onClick={() => deleteMutation.mutate(deleteConfirm.id)}
-                                disabled={deleteMutation.isPending}
-                                className="px-4 py-2 text-sm font-semibold bg-red-500 text-white rounded-xl hover:bg-red-600 transition-colors disabled:opacity-50">
-                                {deleteMutation.isPending ? 'Withdrawing...' : 'Withdraw'}
-                            </button>
-                        </div>
-                    </div>
-                </div>
+                    </Modal.Body>
+                    <Modal.Footer>
+                        <Button variant="cancel" onClick={() => setDeleteConfirm(null)}>Cancel</Button>
+                        <Button variant="danger" onClick={() => deleteMutation.mutate(deleteConfirm.id)} disabled={deleteMutation.isPending} isLoading={deleteMutation.isPending}>
+                            {!deleteMutation.isPending && 'Withdraw'}
+                        </Button>
+                    </Modal.Footer>
+                </Modal>
             )}
         </div>
     );

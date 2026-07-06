@@ -5,6 +5,7 @@ import { LayoutDashboard, FolderKanban, Calendar, CalendarCheck, Rocket, LogOut,
 import BrandLockup from '../components/brand/BrandLockup';
 import NotificationBell from '../components/NotificationBell';
 import { authApi } from '../services/api';
+import ChatWidget from '../components/chat/ChatWidget';
 
 const accentTheme = {
     pm: {
@@ -29,7 +30,7 @@ const EmployeeLayout = () => {
         return saved === null ? true : saved === 'true';
     });
     const [isHovered, setIsHovered] = useState(false);
-    const [isMobile, setIsMobile] = useState(window.innerWidth < 1024);
+    const [isMobile, setIsMobile] = useState(() => typeof window !== 'undefined' ? window.innerWidth < 1024 : false);
 
     useEffect(() => {
         const handleResize = () => {
@@ -62,13 +63,6 @@ const EmployeeLayout = () => {
     const portalLabel = isPm ? 'PM Portal' : 'Employee Portal';
     const theme = isPm ? accentTheme.pm : accentTheme.employee;
 
-    const hasAnnotationSkill = Array.isArray(user.skills) &&
-        user.skills.some(s => String(s).toLowerCase().includes('annotation'));
-    const isAnnotator = hasAnnotationSkill || (user.designation && (
-        user.designation.toLowerCase().includes('annotator') ||
-        user.designation.toLowerCase().includes('reviewer')
-    ));
-
     const navItems = isPm
         ? [
             { to: `${prefix}/dashboard`, label: 'Dashboard', icon: LayoutDashboard },
@@ -92,7 +86,7 @@ const EmployeeLayout = () => {
             { to: `${prefix}/guidelines`, label: 'Guidelines', icon: FileText },
             { to: `${prefix}/referrals`, label: 'Referrals', icon: Users2 },
             { to: `${prefix}/company-info`, label: 'Company Info', icon: Info },
-            ...(isAnnotator ? [{ to: `${prefix}/onboarding`, label: 'Onboarding', icon: GraduationCap }] : []),
+            { to: `${prefix}/onboarding`, label: 'Onboarding', icon: GraduationCap },
             { to: `${prefix}/profile`, label: 'Profile', icon: UserRound },
         ];
 
@@ -244,6 +238,9 @@ const EmployeeLayout = () => {
                     <Outlet />
                 </main>
             </div>
+
+            {/* AI Chat Widget */}
+            <ChatWidget />
         </div>
     );
 };

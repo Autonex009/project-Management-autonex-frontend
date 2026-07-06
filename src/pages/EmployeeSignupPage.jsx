@@ -1,6 +1,7 @@
 import { useState } from 'react';
 import { Link } from 'react-router-dom';
 import { useMutation } from '@tanstack/react-query';
+import Spinner from '../components/ui/LoadingSpinner';
 import { User, Mail, Phone, Briefcase, CheckCircle } from 'lucide-react';
 import toast from 'react-hot-toast';
 import { signupRequestApi } from '../services/api';
@@ -179,9 +180,7 @@ const EmployeeSignupPage = () => {
 
                         <button type="submit" disabled={mutation.isPending}
                             className="w-full flex items-center justify-center gap-2 rounded-2xl px-4 py-3 font-semibold text-white transition-all disabled:cursor-not-allowed disabled:opacity-70 bg-emerald-600 shadow-[0_16px_38px_rgba(5,150,105,0.24)] hover:bg-emerald-700">
-                            {mutation.isPending ? (
-                                <><span className="h-5 w-5 animate-spin rounded-full border-2 border-white/30 border-t-white" /> Submitting...</>
-                            ) : 'Submit Signup Request'}
+                            {mutation.isPending ? <Spinner size="sm" color="white" text="Submitting..." /> : 'Submit Signup Request'}
                         </button>
                     </form>
                 </div>

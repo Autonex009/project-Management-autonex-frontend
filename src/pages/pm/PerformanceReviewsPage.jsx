@@ -1,19 +1,162 @@
 import React, { useState } from 'react';
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
-import { employeeApi, allocationApi, parentProjectApi, subProjectApi, perfReviewApi } from '../../services/api';
+import Button from '../../components/ui/Button';
+import { employeeApi, allocationApi, parentProjectApi, subProjectApi, performanceReviewApi } from '../../services/api';
 import { getPmEmployeeId, getPmSubProjects } from '../../utils/pmScope';
 import { ChevronDown, ChevronUp, ClipboardList, Plus } from 'lucide-react';
 import toast from 'react-hot-toast';
-import PerfReviewForm from '../../components/perf/PerfReviewForm';
-import PerfReviewCard from '../../components/perf/PerfReviewCard';
-import PerfRatingPopover from '../../components/perf/PerfRatingPopover';
+import Dropdown from '../../components/ui/Dropdown';
 import ConfirmDialog from '../../components/ui/ConfirmDialog';
 
-const EmployeePanel = ({ employee, reviews, reviewerId }) => {
+const REVIEW_TYPES = [
+    { value: 'feedback', label: 'Feedback', icon: MessageSquare, color: 'text-blue-600', bg: 'bg-blue-50', border: 'border-blue-200', badge: 'bg-blue-50 text-blue-700 border-blue-200' },
+    { value: 'performance_review', label: 'Performance Review', icon: Star, color: 'text-amber-600', bg: 'bg-amber-50', border: 'border-amber-200', badge: 'bg-amber-50 text-amber-700 border-amber-200' },
+    { value: 'comment', label: 'Comment', icon: ClipboardList, color: 'text-slate-600', bg: 'bg-slate-50', border: 'border-slate-200', badge: 'bg-slate-100 text-slate-600 border-slate-200' },
+];
+
+const typeInfo = (value) => REVIEW_TYPES.find(t => t.value === value) || REVIEW_TYPES[2];
+
+const StarRating = ({ value, onChange, readOnly = false }) => (
+    <div className="flex gap-1">
+        {[1, 2, 3, 4, 5].map(star => (
+            <button
+                key={star}
+                type="button"
+                disabled={readOnly}
+                onClick={() => !readOnly && onChange && onChange(star === value ? null : star)}
+                className={`text-xl transition-colors ${readOnly ? 'cursor-default' : 'cursor-pointer hover:scale-110'} ${star <= (value || 0) ? 'text-amber-400' : 'text-slate-200'}`}
+            >
+                ★
+            </button>
+        ))}
+    </div>
+);
+
+const EMPTY_FORM = { review_type: 'feedback', title: '', content: '', rating: null, period: '' };
+
+const ReviewForm = ({ initial = EMPTY_FORM, onSubmit, onCancel, loading }) => {
+    const [form, setForm] = useState(initial);
+    const set = (key, val) => setForm(prev => ({ ...prev, [key]: val }));
+    const reviewTypeOptions = REVIEW_TYPES.map(t => ({ value: t.value, label: t.label }));
+
+    const handleSubmit = (e) => {
+        e.preventDefault();
+        if (!form.title.trim() || !form.content.trim()) {
+            toast.error('Title and content are required');
+            return;
+        }
+        onSubmit({ ...form, period: form.period || null, rating: form.review_type === 'performance_review' ? form.rating : null });
+    };
+
+    return (
+        <form onSubmit={handleSubmit} className="space-y-4">
+            <div className="grid gap-4 sm:grid-cols-2">
+                <div>
+                    <label className="block text-xs font-semibold uppercase tracking-wide text-slate-500 mb-1.5">Type</label>
+                    <Dropdown
+                        options={reviewTypeOptions}
+                        value={form.review_type}
+                        onChange={(val) => set('review_type', val)}
+                    />
+                </div>
+                <div>
+                    <label className="block text-xs font-semibold uppercase tracking-wide text-slate-500 mb-1.5">Period (optional)</label>
+                    <input
+                        type="text"
+                        placeholder="e.g. Q1 2025, May 2026"
+                        value={form.period}
+                        onChange={e => set('period', e.target.value)}
+                        className="w-full rounded-xl border border-slate-200 bg-white px-3 py-2.5 text-sm text-slate-800 placeholder:text-slate-300 focus:border-blue-400 focus:outline-none focus:ring-2 focus:ring-blue-100"
+                    />
+                </div>
+            </div>
+
+            <div>
+                <label className="block text-xs font-semibold uppercase tracking-wide text-slate-500 mb-1.5">Title</label>
+                <input
+                    type="text"
+                    placeholder="Short title for this entry"
+                    value={form.title}
+                    onChange={e => set('title', e.target.value)}
+                    className="w-full rounded-xl border border-slate-200 bg-white px-3 py-2.5 text-sm text-slate-800 placeholder:text-slate-300 focus:border-blue-400 focus:outline-none focus:ring-2 focus:ring-blue-100"
+                    required
+                />
+            </div>
+
+            <div>
+                <label className="block text-xs font-semibold uppercase tracking-wide text-slate-500 mb-1.5">Content</label>
+                <textarea
+                    placeholder="Write your feedback, review, or comment here…"
+                    value={form.content}
+                    onChange={e => set('content', e.target.value)}
+                    rows={4}
+                    className="w-full rounded-xl border border-slate-200 bg-white px-3 py-2.5 text-sm text-slate-800 placeholder:text-slate-300 focus:border-blue-400 focus:outline-none focus:ring-2 focus:ring-blue-100 resize-none"
+                    required
+                />
+            </div>
+
+            {form.review_type === 'performance_review' && (
+                <div>
+                    <label className="block text-xs font-semibold uppercase tracking-wide text-slate-500 mb-1.5">Rating (optional)</label>
+                    <StarRating value={form.rating} onChange={val => set('rating', val)} />
+                </div>
+            )}
+
+            <div className="flex justify-end gap-2 pt-1">
+                <Button type="button" variant="cancel" onClick={onCancel}><X className="w-3.5 h-3.5" /> Cancel</Button>
+                <Button type="submit" variant="blue" disabled={loading} isLoading={loading}>
+                    {!loading && <Check className="w-3.5 h-3.5" />} {loading ? 'Saving…' : 'Save'}
+                </Button>
+            </div>
+        </form>
+    );
+};
+
+const ReviewCard = ({ review, onEdit, onDelete }) => {
+    const info = typeInfo(review.review_type);
+    const Icon = info.icon;
+    return (
+        <div className={`rounded-2xl border ${info.border} bg-white p-4`}>
+            <div className="flex items-start justify-between gap-3">
+                <div className="flex items-center gap-2 min-w-0">
+                    <span className={`inline-flex items-center gap-1 rounded-full border px-2.5 py-1 text-xs font-medium ${info.badge}`}>
+                        <Icon className="w-3 h-3" /> {info.label}
+                    </span>
+                    {review.period && (
+                        <span className="rounded-full bg-slate-100 px-2.5 py-1 text-xs text-slate-500">{review.period}</span>
+                    )}
+                </div>
+                <div className="flex items-center gap-1 shrink-0">
+                    <button onClick={() => onEdit(review)} className="rounded-lg p-1.5 text-slate-400 hover:bg-slate-100 hover:text-blue-600 transition-colors">
+                        <Pencil className="w-3.5 h-3.5" />
+                    </button>
+                    <button onClick={() => onDelete(review.id)} className="rounded-lg p-1.5 text-slate-400 hover:bg-red-50 hover:text-red-500 transition-colors">
+                        <Trash2 className="w-3.5 h-3.5" />
+                    </button>
+                </div>
+            </div>
+
+            <h4 className="mt-3 text-sm font-semibold text-slate-800">{review.title}</h4>
+            <p className="mt-1.5 text-sm text-slate-600 whitespace-pre-wrap leading-relaxed">{review.content}</p>
+
+            {review.rating && (
+                <div className="mt-2">
+                    <StarRating value={review.rating} readOnly />
+                </div>
+            )}
+
+            <p className="mt-3 text-xs text-slate-400">
+                {new Date(review.created_at).toLocaleDateString('en-IN', { day: 'numeric', month: 'short', year: 'numeric' })}
+            </p>
+        </div>
+    );
+};
+
+const EmployeePanel = ({ employee, reviews, reviewerId, onReviewCreated }) => {
     const [expanded, setExpanded] = useState(false);
     const [showForm, setShowForm] = useState(false);
     const [editing, setEditing] = useState(null);
-    const [confirmId, setConfirmId] = useState(null);
+    const [deleteConfirm, setDeleteConfirm] = useState(null);
     const queryClient = useQueryClient();
 
     const invalidate = () => queryClient.invalidateQueries({ queryKey: ['perf-reviews'] });
@@ -36,9 +179,10 @@ const EmployeePanel = ({ employee, reviews, reviewerId }) => {
         onError: () => toast.error('Failed to delete review'),
     });
 
-    const sorted = [...reviews].sort((a, b) => (b.period || '').localeCompare(a.period || ''));
-    const latestReview = sorted.length > 0 ? sorted[0] : null;
-    
+    const handleDelete = (id) => {
+        setDeleteConfirm(id);
+    };
+
     return (
         <article className="overflow-hidden rounded-3xl border border-slate-200/70 bg-white shadow-sm">
             <button
@@ -119,14 +263,12 @@ const EmployeePanel = ({ employee, reviews, reviewerId }) => {
                     )}
                 </div>
             )}
-
             <ConfirmDialog
-                isOpen={confirmId != null}
-                onClose={() => setConfirmId(null)}
-                onConfirm={() => deleteMutation.mutate(confirmId)}
-                title="Delete review"
-                message="Delete this monthly performance review? This cannot be undone."
-                confirmText="Delete"
+                isOpen={deleteConfirm !== null}
+                onClose={() => setDeleteConfirm(null)}
+                onConfirm={() => { deleteMutation.mutate(deleteConfirm); setDeleteConfirm(null); }}
+                title="Delete Review"
+                message="Are you sure you want to delete this review? This action cannot be undone."
                 isPending={deleteMutation.isPending}
             />
         </article>

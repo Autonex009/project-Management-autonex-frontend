@@ -128,6 +128,8 @@ export const leaveApi = {
     delete: (id) => api.delete(`/leaves/${id}`).then(res => res.data),
     approve: (id, approvedBy, remark) => api.patch(`/leaves/${id}/approve`, { remark: remark || null }, { params: { approved_by: approvedBy } }).then(res => res.data),
     reject: (id, approvedBy) => api.patch(`/leaves/${id}/reject`, null, { params: { approved_by: approvedBy } }).then(res => res.data),
+    undoApprove: (id, approvedBy) => api.patch(`/leaves/${id}/undo-approve`, null, { params: { approved_by: approvedBy } }).then(res => res.data),
+    undoReject: (id, approvedBy) => api.patch(`/leaves/${id}/undo-reject`, null, { params: { approved_by: approvedBy } }).then(res => res.data),
     applyToRazorpay: (id) => api.post(`/leaves/${id}/apply-to-razorpay`).then(res => res.data),
     getCalendar: (month) => api.get('/leaves/calendar', { params: { month } }).then(res => res.data),
 };
@@ -135,8 +137,11 @@ export const leaveApi = {
 export const signupRequestApi = {
     submit: (data) => api.post('/signup-requests', data).then(res => res.data),
     getAll: (params) => api.get('/signup-requests', { params }).then(res => res.data),
+    getCounts: () => api.get('/signup-requests/counts').then(res => res.data),
     approve: (id, reviewedBy) => api.patch(`/signup-requests/${id}/approve`, null, { params: { reviewed_by: reviewedBy } }).then(res => res.data),
     reject: (id, reviewedBy, reason) => api.patch(`/signup-requests/${id}/reject`, { reason: reason || null }, { params: { reviewed_by: reviewedBy } }).then(res => res.data),
+    undoReject: (id, reviewedBy) => api.patch(`/signup-requests/${id}/undo-reject`, null, { params: { reviewed_by: reviewedBy } }).then(res => res.data),
+    undoApprove: (id, reviewedBy, reason) => api.patch(`/signup-requests/${id}/undo-approve`, { reason: reason || null }, { params: { reviewed_by: reviewedBy } }).then(res => res.data),
     update: (id, data) => api.patch(`/signup-requests/${id}`, data).then(res => res.data),
 };
 
@@ -146,6 +151,8 @@ export const wfhApi = {
     update: (id, data) => api.put(`/wfh/${id}`, data).then(res => res.data),
     approve: (id, approvedBy, remark) => api.patch(`/wfh/${id}/approve`, { remark: remark || null }, { params: { approved_by: approvedBy } }).then(res => res.data),
     reject: (id, approvedBy, remark) => api.patch(`/wfh/${id}/reject`, { remark: remark || null }, { params: { approved_by: approvedBy } }).then(res => res.data),
+    undoApprove: (id, approvedBy) => api.patch(`/wfh/${id}/undo-approve`, null, { params: { approved_by: approvedBy } }).then(res => res.data),
+    undoReject: (id, approvedBy) => api.patch(`/wfh/${id}/undo-reject`, null, { params: { approved_by: approvedBy } }).then(res => res.data),
     delete: (id) => api.delete(`/wfh/${id}`).then(res => res.data),
 };
 
