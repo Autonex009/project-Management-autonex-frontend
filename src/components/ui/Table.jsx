@@ -22,10 +22,11 @@ export const Table = ({
     expandedRowId,
     getRowId = (row) => row.id,
     renderExpandedRow,
+    totalItems,
 }) => {
-    const totalPages = Math.ceil((data?.length || 0) / pageSize);
+    const totalPages = totalItems !== undefined ? Math.ceil(totalItems / pageSize) : Math.ceil((data?.length || 0) / pageSize);
     const startIndex = (currentPage - 1) * pageSize;
-    const paginatedData = data?.slice(startIndex, startIndex + pageSize) || [];
+    const paginatedData = totalItems !== undefined ? (data || []) : (data?.slice(startIndex, startIndex + pageSize) || []);
 
     const isCompact = variant === 'compact';
     const isStriped = variant === 'striped';
@@ -138,7 +139,7 @@ export const Table = ({
                 <div className="flex items-center justify-between px-5 py-3 border-t border-slate-100">
                     <p className="text-sm text-slate-500">
                         Showing {paginatedData.length === 0 ? 0 : startIndex + 1}–
-                        {Math.min(startIndex + pageSize, data.length)} of {data.length} items
+                        {Math.min(startIndex + pageSize, totalItems ?? data.length)} of {totalItems ?? data.length} items
                     </p>
                     <div className="flex items-center gap-1">
                         <button

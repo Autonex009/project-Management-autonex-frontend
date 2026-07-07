@@ -7,21 +7,23 @@ import Table from '../../components/ui/Table';
 import SearchBar from '../../components/ui/SearchBar';
 
 export default function AdminReportsPage() {
-  const [reports, setReports] = useState([]);
   const [searchTerm, setSearchTerm] = useState('');
+  const [debouncedSearch, setDebouncedSearch] = useState('');
   const [expandedRow, setExpandedRow] = useState(null);
   const [currentPage, setCurrentPage] = useState(1);
 
-  const { data, isLoading: loading } = useQuery({
-      queryKey: ['admin-reports'],
-      queryFn: () => onboardingApi.getReports(),
+  useEffect(() => {
+    const timer = setTimeout(() => setDebouncedSearch(searchTerm), 300);
+    return () => clearTimeout(timer);
+  }, [searchTerm]);
+
+  const { data: response, isLoading: loading } = useQuery({
+      queryKey: ['admin-reports', currentPage, debouncedSearch],
+      queryFn: () => onboardingApi.getReports(currentPage, 10, debouncedSearch),
   });
 
-  useEffect(() => {
-      if (data) {
-          setReports(Array.isArray(data) ? data : []);
-      }
-  }, [data]);
+  const reports = response?.data || [];
+  const totalItems = response?.total || 0;
 
   const handleExportCSV = () => {
     onboardingApi.exportReports()
@@ -41,10 +43,7 @@ export default function AdminReportsPage() {
       });
   };
 
-  const filteredReports = reports.filter(r => 
-    (r.name || '').toLowerCase().includes(searchTerm.toLowerCase()) || 
-    (r.email || '').toLowerCase().includes(searchTerm.toLowerCase())
-  );
+
 
   const toggleExpand = (userId) => {
     setExpandedRow(expandedRow === userId ? null : userId);
@@ -288,7 +287,8 @@ export default function AdminReportsPage() {
 
         <Table
           columns={columns}
-          data={filteredReports}
+          data={reports}
+          totalItems={totalItems}
           loading={loading}
           currentPage={currentPage}
           pageSize={10}

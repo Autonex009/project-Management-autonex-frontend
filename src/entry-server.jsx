@@ -51,29 +51,29 @@ export async function prefetch(url, token, user) {
         }
       } else if (url.startsWith('/admin/onboarding-reports')) {
         await queryClient.prefetchQuery({
-          queryKey: ['admin-reports'],
-          queryFn: () => onboardingApi.getReports()
+          queryKey: ['admin-reports', 1, ''],
+          queryFn: () => onboardingApi.getReports(1, 10, '')
         });
       } else if (url.startsWith('/admin/newly-onboarded')) {
         await queryClient.prefetchQuery({
-          queryKey: ['newly-onboarded'],
-          queryFn: () => onboardingApi.getNewlyOnboarded()
+          queryKey: ['newly-onboarded', 1, ''],
+          queryFn: () => onboardingApi.getNewlyOnboarded(1, 10, '')
         });
       }
 
       // PM Onboarding Pages
       else if (url.startsWith('/pm/onboarding-mentor')) {
         // Prefetch mentees (PMOnboardingDashboard default tab)
-        if (user && user.id) {
+        if (user?.id) {
           await queryClient.prefetchQuery({
-            queryKey: ['pm-mentees', user.id],
-            queryFn: () => onboardingApi.getMentees(user.id)
+            queryKey: ['pm-mentees', user.id, 1, ''],
+            queryFn: () => onboardingApi.getMentees(user.id, 1, 10, '')
           });
         }
         // Prefetch newly onboarded (fallback/second tab)
         await queryClient.prefetchQuery({
-          queryKey: ['newly-onboarded'],
-          queryFn: () => onboardingApi.getNewlyOnboarded()
+          queryKey: ['newly-onboarded', 1, ''],
+          queryFn: () => onboardingApi.getNewlyOnboarded(1, 10, '')
         });
       }
 

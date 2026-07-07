@@ -283,8 +283,16 @@ export const onboardingApi = {
     getProgress: (userId) => api.get(`/onboarding/progress/${userId}`).then(res => res.data),
     submitQuiz: (sectionId, answers, userId = null) => api.post('/onboarding/quiz/submit', { section_id: sectionId, answers, user_id: userId }).then(res => res.data),
     getCandidateDashboard: (userId) => api.get(`/onboarding/candidates/${userId}/dashboard`).then(res => res.data),
-    getMentees: (mentorId) => api.get(`/onboarding/mentors/${mentorId}/mentees`).then(res => res.data),
-    getNewlyOnboarded: () => api.get('/onboarding/newly-onboarded').then(res => res.data),
+    // Admin/PM Reports & Candidates
+    getReports: (page = 1, limit = 10, search = '') => 
+        api.get('/onboarding/reports', { params: { page, limit, search } }).then(res => res.data),
+    getNewlyOnboarded: (page = 1, limit = 10, search = '') => 
+        api.get('/onboarding/newly-onboarded', { params: { page, limit, search } }).then(res => res.data),
+    exportReports: () => api.get('/onboarding/reports/export', { responseType: 'blob' }).then(res => res.data),
+
+    // PM Mentor dashboard
+    getMentees: (pmId, page = 1, limit = 10, search = '') => 
+        api.get(`/onboarding/mentors/${pmId}/mentees`, { params: { page, limit, search } }).then(res => res.data),
     getTeam: () => api.get('/onboarding/team').then(res => res.data),
     createTeamMember: (data) => api.post('/onboarding/team', data).then(res => res.data),
     updateTeamMember: (id, data) => api.put(`/onboarding/team/${id}`, data).then(res => res.data),
@@ -295,9 +303,7 @@ export const onboardingApi = {
     getTeamSampleUrl: () => `${apiBaseUrl}/onboarding/team/sample-excel`,
     getAnalyticsDashboard: () => api.get('/onboarding/analytics/dashboard').then(res => res.data),
     getFullAnalytics: () => api.get('/onboarding/analytics/full').then(res => res.data),
-    getReports: () => api.get('/onboarding/reports').then(res => res.data),
     getReportsExportUrl: () => `${apiBaseUrl}/onboarding/reports/export`,
-    exportReports: () => api.get('/onboarding/reports/export', { responseType: 'blob' }).then(res => res.data),
 };
 
 // === Company Settings API ===

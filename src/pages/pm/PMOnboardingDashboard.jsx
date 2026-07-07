@@ -1,40 +1,55 @@
-import React from 'react';
+import React, { useState, useEffect } from 'react';
 import { Users, BookOpen, Award, CheckCircle, HelpCircle } from 'lucide-react';
 import { useQuery } from '@tanstack/react-query';
 import { onboardingApi } from '../../services/api';
 import Table from '../../components/ui/Table';
 import Spinner from '../../components/ui/LoadingSpinner';
 import { useAuthContext } from '../../context/AuthContext';
+import SearchBar from '../../components/ui/SearchBar';
 
 const PMOnboardingDashboard = ({ embedded = false }) => {
     const { user } = useAuthContext();
     const pmId = user?.id;
     const pmName = user?.name;
 
-    const { data: menteesData, isLoading, error: fetchError } = useQuery({
-        queryKey: ['pm-mentees', pmId],
+    const [searchTerm, setSearchTerm] = useState('');
+    const [debouncedSearch, setDebouncedSearch] = useState('');
+    const [currentPage, setCurrentPage] = useState(1);
+
+    useEffect(() => {
+        const timer = setTimeout(() => setDebouncedSearch(searchTerm), 300);
+        return () => clearTimeout(timer);
+    }, [searchTerm]);
+
+    const { data: response, isLoading, error: fetchError } = useQuery({
+        queryKey: ['pm-mentees', pmId, currentPage, debouncedSearch],
         queryFn: async () => {
             try {
-                return await onboardingApi.getMentees(pmId);
+                return await onboardingApi.getMentees(pmId, currentPage, 10, debouncedSearch);
             } catch (err) {
                 console.warn('getMentees API failed, trying fallback from reports:', err);
-                const data = await onboardingApi.getReports();
+                const res = await onboardingApi.getReports(currentPage, 10, debouncedSearch);
+                const data = res.data || [];
                 const filtered = data.filter(c => c.mentorName === pmName);
-                return filtered.map(c => ({
-                    id: c.userId,
-                    name: c.name,
-                    email: c.email,
-                    department: c.department,
-                    isActive: true,
-                    completedModulesCount: (c.moduleStats || []).filter(m => m.progress === 100).length,
-                    quizScorePercent: c.overallScore
-                }));
+                return {
+                    data: filtered.map(c => ({
+                        id: c.userId,
+                        name: c.name,
+                        email: c.email,
+                        department: c.department,
+                        isActive: true,
+                        completedModulesCount: (c.moduleStats || []).filter(m => m.progress === 100).length,
+                        quizScorePercent: c.overallScore
+                    })),
+                    total: res.total || filtered.length
+                };
             }
         },
         enabled: !!pmId && !!pmName
     });
 
-    const mentees = menteesData || [];
+    const mentees = response?.data || [];
+    const totalItems = response?.total || 0;
     const loading = isLoading;
     const error = fetchError ? 'Could not load assigned candidates.' : null;
 
@@ -81,8 +96,17 @@ const PMOnboardingDashboard = ({ embedded = false }) => {
 
             {/* Mentees list container */}
             <div className="bg-white rounded-2xl border border-slate-200/60 shadow-sm overflow-hidden">
-                <div className="p-6 border-b border-slate-100">
+                <div className="p-6 border-b border-slate-100 flex flex-col sm:flex-row sm:items-center justify-between gap-4">
                     <h3 className="text-lg font-bold text-slate-900">Your Candidates</h3>
+                    <SearchBar
+                        placeholder="Search mentees..."
+                        value={searchTerm}
+                        onChange={(value) => {
+                            setSearchTerm(value);
+                            setCurrentPage(1);
+                        }}
+                        className="max-w-sm w-full"
+                    />
                 </div>
 
                 <div>
@@ -149,6 +173,10 @@ const PMOnboardingDashboard = ({ embedded = false }) => {
                                 },
                             ]}
                             data={mentees}
+                            totalItems={totalItems}
+                            currentPage={currentPage}
+                            pageSize={10}
+                            onPageChange={setCurrentPage}
                         />
                     )}
                 </div>
