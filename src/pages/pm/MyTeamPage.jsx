@@ -1,7 +1,10 @@
 import React, { useMemo, useState } from 'react';
 import { useQuery } from '@tanstack/react-query';
 import { allocationApi, employeeApi, parentProjectApi, subProjectApi } from '../../services/api';
-import { Briefcase, Clock3, FolderKanban, Mail, Phone, Search, Users, X } from 'lucide-react';
+import { Briefcase, Clock3, FolderKanban, Mail, Phone, Users, X } from 'lucide-react';
+import Button from '../../components/ui/Button';
+import SearchBar from '../../components/ui/SearchBar';
+import Dropdown from '../../components/ui/Dropdown';
 import SlackIcon from '../../components/icons/SlackIcon';
 import { getPmEmployeeId, getPmSubProjects } from '../../utils/pmScope';
 
@@ -131,50 +134,40 @@ const MyTeamPage = () => {
             {!isLoading && teamMembers.length > 0 && (
                 <section className="rounded-2xl border border-slate-200/70 bg-white p-4 shadow-sm">
                     <div className="flex flex-col gap-3 lg:flex-row lg:items-center">
-                        <div className="relative flex-1">
-                            <Search className="pointer-events-none absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-slate-400" />
-                            <input
-                                type="text"
-                                value={searchTerm}
-                                onChange={(event) => setSearchTerm(event.target.value)}
-                                placeholder="Search team members by name..."
-                                className="w-full rounded-xl border border-slate-200 bg-slate-50 py-2.5 pl-10 pr-3 text-sm text-slate-700 outline-none transition focus:border-blue-300 focus:bg-white focus:ring-2 focus:ring-blue-100"
-                            />
-                        </div>
+                        <SearchBar
+                            value={searchTerm}
+                            onChange={setSearchTerm}
+                            placeholder="Search team members by name..."
+                            width="w-full sm:w-80"
+                            className="flex-1 sm:flex-none"
+                            size="sm"
+                        />
                         <div className="flex flex-col gap-3 sm:flex-row">
-                            <select
+                            <Dropdown
                                 value={projectFilter}
-                                onChange={(event) => setProjectFilter(event.target.value)}
-                                className="rounded-xl border border-slate-200 bg-slate-50 px-3 py-2.5 text-sm text-slate-700 outline-none transition focus:border-blue-300 focus:bg-white focus:ring-2 focus:ring-blue-100"
-                            >
-                                <option value="all">All projects</option>
-                                {scopedProjects.map((project) => (
-                                    <option key={project.id} value={String(project.id)}>
-                                        {project.name}
-                                    </option>
-                                ))}
-                            </select>
-                            <select
+                                onChange={setProjectFilter}
+                                placeholder="All projects"
+                                options={[
+                                    { value: 'all', label: 'All projects' },
+                                    ...scopedProjects.map((p) => ({ value: String(p.id), label: p.name })),
+                                ]}
+                                className="w-full sm:w-44"
+                            />
+                            <Dropdown
                                 value={roleFilter}
-                                onChange={(event) => setRoleFilter(event.target.value)}
-                                className="rounded-xl border border-slate-200 bg-slate-50 px-3 py-2.5 text-sm text-slate-700 outline-none transition focus:border-blue-300 focus:bg-white focus:ring-2 focus:ring-blue-100"
-                            >
-                                <option value="all">All roles</option>
-                                {roleOptions.map((roleName) => (
-                                    <option key={roleName} value={roleName}>
-                                        {roleName}
-                                    </option>
-                                ))}
-                            </select>
+                                onChange={setRoleFilter}
+                                placeholder="All roles"
+                                options={[
+                                    { value: 'all', label: 'All roles' },
+                                    ...roleOptions.map((r) => ({ value: r, label: r })),
+                                ]}
+                                className="w-full sm:w-40"
+                            />
                             {hasActiveFilters && (
-                                <button
-                                    type="button"
-                                    onClick={clearFilters}
-                                    className="inline-flex items-center justify-center gap-1.5 rounded-xl border border-slate-200 bg-white px-3 py-2.5 text-sm font-medium text-slate-600 transition hover:bg-slate-50"
-                                >
-                                    <X className="h-4 w-4" />
+                                <Button variant="secondary" size="sm" onClick={clearFilters}>
+                                    <X className="h-3 w-3 text-gray-600" />
                                     Clear
-                                </button>
+                                </Button>
                             )}
                         </div>
                     </div>
@@ -303,15 +296,10 @@ const SlackDmButton = ({ employee }) => {
 
     return (
         <div className="flex flex-col items-end gap-1">
-            <button
-                type="button"
-                onClick={handleClick}
-                disabled={loading}
-                className="inline-flex items-center gap-2 rounded-xl border border-slate-200 bg-white px-3 py-2 text-xs font-semibold text-slate-700 shadow-sm transition hover:bg-slate-50 disabled:cursor-not-allowed disabled:opacity-60"
-            >
-                <SlackIcon size={16} />
+            <Button type="button" variant="secondary" size="sm" onClick={handleClick} disabled={loading} isLoading={loading}>
+                {!loading && <SlackIcon size={16} />}
                 {loading ? 'Opening…' : 'Slack DM'}
-            </button>
+            </Button>
             {error && <span className="text-xs font-medium text-amber-600">{error}</span>}
         </div>
     );

@@ -1,6 +1,8 @@
 import { useMemo, useState } from 'react';
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
+import Button from './ui/Button';
 import { leaveApi, wfhApi } from '../services/api';
+import Spinner from './ui/LoadingSpinner';
 import { Calendar, Plus, X, CheckCircle, XCircle, Clock, Home, AlertTriangle, Pencil, Trash2 } from 'lucide-react';
 import { format, parseISO } from 'date-fns';
 import toast from 'react-hot-toast';
@@ -8,7 +10,7 @@ import Dropdown from './ui/Dropdown';
 import { getEndDateValidationMessage, isEndDateBeforeStartDate } from '../utils/dateValidation';
 import { getLeaveTypeLabel, LEAVE_TYPE_OPTIONS, RAZORPAY_NEGATIVE_BALANCE_NOTE, FLOATER_DATES_2026, isValidFloaterDate, getFloaterDateLabel, isNonWorkingDay, getNonWorkingDayLabel, getWorkingDayCount, countNonWorkingDaysInRange, toLocalISODate, ANNUAL_LEAVE_QUOTA, INTERN_MONTHLY_PAID_QUOTA, isIntern, normalizeLeaveType, validateConsecutiveLeaves } from '../utils/leaveTypes';
 import LeaveCalendar from './LeaveCalendar';
-import DeleteConfirmModal from './ui/DeleteConfirmModal';
+import ConfirmDialog from './ui/ConfirmDialog';
 
 const TABS = ['My Leaves', 'Calendar', 'Work From Home'];
 
@@ -178,6 +180,7 @@ const MyLeavesPanel = ({
     const [editingWfh, setEditingWfh] = useState(null);
     const [editWfhForm, setEditWfhForm] = useState({ wfh_date: '', end_date: '', reason: '' });
     const [deleteTarget, setDeleteTarget] = useState(null);
+    const [wfhDeleteConfirm, setWfhDeleteConfirm] = useState(null);
     const [formLeaveType, setFormLeaveType] = useState('paid');
     const [editFormLeaveType, setEditFormLeaveType] = useState('paid');
 
@@ -341,6 +344,10 @@ const MyLeavesPanel = ({
 
     const handleLeaveSubmit = (e) => {
         e.preventDefault();
+        if (!leaveForm.reason || !leaveForm.reason.trim()) {
+            toast.error('Please enter a reason for your leave request.');
+            return;
+        }
         const isHalf = leaveForm.leave_type === 'first_half' || leaveForm.leave_type === 'second_half';
         const sDate = leaveForm.start_date;
         const eDate = isHalf ? sDate : leaveForm.end_date;
@@ -390,12 +397,12 @@ const MyLeavesPanel = ({
 
     const handleWfhSubmit = (e) => {
         e.preventDefault();
-        if (!wfhForm.wfh_date) { toast.error('Please select a start date'); return; }
-        if (wfhForm.end_date && wfhForm.end_date < wfhForm.wfh_date) {
-            toast.error('End date cannot be before start date');
+        if (!wfhForm.reason || !wfhForm.reason.trim()) {
+            toast.error('Please enter a reason for your WFH request.');
             return;
         }
-        createWfhMutation.mutate({ ...wfhForm, end_date: wfhForm.end_date || wfhForm.wfh_date });
+        if (!wfhForm.wfh_date) { toast.error('Please select a date'); return; }
+        createWfhMutation.mutate({ ...wfhForm, end_date: wfhForm.wfh_date });
     };
 
     const handleEditOpen = (leave) => {
@@ -413,6 +420,10 @@ const MyLeavesPanel = ({
 
     const handleEditSubmit = (e) => {
         e.preventDefault();
+        if (!editForm.reason || !editForm.reason.trim()) {
+            toast.error('Please enter a reason for your leave request.');
+            return;
+        }
         const isHalf = editForm.leave_type === 'first_half' || editForm.leave_type === 'second_half';
         const sDate = editForm.start_date;
         const eDate = isHalf ? sDate : editForm.end_date;
@@ -475,17 +486,16 @@ const MyLeavesPanel = ({
 
     const handleWfhEditSubmit = (e) => {
         e.preventDefault();
-        if (!editWfhForm.wfh_date) { toast.error('Please select a start date'); return; }
-        if (editWfhForm.end_date && editWfhForm.end_date < editWfhForm.wfh_date) {
-            toast.error('End date cannot be before start date');
+        if (!editWfhForm.reason || !editWfhForm.reason.trim()) {
+            toast.error('Please enter a reason for your WFH request.');
             return;
         }
-        updateWfhMutation.mutate({ id: editingWfh.id, data: { ...editWfhForm, end_date: editWfhForm.end_date || editWfhForm.wfh_date } });
+        if (!editWfhForm.wfh_date) { toast.error('Please select a date'); return; }
+        updateWfhMutation.mutate({ id: editingWfh.id, data: { ...editWfhForm, end_date: editWfhForm.wfh_date } });
     };
 
     const handleWfhDelete = (wfh) => {
-        if (!window.confirm(`Delete WFH request for ${wfh.wfh_date}?`)) return;
-        deleteWfhMutation.mutate(wfh.id);
+        setWfhDeleteConfirm(wfh);
     };
 
     const myEmployeeIdSet = employeeId ? new Set([employeeId]) : null;
@@ -499,16 +509,14 @@ const MyLeavesPanel = ({
                 </div>
                 <div className="flex gap-2">
                     {activeTab === 'My Leaves' && (
-                        <button onClick={() => setShowLeaveForm(true)}
-                            className="flex items-center gap-2 px-4 py-2.5 bg-emerald-600 text-white rounded-xl text-sm font-medium hover:bg-emerald-700 transition-colors shadow-sm">
+                        <Button variant="success" onClick={() => setShowLeaveForm(true)}>
                             <Plus className="w-4 h-4"/> Request Leave
-                        </button>
+                        </Button>
                     )}
                     {activeTab === 'Work From Home' && (
-                        <button onClick={() => setShowWfhForm(true)}
-                            className="flex items-center gap-2 px-4 py-2.5 bg-purple-600 text-white rounded-xl text-sm font-medium hover:bg-purple-700 transition-colors shadow-sm">
+                        <Button onClick={() => setShowWfhForm(true)} className="bg-purple-600 hover:bg-purple-700">
                             <Plus className="w-4 h-4"/> Request WFH
-                        </button>
+                        </Button>
                     )}
                 </div>
             </div>
@@ -567,7 +575,7 @@ const MyLeavesPanel = ({
                                 <div>
                                     <label className="block text-sm font-medium text-slate-700 mb-1">Reason</label>
                                     <input type="text" value={leaveForm.reason} onChange={e => setLeaveForm({ ...leaveForm, reason: e.target.value })}
-                                        className="w-full px-3 py-2 border border-slate-200 rounded-lg text-sm" placeholder="Optional reason"/>
+                                        className="w-full px-3 py-2 border border-slate-200 rounded-lg text-sm" placeholder="Reason for leave (required)"/>
                                 </div>
                                 {leaveForm.leave_type === 'floater' ? (
                                     <FloaterDatePicker
@@ -625,10 +633,9 @@ const MyLeavesPanel = ({
                                     {RAZORPAY_NEGATIVE_BALANCE_NOTE}
                                 </div>
                                 <div className="md:col-span-2 flex justify-end">
-                                    <button type="submit" disabled={createLeaveMutation.isPending}
-                                        className="px-4 py-2 bg-emerald-600 text-white rounded-lg text-sm font-medium hover:bg-emerald-700 disabled:opacity-50">
-                                        {createLeaveMutation.isPending ? 'Submitting...' : 'Apply Leave'}
-                                    </button>
+                                    <Button type="submit" variant="success" disabled={createLeaveMutation.isPending} isLoading={createLeaveMutation.isPending}>
+                                        {!createLeaveMutation.isPending && 'Apply Leave'}
+                                    </Button>
                                 </div>
                             </form>
                         </div>
@@ -653,7 +660,7 @@ const MyLeavesPanel = ({
                                 <div>
                                     <label className="block text-sm font-medium text-slate-700 mb-1">Reason</label>
                                     <input type="text" value={editForm.reason} onChange={e => setEditForm({ ...editForm, reason: e.target.value })}
-                                        className="w-full px-3 py-2 border border-slate-200 rounded-lg text-sm" placeholder="Optional reason"/>
+                                        className="w-full px-3 py-2 border border-slate-200 rounded-lg text-sm" placeholder="Reason for leave (required)"/>
                                 </div>
                                 {editForm.leave_type === 'floater' ? (
                                     <FloaterDatePicker
@@ -711,14 +718,10 @@ const MyLeavesPanel = ({
                                     Editing will reset the approval status back to <strong>pending</strong> so your manager can re-review.
                                 </div>
                                 <div className="md:col-span-2 flex justify-end gap-2">
-                                    <button type="button" onClick={() => setEditingLeave(null)}
-                                        className="px-4 py-2 border border-slate-200 text-slate-600 rounded-lg text-sm font-medium hover:bg-slate-50">
-                                        Cancel
-                                    </button>
-                                    <button type="submit" disabled={updateLeaveMutation.isPending}
-                                        className="px-4 py-2 bg-blue-600 text-white rounded-lg text-sm font-medium hover:bg-blue-700 disabled:opacity-50">
-                                        {updateLeaveMutation.isPending ? 'Saving...' : 'Save Changes'}
-                                    </button>
+                                    <Button type="button" variant="cancel" onClick={() => setEditingLeave(null)}>Cancel</Button>
+                                    <Button type="submit" variant="blue" disabled={updateLeaveMutation.isPending} isLoading={updateLeaveMutation.isPending}>
+                                        {!updateLeaveMutation.isPending && 'Save Changes'}
+                                    </Button>
                                 </div>
                             </form>
                         </div>
@@ -821,27 +824,19 @@ const MyLeavesPanel = ({
                             </div>
                             <form onSubmit={handleWfhSubmit} className="grid grid-cols-1 md:grid-cols-2 gap-4">
                                 <div>
-                                    <label className="block text-sm font-medium text-slate-700 mb-1">Start Date</label>
+                                    <label className="block text-sm font-medium text-slate-700 mb-1">Date</label>
                                     <input type="date" value={wfhForm.wfh_date} onChange={e => setWfhForm({ ...wfhForm, wfh_date: e.target.value })}
                                         className="w-full px-3 py-2 border border-slate-200 rounded-lg text-sm" required/>
-                                </div>
-                                <div>
-                                    <label className="block text-sm font-medium text-slate-700 mb-1">End Date</label>
-                                    <input type="date" value={wfhForm.end_date} onChange={e => setWfhForm({ ...wfhForm, end_date: e.target.value })}
-                                        min={wfhForm.wfh_date || undefined}
-                                        className="w-full px-3 py-2 border border-slate-200 rounded-lg text-sm"/>
-                                    <p className="mt-1 text-xs text-slate-400">Leave blank for a single day</p>
                                 </div>
                                 <div className="md:col-span-2">
                                     <label className="block text-sm font-medium text-slate-700 mb-1">Reason</label>
                                     <input type="text" value={wfhForm.reason} onChange={e => setWfhForm({ ...wfhForm, reason: e.target.value })}
-                                        className="w-full px-3 py-2 border border-slate-200 rounded-lg text-sm" placeholder="Optional reason"/>
+                                        className="w-full px-3 py-2 border border-slate-200 rounded-lg text-sm" placeholder="Reason for WFH (required)"/>
                                 </div>
                                 <div className="md:col-span-2 flex justify-end">
-                                    <button type="submit" disabled={createWfhMutation.isPending}
-                                        className="px-4 py-2 bg-purple-600 text-white rounded-lg text-sm font-medium hover:bg-purple-700 disabled:opacity-50">
-                                        {createWfhMutation.isPending ? 'Submitting...' : 'Submit WFH Request'}
-                                    </button>
+                                    <Button type="submit" className="bg-purple-600 hover:bg-purple-700" disabled={createWfhMutation.isPending} isLoading={createWfhMutation.isPending}>
+                                        {!createWfhMutation.isPending && 'Submit WFH Request'}
+                                    </Button>
                                 </div>
                             </form>
                         </div>
@@ -856,33 +851,23 @@ const MyLeavesPanel = ({
                             </div>
                             <form onSubmit={handleWfhEditSubmit} className="grid grid-cols-1 md:grid-cols-2 gap-4">
                                 <div>
-                                    <label className="block text-sm font-medium text-slate-700 mb-1">Start Date</label>
+                                    <label className="block text-sm font-medium text-slate-700 mb-1">Date</label>
                                     <input type="date" value={editWfhForm.wfh_date} onChange={e => setEditWfhForm({ ...editWfhForm, wfh_date: e.target.value })}
                                         className="w-full px-3 py-2 border border-slate-200 rounded-lg text-sm" required/>
-                                </div>
-                                <div>
-                                    <label className="block text-sm font-medium text-slate-700 mb-1">End Date</label>
-                                    <input type="date" value={editWfhForm.end_date} onChange={e => setEditWfhForm({ ...editWfhForm, end_date: e.target.value })}
-                                        min={editWfhForm.wfh_date || undefined}
-                                        className="w-full px-3 py-2 border border-slate-200 rounded-lg text-sm"/>
                                 </div>
                                 <div className="md:col-span-2">
                                     <label className="block text-sm font-medium text-slate-700 mb-1">Reason</label>
                                     <input type="text" value={editWfhForm.reason} onChange={e => setEditWfhForm({ ...editWfhForm, reason: e.target.value })}
-                                        className="w-full px-3 py-2 border border-slate-200 rounded-lg text-sm" placeholder="Optional reason"/>
+                                        className="w-full px-3 py-2 border border-slate-200 rounded-lg text-sm" placeholder="Reason for WFH (required)"/>
                                 </div>
                                 <div className="md:col-span-2 rounded-lg border border-blue-100 bg-blue-50 px-3 py-2 text-sm text-blue-700">
                                     Editing will reset the approval status back to <strong>pending</strong> so your manager can re-review.
                                 </div>
                                 <div className="md:col-span-2 flex justify-end gap-2">
-                                    <button type="button" onClick={() => setEditingWfh(null)}
-                                        className="px-4 py-2 border border-slate-200 text-slate-600 rounded-lg text-sm font-medium hover:bg-slate-50">
-                                        Cancel
-                                    </button>
-                                    <button type="submit" disabled={updateWfhMutation.isPending}
-                                        className="px-4 py-2 bg-blue-600 text-white rounded-lg text-sm font-medium hover:bg-blue-700 disabled:opacity-50">
-                                        {updateWfhMutation.isPending ? 'Saving...' : 'Save Changes'}
-                                    </button>
+                                    <Button type="button" variant="cancel" onClick={() => setEditingWfh(null)}>Cancel</Button>
+                                    <Button type="submit" variant="blue" disabled={updateWfhMutation.isPending} isLoading={updateWfhMutation.isPending}>
+                                        {!updateWfhMutation.isPending && 'Save Changes'}
+                                    </Button>
                                 </div>
                             </form>
                         </div>
@@ -950,7 +935,7 @@ const MyLeavesPanel = ({
                 </>
             )}
             {deleteTarget && (
-                <DeleteConfirmModal
+                <ConfirmDialog
                     isOpen={!!deleteTarget}
                     onClose={() => setDeleteTarget(null)}
                     onConfirm={() => {
@@ -963,8 +948,23 @@ const MyLeavesPanel = ({
                     isPending={deleteLeaveMutation.isPending}
                     title="Delete Leave Request"
                     message={`Are you sure you want to delete this ${getLeaveTypeLabel(deleteTarget.leave_type)} request (${deleteTarget.start_date} — ${deleteTarget.end_date})?`}
+                    variant="danger"
+                    confirmText="Delete"
                 />
             )}
+            <ConfirmDialog
+                isOpen={wfhDeleteConfirm !== null}
+                onClose={() => setWfhDeleteConfirm(null)}
+                onConfirm={() => {
+                    deleteWfhMutation.mutate(wfhDeleteConfirm.id);
+                    setWfhDeleteConfirm(null);
+                }}
+                title="Delete WFH Request"
+                message={`Delete WFH request for ${wfhDeleteConfirm?.wfh_date}?`}
+                variant="danger"
+                confirmText="Delete"
+                isPending={deleteWfhMutation.isPending}
+            />
         </div>
     );
 };

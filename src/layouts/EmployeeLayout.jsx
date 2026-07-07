@@ -1,10 +1,11 @@
 import React, { useState, useEffect } from 'react';
 import { Outlet, NavLink, useNavigate } from 'react-router-dom';
-import { useQuery } from '@tanstack/react-query';
+import { useQuery, useQueryClient } from '@tanstack/react-query';
 import { LayoutDashboard, FolderKanban, Calendar, CalendarCheck, Rocket, LogOut, Menu, X, FileText, Layers, UserCog, UserRound, Users, Users2, TrendingUp, GraduationCap, Info, ChevronLeft, ChevronRight } from 'lucide-react';
 import BrandLockup from '../components/brand/BrandLockup';
 import NotificationBell from '../components/NotificationBell';
 import { authApi } from '../services/api';
+import ChatWidget from '../components/chat/ChatWidget';
 
 const accentTheme = {
     pm: {
@@ -23,13 +24,14 @@ const accentTheme = {
 
 const EmployeeLayout = () => {
     const navigate = useNavigate();
+    const queryClient = useQueryClient();
     const [sidebarOpen, setSidebarOpen] = useState(false);
     const [isCollapsed, setIsCollapsed] = useState(() => {
         const saved = localStorage.getItem('sidebar-collapsed');
         return saved === null ? true : saved === 'true';
     });
     const [isHovered, setIsHovered] = useState(false);
-    const [isMobile, setIsMobile] = useState(window.innerWidth < 1024);
+    const [isMobile, setIsMobile] = useState(() => typeof window !== 'undefined' ? window.innerWidth < 1024 : false);
 
     useEffect(() => {
         const handleResize = () => {
@@ -62,13 +64,6 @@ const EmployeeLayout = () => {
     const portalLabel = isPm ? 'PM Portal' : 'Employee Portal';
     const theme = isPm ? accentTheme.pm : accentTheme.employee;
 
-    const hasAnnotationSkill = Array.isArray(user.skills) &&
-        user.skills.some(s => String(s).toLowerCase().includes('annotation'));
-    const isAnnotator = hasAnnotationSkill || (user.designation && (
-        user.designation.toLowerCase().includes('annotator') ||
-        user.designation.toLowerCase().includes('reviewer')
-    ));
-
     const navItems = isPm
         ? [
             { to: `${prefix}/dashboard`, label: 'Dashboard', icon: LayoutDashboard },
@@ -92,15 +87,18 @@ const EmployeeLayout = () => {
             { to: `${prefix}/guidelines`, label: 'Guidelines', icon: FileText },
             { to: `${prefix}/referrals`, label: 'Referrals', icon: Users2 },
             { to: `${prefix}/company-info`, label: 'Company Info', icon: Info },
-            ...(isAnnotator ? [{ to: `${prefix}/onboarding`, label: 'Onboarding', icon: GraduationCap }] : []),
+            { to: `${prefix}/onboarding`, label: 'Onboarding', icon: GraduationCap },
             { to: `${prefix}/profile`, label: 'Profile', icon: UserRound },
         ];
 
     const handleLogout = () => {
-        localStorage.removeItem('token');
-        localStorage.removeItem('user');
-        localStorage.removeItem('role');
-        navigate(isPm ? '/login/pm' : '/login/employee');
+        authApi.logout().catch(() => {}).finally(() => {
+            localStorage.removeItem('token');
+            localStorage.removeItem('user');
+            localStorage.removeItem('role');
+            queryClient.clear();
+            window.location.href = isPm ? '/login/pm' : '/login/employee';
+        });
     };
 
     const isSidebarCollapsed = !isMobile && isCollapsed && !isHovered;
@@ -244,6 +242,9 @@ const EmployeeLayout = () => {
                     <Outlet />
                 </main>
             </div>
+
+            {/* AI Chat Widget */}
+            <ChatWidget />
         </div>
     );
 };

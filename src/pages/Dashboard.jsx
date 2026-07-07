@@ -3,6 +3,8 @@ import { useMemo } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { subProjectApi, employeeApi, allocationApi, leaveApi, skillsApi } from '../services/api';
 import { FolderKanban, Calendar, Users, AlertTriangle, ArrowUpRight, Activity, Zap, Target, TrendingUp, Plus, ChevronRight } from 'lucide-react';
+import Table from '../components/ui/Table';
+import Button from '../components/ui/Button';
 import { format, isWithinInterval, parseISO } from 'date-fns';
 import { getWorkingDays } from '../utils/dateCalculations';
 
@@ -111,9 +113,18 @@ const Dashboard = () => {
     queryFn: allocationApi.getAll,
   });
 
+  const { startStr, endStr } = useMemo(() => {
+    const today = new Date();
+    const y = today.getFullYear();
+    const m = today.getMonth();
+    const start = `${y}-${String(m + 1).padStart(2, '0')}-01`;
+    const end = `${y}-${String(m + 1).padStart(2, '0')}-${String(new Date(y, m + 1, 0).getDate()).padStart(2, '0')}`;
+    return { startStr: start, endStr: end };
+  }, []);
+
   const { data: leaves = [] } = useQuery({
-    queryKey: ['leaves'],
-    queryFn: leaveApi.getAll,
+    queryKey: ['leaves', startStr, endStr],
+    queryFn: () => leaveApi.getAll({ start_date: startStr, end_date: endStr }),
   });
 
   const { data: skillsSummary = {} } = useQuery({
@@ -268,48 +279,56 @@ const Dashboard = () => {
               subtitle="Overview of active sub-projects"
             />
             <CardContent className="p-0">
-              <div className="overflow-x-auto">
-                <table className="w-full">
-                  <thead>
-                    <tr className="border-b border-slate-100">
-                      <th className="px-5 py-3 text-left text-xs font-semibold text-slate-500 uppercase tracking-wider">Project</th>
-                      <th className="px-5 py-3 text-center text-xs font-semibold text-slate-500 uppercase tracking-wider">Status</th>
-                      <th className="px-5 py-3 text-center text-xs font-semibold text-slate-500 uppercase tracking-wider">Deadline</th>
-                      <th className="px-5 py-3 text-right text-xs font-semibold text-slate-500 uppercase tracking-wider">Insight</th>
-                    </tr>
-                  </thead>
-                  <tbody className="divide-y divide-slate-50">
-                    {projectAnalyses.slice(0, 5).map(({ project, analysis }) => (
-                      <tr key={project.id} className="hover:bg-slate-50/50 transition-colors group">
-                        <td className="px-5 py-4">
-                          <div className="font-medium text-slate-800 group-hover:text-indigo-600 transition-colors">{project.name}</div>
-                          <div className="text-xs text-slate-400">{project.client}</div>
-                        </td>
-                        <td className="px-5 py-4 text-center">
-                          <StatusBadge status={analysis.status} />
-                        </td>
-                        <td className="px-5 py-4 text-center">
-                          <span className="text-sm text-slate-600 font-mono">
-                            {format(parseISO(project.end_date), 'MMM dd')}
-                          </span>
-                        </td>
-                        <td className="px-5 py-4 text-right">
-                          {analysis.recommendation ? (
-                            <span className="text-xs font-medium text-slate-500">{analysis.recommendation.message}</span>
-                          ) : (
-                            <span className="text-xs text-slate-400">—</span>
-                          )}
-                        </td>
-                      </tr>
-                    ))}
-                  </tbody>
-                </table>
-              </div>
+              <Table
+                variant="borderless"
+                loading={projectsLoading}
+                rowClassName={() => 'group'}
+                columns={[
+                  {
+                    key: 'project',
+                    label: 'Project',
+                    render: (project) => (
+                      <div>
+                        <div className="font-medium text-slate-800 group-hover:text-indigo-600 transition-colors">{project.name}</div>
+                        <div className="text-xs text-slate-400">{project.client}</div>
+                      </div>
+                    ),
+                  },
+                  {
+                    key: 'analysis',
+                    label: 'Status',
+                    align: 'center',
+                    render: (analysis) => <StatusBadge status={analysis.status} />,
+                  },
+                  {
+                    key: '_deadline',
+                    label: 'Deadline',
+                    align: 'center',
+                    render: (_, row) => (
+                      <span className="text-sm text-slate-600 font-mono">
+                        {format(parseISO(row.project.end_date), 'MMM dd')}
+                      </span>
+                    ),
+                  },
+                  {
+                    key: '_insight',
+                    label: 'Insight',
+                    align: 'right',
+                    render: (_, row) => row.analysis.recommendation ? (
+                      <span className="text-xs font-medium text-slate-500">{row.analysis.recommendation.message}</span>
+                    ) : (
+                      <span className="text-xs text-slate-400">—</span>
+                    ),
+                  },
+                ]}
+                data={projectAnalyses.slice(0, 5)}
+                emptyState={{ title: 'No projects', description: 'Active projects will appear here' }}
+              />
             </CardContent>
             <CardFooter>
-              <button onClick={() => navigate('/admin/sub-projects')} className="flex items-center gap-1 text-indigo-600 hover:text-indigo-700 font-medium transition-colors">
+              <Button variant="link" onClick={() => navigate('/admin/sub-projects')}>
                 View all projects <ChevronRight className="w-4 h-4" />
-              </button>
+              </Button>
             </CardFooter>
           </Card>
         </div>

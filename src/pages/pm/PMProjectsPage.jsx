@@ -2,6 +2,7 @@ import React from 'react';
 import { useQuery } from '@tanstack/react-query';
 import { parentProjectApi } from '../../services/api';
 import { Calendar, FolderTree, Layers, ChevronRight } from 'lucide-react';
+import Spinner from '../../components/ui/LoadingSpinner';
 import { Link } from 'react-router-dom';
 import { format } from 'date-fns';
 import { getPmEmployeeId, getPmProjects } from '../../utils/pmScope';
@@ -30,7 +31,7 @@ const PMProjectsPage = () => {
     if (isLoading) {
         return (
             <div className="flex items-center justify-center py-20">
-                <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-blue-600"></div>
+                <Spinner size="lg" color="indigo" />
             </div>
         );
     }

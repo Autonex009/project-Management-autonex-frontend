@@ -1,6 +1,7 @@
 import React, { useState, useEffect } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { Award, BookOpen, CheckCircle, Clock, GraduationCap, ChevronRight, Play, Lock } from 'lucide-react';
+import Spinner from '../../components/ui/LoadingSpinner';
 import { onboardingApi } from '../../services/api';
 
 const OnboardingDashboard = () => {
@@ -43,8 +44,7 @@ const OnboardingDashboard = () => {
     if (loading) {
         return (
             <div className="flex items-center justify-center min-h-[400px] text-slate-500 font-medium">
-                <span className="h-6 w-6 animate-spin rounded-full border-2 border-emerald-500/20 border-t-emerald-600 mr-2" />
-                Loading your training portal...
+                <Spinner size="md" color="emerald" text="Loading your training portal..." />
             </div>
         );
     }

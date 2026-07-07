@@ -1,6 +1,6 @@
 /* eslint-disable react/prop-types */
-import React, { Suspense, lazy } from 'react';
-import { BrowserRouter as Router, Routes, Route, Navigate } from 'react-router-dom';
+import React, { Suspense, lazy, useState } from 'react';
+import { Routes, Route, Navigate } from 'react-router-dom';
 import { QueryClient, QueryClientProvider } from '@tanstack/react-query';
 import { Toaster } from 'react-hot-toast';
 import ProtectedRoute from './routes/ProtectedRoute';
@@ -28,6 +28,7 @@ const PMDashboard = lazy(() => import('./pages/pm/PMDashboard'));
 const GuidelinesPage = lazy(() => import('./pages/guidelines/GuidelinesPage'));
 const MyTeamPage = lazy(() => import('./pages/pm/MyTeamPage'));
 const PerformanceReviewsPage = lazy(() => import('./pages/pm/PerformanceReviewsPage'));
+const AdminPerformancePage = lazy(() => import('./pages/admin/AdminPerformancePage'));
 
 // Scoped Pages
 const PMLeavesPage = lazy(() => import('./pages/pm/PMLeavesPage'));
@@ -56,22 +57,25 @@ const AdminCompanySettingsPage = lazy(() => import('./pages/admin/AdminCompanySe
 // const AdminAnalyticsPage = lazy(() => import('./pages/admin/AdminAnalyticsPage'));
 
 
-const queryClient = new QueryClient({
-  defaultOptions: {
-    queries: {
-      refetchOnWindowFocus: false,
-      retry: 1,
-    },
-  },
-});
-
 function App() {
+  // Per-request QueryClient: created once per component-tree mount. On the
+  // server, module memory is shared across all concurrent requests, so a
+  // module-scope client would leak one visitor's cached data into another's
+  // response. useState(() => ...) gives each request/mount its own instance.
+  const [queryClient] = useState(() => new QueryClient({
+    defaultOptions: {
+      queries: {
+        refetchOnWindowFocus: false,
+        retry: 1,
+      },
+    },
+  }));
+
   return (
     <QueryClientProvider client={queryClient}>
-      <Toaster position="top-right" toastOptions={{ duration: 4000, style: { background: '#333', color: '#fff' } }} />
-      <Router>
-        <Suspense fallback={<div className="flex items-center justify-center min-h-screen text-slate-500 font-medium">Loading Application...</div>}>
-          <Routes>
+      <Toaster position="top-right" containerStyle={{ zIndex: 100000 }} toastOptions={{ duration: 4000, style: { background: '#333', color: '#fff' } }} />
+      <Suspense fallback={<div className="flex items-center justify-center min-h-screen text-slate-500 font-medium">Loading Application...</div>}>
+        <Routes>
             {/* Public Auth Routes */}
             <Route path="/login/admin" element={<AdminLogin />} />
             <Route path="/login/employee" element={<EmployeeLogin />} />
@@ -94,6 +98,7 @@ function App() {
               <Route path="sub-projects" element={<SubProjectsPage />} />
               <Route path="allocations" element={<AllocationsPage />} />
               <Route path="leaves" element={<LeavesPage />} />
+              <Route path="performance" element={<AdminPerformancePage />} />
               <Route path="signup-requests" element={<SignupRequestsPage />} />
               <Route path="payroll" element={<PayrollTabs />} />
               <Route path="referrals" element={<ReferralsPage />} />
@@ -149,15 +154,13 @@ function App() {
               <Route path="guidelines" element={<GuidelinesPage />} />
               <Route path="onboarding-mentor" element={<PMMentorshipPage />} />
               <Route path="newly-onboarded" element={<Navigate to="/pm/onboarding-mentor" replace />} />
-              {/* <Route path="onboarding-mentor" element={<PMOnboardingDashboard />} /> */}
               <Route path="profile" element={<ProfilePage />} />
             </Route>
 
             {/* Catch all */}
             <Route path="*" element={<Navigate to="/login/admin" replace />} />
-          </Routes>
-        </Suspense>
-      </Router>
+        </Routes>
+      </Suspense>
     </QueryClientProvider>
   );
 }

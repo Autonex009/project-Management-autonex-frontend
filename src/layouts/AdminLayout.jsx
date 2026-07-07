@@ -1,13 +1,12 @@
-import { Link, useLocation, Outlet, useNavigate } from 'react-router-dom';
-import { LogOut, Menu, X, GraduationCap, FileSpreadsheet, ChevronLeft, ChevronRight, Sparkles } from 'lucide-react';
-import SearchInput from '../components/ui/SearchInput';
+import { Link, useLocation, Outlet } from 'react-router-dom';
+import { LogOut, Menu, GraduationCap, FileSpreadsheet, ChevronLeft, ChevronRight, Sparkles } from 'lucide-react';
 import { navigation } from '../config/navigation';
-import api, { signupRequestApi } from '../services/api';
+import api, { signupRequestApi, employeeApi, subProjectApi } from '../services/api';
 import { useState, useEffect } from 'react';
 import { useQuery, useQueryClient } from '@tanstack/react-query';
-import { subProjectApi, employeeApi } from '../services/api';
 import BrandLockup from '../components/brand/BrandLockup';
 import NotificationBell from '../components/NotificationBell';
+import ChatWidget from '../components/chat/ChatWidget';
 
 const onboardingNavigation = [
   { name: 'Training Modules', href: '/admin/modules', icon: GraduationCap },
@@ -17,17 +16,14 @@ const onboardingNavigation = [
 
 const AdminLayout = () => {
   const location = useLocation();
-  const navigate = useNavigate();
   const queryClient = useQueryClient();
   const [sidebarOpen, setSidebarOpen] = useState(false);
-  const [searchQuery, setSearchQuery] = useState('');
-  const [showResults, setShowResults] = useState(false);
   const [isCollapsed, setIsCollapsed] = useState(() => {
     const saved = localStorage.getItem('sidebar-collapsed');
     return saved === null ? true : saved === 'true';
   });
   const [isHovered, setIsHovered] = useState(false);
-  const [isMobile, setIsMobile] = useState(window.innerWidth < 1024);
+  const [isMobile, setIsMobile] = useState(() => typeof window !== 'undefined' ? window.innerWidth < 1024 : false);
 
   useEffect(() => {
     const handleResize = () => {
@@ -64,11 +60,6 @@ const AdminLayout = () => {
     staleTime: 30_000,
   });
   const pendingSignupCount = signupCounts?.pending || 0;
-
-  const filteredResults = {
-    employees: (searchEmployees || []).filter(e => e.name.toLowerCase().includes(searchQuery.toLowerCase())).slice(0, 3),
-    projects: (searchProjects || []).filter(p => p.name.toLowerCase().includes(searchQuery.toLowerCase())).slice(0, 3)
-  };
 
   // Get user info from localStorage
   const user = JSON.parse(localStorage.getItem('user') || '{}');
@@ -264,49 +255,6 @@ const AdminLayout = () => {
           <div className="flex items-center gap-4">
             {/* Notification Bell */}
             <NotificationBell />
-
-            {/* Search Bar */}
-            <div className="relative hidden md:block">
-              <SearchInput
-                placeholder="Search resources..."
-                value={searchQuery}
-                onChange={(val) => { setSearchQuery(val); setShowResults(true); }}
-                className="w-64"
-              />
-
-              {/* Search Results Dropdown */}
-              {showResults && searchQuery.length > 0 && (
-                <div className="absolute top-full mt-2 w-64 bg-white rounded-xl shadow-xl border border-slate-100 py-2 z-50 max-h-96 overflow-auto">
-                  {/* Projects */}
-                  {filteredResults.projects.length > 0 && (
-                    <div>
-                      <div className="px-4 py-1 text-xs font-semibold text-slate-400 uppercase">Projects</div>
-                      {filteredResults.projects.map(p => (
-                        <button key={p.id} onClick={() => navigate('/admin/sub-projects')} className="w-full text-left px-4 py-2 hover:bg-slate-50 text-sm text-slate-700 truncate">
-                          {p.name}
-                        </button>
-                      ))}
-                    </div>
-                  )}
-
-                  {/* Employees */}
-                  {filteredResults.employees.length > 0 && (
-                    <div>
-                      <div className="px-4 py-1 text-xs font-semibold text-slate-400 uppercase mt-2">Employees</div>
-                      {filteredResults.employees.map(e => (
-                        <button key={e.id} onClick={() => navigate('/admin/employees')} className="w-full text-left px-4 py-2 hover:bg-slate-50 text-sm text-slate-700 truncate">
-                          {e.name}
-                        </button>
-                      ))}
-                    </div>
-                  )}
-
-                  {filteredResults.projects.length === 0 && filteredResults.employees.length === 0 && (
-                    <div className="px-4 py-2 text-sm text-slate-400 text-center">No matches found</div>
-                  )}
-                </div>
-              )}
-            </div>
           </div>
         </header>
 
@@ -325,6 +273,9 @@ const AdminLayout = () => {
           onClick={() => setSidebarOpen(false)}
         />
       )}
+
+      {/* AI Chat Widget */}
+      <ChatWidget role="admin" />
     </div>
   );
 };

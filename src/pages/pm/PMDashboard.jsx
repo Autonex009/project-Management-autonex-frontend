@@ -1,10 +1,11 @@
-import React from 'react';
+import React, { useMemo } from 'react';
 import { useQuery } from '@tanstack/react-query';
 import { allocationApi, subProjectApi, leaveApi, employeeApi } from '../../services/api';
 import { FolderKanban, Users, Calendar, CheckCircle2, Clock, AlertTriangle, TrendingUp } from 'lucide-react';
 import { format, parseISO, isWithinInterval, isFuture } from 'date-fns';
 import { parentProjectApi } from '../../services/api';
 import { getPmEmployeeId, getPmSubProjects } from '../../utils/pmScope';
+import Table from '../../components/ui/Table';
 
 const PMDashboard = () => {
     const user = JSON.parse(localStorage.getItem('user') || '{}');
@@ -27,9 +28,18 @@ const PMDashboard = () => {
         queryKey: ['allocations'],
         queryFn: allocationApi.getAll,
     });
+    const { startStr, endStr } = useMemo(() => {
+        const today = new Date();
+        const y = today.getFullYear();
+        const m = today.getMonth();
+        const start = `${y}-${String(m + 1).padStart(2, '0')}-01`;
+        const end = `${y}-${String(m + 1).padStart(2, '0')}-${String(new Date(y, m + 1, 0).getDate()).padStart(2, '0')}`;
+        return { startStr: start, endStr: end };
+    }, []);
+
     const { data: allLeaves = [] } = useQuery({
-        queryKey: ['leaves'],
-        queryFn: leaveApi.getAll,
+        queryKey: ['leaves', startStr, endStr],
+        queryFn: () => leaveApi.getAll({ start_date: startStr, end_date: endStr }),
     });
 
     const today = new Date();
@@ -93,53 +103,63 @@ const PMDashboard = () => {
                             </div>
                         </div>
 
-                        {projLoading ? (
-                            <div className="p-8 text-center text-slate-400 animate-pulse">Loading...</div>
-                        ) : (
-                            <div className="overflow-x-auto">
-                                <table className="w-full">
-                                    <thead>
-                                        <tr className="border-b border-slate-100">
-                                            <th className="px-5 py-3 text-left text-xs font-semibold text-slate-500 uppercase">Project</th>
-                                            <th className="px-5 py-3 text-center text-xs font-semibold text-slate-500 uppercase">Staff</th>
-                                            <th className="px-5 py-3 text-center text-xs font-semibold text-slate-500 uppercase">Status</th>
-                                            <th className="px-5 py-3 text-right text-xs font-semibold text-slate-500 uppercase">Deadline</th>
-                                        </tr>
-                                    </thead>
-                                    <tbody className="divide-y divide-slate-50">
-                                        {activeProjects.slice(0, 8).map(project => {
-                                            const projAllocs = allocations.filter(a => a.sub_project_id === project.id);
-                                            const isUnderStaffed = project.required_manpower && projAllocs.length < project.required_manpower;
-                                            return (
-                                                <tr key={project.id} className="hover:bg-slate-50/50 transition-colors">
-                                                    <td className="px-5 py-3.5">
-                                                        <div className="font-medium text-slate-800">{project.name}</div>
-                                                        <div className="text-xs text-slate-400">{project.client}</div>
-                                                    </td>
-                                                    <td className="px-5 py-3.5 text-center">
-                                                        <span className={`text-sm font-semibold ${isUnderStaffed ? 'text-red-600' : 'text-slate-700'}`}>
-                                                            {projAllocs.length}/{project.required_manpower || '—'}
-                                                        </span>
-                                                    </td>
-                                                    <td className="px-5 py-3.5 text-center">
-                                                        <span className={`inline-flex items-center gap-1 px-2 py-0.5 rounded-full text-xs font-medium border ${isUnderStaffed
-                                                                ? 'bg-red-50 text-red-700 border-red-200'
-                                                                : 'bg-emerald-50 text-emerald-700 border-emerald-200'
-                                                            }`}>
-                                                            <span className={`w-1.5 h-1.5 rounded-full ${isUnderStaffed ? 'bg-red-500' : 'bg-emerald-500'}`} />
-                                                            {isUnderStaffed ? 'Under-staffed' : 'On Track'}
-                                                        </span>
-                                                    </td>
-                                                    <td className="px-5 py-3.5 text-right text-sm text-slate-500 font-mono">
-                                                        {project.end_date ? format(parseISO(project.end_date), 'MMM dd') : '—'}
-                                                    </td>
-                                                </tr>
-                                            );
-                                        })}
-                                    </tbody>
-                                </table>
-                            </div>
-                        )}
+                        <Table
+                            variant="borderless"
+                            loading={projLoading}
+                            columns={[
+                                {
+                                    key: 'name',
+                                    label: 'Project',
+                                    render: (value, project) => (
+                                        <div>
+                                            <div className="font-medium text-slate-800">{value}</div>
+                                            <div className="text-xs text-slate-400">{project.client}</div>
+                                        </div>
+                                    ),
+                                },
+                                {
+                                    key: 'id',
+                                    label: 'Staff',
+                                    align: 'center',
+                                    render: (id, project) => {
+                                        const projAllocs = allocations.filter(a => a.sub_project_id === id);
+                                        const isUnder = project.required_manpower && projAllocs.length < project.required_manpower;
+                                        return (
+                                            <span className={`text-sm font-semibold ${isUnder ? 'text-red-600' : 'text-slate-700'}`}>
+                                                {projAllocs.length}/{project.required_manpower || '—'}
+                                            </span>
+                                        );
+                                    },
+                                },
+                                {
+                                    key: '_status',
+                                    label: 'Status',
+                                    align: 'center',
+                                    render: (_, project) => {
+                                        const projAllocs = allocations.filter(a => a.sub_project_id === project.id);
+                                        const isUnder = project.required_manpower && projAllocs.length < project.required_manpower;
+                                        return (
+                                            <span className={`inline-flex items-center gap-1 px-2 py-0.5 rounded-full text-xs font-medium border ${isUnder ? 'bg-red-50 text-red-700 border-red-200' : 'bg-emerald-50 text-emerald-700 border-emerald-200'}`}>
+                                                <span className={`w-1.5 h-1.5 rounded-full ${isUnder ? 'bg-red-500' : 'bg-emerald-500'}`} />
+                                                {isUnder ? 'Under-staffed' : 'On Track'}
+                                            </span>
+                                        );
+                                    },
+                                },
+                                {
+                                    key: 'end_date',
+                                    label: 'Deadline',
+                                    align: 'right',
+                                    render: (value) => (
+                                        <span className="text-sm text-slate-500 font-mono">
+                                            {value ? format(parseISO(value), 'MMM dd') : '—'}
+                                        </span>
+                                    ),
+                                },
+                            ]}
+                            data={activeProjects.slice(0, 8)}
+                            emptyState={{ title: 'No active projects', description: 'Active projects will appear here' }}
+                        />
                     </div>
                 </div>
 

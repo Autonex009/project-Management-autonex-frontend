@@ -1,10 +1,12 @@
 import React, { useState, useEffect } from 'react';
-import { createPortal } from 'react-dom';
 import { Plus, BookOpen, Trash2, Layers, GripVertical, AlertTriangle } from 'lucide-react';
+import Spinner from '../../components/ui/LoadingSpinner';
+import Button from '../../components/ui/Button';
 import { useNavigate } from 'react-router-dom';
 import toast from 'react-hot-toast';
 import { onboardingApi } from '../../services/api';
-import SearchInput from '../../components/ui/SearchInput';
+import SearchBar from '../../components/ui/SearchBar';
+import Modal from '../../components/ui/Modal';
 
 export default function AdminModulesList() {
   const [modules, setModules] = useState([]);
@@ -83,17 +85,14 @@ export default function AdminModulesList() {
           <h2 className="text-2xl font-extrabold text-slate-900">Module Management</h2>
           <p className="text-sm text-slate-500">Create and oversee onboarding training modules. Drag rows to reorder.</p>
         </div>
-        <button
-          onClick={() => navigate('/admin/modules/new')}
-          className="flex items-center gap-2 px-5 py-2.5 rounded-xl text-white text-sm font-semibold transition-all hover:shadow-lg hover:bg-indigo-700 shadow-md bg-indigo-600"
-        >
+        <Button size="lg" onClick={() => navigate('/admin/modules/new')}>
           <Plus className="h-4 w-4" /> Create Module
-        </button>
+        </Button>
       </div>
 
       <div className="bg-white p-6 rounded-2xl shadow-[0_1px_3px_rgba(0,0,0,0.04)] border border-slate-200/60 mb-6">
         <div className="p-4 flex flex-col sm:flex-row gap-4 border-b border-slate-100">
-          <SearchInput
+          <SearchBar
             placeholder="Search modules..."
             value={searchQuery}
             onChange={setSearchQuery}
@@ -108,8 +107,7 @@ export default function AdminModulesList() {
 
         {loading ? (
           <div className="p-10 text-center text-slate-500 flex items-center justify-center gap-2">
-            <span className="h-5 w-5 animate-spin rounded-full border-2 border-slate-350 border-t-indigo-600" />
-            Loading modules...
+            <Spinner size="sm" color="indigo" text="Loading modules..." />
           </div>
         ) : (
           <div className="space-y-3 p-6 bg-slate-50/50 rounded-b-2xl">
@@ -180,15 +178,9 @@ export default function AdminModulesList() {
         )}
       </div>
 
-      {pendingDelete && createPortal(
-        <div
-          className="fixed inset-0 bg-slate-900/60 backdrop-blur-sm z-[100] flex items-center justify-center px-4 py-8"
-          onClick={() => setPendingDelete(null)}
-        >
-          <div
-            className="bg-white rounded-2xl max-w-md w-full shadow-2xl border border-slate-100 p-6"
-            onClick={(e) => e.stopPropagation()}
-          >
+      {pendingDelete && (
+        <Modal isOpen onClose={() => setPendingDelete(null)} size="md">
+          <Modal.Body>
             <div className="flex items-start gap-4">
               <div className="h-11 w-11 rounded-xl flex items-center justify-center flex-shrink-0 bg-red-50 text-red-600">
                 <AlertTriangle className="h-5 w-5" />
@@ -200,23 +192,12 @@ export default function AdminModulesList() {
                 </p>
               </div>
             </div>
-            <div className="flex justify-end gap-3 mt-6">
-              <button
-                onClick={() => setPendingDelete(null)}
-                className="px-4 py-2 rounded-xl text-sm font-semibold text-slate-600 hover:bg-slate-100 transition-colors"
-              >
-                Cancel
-              </button>
-              <button
-                onClick={confirmDelete}
-                className="px-4 py-2 rounded-xl text-sm font-semibold text-white bg-red-600 hover:bg-red-700 transition-colors shadow-sm"
-              >
-                Delete Module
-              </button>
-            </div>
-          </div>
-        </div>,
-        document.body
+          </Modal.Body>
+          <Modal.Footer>
+            <Button variant="cancel" onClick={() => setPendingDelete(null)}>Cancel</Button>
+            <Button variant="danger" onClick={confirmDelete}>Delete Module</Button>
+          </Modal.Footer>
+        </Modal>
       )}
     </div>
   );
