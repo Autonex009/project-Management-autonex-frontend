@@ -1,6 +1,7 @@
 import React, { useState, useEffect } from 'react';
 import { useNavigate, useSearchParams } from 'react-router-dom';
 import { Save, Plus, ArrowLeft, Link2, Loader2 } from 'lucide-react';
+import { useQuery } from '@tanstack/react-query';
 import Spinner from '../../components/ui/LoadingSpinner';
 import Button from '../../components/ui/Button';
 import toast from 'react-hot-toast';
@@ -18,57 +19,56 @@ export default function AdminModulesBuilder() {
   const [status, setStatus] = useState('published');
   const [order, setOrder] = useState(0);
   const [isSaving, setIsSaving] = useState(false);
-  const [isLoading, setIsLoading] = useState(!!editId);
   const [sections, setSections] = useState([]);
+
+  const { data: moduleData, isLoading: isQueryLoading } = useQuery({
+      queryKey: ['module', editId],
+      queryFn: () => onboardingApi.getModule(editId),
+      enabled: !!editId,
+  });
+
+  const isLoading = editId ? isQueryLoading : false;
 
   // Load existing module if editing
   useEffect(() => {
-    if (!editId) return;
-    setIsLoading(true);
-    onboardingApi.getModule(editId)
-      .then(data => {
-        setTitle(data.title || '');
-        setDescription(data.description || '');
-        setAssessmentUrl(data.assessment_url || '');
-        setStatus(data.status?.toLowerCase() === 'draft' ? 'draft' : 'published');
-        setOrder(data.order ?? 0);
-        
-        // Map sections from DB format to component format
-        const mappedSections = (data.sections || []).map((s) => ({
-          id: s.id,
-          title: s.title || '',
-          description: s.description || '',
-          videoUrl: s.video_url || '',
-          videoDuration: s.video_duration || '',
-          quizPassingScore: s.quiz_passing_score ?? 0,
-          document: s.documents?.[0] ? {
-            title: s.documents[0].title,
-            type: s.documents[0].type,
-            url: s.documents[0].url
-          } : undefined,
-          questions: (s.questions || []).map((q) => {
-            let opts = [];
-            try { 
-              opts = typeof q.options === 'string' ? JSON.parse(q.options) : q.options; 
-            } catch { 
-              opts = q.options || []; 
-            }
-            return {
-              id: q.id,
-              question: q.question || '',
-              options: opts.length === 4 ? opts : ['', '', '', ''],
-              correctIndex: q.correct_option_index ?? 0
-            };
-          })
-        }));
-        setSections(mappedSections);
+    if (!moduleData) return;
+    
+    setTitle(moduleData.title || '');
+    setDescription(moduleData.description || '');
+    setAssessmentUrl(moduleData.assessment_url || '');
+    setStatus(moduleData.status?.toLowerCase() === 'draft' ? 'draft' : 'published');
+    setOrder(moduleData.order ?? 0);
+    
+    // Map sections from DB format to component format
+    const mappedSections = (moduleData.sections || []).map((s) => ({
+      id: s.id,
+      title: s.title || '',
+      description: s.description || '',
+      videoUrl: s.video_url || '',
+      videoDuration: s.video_duration || '',
+      quizPassingScore: s.quiz_passing_score ?? 0,
+      document: s.documents?.[0] ? {
+        title: s.documents[0].title,
+        type: s.documents[0].type,
+        url: s.documents[0].url
+      } : undefined,
+      questions: (s.questions || []).map((q) => {
+        let opts = [];
+        try { 
+          opts = typeof q.options === 'string' ? JSON.parse(q.options) : q.options; 
+        } catch { 
+          opts = q.options || []; 
+        }
+        return {
+          id: q.id,
+          question: q.question || '',
+          options: opts.length === 4 ? opts : ['', '', '', ''],
+          correctIndex: q.correct_option_index ?? 0
+        };
       })
-      .catch(err => {
-        console.error('Failed to load module:', err);
-        toast.error('Failed to load module for editing.');
-      })
-      .finally(() => setIsLoading(false));
-  }, [editId]);
+    }));
+    setSections(mappedSections);
+  }, [moduleData]);
 
   const addSection = () => {
     setSections([...sections, {

@@ -56,8 +56,10 @@ const AdminReportsPage = lazy(() => import('./pages/admin/AdminReportsPage'));
 const AdminCompanySettingsPage = lazy(() => import('./pages/admin/AdminCompanySettingsPage'));
 // const AdminAnalyticsPage = lazy(() => import('./pages/admin/AdminAnalyticsPage'));
 
+import { HydrationBoundary } from '@tanstack/react-query';
+import { AuthProvider } from './context/AuthContext';
 
-function App() {
+function App({ ssrAuth, dehydratedState }) {
   // Per-request QueryClient: created once per component-tree mount. On the
   // server, module memory is shared across all concurrent requests, so a
   // module-scope client would leak one visitor's cached data into another's
@@ -72,11 +74,13 @@ function App() {
   }));
 
   return (
-    <QueryClientProvider client={queryClient}>
-      <Toaster position="top-right" containerStyle={{ zIndex: 100000 }} toastOptions={{ duration: 4000, style: { background: '#333', color: '#fff' } }} />
-      <Suspense fallback={<div className="flex items-center justify-center min-h-screen text-slate-500 font-medium">Loading Application...</div>}>
-        <Routes>
-            {/* Public Auth Routes */}
+    <AuthProvider ssrAuth={ssrAuth}>
+      <QueryClientProvider client={queryClient}>
+        <HydrationBoundary state={dehydratedState}>
+          <Toaster position="top-right" containerStyle={{ zIndex: 100000 }} toastOptions={{ duration: 4000, style: { background: '#333', color: '#fff' } }} />
+          <Suspense fallback={<div className="flex items-center justify-center min-h-screen text-slate-500 font-medium">Loading Application...</div>}>
+            <Routes>
+              {/* Public Auth Routes */}
             <Route path="/login/admin" element={<AdminLogin />} />
             <Route path="/login/employee" element={<EmployeeLogin />} />
             <Route path="/login/pm" element={<PMLogin />} />
@@ -159,9 +163,11 @@ function App() {
 
             {/* Catch all */}
             <Route path="*" element={<Navigate to="/login/admin" replace />} />
-        </Routes>
-      </Suspense>
+          </Routes>
+        </Suspense>
+      </HydrationBoundary>
     </QueryClientProvider>
+    </AuthProvider>
   );
 }
 

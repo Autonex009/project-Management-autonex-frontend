@@ -1,5 +1,6 @@
 import React, { useState, useEffect } from 'react';
 import { Plus, BookOpen, Trash2, Layers, GripVertical, AlertTriangle } from 'lucide-react';
+import { useQuery } from '@tanstack/react-query';
 import Spinner from '../../components/ui/LoadingSpinner';
 import Button from '../../components/ui/Button';
 import { useNavigate } from 'react-router-dom';
@@ -11,27 +12,21 @@ import Modal from '../../components/ui/Modal';
 export default function AdminModulesList() {
   const [modules, setModules] = useState([]);
   const [searchQuery, setSearchQuery] = useState('');
-  const [loading, setLoading] = useState(true);
   const [dragIndex, setDragIndex] = useState(null);
   const [dragOverIndex, setDragOverIndex] = useState(null);
   const [pendingDelete, setPendingDelete] = useState(null);
   const navigate = useNavigate();
 
-  const fetchModules = async () => {
-    try {
-      setLoading(true);
-      const data = await onboardingApi.getModules(true); // include drafts
-      setModules(Array.isArray(data) ? data : []);
-    } catch (err) {
-      console.error('Failed to fetch modules:', err);
-    } finally {
-      setLoading(false);
-    }
-  };
+  const { data, isLoading: loading } = useQuery({
+      queryKey: ['admin-modules'],
+      queryFn: () => onboardingApi.getModules(true),
+  });
 
   useEffect(() => {
-    fetchModules();
-  }, []);
+      if (data) {
+          setModules(Array.isArray(data) ? data : []);
+      }
+  }, [data]);
 
   const confirmDelete = async () => {
     if (!pendingDelete) return;

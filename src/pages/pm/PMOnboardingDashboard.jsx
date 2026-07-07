@@ -1,48 +1,42 @@
-import React, { useState, useEffect } from 'react';
+import React from 'react';
 import { Users, BookOpen, Award, CheckCircle, HelpCircle } from 'lucide-react';
+import { useQuery } from '@tanstack/react-query';
 import { onboardingApi } from '../../services/api';
 import Table from '../../components/ui/Table';
 import Spinner from '../../components/ui/LoadingSpinner';
+import { useAuthContext } from '../../context/AuthContext';
 
 const PMOnboardingDashboard = ({ embedded = false }) => {
-    const [mentees, setMentees] = useState([]);
-    const [loading, setLoading] = useState(true);
-    const [error, setError] = useState(null);
+    const { user } = useAuthContext();
+    const pmId = user?.id;
+    const pmName = user?.name;
 
-    const user = JSON.parse(localStorage.getItem('user') || '{}');
-    const pmId = user.id;
-
-    useEffect(() => {
-        if (!pmId) return;
-
-        setLoading(true);
-        setError(null);
-
-        onboardingApi.getMentees(pmId)
-            .then((menteesList) => {
-                setMentees(menteesList);
-            })
-            .catch(async (err) => {
+    const { data: menteesData, isLoading, error: fetchError } = useQuery({
+        queryKey: ['pm-mentees', pmId],
+        queryFn: async () => {
+            try {
+                return await onboardingApi.getMentees(pmId);
+            } catch (err) {
                 console.warn('getMentees API failed, trying fallback from reports:', err);
-                try {
-                    const data = await onboardingApi.getReports();
-                    const filtered = data.filter(c => c.mentorName === user.name);
-                    setMentees(filtered.map(c => ({
-                        id: c.userId,
-                        name: c.name,
-                        email: c.email,
-                        department: c.department,
-                        isActive: true,
-                        completedModulesCount: (c.moduleStats || []).filter(m => m.progress === 100).length,
-                        quizScorePercent: c.overallScore
-                    })));
-                } catch (fallbackErr) {
-                    console.error('Failed to load mentees and reports:', fallbackErr);
-                    setError('Could not load assigned candidates.');
-                }
-            })
-            .finally(() => setLoading(false));
-    }, [pmId, user.name]);
+                const data = await onboardingApi.getReports();
+                const filtered = data.filter(c => c.mentorName === pmName);
+                return filtered.map(c => ({
+                    id: c.userId,
+                    name: c.name,
+                    email: c.email,
+                    department: c.department,
+                    isActive: true,
+                    completedModulesCount: (c.moduleStats || []).filter(m => m.progress === 100).length,
+                    quizScorePercent: c.overallScore
+                }));
+            }
+        },
+        enabled: !!pmId && !!pmName
+    });
+
+    const mentees = menteesData || [];
+    const loading = isLoading;
+    const error = fetchError ? 'Could not load assigned candidates.' : null;
 
     if (loading) {
         return (

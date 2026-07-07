@@ -37,3 +37,15 @@ Object.defineProperty(globalThis, 'sessionStorage', {
   configurable: true,
   writable: true,
 });
+
+// SSR Request Context for passing the token to api.js on the server
+import { AsyncLocalStorage } from 'node:async_hooks';
+const ssrTokenContext = new AsyncLocalStorage();
+
+export const runWithSsrToken = (token, cb) => {
+  return ssrTokenContext.run(token, cb);
+};
+
+globalThis.__getSsrToken = () => {
+  return ssrTokenContext.getStore();
+};

@@ -7,6 +7,7 @@ import SearchBar from '../components/ui/SearchBar';
 import AllocationModalV2 from '../components/AllocationModalV2';
 import CandidateAllocationsPopover from '../components/CandidateAllocationsPopover';
 import { getPmSubProjects, getPmEmployeeId } from '../utils/pmScope';
+import { useAuthContext } from '../context/AuthContext';
 
 const scoreBadgeClass = (score) => {
     if (score >= 80) return 'bg-emerald-50 text-emerald-700 border-emerald-100';
@@ -20,8 +21,8 @@ const NewlyOnboardedPage = ({ embedded = false }) => {
     const [allocatingCandidate, setAllocatingCandidate] = useState(null);
     const [expandedRow, setExpandedRow] = useState(null);
 
-    const user = JSON.parse(localStorage.getItem('user') || '{}');
-    const isPm = (localStorage.getItem('role') || 'employee') === 'pm';
+    const { user, role } = useAuthContext();
+    const isPm = role === 'pm';
 
     const { data: candidates = [], isLoading, isError } = useQuery({
         queryKey: ['newly-onboarded'],

@@ -1,5 +1,6 @@
 import React, { useState, useEffect } from 'react';
 import { Download, Users, TrendingUp, CheckCircle2, ChevronDown, ChevronRight } from 'lucide-react';
+import { useQuery } from '@tanstack/react-query';
 import Button from '../../components/ui/Button';
 import { onboardingApi } from '../../services/api';
 import Table from '../../components/ui/Table';
@@ -7,17 +8,20 @@ import SearchBar from '../../components/ui/SearchBar';
 
 export default function AdminReportsPage() {
   const [reports, setReports] = useState([]);
-  const [loading, setLoading] = useState(true);
   const [searchTerm, setSearchTerm] = useState('');
   const [expandedRow, setExpandedRow] = useState(null);
   const [currentPage, setCurrentPage] = useState(1);
 
+  const { data, isLoading: loading } = useQuery({
+      queryKey: ['admin-reports'],
+      queryFn: () => onboardingApi.getReports(),
+  });
+
   useEffect(() => {
-    onboardingApi.getReports()
-      .then(data => setReports(Array.isArray(data) ? data : []))
-      .catch(console.error)
-      .finally(() => setLoading(false));
-  }, []);
+      if (data) {
+          setReports(Array.isArray(data) ? data : []);
+      }
+  }, [data]);
 
   const handleExportCSV = () => {
     onboardingApi.exportReports()

@@ -62,19 +62,53 @@ async function main() {
     const url = req.originalUrl;
     try {
       let html;
+      
+      // 1. Extract and parse JWT cookie
+      const cookieHeader = req.headers.cookie || '';
+      const tokenMatch = cookieHeader.match(/(?:^|;\s*)access_token=([^;]*)/);
+      const token = tokenMatch ? tokenMatch[1] : null;
+      
+      let ssrAuth = { isAuthenticated: false, role: null, user: null };
+      if (token) {
+        try {
+            const base64 = token.split('.')[1].replace(/-/g, '+').replace(/_/g, '/');
+            const payload = JSON.parse(Buffer.from(base64, 'base64').toString());
+            if (!payload.exp || payload.exp * 1000 >= Date.now()) {
+                ssrAuth = { isAuthenticated: true, role: payload.role, user: payload };
+            }
+        } catch(e) {}
+      }
+
+      let modRender, modPrefetch;
+      let templateHtml;
+
       if (!isProd) {
-        let templateHtml = fs.readFileSync(
-          path.resolve(__dirname, 'index.html'),
-          'utf-8'
-        );
+        templateHtml = fs.readFileSync(path.resolve(__dirname, 'index.html'), 'utf-8');
         templateHtml = await vite.transformIndexHtml(url, templateHtml);
         const mod = await vite.ssrLoadModule('/src/entry-server.jsx');
-        const { html: appHtml } = mod.render(url, req.headers.cookie || '');
-        html = templateHtml.replace('<!--ssr-outlet-->', appHtml);
+        modRender = mod.render;
+        modPrefetch = mod.prefetch;
       } else {
-        const { html: appHtml } = render(url, req.headers.cookie || '');
-        html = template.replace('<!--ssr-outlet-->', appHtml);
+        modRender = render;
+        const mod = await import('./dist/server/entry-server.js');
+        modPrefetch = mod.prefetch;
+        templateHtml = template;
       }
+
+      // 2. Prefetch data
+      let dehydratedState = null;
+      if (modPrefetch && ssrAuth.isAuthenticated) {
+          dehydratedState = await modPrefetch(url, token, ssrAuth.user);
+      }
+
+      // 3. Render App
+      const { html: appHtml } = modRender(url, cookieHeader, ssrAuth, dehydratedState);
+      
+      // 4. Inject State
+      const injectedState = `<script>window.__SSR_AUTH__=${JSON.stringify(ssrAuth)};window.__REACT_QUERY_STATE__=${JSON.stringify(dehydratedState || null)};</script>`;
+      
+      html = templateHtml.replace('<!--ssr-outlet-->', injectedState + appHtml);
+
       res.status(200).set({ 'Content-Type': 'text/html' }).end(html);
     } catch (e) {
       if (!isProd && vite) vite.ssrFixStacktrace(e);

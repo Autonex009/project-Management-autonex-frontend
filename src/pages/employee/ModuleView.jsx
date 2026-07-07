@@ -1,53 +1,56 @@
 import React, { useState, useEffect } from 'react';
 import { useParams, useNavigate } from 'react-router-dom';
 import { ArrowLeft, Award, HelpCircle, FileText, ExternalLink, Check, Circle, CheckCircle, ArrowRight, Video } from 'lucide-react';
+import { useQuery, useQueryClient } from '@tanstack/react-query';
 import Button from '../../components/ui/Button';
 import Spinner from '../../components/ui/LoadingSpinner';
 import Modal from '../../components/ui/Modal';
 import { onboardingApi } from '../../services/api';
 import toast from 'react-hot-toast';
+import { useAuthContext } from '../../context/AuthContext';
 
 const ModuleView = () => {
     const { moduleId } = useParams();
     const navigate = useNavigate();
+    const queryClient = useQueryClient();
+    const { user } = useAuthContext();
+    const userId = user?.id;
     
-    const [moduleData, setModuleData] = useState(null);
     const [completedSections, setCompletedSections] = useState(new Set());
     const [activeTab, setActiveTab] = useState('content');
     const [selectedAnswers, setSelectedAnswers] = useState({});
     const [quizSubmitted, setQuizSubmitted] = useState({});
-    const [loading, setLoading] = useState(true);
-    const [error, setError] = useState(null);
     const [showScoreModal, setShowScoreModal] = useState(false);
     const [modalData, setModalData] = useState(null);
 
-    const user = JSON.parse(localStorage.getItem('user') || '{}');
-    const userId = user.id;
+    const { data: rawModuleData, isLoading: isModuleLoading, error: moduleError } = useQuery({
+        queryKey: ['module', moduleId],
+        queryFn: () => onboardingApi.getModule(moduleId),
+        enabled: !!moduleId,
+        retry: false
+    });
+
+    const { data: progressData, isLoading: isProgressLoading } = useQuery({
+        queryKey: ['module-progress', userId],
+        queryFn: () => onboardingApi.getProgress(userId),
+        enabled: !!userId,
+    });
+
+    const loading = isModuleLoading || isProgressLoading;
+    const error = moduleError?.response?.status === 403 
+        ? 'This module is locked. You must complete the previous module and pass its quizzes before accessing this level.' 
+        : moduleError ? 'Could not load module training content.' : null;
 
     useEffect(() => {
-        if (!userId || !moduleId) return;
+        if (progressData) {
+            setCompletedSections(new Set(progressData.map((p) => p.section_id)));
+        }
+    }, [progressData]);
 
-        Promise.all([
-            onboardingApi.getModule(moduleId),
-            onboardingApi.getProgress(userId)
-        ])
-            .then(([moduleResult, progressResult]) => {
-                if (moduleResult && moduleResult.sections) {
-                    moduleResult.sections.sort((a, b) => a.order - b.order);
-                }
-                setModuleData(moduleResult);
-                setCompletedSections(new Set(progressResult.map((p) => p.section_id)));
-            })
-            .catch((err) => {
-                console.error('Failed to load module details:', err);
-                if (err.response && err.response.status === 403) {
-                    setError('This module is locked. You must complete the previous module and pass its quizzes before accessing this level.');
-                } else {
-                    setError('Could not load module training content.');
-                }
-            })
-            .finally(() => setLoading(false));
-    }, [userId, moduleId]);
+    const moduleData = rawModuleData ? {
+        ...rawModuleData,
+        sections: [...(rawModuleData.sections || [])].sort((a, b) => a.order - b.order)
+    } : null;
 
     if (loading) {
         return (

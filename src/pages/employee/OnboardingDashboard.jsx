@@ -1,45 +1,30 @@
-import React, { useState, useEffect } from 'react';
+import React from 'react';
 import { useNavigate } from 'react-router-dom';
 import { Award, BookOpen, CheckCircle, Clock, GraduationCap, ChevronRight, Play, Lock } from 'lucide-react';
+import { useQuery } from '@tanstack/react-query';
 import Spinner from '../../components/ui/LoadingSpinner';
 import { onboardingApi } from '../../services/api';
+import { useAuthContext } from '../../context/AuthContext';
 
 const OnboardingDashboard = () => {
     const navigate = useNavigate();
-    const [modules, setModules] = useState([]);
-    const [stats, setStats] = useState({
+    const { user } = useAuthContext();
+    const userId = user?.id;
+
+    const { data, isLoading: loading, error } = useQuery({
+        queryKey: ['candidate-dashboard', userId],
+        queryFn: () => onboardingApi.getCandidateDashboard(userId),
+        enabled: !!userId,
+    });
+
+    const modules = data?.modules || [];
+    const stats = data?.stats || {
         overallProgress: 0,
         completedModules: 0,
         totalModules: 0,
         avgQuizScore: 0,
         mentorName: 'Unassigned'
-    });
-    const [loading, setLoading] = useState(true);
-    const [error, setError] = useState(null);
-
-    const user = JSON.parse(localStorage.getItem('user') || '{}');
-    const userId = user.id;
-
-    useEffect(() => {
-        if (!userId) return;
-
-        onboardingApi.getCandidateDashboard(userId)
-            .then((data) => {
-                setModules(data.modules || []);
-                setStats(data.stats || {
-                    overallProgress: 0,
-                    completedModules: 0,
-                    totalModules: 0,
-                    avgQuizScore: 0,
-                    mentorName: 'Unassigned'
-                });
-            })
-            .catch((err) => {
-                console.error('Failed to fetch onboarding dashboard:', err);
-                setError('Could not load onboarding training modules.');
-            })
-            .finally(() => setLoading(false));
-    }, [userId]);
+    };
 
     if (loading) {
         return (
