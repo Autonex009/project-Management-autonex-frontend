@@ -1,6 +1,6 @@
 import React, { useState, useEffect } from 'react';
 import { Outlet, NavLink, useNavigate } from 'react-router-dom';
-import { useQuery } from '@tanstack/react-query';
+import { useQuery, useQueryClient } from '@tanstack/react-query';
 import { LayoutDashboard, FolderKanban, Calendar, CalendarCheck, Rocket, LogOut, Menu, X, FileText, Layers, UserCog, UserRound, Users, Users2, TrendingUp, GraduationCap, Info, ChevronLeft, ChevronRight } from 'lucide-react';
 import BrandLockup from '../components/brand/BrandLockup';
 import NotificationBell from '../components/NotificationBell';
@@ -24,6 +24,7 @@ const accentTheme = {
 
 const EmployeeLayout = () => {
     const navigate = useNavigate();
+    const queryClient = useQueryClient();
     const [sidebarOpen, setSidebarOpen] = useState(false);
     const [isCollapsed, setIsCollapsed] = useState(() => {
         const saved = localStorage.getItem('sidebar-collapsed');
@@ -91,10 +92,13 @@ const EmployeeLayout = () => {
         ];
 
     const handleLogout = () => {
-        localStorage.removeItem('token');
-        localStorage.removeItem('user');
-        localStorage.removeItem('role');
-        navigate(isPm ? '/login/pm' : '/login/employee');
+        authApi.logout().catch(() => {}).finally(() => {
+            localStorage.removeItem('token');
+            localStorage.removeItem('user');
+            localStorage.removeItem('role');
+            queryClient.clear();
+            window.location.href = isPm ? '/login/pm' : '/login/employee';
+        });
     };
 
     const isSidebarCollapsed = !isMobile && isCollapsed && !isHovered;
