@@ -6,6 +6,10 @@ export default defineConfig(({ isSsrBuild }) => ({
   // Note: the dev server port and the /api proxy are now owned by server.js
   // (the Express SSR server), which runs Vite in middleware mode. Vite's own
   // server.proxy no longer applies since Express handles the top-level request.
+  server: {
+    allowedHosts: ['pmportal.autonexai360.com'],
+    // or you can use allowedHosts: true to allow all domains temporarily
+  },
   build: {
     // Production optimizations - using esbuild (built-in, no extra deps)
     minify: 'esbuild',
