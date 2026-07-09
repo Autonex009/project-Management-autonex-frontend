@@ -89,16 +89,32 @@ const NotificationBell = () => {
   const didMountRef = useRef(false);
   const queryClient = useQueryClient();
 
-  const user = JSON.parse(localStorage.getItem('user') || '{}');
+  const [mounted, setMounted] = useState(false);
+  const [user, setUser] = useState({});
+  const [role, setRole] = useState('employee');
+
+  useEffect(() => {
+    setMounted(true);
+    const savedUser = localStorage.getItem('user');
+    if (savedUser) {
+      try {
+        const parsed = JSON.parse(savedUser);
+        setUser(parsed);
+        setRole(localStorage.getItem('role') || parsed.role || 'employee');
+      } catch (e) {
+        console.error("Failed to parse user from localStorage", e);
+      }
+    }
+  }, []);
+
   const userId = user.id;
-  const role = localStorage.getItem('role') || user.role || 'employee';
 
   // Event-driven (no polling): React Query refetches on mount + tab refocus; we add
   // refetch-on-navigation and refetch-on-open below. Cuts the constant 15s drumbeat.
   const { data: notifications = [], refetch } = useQuery({
     queryKey: ['notifications', userId],
     queryFn: () => notificationApi.getAll(userId),
-    enabled: !!userId,
+    enabled: !!userId && mounted,
     staleTime: 15_000,
     refetchOnWindowFocus: true, // global default is false; enable just for notifications
   });
@@ -141,7 +157,7 @@ const NotificationBell = () => {
     return () => document.removeEventListener('mousedown', handler);
   }, []);
 
-  if (!userId) return null;
+  if (!mounted || !userId) return null;
 
   return (
     <div className="relative" ref={panelRef}>
