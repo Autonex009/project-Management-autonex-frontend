@@ -1,7 +1,7 @@
 import React, { useState, useEffect } from 'react';
 import { Outlet, NavLink, useNavigate } from 'react-router-dom';
 import { useQuery } from '@tanstack/react-query';
-import { LayoutDashboard, FolderKanban, Calendar, CalendarCheck, Rocket, LogOut, Menu, X, FileText, Layers, UserCog, UserRound, Users, Users2, TrendingUp, GraduationCap, Info, ChevronLeft, ChevronRight } from 'lucide-react';
+import { LayoutDashboard, FolderKanban, Calendar, CalendarCheck, Rocket, LogOut, Menu, X, FileText, Layers, UserCog, UserRound, Users, Users2, TrendingUp, GraduationCap, Info, ChevronLeft, ChevronRight, ClipboardList } from 'lucide-react';
 import BrandLockup from '../components/brand/BrandLockup';
 import NotificationBell from '../components/NotificationBell';
 import { authApi } from '../services/api';
@@ -71,6 +71,7 @@ const EmployeeLayout = () => {
             { to: `${prefix}/allocations`, label: 'Allocations', icon: UserCog },
             { to: `${prefix}/my-team`, label: 'My Team', icon: Users },
             { to: `${prefix}/performance`, label: 'Performance', icon: TrendingUp },
+            { to: `${prefix}/self-evaluation`, label: 'Self Evaluation', icon: ClipboardList },
             { to: `${prefix}/leaves`, label: 'Team Leaves', icon: Calendar },
             { to: `${prefix}/my-leaves`, label: 'My Leaves', icon: CalendarCheck },
             { to: `${prefix}/side-projects`, label: 'Side Projects', icon: Rocket },
@@ -81,6 +82,7 @@ const EmployeeLayout = () => {
         : [
             { to: `${prefix}/dashboard`, label: 'Dashboard', icon: LayoutDashboard },
             { to: `${prefix}/projects`, label: 'My Projects', icon: FolderKanban },
+            { to: `${prefix}/self-evaluation`, label: 'Self Evaluation', icon: ClipboardList },
             { to: `${prefix}/leaves`, label: 'Leaves', icon: Calendar },
             { to: `${prefix}/side-projects`, label: 'Side Projects', icon: Rocket },
             { to: `${prefix}/guidelines`, label: 'Guidelines', icon: FileText },

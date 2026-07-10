@@ -1,276 +1,248 @@
-import React, { useState } from 'react';
+import React, { useMemo, useState } from 'react';
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
-import Button from '../../components/ui/Button';
-import { employeeApi, allocationApi, parentProjectApi, subProjectApi, performanceReviewApi } from '../../services/api';
+import { employeeApi, allocationApi, parentProjectApi, subProjectApi, perfEvalApi } from '../../services/api';
 import { getPmEmployeeId, getPmSubProjects } from '../../utils/pmScope';
-import { ChevronDown, ChevronUp, ClipboardList, Plus } from 'lucide-react';
+import { ChevronDown, ChevronUp, ClipboardList, Plus, X, Settings2, CheckCircle2, Pencil, Check, Trash2 } from 'lucide-react';
 import toast from 'react-hot-toast';
-import Dropdown from '../../components/ui/Dropdown';
+import StarRating, { currentPeriod, formatPeriod, cleanParamNames, isReservedParam } from '../../components/perf/StarRating';
+import EvaluationDetail from '../../components/perf/EvaluationDetail';
 import ConfirmDialog from '../../components/ui/ConfirmDialog';
 
-const REVIEW_TYPES = [
-    { value: 'feedback', label: 'Feedback', icon: MessageSquare, color: 'text-blue-600', bg: 'bg-blue-50', border: 'border-blue-200', badge: 'bg-blue-50 text-blue-700 border-blue-200' },
-    { value: 'performance_review', label: 'Performance Review', icon: Star, color: 'text-amber-600', bg: 'bg-amber-50', border: 'border-amber-200', badge: 'bg-amber-50 text-amber-700 border-amber-200' },
-    { value: 'comment', label: 'Comment', icon: ClipboardList, color: 'text-slate-600', bg: 'bg-slate-50', border: 'border-slate-200', badge: 'bg-slate-100 text-slate-600 border-slate-200' },
-];
+// ── PM edits the per-project parameter template ──────────────────────────────
+const ParamsEditor = ({ projectId }) => {
+    const queryClient = useQueryClient();
+    const { data: template } = useQuery({
+        queryKey: ['perf-eval-params', projectId],
+        queryFn: () => perfEvalApi.getParams(projectId),
+    });
+    const [params, setParams] = useState(null);
+    const [draft, setDraft] = useState('');
+    const list = cleanParamNames(params ?? template?.params ?? []);
 
-const typeInfo = (value) => REVIEW_TYPES.find(t => t.value === value) || REVIEW_TYPES[2];
+    const saveMutation = useMutation({
+        mutationFn: (next) => perfEvalApi.setParams({ project_id: projectId, params: next }),
+        onSuccess: () => { queryClient.invalidateQueries({ queryKey: ['perf-eval-params', projectId] }); toast.success('Parameters saved'); },
+        onError: () => toast.error('Failed to save parameters'),
+    });
 
-const StarRating = ({ value, onChange, readOnly = false }) => (
-    <div className="flex gap-1">
-        {[1, 2, 3, 4, 5].map(star => (
-            <button
-                key={star}
-                type="button"
-                disabled={readOnly}
-                onClick={() => !readOnly && onChange && onChange(star === value ? null : star)}
-                className={`text-xl transition-colors ${readOnly ? 'cursor-default' : 'cursor-pointer hover:scale-110'} ${star <= (value || 0) ? 'text-amber-400' : 'text-slate-200'}`}
-            >
-                ★
-            </button>
-        ))}
-    </div>
-);
-
-const EMPTY_FORM = { review_type: 'feedback', title: '', content: '', rating: null, period: '' };
-
-const ReviewForm = ({ initial = EMPTY_FORM, onSubmit, onCancel, loading }) => {
-    const [form, setForm] = useState(initial);
-    const set = (key, val) => setForm(prev => ({ ...prev, [key]: val }));
-    const reviewTypeOptions = REVIEW_TYPES.map(t => ({ value: t.value, label: t.label }));
-
-    const handleSubmit = (e) => {
-        e.preventDefault();
-        if (!form.title.trim() || !form.content.trim()) {
-            toast.error('Title and content are required');
-            return;
-        }
-        onSubmit({ ...form, period: form.period || null, rating: form.review_type === 'performance_review' ? form.rating : null });
+    const add = () => {
+        const v = draft.trim();
+        if (!v) return;
+        if (isReservedParam(v)) { toast.error('That is a reserved field and is already included'); return; }
+        if (list.some((p) => p.toLowerCase() === v.toLowerCase())) { toast.error('Parameter already exists'); return; }
+        const next = [...list, v];
+        setParams(next);
+        setDraft('');
     };
+    const remove = (name) => setParams(list.filter((p) => p !== name));
 
     return (
-        <form onSubmit={handleSubmit} className="space-y-4">
-            <div className="grid gap-4 sm:grid-cols-2">
-                <div>
-                    <label className="block text-xs font-semibold uppercase tracking-wide text-slate-500 mb-1.5">Type</label>
-                    <Dropdown
-                        options={reviewTypeOptions}
-                        value={form.review_type}
-                        onChange={(val) => set('review_type', val)}
-                    />
-                </div>
-                <div>
-                    <label className="block text-xs font-semibold uppercase tracking-wide text-slate-500 mb-1.5">Period (optional)</label>
-                    <input
-                        type="text"
-                        placeholder="e.g. Q1 2025, May 2026"
-                        value={form.period}
-                        onChange={e => set('period', e.target.value)}
-                        className="w-full rounded-xl border border-slate-200 bg-white px-3 py-2.5 text-sm text-slate-800 placeholder:text-slate-300 focus:border-blue-400 focus:outline-none focus:ring-2 focus:ring-blue-100"
-                    />
-                </div>
+        <div className="rounded-2xl border border-blue-100 bg-blue-50/40 p-4">
+            <div className="mb-3 flex items-center gap-2">
+                <Settings2 className="h-4 w-4 text-blue-600" />
+                <h4 className="text-sm font-semibold text-slate-700">Evaluation Parameters</h4>
             </div>
-
-            <div>
-                <label className="block text-xs font-semibold uppercase tracking-wide text-slate-500 mb-1.5">Title</label>
+            <div className="mb-3 flex flex-wrap gap-2">
+                {list.length === 0 && <p className="text-xs text-slate-400">No parameters yet. Add ones like “Time per task”, “Quality”, “Rejection Rate”.</p>}
+                {list.map((name) => (
+                    <span key={name} className="inline-flex items-center gap-1.5 rounded-full border border-blue-200 bg-white px-3 py-1 text-xs font-medium text-slate-700">
+                        {name}
+                        <button type="button" onClick={() => remove(name)} className="text-slate-400 hover:text-rose-500"><X className="h-3 w-3" /></button>
+                    </span>
+                ))}
+            </div>
+            <div className="flex gap-2">
                 <input
                     type="text"
-                    placeholder="Short title for this entry"
-                    value={form.title}
-                    onChange={e => set('title', e.target.value)}
-                    className="w-full rounded-xl border border-slate-200 bg-white px-3 py-2.5 text-sm text-slate-800 placeholder:text-slate-300 focus:border-blue-400 focus:outline-none focus:ring-2 focus:ring-blue-100"
-                    required
+                    value={draft}
+                    onChange={(e) => setDraft(e.target.value)}
+                    onKeyDown={(e) => { if (e.key === 'Enter') { e.preventDefault(); add(); } }}
+                    placeholder="Add a parameter…"
+                    className="flex-1 rounded-xl border border-slate-200 bg-white px-3 py-2 text-sm text-slate-800 placeholder:text-slate-300 focus:border-blue-400 focus:outline-none focus:ring-2 focus:ring-blue-100"
                 />
+                <button type="button" onClick={add} className="flex items-center gap-1 rounded-xl border border-slate-200 bg-white px-3 py-2 text-sm font-medium text-slate-600 hover:bg-slate-50">
+                    <Plus className="h-3.5 w-3.5" /> Add
+                </button>
+                <button
+                    type="button"
+                    onClick={() => saveMutation.mutate(list)}
+                    disabled={saveMutation.isPending || params === null}
+                    className="rounded-xl bg-blue-600 px-4 py-2 text-sm font-medium text-white hover:bg-blue-700 disabled:opacity-50"
+                >
+                    {saveMutation.isPending ? 'Saving…' : 'Save'}
+                </button>
             </div>
-
-            <div>
-                <label className="block text-xs font-semibold uppercase tracking-wide text-slate-500 mb-1.5">Content</label>
-                <textarea
-                    placeholder="Write your feedback, review, or comment here…"
-                    value={form.content}
-                    onChange={e => set('content', e.target.value)}
-                    rows={4}
-                    className="w-full rounded-xl border border-slate-200 bg-white px-3 py-2.5 text-sm text-slate-800 placeholder:text-slate-300 focus:border-blue-400 focus:outline-none focus:ring-2 focus:ring-blue-100 resize-none"
-                    required
-                />
-            </div>
-
-            {form.review_type === 'performance_review' && (
-                <div>
-                    <label className="block text-xs font-semibold uppercase tracking-wide text-slate-500 mb-1.5">Rating (optional)</label>
-                    <StarRating value={form.rating} onChange={val => set('rating', val)} />
-                </div>
-            )}
-
-            <div className="flex justify-end gap-2 pt-1">
-                <Button type="button" variant="cancel" onClick={onCancel}><X className="w-3.5 h-3.5" /> Cancel</Button>
-                <Button type="submit" variant="blue" disabled={loading} isLoading={loading}>
-                    {!loading && <Check className="w-3.5 h-3.5" />} {loading ? 'Saving…' : 'Save'}
-                </Button>
-            </div>
-        </form>
-    );
-};
-
-const ReviewCard = ({ review, onEdit, onDelete }) => {
-    const info = typeInfo(review.review_type);
-    const Icon = info.icon;
-    return (
-        <div className={`rounded-2xl border ${info.border} bg-white p-4`}>
-            <div className="flex items-start justify-between gap-3">
-                <div className="flex items-center gap-2 min-w-0">
-                    <span className={`inline-flex items-center gap-1 rounded-full border px-2.5 py-1 text-xs font-medium ${info.badge}`}>
-                        <Icon className="w-3 h-3" /> {info.label}
-                    </span>
-                    {review.period && (
-                        <span className="rounded-full bg-slate-100 px-2.5 py-1 text-xs text-slate-500">{review.period}</span>
-                    )}
-                </div>
-                <div className="flex items-center gap-1 shrink-0">
-                    <button onClick={() => onEdit(review)} className="rounded-lg p-1.5 text-slate-400 hover:bg-slate-100 hover:text-blue-600 transition-colors">
-                        <Pencil className="w-3.5 h-3.5" />
-                    </button>
-                    <button onClick={() => onDelete(review.id)} className="rounded-lg p-1.5 text-slate-400 hover:bg-red-50 hover:text-red-500 transition-colors">
-                        <Trash2 className="w-3.5 h-3.5" />
-                    </button>
-                </div>
-            </div>
-
-            <h4 className="mt-3 text-sm font-semibold text-slate-800">{review.title}</h4>
-            <p className="mt-1.5 text-sm text-slate-600 whitespace-pre-wrap leading-relaxed">{review.content}</p>
-
-            {review.rating && (
-                <div className="mt-2">
-                    <StarRating value={review.rating} readOnly />
-                </div>
-            )}
-
-            <p className="mt-3 text-xs text-slate-400">
-                {new Date(review.created_at).toLocaleDateString('en-IN', { day: 'numeric', month: 'short', year: 'numeric' })}
-            </p>
         </div>
     );
 };
 
-const EmployeePanel = ({ employee, reviews, reviewerId, onReviewCreated }) => {
-    const [expanded, setExpanded] = useState(false);
-    const [showForm, setShowForm] = useState(false);
-    const [editing, setEditing] = useState(null);
-    const [deleteConfirm, setDeleteConfirm] = useState(null);
+// ── PM reviews a single submitted evaluation (accept / edit) ─────────────────
+const EvalReviewCard = ({ evaluation, employeeName, reviewerId }) => {
     const queryClient = useQueryClient();
-
-    const invalidate = () => queryClient.invalidateQueries({ queryKey: ['perf-reviews'] });
-
-    const createMutation = useMutation({
-        mutationFn: (data) => perfReviewApi.create({ ...data, employee_id: employee.id, reviewer_id: reviewerId, reviewer_role: 'pm' }),
-        onSuccess: () => { invalidate(); setShowForm(false); toast.success('Review saved'); },
-        onError: () => toast.error('Failed to save review'),
+    const [editing, setEditing] = useState(false);
+    const [confirmDelete, setConfirmDelete] = useState(false);
+    const [rating, setRating] = useState(evaluation.overall_rating || null);
+    const editableParams = (evaluation.parameter_values || []).filter((p) => !isReservedParam(p?.name));
+    const [values, setValues] = useState(() => {
+        const m = {};
+        editableParams.forEach((p) => { m[p.name] = p.value || ''; });
+        return m;
     });
+    const [contributions, setContributions] = useState(evaluation.contributions || '');
+    const [strengths, setStrengths] = useState(evaluation.strengths || '');
+    const [improvements, setImprovements] = useState(evaluation.improvements || '');
 
-    const updateMutation = useMutation({
-        mutationFn: ({ id, data }) => perfReviewApi.update(id, data),
-        onSuccess: () => { invalidate(); setEditing(null); toast.success('Review updated'); },
-        onError: () => toast.error('Failed to update review'),
-    });
+    const invalidate = () => queryClient.invalidateQueries({ queryKey: ['perf-evals'] });
 
     const deleteMutation = useMutation({
-        mutationFn: (id) => perfReviewApi.delete(id),
-        onSuccess: () => { invalidate(); setConfirmId(null); toast.success('Review deleted'); },
-        onError: () => toast.error('Failed to delete review'),
+        mutationFn: () => perfEvalApi.delete(evaluation.id),
+        onSuccess: () => { invalidate(); setConfirmDelete(false); toast.success('Evaluation deleted'); },
+        onError: () => toast.error('Failed to delete'),
     });
 
-    const handleDelete = (id) => {
-        setDeleteConfirm(id);
+    const acceptMutation = useMutation({
+        mutationFn: () => perfEvalApi.accept(evaluation.id, reviewerId),
+        onSuccess: () => { invalidate(); toast.success('Evaluation accepted'); },
+        onError: () => toast.error('Failed to accept'),
+    });
+
+    const saveMutation = useMutation({
+        mutationFn: (data) => perfEvalApi.update(evaluation.id, data),
+        onSuccess: () => { invalidate(); setEditing(false); toast.success('Evaluation updated'); },
+        onError: () => toast.error('Failed to update'),
+    });
+
+    const saveEdits = () => {
+        saveMutation.mutate({
+            parameter_values: editableParams.map((p) => ({ name: p.name, value: values[p.name] || '' })),
+            contributions: contributions.trim() || null,
+            strengths: strengths.trim() || null,
+            improvements: improvements.trim() || null,
+            overall_rating: rating,
+            reviewed_by: reviewerId,
+        });
     };
+
+    return (
+        <div className="rounded-2xl border border-slate-200 bg-white p-4">
+            <div className="mb-3 flex items-center justify-between gap-2">
+                <div className="flex items-center gap-2">
+                    <span className="font-medium text-slate-800">{employeeName}</span>
+                    <span className="rounded-full bg-slate-100 px-2 py-0.5 text-xs text-slate-500">{formatPeriod(evaluation.period)}</span>
+                    {evaluation.status === 'accepted'
+                        ? <span className="inline-flex items-center gap-1 rounded-full bg-emerald-50 px-2 py-0.5 text-xs font-medium text-emerald-700"><CheckCircle2 className="h-3 w-3" /> Accepted</span>
+                        : <span className="rounded-full bg-amber-50 px-2 py-0.5 text-xs font-medium text-amber-700">Pending review</span>}
+                </div>
+                {!editing && (
+                    <div className="flex items-center gap-2">
+                        {evaluation.status !== 'accepted' && (
+                            <>
+                                <button onClick={() => setEditing(true)} className="inline-flex items-center gap-1 rounded-lg border border-slate-200 px-2.5 py-1 text-xs font-medium text-slate-600 hover:bg-slate-50">
+                                    <Pencil className="h-3 w-3" /> Edit
+                                </button>
+                                <button onClick={() => acceptMutation.mutate()} disabled={acceptMutation.isPending} className="inline-flex items-center gap-1 rounded-lg bg-emerald-600 px-2.5 py-1 text-xs font-medium text-white hover:bg-emerald-700 disabled:opacity-50">
+                                    <Check className="h-3 w-3" /> Accept
+                                </button>
+                            </>
+                        )}
+                        <button onClick={() => setConfirmDelete(true)} title="Delete" className="inline-flex items-center gap-1 rounded-lg border border-slate-200 px-2 py-1 text-xs font-medium text-slate-500 hover:bg-rose-50 hover:text-rose-600">
+                            <Trash2 className="h-3 w-3" />
+                        </button>
+                    </div>
+                )}
+            </div>
+
+            {editing ? (
+                <div className="space-y-3">
+                    {editableParams.map((p) => (
+                        <div key={p.name}>
+                            <label className="mb-1 block text-xs font-semibold uppercase tracking-wide text-slate-500">{p.name}</label>
+                            <textarea rows={2} value={values[p.name] || ''} onChange={(e) => setValues((m) => ({ ...m, [p.name]: e.target.value }))} className="w-full resize-none rounded-xl border border-slate-200 bg-white px-3 py-2 text-sm text-slate-800 focus:border-blue-400 focus:outline-none focus:ring-2 focus:ring-blue-100" />
+                        </div>
+                    ))}
+                    <div>
+                        <label className="mb-1 block text-xs font-semibold uppercase tracking-wide text-slate-500">Overall contributions in last month</label>
+                        <textarea rows={2} value={contributions} onChange={(e) => setContributions(e.target.value)} className="w-full resize-none rounded-xl border border-slate-200 bg-white px-3 py-2 text-sm text-slate-800 focus:border-blue-400 focus:outline-none focus:ring-2 focus:ring-blue-100" />
+                    </div>
+                    <div>
+                        <label className="mb-1 block text-xs font-semibold uppercase tracking-wide text-slate-500">Areas that are your strengths</label>
+                        <textarea rows={2} value={strengths} onChange={(e) => setStrengths(e.target.value)} className="w-full resize-none rounded-xl border border-slate-200 bg-white px-3 py-2 text-sm text-slate-800 focus:border-blue-400 focus:outline-none focus:ring-2 focus:ring-blue-100" />
+                    </div>
+                    <div>
+                        <label className="mb-1 block text-xs font-semibold uppercase tracking-wide text-slate-500">Areas to improve</label>
+                        <textarea rows={2} value={improvements} onChange={(e) => setImprovements(e.target.value)} className="w-full resize-none rounded-xl border border-slate-200 bg-white px-3 py-2 text-sm text-slate-800 focus:border-blue-400 focus:outline-none focus:ring-2 focus:ring-blue-100" />
+                    </div>
+                    <div className="flex items-center justify-between border-t border-slate-100 pt-3">
+                        <StarRating value={rating} onChange={setRating} />
+                        <div className="flex gap-2">
+                            <button onClick={() => setEditing(false)} className="rounded-xl border border-slate-200 bg-white px-4 py-2 text-sm font-medium text-slate-600 hover:bg-slate-50">Cancel</button>
+                            <button onClick={saveEdits} disabled={saveMutation.isPending} className="rounded-xl bg-blue-600 px-4 py-2 text-sm font-medium text-white hover:bg-blue-700 disabled:opacity-50">{saveMutation.isPending ? 'Saving…' : 'Save'}</button>
+                        </div>
+                    </div>
+                </div>
+            ) : (
+                <EvaluationDetail evaluation={evaluation} />
+            )}
+
+            <ConfirmDialog
+                isOpen={confirmDelete}
+                onClose={() => setConfirmDelete(false)}
+                onConfirm={() => deleteMutation.mutate()}
+                title="Delete evaluation"
+                message={`Delete ${employeeName}'s evaluation for ${formatPeriod(evaluation.period)}? This cannot be undone.`}
+                confirmText="Delete"
+                isPending={deleteMutation.isPending}
+            />
+        </div>
+    );
+};
+
+const ProjectPanel = ({ project, employees, evaluations, reviewerId }) => {
+    const [expanded, setExpanded] = useState(false);
+    const projectEvals = evaluations.filter((e) => e.project_id === project.id);
+    const empName = (id) => employees.find((e) => e.id === id)?.name || `Employee #${id}`;
 
     return (
         <article className="overflow-hidden rounded-3xl border border-slate-200/70 bg-white shadow-sm">
             <button
-                onClick={() => { setExpanded((e) => !e); setShowForm(false); setEditing(null); }}
+                onClick={() => setExpanded((v) => !v)}
                 className="flex w-full items-center justify-between gap-4 p-5 text-left transition-colors hover:bg-slate-50/60"
             >
                 <div className="flex items-center gap-4">
                     <div className="flex h-12 w-12 items-center justify-center rounded-2xl bg-blue-100 text-base font-bold text-blue-700 shrink-0">
-                        {(employee.name || 'U').charAt(0)}
+                        {(project.name || 'P').charAt(0)}
                     </div>
                     <div>
-                        <p className="font-semibold text-slate-900">{employee.name}</p>
-                        <p className="text-xs text-slate-400">{employee.designation || 'Team Member'} · {employee.email}</p>
+                        <p className="font-semibold text-slate-900">{project.name}</p>
+                        <p className="text-xs text-slate-400">{project.client || 'No client'}</p>
                     </div>
                 </div>
                 <div className="flex items-center gap-3 shrink-0">
-                    {latestReview ? (
-                        <PerfRatingPopover review={latestReview}>
-                            <span className="cursor-default rounded-full bg-amber-50 px-3 py-1 text-xs font-semibold text-amber-700 transition-colors hover:bg-amber-100">
-                                ★ {Number(latestReview.average).toFixed(2)} / 5
-                            </span>
-                        </PerfRatingPopover>
-                    ) : (
-                        <span className="rounded-full bg-slate-100 px-3 py-1 text-xs font-semibold text-slate-500">No Reviews</span>
-                    )}
+                    <span className="rounded-full bg-blue-50 px-3 py-1 text-xs font-medium text-blue-700">
+                        {projectEvals.length} {projectEvals.length === 1 ? 'submission' : 'submissions'}
+                    </span>
                     {expanded ? <ChevronUp className="h-4 w-4 text-slate-400" /> : <ChevronDown className="h-4 w-4 text-slate-400" />}
                 </div>
             </button>
 
             {expanded && (
                 <div className="space-y-5 border-t border-slate-100 p-5">
-                    {showForm && !editing && (
-                        <div className="rounded-2xl border border-blue-100 bg-blue-50/40 p-4">
-                            <h4 className="mb-4 text-sm font-semibold text-slate-700">New Monthly Review</h4>
-                            <PerfReviewForm
-                                onSubmit={(data) => createMutation.mutate(data)}
-                                onCancel={() => setShowForm(false)}
-                                loading={createMutation.isPending}
-                            />
-                        </div>
-                    )}
+                    <ParamsEditor projectId={project.id} />
 
-                    {editing && (
-                        <div className="rounded-2xl border border-amber-100 bg-amber-50/40 p-4">
-                            <h4 className="mb-4 text-sm font-semibold text-slate-700">Edit Review</h4>
-                            <PerfReviewForm
-                                initial={editing}
-                                onSubmit={(data) => updateMutation.mutate({ id: editing.id, data })}
-                                onCancel={() => setEditing(null)}
-                                loading={updateMutation.isPending}
-                            />
-                        </div>
-                    )}
-
-                    {sorted.length === 0 && !showForm && (
-                        <p className="py-4 text-center text-sm text-slate-400">No reviews yet — add the first one below.</p>
-                    )}
-                    {sorted.length > 0 && (
-                        <div className="space-y-3">
-                            {sorted.map((r) => (
-                                <PerfReviewCard
-                                    key={r.id}
-                                    review={r}
-                                    onEdit={(rev) => { setEditing(rev); setShowForm(false); }}
-                                    onDelete={(id) => setConfirmId(id)}
-                                />
-                            ))}
-                        </div>
-                    )}
-
-                    {!showForm && !editing && (
-                        <button
-                            onClick={() => setShowForm(true)}
-                            className="flex w-full items-center justify-center gap-2 rounded-2xl border border-dashed border-blue-300 bg-blue-50/50 py-3 text-sm font-medium text-blue-600 transition-colors hover:bg-blue-50"
-                        >
-                            <Plus className="h-4 w-4" /> Add Monthly Review
-                        </button>
-                    )}
+                    <div>
+                        <h4 className="mb-3 text-sm font-semibold text-slate-700">Submitted Evaluations</h4>
+                        {projectEvals.length === 0 ? (
+                            <p className="py-4 text-center text-sm text-slate-400">No employee submissions yet for this project.</p>
+                        ) : (
+                            <div className="space-y-3">
+                                {projectEvals.map((ev) => (
+                                    <EvalReviewCard key={ev.id} evaluation={ev} employeeName={empName(ev.employee_id)} reviewerId={reviewerId} />
+                                ))}
+                            </div>
+                        )}
+                    </div>
                 </div>
             )}
-            <ConfirmDialog
-                isOpen={deleteConfirm !== null}
-                onClose={() => setDeleteConfirm(null)}
-                onConfirm={() => { deleteMutation.mutate(deleteConfirm); setDeleteConfirm(null); }}
-                title="Delete Review"
-                message="Are you sure you want to delete this review? This action cannot be undone."
-                isPending={deleteMutation.isPending}
-            />
         </article>
     );
 };
@@ -283,21 +255,15 @@ const PerformanceReviewsPage = () => {
     const { data: projects = [] } = useQuery({ queryKey: ['sub-projects'], queryFn: subProjectApi.getAll });
     const { data: employees = [], isLoading: empLoading } = useQuery({ queryKey: ['employees'], queryFn: employeeApi.getAll });
     const { data: allocations = [] } = useQuery({ queryKey: ['allocations'], queryFn: allocationApi.getAll });
-    const { data: allReviews = [], isLoading: reviewsLoading } = useQuery({
-        queryKey: ['perf-reviews'],
-        queryFn: () => perfReviewApi.getAll(),
-    });
+    const { data: evaluations = [], isLoading: evalLoading } = useQuery({ queryKey: ['perf-evals'], queryFn: () => perfEvalApi.getAll() });
 
-    const scopedProjects = getPmSubProjects(projects, parentProjects, pmEmployeeId, allocations);
-    const scopedProjectIds = new Set(scopedProjects.map((p) => p.id));
-    const scopedAllocations = allocations.filter((a) => scopedProjectIds.has(a.sub_project_id));
-    const teamEmployeeIds = new Set(scopedAllocations.map((a) => a.employee_id));
-    const teamMembers = employees.filter((e) => teamEmployeeIds.has(e.id)).sort((a, b) => a.name.localeCompare(b.name));
+    const scopedProjects = useMemo(
+        () => getPmSubProjects(projects, parentProjects, pmEmployeeId, allocations).sort((a, b) => a.name.localeCompare(b.name)),
+        [projects, parentProjects, pmEmployeeId, allocations],
+    );
 
-    const reviewsByEmployee = (employeeId) => allReviews.filter((r) => r.employee_id === employeeId);
-    const totalReviews = allReviews.filter((r) => teamEmployeeIds.has(r.employee_id)).length;
-
-    const isLoading = empLoading || reviewsLoading;
+    const pendingCount = evaluations.filter((e) => e.status === 'submitted' && scopedProjects.some((p) => p.id === e.project_id)).length;
+    const isLoading = empLoading || evalLoading;
 
     return (
         <div className="space-y-8">
@@ -305,43 +271,40 @@ const PerformanceReviewsPage = () => {
                 <div className="flex flex-col gap-5 lg:flex-row lg:items-end lg:justify-between">
                     <div>
                         <p className="text-sm font-medium uppercase tracking-[0.18em] text-blue-700">Performance</p>
-                        <h1 className="mt-1 text-2xl font-bold tracking-tight text-slate-900">Monthly Performance Reviews</h1>
+                        <h1 className="mt-1 text-2xl font-bold tracking-tight text-slate-900">Project Performance Evaluations</h1>
                         <p className="mt-2 max-w-2xl text-sm text-slate-500">
-                            Rate your team members each month across five criteria. Reviews are visible to admins.
+                            Define evaluation parameters per project and review your team's monthly self-evaluations.
                         </p>
                     </div>
                     <div className="grid gap-3 sm:grid-cols-2">
                         <div className="rounded-2xl border border-white/70 bg-white/80 px-4 py-3 shadow-sm">
-                            <p className="text-xs font-medium uppercase tracking-[0.14em] text-slate-400">Team Members</p>
-                            <p className="text-xl font-semibold text-slate-900">{teamMembers.length}</p>
+                            <p className="text-xs font-medium uppercase tracking-[0.14em] text-slate-400">Projects</p>
+                            <p className="text-xl font-semibold text-slate-900">{scopedProjects.length}</p>
                         </div>
                         <div className="rounded-2xl border border-white/70 bg-white/80 px-4 py-3 shadow-sm">
-                            <p className="text-xs font-medium uppercase tracking-[0.14em] text-slate-400">Total Reviews</p>
-                            <p className="text-xl font-semibold text-slate-900">{totalReviews}</p>
+                            <p className="text-xs font-medium uppercase tracking-[0.14em] text-slate-400">Pending Review</p>
+                            <p className="text-xl font-semibold text-slate-900">{pendingCount}</p>
                         </div>
                     </div>
                 </div>
             </section>
 
             {isLoading ? (
-                <div className="rounded-2xl border border-slate-200 bg-white p-10 text-center text-sm text-slate-400 shadow-sm">
-                    Loading performance data…
-                </div>
-            ) : teamMembers.length === 0 ? (
+                <div className="rounded-2xl border border-slate-200 bg-white p-10 text-center text-sm text-slate-400 shadow-sm">Loading…</div>
+            ) : scopedProjects.length === 0 ? (
                 <div className="rounded-3xl border border-dashed border-slate-200 bg-white p-12 text-center shadow-sm">
                     <ClipboardList className="mx-auto h-10 w-10 text-slate-300" />
-                    <h2 className="mt-4 text-lg font-semibold text-slate-800">No team members found</h2>
-                    <p className="mt-2 text-sm text-slate-500">
-                        Team members appear once employees are allocated to your scoped projects.
-                    </p>
+                    <h2 className="mt-4 text-lg font-semibold text-slate-800">No projects in your scope</h2>
+                    <p className="mt-2 text-sm text-slate-500">Projects appear here once they're assigned to you.</p>
                 </div>
             ) : (
                 <div className="space-y-4">
-                    {teamMembers.map((member) => (
-                        <EmployeePanel
-                            key={member.id}
-                            employee={member}
-                            reviews={reviewsByEmployee(member.id)}
+                    {scopedProjects.map((project) => (
+                        <ProjectPanel
+                            key={project.id}
+                            project={project}
+                            employees={employees}
+                            evaluations={evaluations}
                             reviewerId={user.id}
                         />
                     ))}
