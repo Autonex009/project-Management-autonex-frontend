@@ -7,14 +7,32 @@ import { Navigate, useLocation } from 'react-router-dom';
 const parseJwt = (token) => {
     try {
         const base64 = token.split('.')[1].replace(/-/g, '+').replace(/_/g, '/');
-        return JSON.parse(atob(base64));
+        // Support Node.js SSR environments where atob might need a fallback, though global in modern Node
+        const decoded = typeof atob !== 'undefined' 
+            ? atob(base64) 
+            : Buffer.from(base64, 'base64').toString('binary');
+        return JSON.parse(decoded);
     } catch {
         return null;
     }
 };
 
 const useAuth = () => {
-    const token = localStorage.getItem('token');
+    let token = null;
+    
+    if (typeof window === 'undefined') {
+        // Server side: extract access_token from the global cookie header set in entry-server.jsx
+        if (globalThis.__cookieHeader) {
+            const match = globalThis.__cookieHeader.match(/(?:^|; )access_token=([^;]*)/);
+            if (match) {
+                token = decodeURIComponent(match[1]);
+            }
+        }
+    } else {
+        // Client side: fetch from localStorage
+        token = localStorage.getItem('token');
+    }
+
     if (!token) return { isAuthenticated: false, role: null, user: null };
 
     const payload = parseJwt(token);
@@ -22,13 +40,15 @@ const useAuth = () => {
 
     // Check expiry
     if (payload.exp && payload.exp * 1000 < Date.now()) {
-        localStorage.removeItem('token');
-        localStorage.removeItem('role');
-        localStorage.removeItem('user');
+        if (typeof window !== 'undefined') {
+            localStorage.removeItem('token');
+            localStorage.removeItem('role');
+            localStorage.removeItem('user');
+        }
         return { isAuthenticated: false, role: null, user: null };
     }
 
-    const role = payload.role || localStorage.getItem('role');
+    const role = payload.role || (typeof window !== 'undefined' ? localStorage.getItem('role') : null);
     return { isAuthenticated: true, role, user: payload };
 };
 

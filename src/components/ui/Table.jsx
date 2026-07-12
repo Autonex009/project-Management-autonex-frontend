@@ -186,6 +186,28 @@ export const Table = ({
     );
 };
 
+export const formatDateDeterministic = (v) => {
+    if (!v) return '—';
+    const datePart = String(v).split('T')[0];
+    const parts = datePart.split('-');
+    if (parts.length === 3) {
+        const year = parts[0];
+        const month = parts[1].padStart(2, '0');
+        const day = parts[2].padStart(2, '0');
+        return `${day}/${month}/${year}`;
+    }
+    try {
+        const d = new Date(v);
+        if (isNaN(d.getTime())) return v;
+        const day = String(d.getUTCDate()).padStart(2, '0');
+        const month = String(d.getUTCMonth() + 1).padStart(2, '0');
+        const year = d.getUTCFullYear();
+        return `${day}/${month}/${year}`;
+    } catch {
+        return v;
+    }
+};
+
 export const ColumnTemplates = {
     // Name + avatar initial + optional subtitle row
     avatarInfo: (key, label, subtitleKey, opts = {}) => ({
@@ -271,7 +293,7 @@ export const ColumnTemplates = {
     }),
 
     // Date with optional format function
-    date: (key, label, fmt = (v) => v ? new Date(v).toLocaleDateString() : '—') => ({
+    date: (key, label, fmt = (v) => formatDateDeterministic(v)) => ({
         key,
         label,
         render: (value) => (
