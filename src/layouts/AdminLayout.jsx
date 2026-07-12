@@ -18,14 +18,29 @@ const AdminLayout = () => {
   const location = useLocation();
   const queryClient = useQueryClient();
   const [sidebarOpen, setSidebarOpen] = useState(false);
-  const [isCollapsed, setIsCollapsed] = useState(() => {
-    const saved = localStorage.getItem('sidebar-collapsed');
-    return saved === null ? true : saved === 'true';
-  });
+  const [isCollapsed, setIsCollapsed] = useState(true);
   const [isHovered, setIsHovered] = useState(false);
-  const [isMobile, setIsMobile] = useState(() => typeof window !== 'undefined' ? window.innerWidth < 1024 : false);
+  const [isMobile, setIsMobile] = useState(false);
+  const [user, setUser] = useState({});
 
   useEffect(() => {
+    // Client-side initialization after hydration
+    const saved = localStorage.getItem('sidebar-collapsed');
+    if (saved !== null) {
+      setIsCollapsed(saved === 'true');
+    }
+
+    const savedUser = localStorage.getItem('user');
+    if (savedUser) {
+      try {
+        setUser(JSON.parse(savedUser));
+      } catch (e) {
+        console.error("Failed to parse user from localStorage", e);
+      }
+    }
+
+    setIsMobile(window.innerWidth < 1024);
+
     const handleResize = () => {
       setIsMobile(window.innerWidth < 1024);
     };
@@ -43,26 +58,26 @@ const AdminLayout = () => {
 
   // Fetch data for global search (background)
   const { data: searchEmployees = [] } = useQuery({
+    key: 'employees',
     queryKey: ['employees'],
     queryFn: employeeApi.getAll,
     staleTime: 5 * 60 * 1000
   });
   const { data: searchProjects = [] } = useQuery({
+    key: 'sub-projects',
     queryKey: ['sub-projects'],
     queryFn: subProjectApi.getAll,
     staleTime: 5 * 60 * 1000
   });
 
   const { data: signupCounts } = useQuery({
+    key: 'signup-requests-counts',
     queryKey: ['signup-requests-counts'],
     queryFn: () => signupRequestApi.getCounts(),
     refetchInterval: 60_000,
     staleTime: 30_000,
   });
   const pendingSignupCount = signupCounts?.pending || 0;
-
-  // Get user info from localStorage
-  const user = JSON.parse(localStorage.getItem('user') || '{}');
 
   const handleLogout = async () => {
     try {

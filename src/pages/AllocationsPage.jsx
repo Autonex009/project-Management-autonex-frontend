@@ -85,9 +85,18 @@ const AllocationsPage = () => {
     queryFn: allocationApi.getAll,
   });
 
+  const { startStr, endStr } = useMemo(() => {
+    const today = new Date();
+    const y = today.getFullYear();
+    const m = today.getMonth();
+    const start = `${y}-${String(m + 1).padStart(2, '0')}-01`;
+    const end = `${y}-${String(m + 1).padStart(2, '0')}-${String(new Date(y, m + 1, 0).getDate()).padStart(2, '0')}`;
+    return { startStr: start, endStr: end };
+  }, []);
+
   const { data: leaves = [] } = useQuery({
-    queryKey: ['leaves'],
-    queryFn: leaveApi.getAll,
+    queryKey: ['leaves', startStr, endStr],
+    queryFn: () => leaveApi.getAll({ start_date: startStr, end_date: endStr }),
   });
   const { data: parentProjects = [] } = useQuery({
     queryKey: ['parent-projects'],
