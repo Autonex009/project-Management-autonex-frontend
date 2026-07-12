@@ -241,16 +241,12 @@ export const performanceReviewApi = {
     delete: (id) => api.delete(`/performance-reviews/${id}`).then(res => res.data),
 };
 
-// === Project-based Monthly Self-Evaluations API (perf_evals) ===
+// === Project-based Monthly Performance Evaluations API (perf_evals) ===
 export const perfEvalApi = {
-    // Per-project parameter template (defined by PM)
-    getParams: (projectId) => api.get(`/perf-evals/params/${projectId}`).then(res => res.data),
-    setParams: (data) => api.put('/perf-evals/params', data).then(res => res.data),
-    // Evaluations
     getAll: (params) => api.get('/perf-evals', { params }).then(res => res.data),
     submit: (data) => api.post('/perf-evals', data).then(res => res.data),
-    update: (id, data) => api.put(`/perf-evals/${id}`, data).then(res => res.data),
-    accept: (id, reviewedBy) => api.patch(`/perf-evals/${id}/accept`, null, { params: { reviewed_by: reviewedBy } }).then(res => res.data),
+    // PM review: approvals + PM ratings + per-param feedback + bonus.
+    review: (id, data) => api.patch(`/perf-evals/${id}/review`, data).then(res => res.data),
     delete: (id) => api.delete(`/perf-evals/${id}`).then(res => res.data),
 };
 
