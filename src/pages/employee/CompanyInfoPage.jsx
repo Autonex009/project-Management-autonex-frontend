@@ -1,6 +1,7 @@
 import React, { useState, useEffect } from 'react';
 import { Send, Calendar, Building2, ShieldCheck, Sparkles, MapPin, Wifi, Copy, Check, Globe, Cpu, Bot, Layers, LogOut, AlertTriangle, Linkedin, Youtube } from 'lucide-react';
 import Spinner from '../../components/ui/LoadingSpinner';
+import Button from '../../components/ui/Button';
 import { wifiNetworksApi, companySettingsApi } from '../../services/api';
 import toast from 'react-hot-toast';
 
