@@ -14,12 +14,19 @@ import App from './App';
 // (cookie-based auth); Phase 1 renders public pages fully and protected pages
 // as empty (ProtectedRoute's <Navigate> renders null during renderToString).
 export function render(url, cookieHeader) {
-  const html = renderToString(
-    <React.StrictMode>
-      <StaticRouter location={url}>
-        <App />
-      </StaticRouter>
-    </React.StrictMode>
-  );
-  return { html };
+  // Store the cookie header globally so that useAuth can access it on the server
+  globalThis.__cookieHeader = cookieHeader;
+  try {
+    const html = renderToString(
+      <React.StrictMode>
+        <StaticRouter location={url}>
+          <App />
+        </StaticRouter>
+      </React.StrictMode>
+    );
+    return { html };
+  } finally {
+    // Clean up to prevent memory leaks or cross-request pollution
+    globalThis.__cookieHeader = undefined;
+  }
 }

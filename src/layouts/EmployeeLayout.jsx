@@ -1,5 +1,8 @@
 import React, { useState, useEffect } from 'react';
 import { Outlet, NavLink, useNavigate } from 'react-router-dom';
+import { useQuery } from '@tanstack/react-query';
+import { LayoutDashboard, FolderKanban, Calendar, CalendarCheck, Rocket, LogOut, Menu, X, FileText, Layers, UserCog, UserRound, Users, Users2, TrendingUp, GraduationCap, Info, ChevronLeft, ChevronRight, ClipboardList } from 'lucide-react';
+import { Outlet, NavLink, useNavigate, useLocation } from 'react-router-dom';
 import { useQuery, useQueryClient } from '@tanstack/react-query';
 import { LayoutDashboard, FolderKanban, Calendar, CalendarCheck, Rocket, LogOut, Menu, X, FileText, Layers, UserCog, UserRound, Users, Users2, TrendingUp, GraduationCap, Info, ChevronLeft, ChevronRight } from 'lucide-react';
 import BrandLockup from '../components/brand/BrandLockup';
@@ -24,16 +27,38 @@ const accentTheme = {
 
 const EmployeeLayout = () => {
     const navigate = useNavigate();
+    const location = useLocation();
     const queryClient = useQueryClient();
     const [sidebarOpen, setSidebarOpen] = useState(false);
-    const [isCollapsed, setIsCollapsed] = useState(() => {
-        const saved = localStorage.getItem('sidebar-collapsed');
-        return saved === null ? true : saved === 'true';
-    });
+    const [isCollapsed, setIsCollapsed] = useState(true);
     const [isHovered, setIsHovered] = useState(false);
-    const [isMobile, setIsMobile] = useState(() => typeof window !== 'undefined' ? window.innerWidth < 1024 : false);
+    const [isMobile, setIsMobile] = useState(false);
+    const [user, setUser] = useState({});
+    const [role, setRole] = useState('employee');
 
     useEffect(() => {
+        // Client-side initialization after hydration
+        const saved = localStorage.getItem('sidebar-collapsed');
+        if (saved !== null) {
+            setIsCollapsed(saved === 'true');
+        }
+
+        const savedUser = localStorage.getItem('user');
+        if (savedUser) {
+            try {
+                setUser(JSON.parse(savedUser));
+            } catch (e) {
+                console.error("Failed to parse user from localStorage", e);
+            }
+        }
+
+        const savedRole = localStorage.getItem('role');
+        if (savedRole) {
+            setRole(savedRole);
+        }
+
+        setIsMobile(window.innerWidth < 1024);
+
         const handleResize = () => {
             setIsMobile(window.innerWidth < 1024);
         };
@@ -48,9 +73,8 @@ const EmployeeLayout = () => {
             return next;
         });
     };
-    const user = JSON.parse(localStorage.getItem('user') || '{}');
-    const role = localStorage.getItem('role') || 'employee';
-    const isPm = role === 'pm';
+
+    const isPm = location.pathname.startsWith('/pm');
 
     // Live account data (for profile picture, name, etc.)
     const { data: account } = useQuery({
@@ -72,6 +96,7 @@ const EmployeeLayout = () => {
             { to: `${prefix}/allocations`, label: 'Allocations', icon: UserCog },
             { to: `${prefix}/my-team`, label: 'My Team', icon: Users },
             { to: `${prefix}/performance`, label: 'Performance', icon: TrendingUp },
+            { to: `${prefix}/self-evaluation`, label: 'Self Evaluation', icon: ClipboardList },
             { to: `${prefix}/leaves`, label: 'Team Leaves', icon: Calendar },
             { to: `${prefix}/my-leaves`, label: 'My Leaves', icon: CalendarCheck },
             { to: `${prefix}/side-projects`, label: 'Side Projects', icon: Rocket },
@@ -82,6 +107,7 @@ const EmployeeLayout = () => {
         : [
             { to: `${prefix}/dashboard`, label: 'Dashboard', icon: LayoutDashboard },
             { to: `${prefix}/projects`, label: 'My Projects', icon: FolderKanban },
+            { to: `${prefix}/self-evaluation`, label: 'Self Evaluation', icon: ClipboardList },
             { to: `${prefix}/leaves`, label: 'Leaves', icon: Calendar },
             { to: `${prefix}/side-projects`, label: 'Side Projects', icon: Rocket },
             { to: `${prefix}/guidelines`, label: 'Guidelines', icon: FileText },

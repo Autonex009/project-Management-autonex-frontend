@@ -1,11 +1,11 @@
-﻿import { useState, useRef, useEffect } from 'react';
+import { useState, useRef, useEffect } from 'react';
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import { useSearchParams } from 'react-router-dom';
 import { employeeApi, skillApi, allocationApi } from '../services/api';
 import { Plus, Edit, Trash2, X, User, ChevronDown, CheckCircle, AlertCircle, Clock, ArrowUpCircle, RotateCcw } from 'lucide-react';
 import toast from 'react-hot-toast';
 import SearchBar from '../components/ui/SearchBar';
-import Table, { ColumnTemplates } from '../components/ui/Table';
+import Table, { ColumnTemplates, formatDateDeterministic } from '../components/ui/Table';
 import Dropdown from '../components/ui/Dropdown';
 import Spinner from '../components/ui/LoadingSpinner';
 import Button from '../components/ui/Button';
@@ -939,8 +939,8 @@ const EmployeesPage = () => {
                   {value}
                 </span>
                 {row.converted_to_fulltime_at && (
-                  <p className="text-[10px] text-slate-400 font-medium" title={`Promoted from ${row.previous_employee_type || 'Intern'} on ${new Date(row.converted_to_fulltime_at).toLocaleDateString()}`}>
-                    promoted {new Date(row.converted_to_fulltime_at).toLocaleDateString()}
+                  <p className="text-[10px] text-slate-400 font-medium" title={`Promoted from ${row.previous_employee_type || 'Intern'} on ${formatDateDeterministic(row.converted_to_fulltime_at)}`}>
+                    promoted {formatDateDeterministic(row.converted_to_fulltime_at)}
                   </p>
                 )}
               </div>
@@ -969,7 +969,7 @@ const EmployeesPage = () => {
             ),
           },
           {
-            key: 'id',
+            key: 'assigned_projects',
             label: 'Assigned Projects',
             render: (_, row) => {
               const projects = employeeProjectsMap[row.id];
@@ -1009,7 +1009,7 @@ const EmployeesPage = () => {
             ),
           },
           {
-            key: 'id',
+            key: 'actions',
             label: 'Actions',
             align: 'right',
             render: (_, row) => (
