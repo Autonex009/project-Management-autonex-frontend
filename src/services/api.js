@@ -242,13 +242,13 @@ export const performanceReviewApi = {
     delete: (id) => api.delete(`/performance-reviews/${id}`).then(res => res.data),
 };
 
-// === Monthly Structured Performance Reviews API (perf_reviews) ===
-export const perfReviewApi = {
-    getAll: (params) => api.get('/perf-reviews', { params }).then(res => res.data),
-    getOne: (id) => api.get(`/perf-reviews/${id}`).then(res => res.data),
-    create: (data) => api.post('/perf-reviews', data).then(res => res.data),
-    update: (id, data) => api.put(`/perf-reviews/${id}`, data).then(res => res.data),
-    delete: (id) => api.delete(`/perf-reviews/${id}`).then(res => res.data),
+// === Project-based Monthly Performance Evaluations API (perf_evals) ===
+export const perfEvalApi = {
+    getAll: (params) => api.get('/perf-evals', { params }).then(res => res.data),
+    submit: (data) => api.post('/perf-evals', data).then(res => res.data),
+    // PM review: approvals + PM ratings + per-param feedback + bonus.
+    review: (id, data) => api.patch(`/perf-evals/${id}/review`, data).then(res => res.data),
+    delete: (id) => api.delete(`/perf-evals/${id}`).then(res => res.data),
 };
 
 // === Notifications API ===
