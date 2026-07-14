@@ -155,6 +155,8 @@ function App() {
               <Route path="my-leaves" element={<PMMyLeavesPage />} />
               <Route path="side-projects" element={<SideProjectsPage />} />
               <Route path="guidelines" element={<GuidelinesPage />} />
+              <Route path="onboarding" element={<OnboardingDashboard />} />
+              <Route path="onboarding/:moduleId" element={<ModuleView />} />
               <Route path="onboarding-mentor" element={<PMMentorshipPage />} />
               <Route path="newly-onboarded" element={<Navigate to="/pm/onboarding-mentor" replace />} />
               <Route path="profile" element={<ProfilePage />} />
