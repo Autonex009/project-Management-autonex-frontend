@@ -98,6 +98,7 @@ const EmployeeLayout = () => {
             { to: `${prefix}/my-leaves`, label: 'My Leaves', icon: CalendarCheck },
             { to: `${prefix}/side-projects`, label: 'Side Projects', icon: Rocket },
             { to: `${prefix}/guidelines`, label: 'Guidelines', icon: FileText },
+            { to: `${prefix}/onboarding`, label: 'My Onboarding', icon: GraduationCap },
             { to: `${prefix}/onboarding-mentor`, label: 'Mentorship', icon: GraduationCap },
             { to: `${prefix}/profile`, label: 'Profile', icon: UserRound },
         ]

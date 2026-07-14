@@ -19,6 +19,7 @@ const OnboardingDashboard = () => {
 
     const user = JSON.parse(localStorage.getItem('user') || '{}');
     const userId = user.id;
+    const role = localStorage.getItem('role') || user.role || 'employee';
 
     useEffect(() => {
         if (!userId) return;
@@ -192,7 +193,7 @@ const OnboardingDashboard = () => {
                                                 </div>
                                                 
                                                 <button 
-                                                    onClick={() => !isLocked && navigate(`/employee/onboarding/${m.id}`)}
+                                                    onClick={() => !isLocked && navigate(`/${role === 'pm' ? 'pm' : 'employee'}/onboarding/${m.id}`)}
                                                     disabled={isLocked}
                                                     className={`px-4 py-2 rounded-xl font-bold text-xs transition-all flex items-center gap-1.5 shrink-0 ${
                                                         isLocked

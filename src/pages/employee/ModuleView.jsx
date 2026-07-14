@@ -23,6 +23,8 @@ const ModuleView = () => {
 
     const user = JSON.parse(localStorage.getItem('user') || '{}');
     const userId = user.id;
+    const role = localStorage.getItem('role') || user.role || 'employee';
+    const basePath = role === 'pm' ? '/pm/onboarding' : '/employee/onboarding';
 
     useEffect(() => {
         if (!userId || !moduleId) return;
@@ -113,7 +115,7 @@ const ModuleView = () => {
                 })
                 .finally(() => setLoading(false));
         } else {
-            navigate('/employee/onboarding');
+            navigate(basePath);
         }
     };
 
@@ -184,7 +186,7 @@ const ModuleView = () => {
                 <header className="mb-8">
                     <div className="flex items-center space-x-2 text-emerald-600 font-medium mb-3">
                         <button 
-                            onClick={() => navigate('/employee/onboarding')} 
+                            onClick={() => navigate(basePath)} 
                             className="hover:text-emerald-700 cursor-pointer transition-colors p-1 rounded-lg hover:bg-slate-100 flex items-center"
                         >
                             <ArrowLeft className="w-4 h-4" />
