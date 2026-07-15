@@ -37,13 +37,16 @@ const PayrollTabs = () => {
             setUnlocked(true);
             setPasscodeInput('');
         } catch (err) {
-            if (err.response?.status === 401) {
-                sessionStorage.removeItem('payroll_passcode');
+            // Only a successful call unlocks. Any error keeps the gate closed and
+            // clears the stored passcode so the failed value isn't reused.
+            sessionStorage.removeItem('payroll_passcode');
+            const status = err.response?.status;
+            if (status === 401) {
                 setUnlockError('Incorrect payroll passcode.');
+            } else if (status === 403) {
+                setUnlockError('Your account does not have access to payroll.');
             } else {
-                // Non-auth error (e.g. network) — the passcode itself was accepted.
-                setUnlocked(true);
-                setPasscodeInput('');
+                setUnlockError('Could not verify the passcode. Please try again.');
             }
         } finally {
             setUnlocking(false);
