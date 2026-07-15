@@ -1,4 +1,5 @@
 import React, { useState, useEffect } from 'react';
+import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import { Wifi, Plus, Trash2, Loader2, Settings, Save, Edit2, Building2, MapPin, Sparkles } from 'lucide-react';
 import Button from '../../components/ui/Button';
 import ConfirmDialog from '../../components/ui/ConfirmDialog';
@@ -6,8 +7,7 @@ import { wifiNetworksApi, companySettingsApi } from '../../services/api';
 import toast from 'react-hot-toast';
 
 const AdminCompanySettingsPage = () => {
-    // WiFi state
-    const [networks, setNetworks] = useState([]);
+    const queryClient = useQueryClient();
     
     // General Settings state
     const [generalSettings, setGeneralSettings] = useState({
@@ -16,30 +16,25 @@ const AdminCompanySettingsPage = () => {
         company_perks: '',
     });
 
-    const [loading, setLoading] = useState(true);
-    const [savingGeneral, setSavingGeneral] = useState(false);
+    const { data: networks = [], isLoading: networksLoading } = useQuery({
+        queryKey: ['wifiNetworks'],
+        queryFn: wifiNetworksApi.getAll
+    });
+
+    const { data: settingsData = [], isLoading: settingsLoading } = useQuery({
+        queryKey: ['companySettings'],
+        queryFn: companySettingsApi.getAll
+    });
     
     // WiFi Form state
     const [isFormOpen, setIsFormOpen] = useState(false);
     const [editingId, setEditingId] = useState(null);
     const [formData, setFormData] = useState({ name: '', password: '' });
-    const [savingWifi, setSavingWifi] = useState(false);
     const [deletingId, setDeletingId] = useState(null);
     const [wifiDeleteConfirm, setWifiDeleteConfirm] = useState(null);
 
     useEffect(() => {
-        fetchData();
-    }, []);
-
-    const fetchData = async () => {
-        try {
-            const [networksData, settingsData] = await Promise.all([
-                wifiNetworksApi.getAll(),
-                companySettingsApi.getAll()
-            ]);
-            
-            setNetworks(networksData);
-            
+        if (settingsData && settingsData.length > 0) {
             const settingsMap = {};
             settingsData.forEach(s => { settingsMap[s.key] = s.value || ''; });
             setGeneralSettings({
@@ -47,32 +42,35 @@ const AdminCompanySettingsPage = () => {
                 google_maps_link: settingsMap.google_maps_link || '',
                 company_perks: settingsMap.company_perks || '',
             });
-
-        } catch (err) {
-            toast.error('Failed to load settings');
-        } finally {
-            setLoading(false);
         }
-    };
+    }, [settingsData]);
+
+    const loading = networksLoading || settingsLoading;
 
     // --- General Settings Logic ---
-    const handleSaveGeneral = async (e) => {
-        e.preventDefault();
-        setSavingGeneral(true);
-        try {
+    const saveGeneralMutation = useMutation({
+        mutationFn: async (settings) => {
             const user = JSON.parse(localStorage.getItem('user') || '{}');
             await Promise.all([
-                companySettingsApi.upsert('office_address', { value: generalSettings.office_address, updated_by: user.id }),
-                companySettingsApi.upsert('google_maps_link', { value: generalSettings.google_maps_link, updated_by: user.id }),
-                companySettingsApi.upsert('company_perks', { value: generalSettings.company_perks, updated_by: user.id }),
+                companySettingsApi.upsert('office_address', { value: settings.office_address, updated_by: user.id }),
+                companySettingsApi.upsert('google_maps_link', { value: settings.google_maps_link, updated_by: user.id }),
+                companySettingsApi.upsert('company_perks', { value: settings.company_perks, updated_by: user.id }),
             ]);
+        },
+        onSuccess: () => {
+            queryClient.invalidateQueries({ queryKey: ['companySettings'] });
             toast.success('General company settings saved!');
-        } catch (err) {
+        },
+        onError: () => {
             toast.error('Failed to save general settings');
-        } finally {
-            setSavingGeneral(false);
         }
+    });
+
+    const handleSaveGeneral = (e) => {
+        e.preventDefault();
+        saveGeneralMutation.mutate(generalSettings);
     };
+    const savingGeneral = saveGeneralMutation.isPending;
 
 
     // --- WiFi Logic ---
@@ -94,47 +92,52 @@ const AdminCompanySettingsPage = () => {
         setEditingId(null);
     };
 
-    const handleSaveWifi = async (e) => {
+    const saveWifiMutation = useMutation({
+        mutationFn: async (payload) => {
+            if (editingId) {
+                await wifiNetworksApi.update(editingId, payload);
+            } else {
+                await wifiNetworksApi.create(payload);
+            }
+        },
+        onSuccess: () => {
+            queryClient.invalidateQueries({ queryKey: ['wifiNetworks'] });
+            toast.success(editingId ? 'WiFi network updated successfully!' : 'WiFi network added successfully!');
+            closeForm();
+        },
+        onError: () => {
+            toast.error(editingId ? 'Failed to update network' : 'Failed to add network');
+        }
+    });
+
+    const handleSaveWifi = (e) => {
         e.preventDefault();
         if (!formData.name.trim()) {
             toast.error('Network name is required');
             return;
         }
-
-        setSavingWifi(true);
-        try {
-            const user = JSON.parse(localStorage.getItem('user') || '{}');
-            const payload = { ...formData, updated_by: user.id };
-
-            if (editingId) {
-                await wifiNetworksApi.update(editingId, payload);
-                toast.success('WiFi network updated successfully!');
-            } else {
-                await wifiNetworksApi.create(payload);
-                toast.success('WiFi network added successfully!');
-            }
-            const networksData = await wifiNetworksApi.getAll();
-            setNetworks(networksData);
-            closeForm();
-        } catch (err) {
-            toast.error(editingId ? 'Failed to update network' : 'Failed to add network');
-        } finally {
-            setSavingWifi(false);
-        }
+        const user = JSON.parse(localStorage.getItem('user') || '{}');
+        saveWifiMutation.mutate({ ...formData, updated_by: user.id });
     };
+    const savingWifi = saveWifiMutation.isPending;
 
-    const handleDeleteWifi = async (id) => {
-        setDeletingId(id);
-        try {
-            await wifiNetworksApi.delete(id);
+    const deleteWifiMutation = useMutation({
+        mutationFn: (id) => wifiNetworksApi.delete(id),
+        onSuccess: () => {
+            queryClient.invalidateQueries({ queryKey: ['wifiNetworks'] });
             toast.success('WiFi network deleted successfully');
-            const networksData = await wifiNetworksApi.getAll();
-            setNetworks(networksData);
-        } catch (err) {
+        },
+        onError: () => {
             toast.error('Failed to delete WiFi network');
-        } finally {
+        },
+        onSettled: () => {
             setDeletingId(null);
         }
+    });
+
+    const handleDeleteWifi = (id) => {
+        setDeletingId(id);
+        deleteWifiMutation.mutate(id);
     };
 
     if (loading) {
