@@ -1,4 +1,5 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState, useMemo } from 'react';
+import { useQuery } from '@tanstack/react-query';
 import { Send, Calendar, Building2, ShieldCheck, Sparkles, MapPin, Wifi, Copy, Check, Globe, Cpu, Bot, Layers, LogOut, AlertTriangle, Linkedin, Youtube } from 'lucide-react';
 import Spinner from '../../components/ui/LoadingSpinner';
 import Button from '../../components/ui/Button';
@@ -7,31 +8,29 @@ import toast from 'react-hot-toast';
 
 const CompanyInfoPage = () => {
     const [activeTab, setActiveTab] = useState('about');
-    const [wifiNetworks, setWifiNetworks] = useState([]);
-    const [generalSettings, setGeneralSettings] = useState({
-        office_address: '',
-        google_maps_link: '',
-        company_perks: ''
-    });
     const [copiedId, setCopiedId] = useState(null);
-    const [wifiLoading, setWifiLoading] = useState(true);
 
-    useEffect(() => {
-        Promise.all([
-            wifiNetworksApi.getAll(),
-            companySettingsApi.getAll()
-        ]).then(([networksData, settingsData]) => {
-            setWifiNetworks(networksData);
-            const map = {};
-            settingsData.forEach(s => { map[s.key] = s.value || ''; });
-            setGeneralSettings({
-                office_address: map.office_address || '',
-                google_maps_link: map.google_maps_link || '',
-                company_perks: map.company_perks || ''
-            });
-        }).catch(() => {})
-          .finally(() => setWifiLoading(false));
-    }, []);
+    const { data: wifiNetworks = [], isLoading: wifiLoading } = useQuery({
+        queryKey: ['wifiNetworks'],
+        queryFn: wifiNetworksApi.getAll
+    });
+
+    const { data: settingsData = [], isLoading: settingsLoading } = useQuery({
+        queryKey: ['companySettings'],
+        queryFn: companySettingsApi.getAll
+    });
+
+    const generalSettings = useMemo(() => {
+        const map = {};
+        settingsData.forEach(s => { map[s.key] = s.value || ''; });
+        return {
+            office_address: map.office_address || '',
+            google_maps_link: map.google_maps_link || '',
+            company_perks: map.company_perks || ''
+        };
+    }, [settingsData]);
+
+    const isLoading = wifiLoading || settingsLoading;
 
     const handleCopyPassword = (network) => {
         if (!network.password) return;
