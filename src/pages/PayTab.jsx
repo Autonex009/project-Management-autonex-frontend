@@ -1,23 +1,28 @@
 import { useMemo, useState } from 'react';
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import toast from 'react-hot-toast';
-import { IndianRupee, Users, UserCheck, UserX, Edit2, Save, X, Search, ChevronLeft, ChevronRight } from 'lucide-react';
+import { IndianRupee, Users, UserCheck, UserX, Edit2, Save, X, Search, ChevronLeft, ChevronRight, AlertTriangle } from 'lucide-react';
 import { payrollApi } from '../services/api';
 
 /**
- * Pay — salary records sourced from the `salary` table.
- * Each row's monthly pay can be edited, and its Active/Inactive status toggled.
- * Inactive rows are excluded from the Monthly Pay run; active rows feed it their pay.
+ * Pay — every active employee, matched to their row in the `salary` table where
+ * one exists. Employees with no row yet show as "Not set"; saving their pay here
+ * creates it. Each row's monthly pay can be edited, and its Active/Inactive status
+ * toggled. Inactive rows are excluded from the Monthly Pay run, which itself only
+ * ever includes people who already have a row here.
  */
 const toNum = (s) => Number(String(s ?? '').replace(/[^0-9.]/g, '')) || 0;
 const isActive = (status) => (status || '').trim().toLowerCase() !== 'inactive';
+// Rows without a salary record yet (id === null) share no natural identity, so
+// key them by employee_id instead — row.id alone can't distinguish two unset rows.
+const rowKey = (row) => (row.id != null ? `s-${row.id}` : `e-${row.employee_id}`);
 
 const PayTab = () => {
     const queryClient = useQueryClient();
 
-    // record id → { base, bonus } while editing (undefined = not editing)
+    // row key → { base, bonus } while editing (undefined = not editing)
     const [edits, setEdits] = useState({});
-    const [savingId, setSavingId] = useState(null);
+    const [savingKey, setSavingKey] = useState(null);
 
     const { data, isLoading, isError } = useQuery({
         queryKey: ['salary-records'],
@@ -37,12 +42,26 @@ const PayTab = () => {
         mutationFn: ({ id, baseMonthly, bonusMonthly }) => payrollApi.updateSalaryRecord(id, { baseMonthly, bonusMonthly }),
         onSuccess: (_res, vars) => {
             toast.success('Salary saved');
-            setEdits((p) => { const n = { ...p }; delete n[vars.id]; return n; });
-            setSavingId(null);
+            setEdits((p) => { const n = { ...p }; delete n[vars.key]; return n; });
+            setSavingKey(null);
             invalidate();
         },
         onError: (err) => {
-            setSavingId(null);
+            setSavingKey(null);
+            toast.error(err.response?.data?.detail || 'Failed to save salary');
+        },
+    });
+
+    const createMutation = useMutation({
+        mutationFn: ({ employeeId, baseMonthly, bonusMonthly }) => payrollApi.createSalaryRecord(employeeId, { baseMonthly, bonusMonthly }),
+        onSuccess: (_res, vars) => {
+            toast.success('Salary saved');
+            setEdits((p) => { const n = { ...p }; delete n[vars.key]; return n; });
+            setSavingKey(null);
+            invalidate();
+        },
+        onError: (err) => {
+            setSavingKey(null);
             toast.error(err.response?.data?.detail || 'Failed to save salary');
         },
     });
@@ -82,20 +101,26 @@ const PayTab = () => {
 
     const startEdit = (row) => setEdits((p) => ({
         ...p,
-        [row.id]: { base: toNum(row.base_pay_monthly) || '', bonus: toNum(row.opt_bonus_monthly) || '' },
+        [rowKey(row)]: { base: toNum(row.base_pay_monthly) || '', bonus: toNum(row.opt_bonus_monthly) || '' },
     }));
-    const cancelEdit = (id) => setEdits((p) => { const n = { ...p }; delete n[id]; return n; });
+    const cancelEdit = (row) => setEdits((p) => { const n = { ...p }; delete n[rowKey(row)]; return n; });
 
-    const saveEdit = (id) => {
-        const e = edits[id];
+    const saveEdit = (row) => {
+        const key = rowKey(row);
+        const e = edits[key];
         const base = parseFloat(e.base);
         if (!base || base <= 0) { toast.error('Enter a valid base pay'); return; }
         const bonus = e.bonus === '' ? null : parseFloat(e.bonus);
-        setSavingId(id);
-        updateMutation.mutate({ id, baseMonthly: base, bonusMonthly: bonus });
+        setSavingKey(key);
+        if (row.id != null) {
+            updateMutation.mutate({ id: row.id, key, baseMonthly: base, bonusMonthly: bonus });
+        } else {
+            createMutation.mutate({ employeeId: row.employee_id, key, baseMonthly: base, bonusMonthly: bonus });
+        }
     };
 
     const toggleStatus = (row) => {
+        if (row.id == null) return; // no salary record yet — nothing to toggle
         statusMutation.mutate({ id: row.id, status: isActive(row.status) ? 'Inactive' : 'Active' });
     };
 
@@ -161,28 +186,40 @@ const PayTab = () => {
                             </thead>
                             <tbody className="divide-y divide-slate-100">
                                 {paged.map((row) => {
-                                    const editing = edits[row.id] !== undefined;
+                                    const key = rowKey(row);
+                                    const editing = edits[key] !== undefined;
                                     const active = isActive(row.status);
+                                    const unset = row.id == null;
                                     return (
-                                        <tr key={row.id} className={`transition-colors ${active ? 'hover:bg-slate-50/50' : 'bg-slate-50/40 text-slate-400'}`}>
+                                        <tr key={key} className={`transition-colors ${active ? 'hover:bg-slate-50/50' : 'bg-slate-50/40 text-slate-400'}`}>
                                             <td className="px-5 py-4">
                                                 <p className={`font-semibold ${active ? 'text-slate-800' : 'text-slate-500'}`}>{row.full_name}</p>
                                                 <p className="text-xs text-slate-400">{row.employment_type}</p>
                                             </td>
                                             <td className="px-5 py-4">
-                                                <button
-                                                    onClick={() => toggleStatus(row)}
-                                                    disabled={statusMutation.isPending}
-                                                    title={active ? 'Click to mark Inactive' : 'Click to mark Active'}
-                                                    className={`inline-flex items-center gap-1.5 px-2.5 py-1 rounded-full text-xs font-medium transition-colors disabled:opacity-50 ${
-                                                        active
-                                                            ? 'bg-emerald-50 text-emerald-700 hover:bg-emerald-100'
-                                                            : 'bg-slate-200 text-slate-500 hover:bg-slate-300'
-                                                    }`}
-                                                >
-                                                    <span className={`w-1.5 h-1.5 rounded-full ${active ? 'bg-emerald-500' : 'bg-slate-400'}`} />
-                                                    {active ? 'Active' : 'Inactive'}
-                                                </button>
+                                                {unset ? (
+                                                    <span
+                                                        title="Save a base pay below to create this person's salary record"
+                                                        className="inline-flex items-center gap-1.5 px-2.5 py-1 rounded-full text-xs font-medium bg-slate-100 text-slate-400"
+                                                    >
+                                                        <span className="w-1.5 h-1.5 rounded-full bg-slate-300" />
+                                                        Not set
+                                                    </span>
+                                                ) : (
+                                                    <button
+                                                        onClick={() => toggleStatus(row)}
+                                                        disabled={statusMutation.isPending}
+                                                        title={active ? 'Click to mark Inactive' : 'Click to mark Active'}
+                                                        className={`inline-flex items-center gap-1.5 px-2.5 py-1 rounded-full text-xs font-medium transition-colors disabled:opacity-50 ${
+                                                            active
+                                                                ? 'bg-emerald-50 text-emerald-700 hover:bg-emerald-100'
+                                                                : 'bg-slate-200 text-slate-500 hover:bg-slate-300'
+                                                        }`}
+                                                    >
+                                                        <span className={`w-1.5 h-1.5 rounded-full ${active ? 'bg-emerald-500' : 'bg-slate-400'}`} />
+                                                        {active ? 'Active' : 'Inactive'}
+                                                    </button>
+                                                )}
                                             </td>
 
                                             {/* Base Pay */}
@@ -193,12 +230,17 @@ const PayTab = () => {
                                                         <input
                                                             type="number"
                                                             autoFocus
-                                                            value={edits[row.id].base}
-                                                            onChange={(e) => setEdits((p) => ({ ...p, [row.id]: { ...p[row.id], base: e.target.value } }))}
+                                                            value={edits[key].base}
+                                                            onChange={(e) => setEdits((p) => ({ ...p, [key]: { ...p[key], base: e.target.value } }))}
                                                             placeholder="Base pay"
                                                             className="w-28 px-2 py-1 border border-indigo-300 rounded-lg text-sm text-right focus:outline-none focus:ring-2 focus:ring-indigo-200"
                                                         />
                                                     </div>
+                                                ) : unset ? (
+                                                    <span className="inline-flex items-center justify-end gap-1 text-xs font-medium text-amber-600">
+                                                        <AlertTriangle className="w-3 h-3" />
+                                                        Not set
+                                                    </span>
                                                 ) : (
                                                     <span className="font-mono text-slate-700">{row.base_pay_monthly ?? '—'}</span>
                                                 )}
@@ -211,8 +253,8 @@ const PayTab = () => {
                                                         <span className="text-slate-400">₹</span>
                                                         <input
                                                             type="number"
-                                                            value={edits[row.id].bonus}
-                                                            onChange={(e) => setEdits((p) => ({ ...p, [row.id]: { ...p[row.id], bonus: e.target.value } }))}
+                                                            value={edits[key].bonus}
+                                                            onChange={(e) => setEdits((p) => ({ ...p, [key]: { ...p[key], bonus: e.target.value } }))}
                                                             placeholder="0"
                                                             className="w-24 px-2 py-1 border border-indigo-300 rounded-lg text-sm text-right focus:outline-none focus:ring-2 focus:ring-indigo-200"
                                                         />
@@ -227,15 +269,15 @@ const PayTab = () => {
                                                 {editing ? (
                                                     <div className="flex items-center justify-center gap-1.5">
                                                         <button
-                                                            onClick={() => saveEdit(row.id)}
-                                                            disabled={savingId === row.id}
+                                                            onClick={() => saveEdit(row)}
+                                                            disabled={savingKey === key}
                                                             className="p-1.5 bg-emerald-100 text-emerald-700 rounded-lg hover:bg-emerald-200 transition-colors disabled:opacity-50"
                                                             title="Save"
                                                         >
                                                             <Save className="w-3.5 h-3.5" />
                                                         </button>
                                                         <button
-                                                            onClick={() => cancelEdit(row.id)}
+                                                            onClick={() => cancelEdit(row)}
                                                             className="p-1.5 text-slate-400 hover:text-slate-600 rounded-lg"
                                                             title="Cancel"
                                                         >
