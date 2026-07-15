@@ -1,4 +1,4 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useRef } from 'react';
 import { useParams, useNavigate } from 'react-router-dom';
 import { ArrowLeft, Award, HelpCircle, FileText, ExternalLink, Check, Circle, CheckCircle, ArrowRight, Video } from 'lucide-react';
 import Button from '../../components/ui/Button';
@@ -6,6 +6,7 @@ import Spinner from '../../components/ui/LoadingSpinner';
 import Modal from '../../components/ui/Modal';
 import { onboardingApi } from '../../services/api';
 import toast from 'react-hot-toast';
+import YouTube from 'react-youtube';
 
 const ModuleView = () => {
     const { moduleId } = useParams();
@@ -20,6 +21,32 @@ const ModuleView = () => {
     const [error, setError] = useState(null);
     const [showScoreModal, setShowScoreModal] = useState(false);
     const [modalData, setModalData] = useState(null);
+    const [finishedVideos, setFinishedVideos] = useState(() => {
+        try {
+            return JSON.parse(sessionStorage.getItem('finishedVideos')) || {};
+        } catch {
+            return {};
+        }
+    });
+
+    const ytPlayerRef = useRef(null);
+    const maxTimeWatchedRef = useRef(0);
+    const trackingIntervalRef = useRef(null);
+
+    // Safely compute the current section ID before early returns for our cleanup hook
+    const safeCurrentIndex = moduleData?.sections ? moduleData.sections.findIndex((s) => !completedSections.has(s.id)) : -1;
+    const safeActiveSectionIndex = safeCurrentIndex === -1 && moduleData?.sections ? moduleData.sections.length - 1 : safeCurrentIndex;
+    const safeCurrentSectionId = moduleData?.sections?.[safeActiveSectionIndex]?.id;
+
+    // Clean up interval on unmount, tab change, or section change to prevent memory leaks
+    useEffect(() => {
+        return () => {
+            if (trackingIntervalRef.current) {
+                clearInterval(trackingIntervalRef.current);
+                trackingIntervalRef.current = null;
+            }
+        };
+    }, [activeTab, safeCurrentSectionId]);
 
     const user = JSON.parse(localStorage.getItem('user') || '{}');
     const userId = user.id;
@@ -79,6 +106,21 @@ const ModuleView = () => {
         if (url.includes('/preview')) return url;
         if (url.includes('/view')) return url.replace('/view', '/preview');
         return url;
+    };
+
+    const getYouTubeId = (url) => {
+        if (!url) return null;
+        const match = url.match(/(?:youtu\.be\/|youtube\.com\/(?:embed\/|v\/|watch\?v=|watch\?.+&v=))([^&?]+)/);
+        return match ? match[1] : null;
+    };
+
+    const markVideoFinished = (id) => {
+        setFinishedVideos(prev => {
+            const next = { ...prev, [id]: true };
+            sessionStorage.setItem('finishedVideos', JSON.stringify(next));
+            return next;
+        });
+        toast.success('Video completed! You can now take the quiz.', { icon: '✅' });
     };
 
     const parseOptions = (options) => {
@@ -173,6 +215,37 @@ const ModuleView = () => {
         setQuizSubmitted(nextSubmitted);
     };
 
+    const handleQuizTabClick = () => {
+        const ytId = getYouTubeId(currentSection?.video_url);
+        if (ytId && !finishedVideos[currentSection.id]) {
+            toast.error('Please finish watching the video lesson first!');
+            return;
+        }
+        setActiveTab('quiz');
+    };
+
+    const startTrackingVideo = (player) => {
+        if (trackingIntervalRef.current) clearInterval(trackingIntervalRef.current);
+        trackingIntervalRef.current = setInterval(() => {
+            if (!player || typeof player.getCurrentTime !== 'function') return;
+            const currentTime = player.getCurrentTime();
+            // If they skipped forward by more than 2 seconds, snap them back
+            if (currentTime > maxTimeWatchedRef.current + 2) {
+                player.seekTo(maxTimeWatchedRef.current);
+                toast.error('Skipping forward is not allowed. Please watch the full video.', { id: 'yt-skip' });
+            } else {
+                maxTimeWatchedRef.current = Math.max(maxTimeWatchedRef.current, currentTime);
+            }
+        }, 500);
+    };
+
+    const stopTrackingVideo = () => {
+        if (trackingIntervalRef.current) {
+            clearInterval(trackingIntervalRef.current);
+            trackingIntervalRef.current = null;
+        }
+    };
+
     const totalSections = moduleData.sections.length;
     const totalCompleted = completedSections.size;
     const overallProgress = totalSections === 0 ? 0 : Math.round((totalCompleted / totalSections) * 100);
@@ -237,7 +310,7 @@ const ModuleView = () => {
                             </button>
                             {currentSection.questions && currentSection.questions.length > 0 && (
                                 <button 
-                                    onClick={() => setActiveTab('quiz')} 
+                                    onClick={handleQuizTabClick} 
                                     className={`flex items-center gap-1.5 pb-3 text-xs font-bold uppercase tracking-wider transition-all cursor-pointer ${
                                         activeTab === 'quiz' 
                                             ? 'border-b-2 border-emerald-500 text-emerald-600 font-bold' 
@@ -254,13 +327,43 @@ const ModuleView = () => {
                             <div className="space-y-8 pb-12">
                                 {currentSection.video_url && (
                                     <div className="aspect-video w-full rounded-2xl overflow-hidden bg-slate-900 border border-slate-200/80 shadow-md relative">
-                                        <iframe 
-                                            src={getEmbeddedDriveUrl(currentSection.video_url)} 
-                                            className="absolute inset-0 w-full h-full"
-                                            allow="autoplay" 
-                                            allowFullScreen
-                                            title="Video lesson player"
-                                        />
+                                        {getYouTubeId(currentSection.video_url) ? (
+                                            <YouTube
+                                                videoId={getYouTubeId(currentSection.video_url)}
+                                                opts={{
+                                                    width: '100%',
+                                                    height: '100%',
+                                                    playerVars: {
+                                                        controls: 1, // Re-enable controls so they can go backward
+                                                        disablekb: 0,
+                                                        rel: 0,
+                                                        modestbranding: 1,
+                                                        fs: 0, // Hide fullscreen button
+                                                        iv_load_policy: 3 // Hide annotations/cards
+                                                    }
+                                                }}
+                                                className="absolute inset-0 w-full h-full"
+                                                iframeClassName="w-full h-full border-0"
+                                                onReady={(e) => {
+                                                    ytPlayerRef.current = e.target;
+                                                    maxTimeWatchedRef.current = 0; // Reset on load
+                                                }}
+                                                onPlay={(e) => startTrackingVideo(e.target)}
+                                                onPause={stopTrackingVideo}
+                                                onEnd={() => {
+                                                    stopTrackingVideo();
+                                                    markVideoFinished(currentSection.id);
+                                                }}
+                                            />
+                                        ) : (
+                                            <iframe 
+                                                src={getEmbeddedDriveUrl(currentSection.video_url)} 
+                                                className="absolute inset-0 w-full h-full border-0"
+                                                allow="autoplay" 
+                                                allowFullScreen
+                                                title="Video lesson player"
+                                            />
+                                        )}
                                     </div>
                                 )}
 
