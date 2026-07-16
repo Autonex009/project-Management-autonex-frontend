@@ -3,15 +3,13 @@ import react from '@vitejs/plugin-react'
 
 export default defineConfig(({ isSsrBuild }) => ({
   plugins: [react()],
-  server: {
-    watch: {
-      usePolling: true,
-    },
-  },
   // Note: the dev server port and the /api proxy are now owned by server.js
   // (the Express SSR server), which runs Vite in middleware mode. Vite's own
   // server.proxy no longer applies since Express handles the top-level request.
   server: {
+    watch: {
+      usePolling: true,
+    },
     allowedHosts: ['pmportal.autonexai360.com'],
     // or you can use allowedHosts: true to allow all domains temporarily
   },
