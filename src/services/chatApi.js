@@ -3,7 +3,7 @@
  */
 
 // Base URL - matches the pattern in api.js
-let apiBaseUrl = import.meta.env.VITE_API_URL || 'http://localhost:8000/api';
+let apiBaseUrl = import.meta.env.VITE_API_URL || '/api';
 if (!apiBaseUrl.includes('localhost') && apiBaseUrl.startsWith('http://')) {
     apiBaseUrl = apiBaseUrl.replace('http://', 'https://');
 }

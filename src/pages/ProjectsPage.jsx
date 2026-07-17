@@ -427,12 +427,12 @@ const ProjectsPage = () => {
     const data = {
       name: formData.get('name'),
       main_project_id: selectedMainProjectId,
-      total_tasks: parseInt(formData.get('total_tasks')),
+      total_tasks: parseInt(formData.get('total_tasks')) || 0,
       estimated_time_per_task: parseFloat(formData.get('estimated_time_per_task')) / 60, // Store as hours, input is minutes
       start_date: startDate,
       end_date: endDate,
       daily_target: parseInt(formData.get('daily_target')) || 0,
-      priority: formData.get('priority'),
+      priority: formData.get('priority') || 'medium',
       required_expertise: selectedSkills,
       assigned_employee_ids: [],
       required_manpower: employeesRequired,
@@ -640,13 +640,15 @@ toast.success(wasEditing ? 'Project updated successfully' : 'Project created suc
             onChange={setSubProjectSearch}
             placeholder="Search projects..."
           />
-          <Link
-            to={`${prefix}/projects`}
-            className="inline-flex items-center gap-2 px-4 py-2.5 bg-white border border-slate-200 text-slate-700 font-medium text-sm rounded-xl shadow-sm hover:bg-slate-50 transition-colors"
-          >
-            <Settings className="w-4 h-4" />
-            Organizations
-          </Link>
+          {isPm && (
+            <Link
+              to={`${prefix}/projects`}
+              className="inline-flex items-center gap-2 px-4 py-2.5 bg-white border border-slate-200 text-slate-700 font-medium text-sm rounded-xl shadow-sm hover:bg-slate-50 transition-colors"
+            >
+              <Settings className="w-4 h-4" />
+              Organizations
+            </Link>
+          )}
           <Button onClick={() => { setEditingProject(null); setSelectedSkills([]); setGuidelineFiles([]); setFormMainProjectId(filterMainProjectId || ''); setFormPriority('medium'); setFormProjectStatus('active'); setIsModalOpen(true); }}>
             <Plus className="w-4 h-4" />
             Add Project
@@ -719,22 +721,6 @@ toast.success(wasEditing ? 'Project updated successfully' : 'Project created suc
             },
           },
           {
-            key: 'required_expertise',
-            label: 'Skills',
-            render: (value) => (
-              <div className="text-xs text-slate-600 font-medium whitespace-nowrap">
-                {value && value.length > 0 ? (
-                  <>
-                    <span>{value.slice(0, 2).join(', ')}</span>
-                    {value.length > 2 && <span className="text-slate-400"> +{value.length - 2}</span>}
-                  </>
-                ) : (
-                  <span className="text-slate-400">—</span>
-                )}
-              </div>
-            ),
-          },
-          {
             key: 'required_manpower',
             label: 'Allocated / Req.',
             align: 'center',
@@ -769,74 +755,6 @@ toast.success(wasEditing ? 'Project updated successfully' : 'Project created suc
                     <ArrowRight className="w-3 h-3" />
                   </button>
                   <span className="text-[10px] text-slate-400 font-medium">Req: {project.required_manpower || '0'}</span>
-                </div>
-              );
-            },
-          },
-          {
-            key: 'start_date',
-            label: 'Timeline',
-            render: (_, project) => (
-              <div className="whitespace-nowrap">
-                <div className="text-sm text-slate-700">
-                  {format(new Date(project.start_date), 'MMM d')} — {format(new Date(project.end_date), 'MMM d')}
-                </div>
-                <div className="text-xs text-slate-400">
-                  {project.project_duration_days < 7
-                    ? `${project.project_duration_days}d`
-                    : `${Math.floor(project.project_duration_days / 7)}w ${project.project_duration_days % 7}d`}
-                </div>
-              </div>
-            ),
-          },
-          {
-            key: 'priority',
-            label: 'Priority',
-            align: 'center',
-            render: (value) => (
-              <span className={`inline-flex px-2.5 py-1 rounded-full text-xs font-medium whitespace-nowrap ${
-                value === 'High' ? 'bg-red-50 text-red-700' :
-                value === 'Medium' ? 'bg-amber-50 text-amber-700' :
-                value === 'critical' ? 'bg-red-100 text-red-800' :
-                'bg-slate-100 text-slate-600'
-              }`}>
-                {value}
-              </span>
-            ),
-          },
-          {
-            key: 'estimated_time_per_task',
-            label: 'Avg Time',
-            align: 'center',
-            render: (value) => (
-              <div className="font-medium text-slate-700 whitespace-nowrap">
-                {parseFloat(((value || 0) * 60).toFixed(1))}m
-              </div>
-            ),
-          },
-          {
-            key: '_recommendation',
-            label: 'Recommendation',
-            render: (_, project) => {
-              const allocatedManpower = getAllocatedManpower(project);
-              const recResult = getSystemRecommendation(project);
-              const recommendation = recResult.label;
-              return (
-                <div className="space-y-1">
-                  <span className={`inline-flex px-2.5 py-1 rounded-full text-xs font-medium whitespace-nowrap ${
-                    recommendation === 'Overburdened' ? 'bg-red-50 text-red-700' :
-                    recommendation === 'Balanced' ? 'bg-emerald-50 text-emerald-700' :
-                    recommendation === 'Underutilized' ? 'bg-amber-50 text-amber-700' :
-                    'bg-slate-100 text-slate-600'
-                  }`}>
-                    {recommendation}
-                  </span>
-                  {allocatedManpower > 0 && (
-                    <div className="text-xs text-slate-500 whitespace-nowrap">
-                      {recResult.dailyHours < 999 ? `${recResult.dailyHours.toFixed(1)}h` : '—'} / 8h per day
-                      {recResult.workingDays && <span className="text-slate-400"> ({recResult.workingDays}wd)</span>}
-                    </div>
-                  )}
                 </div>
               );
             },
@@ -953,41 +871,22 @@ toast.success(wasEditing ? 'Project updated successfully' : 'Project created suc
                   </div>
                 </div>
 
-                <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
-                  <div>
-                    <label className="block text-sm font-medium text-gray-700 mb-1">
-                      Priority <span className="text-red-500">*</span>
-                    </label>
-                    <input type="hidden" name="priority" value={formPriority} />
-                    <Dropdown
-                      options={[
-                        { value: 'low', label: 'Low' },
-                        { value: 'medium', label: 'Medium' },
-                        { value: 'high', label: 'High' },
-                        { value: 'critical', label: 'Critical' },
-                      ]}
-                      value={formPriority}
-                      onChange={setFormPriority}
-                      placeholder="Select priority"
-                    />
-                  </div>
-                  <div>
-                    <label className="block text-sm font-medium text-gray-700 mb-1">
-                      Status <span className="text-red-500">*</span>
-                    </label>
-                    <input type="hidden" name="project_status" value={formProjectStatus} />
-                    <Dropdown
-                      options={[
-                        { value: 'active', label: 'In Progress' },
-                        { value: 'completed', label: 'Completed' },
-                        { value: 'on-hold', label: 'On Hold' },
-                        { value: 'cancelled', label: 'Cancelled' },
-                      ]}
-                      value={formProjectStatus}
-                      onChange={setFormProjectStatus}
-                      placeholder="Select status"
-                    />
-                  </div>
+                <div>
+                  <label className="block text-sm font-medium text-gray-700 mb-1">
+                    Status <span className="text-red-500">*</span>
+                  </label>
+                  <input type="hidden" name="project_status" value={formProjectStatus} />
+                  <Dropdown
+                    options={[
+                      { value: 'active', label: 'In Progress' },
+                      { value: 'completed', label: 'Completed' },
+                      { value: 'on-hold', label: 'On Hold' },
+                      { value: 'cancelled', label: 'Cancelled' },
+                    ]}
+                    value={formProjectStatus}
+                    onChange={setFormProjectStatus}
+                    placeholder="Select status"
+                  />
                 </div>
 
                 <div className="flex items-center gap-2 bg-indigo-50/40 border border-indigo-100/60 rounded-xl p-3">
@@ -1004,89 +903,33 @@ toast.success(wasEditing ? 'Project updated successfully' : 'Project created suc
                   </label>
                 </div>
 
-                <div className="grid grid-cols-1 sm:grid-cols-3 gap-4">
-                  <div>
-                    <label className="block text-sm font-medium text-gray-700 mb-1">
-                      Total Tasks <span className="text-red-500">*</span>
-                    </label>
-                    <input
-                      type="number"
-                      name="total_tasks"
-                      required
-                      min="1"
-                      defaultValue={(editingProject || copyingProject)?.total_tasks || ''}
-                      className="input"
-                      placeholder="0"
-                    />
-                  </div>
-                  <div>
-                    <label className="block text-sm font-medium text-gray-700 mb-1">
-                      Time per Task (Minutes) <span className="text-red-500">*</span>
-                    </label>
-                    <input
-                      type="number"
-                      name="estimated_time_per_task"
-                      required
-                      min="0.1"
-                      step="0.1"
-                      defaultValue={(editingProject || copyingProject)?.estimated_time_per_task ? parseFloat(((editingProject || copyingProject).estimated_time_per_task * 60).toFixed(1)) : ''}
-                      className="input"
-                      placeholder="30"
-                    />
-                  </div>
-                  <div>
-                    <label className="block text-sm font-medium text-gray-700 mb-1">
-                      Daily Target
-                    </label>
-                    <input
-                      type="number"
-                      name="daily_target"
-                      min="0"
-                      defaultValue={(editingProject || copyingProject)?.daily_target || ''}
-                      className="input"
-                      placeholder="Optional"
-                    />
-                  </div>
-                </div>
-
-                <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
-                  <div>
-                    <label className="block text-sm font-medium text-gray-700 mb-1">
-                      Start Date <span className="text-red-500">*</span>
-                    </label>
-                    <input
-                      type="date"
-                      name="start_date"
-                      required
-                      defaultValue={(editingProject || copyingProject)?.start_date}
-                      className="input"
-                    />
-                  </div>
-                  <div>
-                    <label className="block text-sm font-medium text-gray-700 mb-1">
-                      End Date <span className="text-gray-400 font-normal">(optional)</span>
-                    </label>
-                    <input
-                      type="date"
-                      name="end_date"
-                      defaultValue={(editingProject || copyingProject)?.end_date}
-                      className="input"
-                    />
-                  </div>
+                <div>
+                  <label className="block text-sm font-medium text-gray-700 mb-1">
+                    Time per Task (Minutes) <span className="text-red-500">*</span>
+                  </label>
+                  <input
+                    type="number"
+                    name="estimated_time_per_task"
+                    required
+                    min="0.1"
+                    step="0.1"
+                    defaultValue={(editingProject || copyingProject)?.estimated_time_per_task ? parseFloat(((editingProject || copyingProject).estimated_time_per_task * 60).toFixed(1)) : ''}
+                    className="input"
+                    placeholder="30"
+                  />
                 </div>
 
                 <div>
                   <label className="block text-sm font-medium text-gray-700 mb-1">
-                    Required Skills
+                    Start Date <span className="text-red-500">*</span>
                   </label>
-                  <SkillMultiSelect
-                    options={skillsData.map((skill) => skill.name)}
-                    value={selectedSkills}
-                    onChange={setSelectedSkills}
+                  <input
+                    type="date"
+                    name="start_date"
+                    required
+                    defaultValue={(editingProject || copyingProject)?.start_date}
+                    className="input"
                   />
-                  <p className="mt-1 text-xs text-gray-500">
-                    Select skills to see available employees count below
-                  </p>
                 </div>
 
                 <div>
