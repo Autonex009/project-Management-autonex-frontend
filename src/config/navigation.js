@@ -1,8 +1,9 @@
-import { Users, FolderKanban, Calendar, LayoutDashboard, UserCog, Layers, FileText, UserPlus, Users2, IndianRupee, Settings, Star } from 'lucide-react';
+import { Users, FolderKanban, Calendar, LayoutDashboard, UserCog, Layers, FileText, UserPlus, Users2, IndianRupee, Settings, Star, BarChart3 } from 'lucide-react';
 
 export const navigation = [
     { name: 'Dashboard', href: '/admin/dashboard', icon: LayoutDashboard },
     { name: 'Projects', href: '/admin/sub-projects', icon: FolderKanban },
+    { name: 'Analytics', href: '/admin/analytics', icon: BarChart3 },
     { name: 'Employees', href: '/admin/employees', icon: Users },
     { name: 'Signup Requests', href: '/admin/signup-requests', icon: UserPlus },
     { name: 'Allocations', href: '/admin/allocations', icon: UserCog },
