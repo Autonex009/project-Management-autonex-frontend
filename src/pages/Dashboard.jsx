@@ -269,10 +269,9 @@ const Dashboard = () => {
         />
       </div>
 
-      {/* Row 2-3: Main Content (8 cols) + Sidebar (4 cols) */}
-      <div className="grid grid-cols-1 xl:grid-cols-12 gap-6">
-        {/* Main List Card (8 cols) */}
-        <div className="xl:col-span-8">
+      {/* Row 2-3: Project Status (full width) */}
+      <div>
+        <div>
           <Card>
             <CardHeader
               title="Project Status"
@@ -321,7 +320,7 @@ const Dashboard = () => {
                     ),
                   },
                 ]}
-                data={projectAnalyses.slice(0, 5)}
+                data={projectAnalyses.slice(0, 10)}
                 emptyState={{ title: 'No projects', description: 'Active projects will appear here' }}
               />
             </CardContent>
@@ -331,39 +330,6 @@ const Dashboard = () => {
               </Button>
             </CardFooter>
           </Card>
-        </div>
-
-        {/* Sidebar (4 cols) */}
-        <div className="xl:col-span-4 space-y-6">
-          {/* Skills Card */}
-          <Card>
-            <CardHeader title="Skill Availability" />
-            <CardContent>
-              <div className="space-y-4">
-                {skillsSummary.skills && Object.entries(skillsSummary.skills).slice(0, 5).map(([skill, data]) => {
-                  const percentage = Math.round((data.available / data.total) * 100) || 0;
-                  const isLow = percentage < 30;
-                  return (
-                    <div key={skill}>
-                      <div className="flex justify-between text-sm mb-1.5">
-                        <span className="font-medium text-slate-700 capitalize">{skill}</span>
-                        <span className={`font-mono text-xs ${isLow ? 'text-red-500 font-semibold' : 'text-slate-400'}`}>{data.available}/{data.total}</span>
-                      </div>
-                      <div className="h-2 w-full bg-slate-100 rounded-full overflow-hidden">
-                        <div className={`h-full rounded-full transition-all ${isLow ? 'bg-red-500' : 'bg-indigo-500'}`} style={{ width: `${percentage}%` }}></div>
-                      </div>
-                    </div>
-                  );
-                })}
-              </div>
-            </CardContent>
-          </Card>
-
-          {/* Quick Actions */}
-          <div className="grid grid-cols-2 gap-4">
-            <ActionCard title="New Project" icon={Plus} onClick={() => navigate('/admin/projects')} />
-            <ActionCard title="Allocate" icon={Users} onClick={() => navigate('/admin/allocations')} />
-          </div>
         </div>
       </div>
     </div>

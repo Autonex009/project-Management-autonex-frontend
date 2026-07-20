@@ -94,7 +94,8 @@ function App() {
             }>
               <Route index element={<Navigate to="/admin/dashboard" replace />} />
               <Route path="dashboard" element={<Dashboard />} />
-              <Route path="projects" element={<ProjectsPage />} />
+              {/* Organizations page removed on admin — redirect to Projects */}
+              <Route path="projects" element={<Navigate to="/admin/sub-projects" replace />} />
               <Route path="employees" element={<EmployeesPage />} />
               <Route path="sub-projects" element={<SubProjectsPage />} />
               <Route path="allocations" element={<AllocationsPage />} />
