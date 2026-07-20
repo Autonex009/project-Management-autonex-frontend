@@ -305,7 +305,7 @@ const Dashboard = () => {
                     align: 'center',
                     render: (_, row) => (
                       <span className="text-sm text-slate-600 font-mono">
-                        {format(parseISO(row.project.end_date), 'MMM dd')}
+                        {row.project.end_date ? format(parseISO(row.project.end_date), 'MMM dd') : '—'}
                       </span>
                     ),
                   },
