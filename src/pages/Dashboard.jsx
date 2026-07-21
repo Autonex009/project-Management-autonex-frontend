@@ -5,7 +5,7 @@ import { subProjectApi, employeeApi, allocationApi, leaveApi, skillsApi } from '
 import { FolderKanban, Calendar, Users, AlertTriangle, ArrowUpRight, Activity, Zap, Target, TrendingUp, Plus, ChevronRight } from 'lucide-react';
 import Table from '../components/ui/Table';
 import Button from '../components/ui/Button';
-import { format, isWithinInterval, parseISO } from 'date-fns';
+import { format, isValid, isWithinInterval, parseISO } from 'date-fns';
 import { getWorkingDays } from '../utils/dateCalculations';
 
 // ===============================================
@@ -303,11 +303,14 @@ const Dashboard = () => {
                     key: '_deadline',
                     label: 'Deadline',
                     align: 'center',
-                    render: (_, row) => (
-                      <span className="text-sm text-slate-600 font-mono">
-                        {format(parseISO(row.project.end_date), 'MMM dd')}
-                      </span>
-                    ),
+                    render: (_, row) => {
+                      const parsed = row.project?.end_date ? parseISO(row.project.end_date) : null;
+                      return (
+                        <span className="text-sm text-slate-600 font-mono">
+                          {parsed && isValid(parsed) ? format(parsed, 'MMM dd') : '—'}
+                        </span>
+                      );
+                    },
                   },
                   {
                     key: '_insight',
