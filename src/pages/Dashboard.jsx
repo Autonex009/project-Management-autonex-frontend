@@ -303,14 +303,11 @@ const Dashboard = () => {
                     key: '_deadline',
                     label: 'Deadline',
                     align: 'center',
-                    render: (_, row) => {
-                      const parsed = row.project?.end_date ? parseISO(row.project.end_date) : null;
-                      return (
-                        <span className="text-sm text-slate-600 font-mono">
-                          {parsed && isValid(parsed) ? format(parsed, 'MMM dd') : '—'}
-                        </span>
-                      );
-                    },
+                    render: (_, row) => (
+                      <span className="text-sm text-slate-600 font-mono">
+                        {row.project.end_date ? format(parseISO(row.project.end_date), 'MMM dd') : '—'}
+                      </span>
+                    ),
                   },
                   {
                     key: '_insight',
