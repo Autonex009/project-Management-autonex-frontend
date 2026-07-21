@@ -5,7 +5,7 @@ import { subProjectApi, employeeApi, allocationApi, leaveApi, skillsApi } from '
 import { FolderKanban, Calendar, Users, AlertTriangle, ArrowUpRight, Activity, Zap, Target, TrendingUp, Plus, ChevronRight } from 'lucide-react';
 import Table from '../components/ui/Table';
 import Button from '../components/ui/Button';
-import { format, isWithinInterval, parseISO } from 'date-fns';
+import { format, isValid, isWithinInterval, parseISO } from 'date-fns';
 import { getWorkingDays } from '../utils/dateCalculations';
 
 // ===============================================

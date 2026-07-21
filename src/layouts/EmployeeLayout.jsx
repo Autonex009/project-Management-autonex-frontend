@@ -268,7 +268,7 @@ const EmployeeLayout = () => {
             </div>
 
             {/* AI Chat Widget */}
-            <ChatWidget />
+            {/* <ChatWidget /> */}
         </div>
     );
 };

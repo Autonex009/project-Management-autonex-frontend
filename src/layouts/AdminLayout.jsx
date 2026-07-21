@@ -290,7 +290,7 @@ const AdminLayout = () => {
       )}
 
       {/* AI Chat Widget */}
-      <ChatWidget role="admin" />
+      {/* <ChatWidget role="admin" /> */}
     </div>
   );
 };
