@@ -6,7 +6,6 @@ import { FolderKanban, Calendar, Users, AlertTriangle, ArrowUpRight, Activity, Z
 import Table from '../components/ui/Table';
 import Button from '../components/ui/Button';
 import { Card, CardHeader, CardContent, CardFooter, MetricCard } from '../components/ui/Card';
-import { format, isWithinInterval, parseISO } from 'date-fns';
 import { format, isValid, isWithinInterval, parseISO } from 'date-fns';
 import { getWorkingDays } from '../utils/dateCalculations';
 
