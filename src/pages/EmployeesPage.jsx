@@ -713,6 +713,7 @@ const EmployeesPage = () => {
       name: formData.get('name'),
       email: formData.get('email'),
       razorpay_email: formData.get('razorpay_email') || null,
+      encord_id: formData.get('encord_id') || null,
       employee_type: formData.get('employee_type'),
       designation: formData.get('designation') || 'Annotator/ Reviewer',
       working_hours_per_day: parseFloat(formData.get('working_hours_per_day')),
@@ -1165,6 +1166,18 @@ const EmployeesPage = () => {
                         defaultValue={editingEmployee?.razorpay_email}
                         className="input"
                         placeholder="john.razorpay@example.com"
+                      />
+                    </div>
+                    <div>
+                      <label className="block text-sm font-medium text-gray-700 mb-1">
+                        Encord ID / Email
+                      </label>
+                      <input
+                        type="text"
+                        name="encord_id"
+                        defaultValue={editingEmployee?.encord_id}
+                        className="input"
+                        placeholder="john.encord@example.com"
                       />
                     </div>
                   </div>
