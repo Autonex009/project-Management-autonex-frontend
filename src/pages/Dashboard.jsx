@@ -5,91 +5,9 @@ import { subProjectApi, employeeApi, allocationApi, leaveApi, skillsApi } from '
 import { FolderKanban, Calendar, Users, AlertTriangle, ArrowUpRight, Activity, Zap, Target, TrendingUp, Plus, ChevronRight } from 'lucide-react';
 import Table from '../components/ui/Table';
 import Button from '../components/ui/Button';
+import { Card, CardHeader, CardContent, CardFooter, MetricCard } from '../components/ui/Card';
 import { format, isValid, isWithinInterval, parseISO } from 'date-fns';
 import { getWorkingDays } from '../utils/dateCalculations';
-
-// ===============================================
-// DESIGN SYSTEM: Card Component Architecture
-// ===============================================
-
-// The Core Card Shell
-const Card = ({ children, className = '', loading = false, onClick }) => (
-  <div 
-    onClick={onClick}
-    className={`bg-white rounded-2xl border border-slate-200/60 shadow-[0_1px_3px_rgba(0,0,0,0.04)] hover:shadow-[0_4px_12px_rgba(0,0,0,0.06)] transition-all duration-300 ${onClick ? 'cursor-pointer hover:border-slate-300/80 hover:scale-[1.02]' : ''} ${className}`}
-  >
-    {loading ? <CardSkeleton /> : children}
-  </div>
-);
-
-const CardHeader = ({ title, subtitle, action, badge }) => (
-  <div className="flex items-center justify-between p-5 pb-0">
-    <div>
-      <div className="flex items-center gap-2">
-        <h3 className="font-semibold text-slate-800">{title}</h3>
-        {badge && <span className="px-2 py-0.5 text-xs font-medium bg-indigo-50 text-indigo-600 rounded-full">{badge}</span>}
-      </div>
-      {subtitle && <p className="text-sm text-slate-500 mt-0.5">{subtitle}</p>}
-    </div>
-    {action && <div className="text-slate-400 hover:text-slate-600 transition-colors cursor-pointer">{action}</div>}
-  </div>
-);
-
-const CardContent = ({ children, className = '' }) => (
-  <div className={`p-5 ${className}`}>{children}</div>
-);
-
-const CardFooter = ({ children }) => (
-  <div className="px-5 py-3 border-t border-slate-100 text-sm text-slate-500">{children}</div>
-);
-
-const CardSkeleton = () => (
-  <div className="p-5 animate-pulse">
-    <div className="h-4 bg-slate-200 rounded w-1/3 mb-4"></div>
-    <div className="h-8 bg-slate-200 rounded w-1/2 mb-2"></div>
-    <div className="h-3 bg-slate-100 rounded w-2/3"></div>
-  </div>
-);
-
-// Variant: Metric Card (KPI)
-const MetricCard = ({ title, value, subtitle, trend, trendPositive, icon: Icon, loading, onClick }) => (
-  <Card loading={loading} onClick={onClick}>
-    <CardContent className="p-6">
-      <div className="flex items-start justify-between">
-        <div className="flex-1">
-          <p className="text-sm font-medium text-slate-500">{title}</p>
-          <div className="flex items-baseline gap-2 mt-2">
-            <span className="text-3xl font-bold text-slate-900 tracking-tight">{value}</span>
-            {trend && (
-              <span className={`text-sm font-semibold ${trendPositive ? 'text-emerald-600' : 'text-red-500'}`}>
-                {trend}
-              </span>
-            )}
-          </div>
-          {subtitle && <p className="text-sm text-slate-400 mt-1">{subtitle}</p>}
-        </div>
-        {Icon && (
-          <div className="p-3 bg-slate-50 rounded-xl">
-            <Icon className="w-5 h-5 text-slate-600" />
-          </div>
-        )}
-      </div>
-    </CardContent>
-  </Card>
-);
-
-// Variant: Action Card (Add New)
-const ActionCard = ({ title, icon: Icon, onClick }) => (
-  <div
-    onClick={onClick}
-    className="bg-white rounded-2xl border-2 border-dashed border-slate-200 hover:border-indigo-400 hover:bg-indigo-50/30 transition-all duration-200 cursor-pointer p-6 flex flex-col items-center justify-center text-center group min-h-[160px]"
-  >
-    <div className="p-3 bg-slate-100 group-hover:bg-indigo-100 rounded-xl mb-3 transition-colors">
-      <Icon className="w-6 h-6 text-slate-500 group-hover:text-indigo-600 transition-colors" />
-    </div>
-    <span className="font-medium text-slate-600 group-hover:text-indigo-600 transition-colors">{title}</span>
-  </div>
-);
 
 // ===============================================
 // DASHBOARD COMPONENT
