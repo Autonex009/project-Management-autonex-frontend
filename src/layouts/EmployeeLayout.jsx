@@ -116,7 +116,7 @@ const EmployeeLayout = () => {
         ];
 
     const handleLogout = () => {
-        authApi.logout().catch(() => {}).finally(() => {
+        authApi.logout().catch(() => { }).finally(() => {
             localStorage.removeItem('token');
             localStorage.removeItem('user');
             localStorage.removeItem('role');
@@ -149,7 +149,7 @@ const EmployeeLayout = () => {
                         </div>
                     </div>
 
-                    <nav 
+                    <nav
                         className="flex-1 overflow-y-auto p-4 space-y-1"
                         style={{ scrollbarWidth: 'none', msOverflowStyle: 'none' }}
                     >
@@ -162,8 +162,8 @@ const EmployeeLayout = () => {
                                 className={({ isActive }) =>
                                     `flex items-center rounded-xl text-sm font-medium transition-all duration-200 group relative
                                     ${isActive ? theme.active : theme.inactive}
-                                    ${isSidebarCollapsed 
-                                        ? 'lg:justify-center lg:w-12 lg:h-12 lg:px-0 lg:mx-auto gap-0' 
+                                    ${isSidebarCollapsed
+                                        ? 'lg:justify-center lg:w-12 lg:h-12 lg:px-0 lg:mx-auto gap-0'
                                         : 'px-4 py-3 gap-3 w-full'
                                     }`
                                 }
@@ -218,8 +218,8 @@ const EmployeeLayout = () => {
                             onClick={handleLogout}
                             title={isSidebarCollapsed ? "Sign out" : undefined}
                             className={`flex items-center justify-center text-red-500 hover:bg-red-50 border border-transparent rounded-lg transition-all
-                                ${isSidebarCollapsed 
-                                    ? 'w-10 h-10 lg:p-0' 
+                                ${isSidebarCollapsed
+                                    ? 'w-10 h-10 lg:p-0'
                                     : 'w-full gap-2 px-4 py-2.5 text-sm'
                                 }
                             `}

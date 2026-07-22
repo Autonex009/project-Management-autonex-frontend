@@ -62,106 +62,106 @@ function EmployeeAvailabilityModal({ employee, onClose }) {
         </Modal.Body>
       ) : data ? (
         <Modal.Body className="space-y-6">
-            {/* Availability Banner */}
-            <div className={`flex items-center gap-3 rounded-xl px-4 py-3 ${data.available_next_30_days ? 'bg-emerald-50 border border-emerald-100' : 'bg-amber-50 border border-amber-100'}`}>
-              {data.available_next_30_days
-                ? <CheckCircle className="w-5 h-5 text-emerald-500 flex-shrink-0" />
-                : <AlertCircle className="w-5 h-5 text-amber-500 flex-shrink-0" />
-              }
-              <div>
-                <p className={`text-sm font-semibold ${data.available_next_30_days ? 'text-emerald-700' : 'text-amber-700'}`}>
-                  {data.available_next_30_days ? 'Available for the next 30 days' : 'Has leave/WFH in the next 30 days'}
-                </p>
-                <p className="text-xs text-slate-500 mt-0.5">As of {new Date(data.today + 'T00:00:00').toLocaleDateString('en-IN', { day: 'numeric', month: 'long', year: 'numeric' })}</p>
-              </div>
+          {/* Availability Banner */}
+          <div className={`flex items-center gap-3 rounded-xl px-4 py-3 ${data.available_next_30_days ? 'bg-emerald-50 border border-emerald-100' : 'bg-amber-50 border border-amber-100'}`}>
+            {data.available_next_30_days
+              ? <CheckCircle className="w-5 h-5 text-emerald-500 flex-shrink-0" />
+              : <AlertCircle className="w-5 h-5 text-amber-500 flex-shrink-0" />
+            }
+            <div>
+              <p className={`text-sm font-semibold ${data.available_next_30_days ? 'text-emerald-700' : 'text-amber-700'}`}>
+                {data.available_next_30_days ? 'Available for the next 30 days' : 'Has leave/WFH in the next 30 days'}
+              </p>
+              <p className="text-xs text-slate-500 mt-0.5">As of {new Date(data.today + 'T00:00:00').toLocaleDateString('en-IN', { day: 'numeric', month: 'long', year: 'numeric' })}</p>
             </div>
+          </div>
 
-            {/* Upcoming Leaves */}
-            {(data.upcoming_leaves.length > 0 || data.upcoming_wfh.length > 0) && (
-              <section>
-                <h3 className="text-xs font-semibold text-slate-400 uppercase tracking-wider mb-3">Upcoming (Next 30 Days)</h3>
-                <div className="space-y-2">
-                  {data.upcoming_leaves.map((leave) => (
-                    <div key={leave.leave_id} className="flex items-start gap-3 rounded-xl border border-slate-100 p-3">
-                      <div className="mt-0.5">
-                        <span className={`inline-flex items-center px-2 py-0.5 rounded-full text-[11px] font-medium ${LEAVE_TYPE_COLORS[leave.leave_type] || 'bg-slate-100 text-slate-600'}`}>
-                          {LEAVE_TYPE_LABELS[leave.leave_type] || leave.leave_type}
-                        </span>
-                      </div>
-                      <div className="flex-1 min-w-0">
-                        <p className="text-sm font-medium text-slate-700">{formatDateRange(leave.start_date, leave.end_date)}</p>
-                        {leave.reason && <p className="text-xs text-slate-400 mt-0.5 truncate">{leave.reason}</p>}
-                      </div>
-                      <span className={`text-[11px] px-2 py-0.5 rounded-full font-medium flex-shrink-0 ${STATUS_COLORS[leave.status] || 'bg-slate-100 text-slate-500'}`}>
-                        {leave.status}
+          {/* Upcoming Leaves */}
+          {(data.upcoming_leaves.length > 0 || data.upcoming_wfh.length > 0) && (
+            <section>
+              <h3 className="text-xs font-semibold text-slate-400 uppercase tracking-wider mb-3">Upcoming (Next 30 Days)</h3>
+              <div className="space-y-2">
+                {data.upcoming_leaves.map((leave) => (
+                  <div key={leave.leave_id} className="flex items-start gap-3 rounded-xl border border-slate-100 p-3">
+                    <div className="mt-0.5">
+                      <span className={`inline-flex items-center px-2 py-0.5 rounded-full text-[11px] font-medium ${LEAVE_TYPE_COLORS[leave.leave_type] || 'bg-slate-100 text-slate-600'}`}>
+                        {LEAVE_TYPE_LABELS[leave.leave_type] || leave.leave_type}
                       </span>
                     </div>
-                  ))}
-                  {data.upcoming_wfh.map((wfh) => (
-                    <div key={wfh.id} className="flex items-start gap-3 rounded-xl border border-slate-100 p-3">
-                      <div className="mt-0.5">
-                        <span className="inline-flex items-center px-2 py-0.5 rounded-full text-[11px] font-medium bg-purple-100 text-purple-700">
-                          ðŸ  WFH
-                        </span>
-                      </div>
-                      <div className="flex-1 min-w-0">
-                        <p className="text-sm font-medium text-slate-700">{new Date(wfh.date + 'T00:00:00').toLocaleDateString('en-IN', { day: 'numeric', month: 'short', weekday: 'short' })}</p>
-                        {wfh.reason && <p className="text-xs text-slate-400 mt-0.5 truncate">{wfh.reason}</p>}
-                      </div>
-                      <span className={`text-[11px] px-2 py-0.5 rounded-full font-medium flex-shrink-0 ${STATUS_COLORS[wfh.status] || 'bg-slate-100 text-slate-500'}`}>
-                        {wfh.status}
+                    <div className="flex-1 min-w-0">
+                      <p className="text-sm font-medium text-slate-700">{formatDateRange(leave.start_date, leave.end_date)}</p>
+                      {leave.reason && <p className="text-xs text-slate-400 mt-0.5 truncate">{leave.reason}</p>}
+                    </div>
+                    <span className={`text-[11px] px-2 py-0.5 rounded-full font-medium flex-shrink-0 ${STATUS_COLORS[leave.status] || 'bg-slate-100 text-slate-500'}`}>
+                      {leave.status}
+                    </span>
+                  </div>
+                ))}
+                {data.upcoming_wfh.map((wfh) => (
+                  <div key={wfh.id} className="flex items-start gap-3 rounded-xl border border-slate-100 p-3">
+                    <div className="mt-0.5">
+                      <span className="inline-flex items-center px-2 py-0.5 rounded-full text-[11px] font-medium bg-purple-100 text-purple-700">
+                        ðŸ  WFH
                       </span>
                     </div>
-                  ))}
-                </div>
-              </section>
-            )}
+                    <div className="flex-1 min-w-0">
+                      <p className="text-sm font-medium text-slate-700">{new Date(wfh.date + 'T00:00:00').toLocaleDateString('en-IN', { day: 'numeric', month: 'short', weekday: 'short' })}</p>
+                      {wfh.reason && <p className="text-xs text-slate-400 mt-0.5 truncate">{wfh.reason}</p>}
+                    </div>
+                    <span className={`text-[11px] px-2 py-0.5 rounded-full font-medium flex-shrink-0 ${STATUS_COLORS[wfh.status] || 'bg-slate-100 text-slate-500'}`}>
+                      {wfh.status}
+                    </span>
+                  </div>
+                ))}
+              </div>
+            </section>
+          )}
 
-            {/* Past Leaves */}
-            {(data.past_leaves.length > 0 || data.past_wfh.length > 0) && (
-              <section>
-                <h3 className="text-xs font-semibold text-slate-400 uppercase tracking-wider mb-3 flex items-center gap-1.5">
-                  <Clock className="w-3.5 h-3.5" /> Past 30 Days
-                </h3>
-                <div className="space-y-2">
-                  {data.past_leaves.map((leave) => (
-                    <div key={leave.leave_id} className="flex items-start gap-3 rounded-xl border border-slate-100 bg-slate-50 p-3">
-                      <div className="mt-0.5">
-                        <span className={`inline-flex items-center px-2 py-0.5 rounded-full text-[11px] font-medium ${LEAVE_TYPE_COLORS[leave.leave_type] || 'bg-slate-100 text-slate-600'}`}>
-                          {LEAVE_TYPE_LABELS[leave.leave_type] || leave.leave_type}
-                        </span>
-                      </div>
-                      <div className="flex-1 min-w-0">
-                        <p className="text-sm font-medium text-slate-600">{formatDateRange(leave.start_date, leave.end_date)}</p>
-                        {leave.reason && <p className="text-xs text-slate-400 mt-0.5 truncate">{leave.reason}</p>}
-                      </div>
-                      <span className={`text-[11px] px-2 py-0.5 rounded-full font-medium flex-shrink-0 ${STATUS_COLORS[leave.status] || 'bg-slate-100 text-slate-500'}`}>
-                        {leave.status}
+          {/* Past Leaves */}
+          {(data.past_leaves.length > 0 || data.past_wfh.length > 0) && (
+            <section>
+              <h3 className="text-xs font-semibold text-slate-400 uppercase tracking-wider mb-3 flex items-center gap-1.5">
+                <Clock className="w-3.5 h-3.5" /> Past 30 Days
+              </h3>
+              <div className="space-y-2">
+                {data.past_leaves.map((leave) => (
+                  <div key={leave.leave_id} className="flex items-start gap-3 rounded-xl border border-slate-100 bg-slate-50 p-3">
+                    <div className="mt-0.5">
+                      <span className={`inline-flex items-center px-2 py-0.5 rounded-full text-[11px] font-medium ${LEAVE_TYPE_COLORS[leave.leave_type] || 'bg-slate-100 text-slate-600'}`}>
+                        {LEAVE_TYPE_LABELS[leave.leave_type] || leave.leave_type}
                       </span>
                     </div>
-                  ))}
-                  {data.past_wfh.map((wfh) => (
-                    <div key={wfh.id} className="flex items-start gap-3 rounded-xl border border-slate-100 bg-slate-50 p-3">
-                      <div className="mt-0.5">
-                        <span className="inline-flex items-center px-2 py-0.5 rounded-full text-[11px] font-medium bg-purple-100 text-purple-700">
-                          ðŸ  WFH
-                        </span>
-                      </div>
-                      <div className="flex-1 min-w-0">
-                        <p className="text-sm font-medium text-slate-600">{new Date(wfh.date + 'T00:00:00').toLocaleDateString('en-IN', { day: 'numeric', month: 'short', weekday: 'short' })}</p>
-                        {wfh.reason && <p className="text-xs text-slate-400 mt-0.5 truncate">{wfh.reason}</p>}
-                      </div>
-                      <span className={`text-[11px] px-2 py-0.5 rounded-full font-medium flex-shrink-0 ${STATUS_COLORS[wfh.status] || 'bg-slate-100 text-slate-500'}`}>
-                        {wfh.status}
+                    <div className="flex-1 min-w-0">
+                      <p className="text-sm font-medium text-slate-600">{formatDateRange(leave.start_date, leave.end_date)}</p>
+                      {leave.reason && <p className="text-xs text-slate-400 mt-0.5 truncate">{leave.reason}</p>}
+                    </div>
+                    <span className={`text-[11px] px-2 py-0.5 rounded-full font-medium flex-shrink-0 ${STATUS_COLORS[leave.status] || 'bg-slate-100 text-slate-500'}`}>
+                      {leave.status}
+                    </span>
+                  </div>
+                ))}
+                {data.past_wfh.map((wfh) => (
+                  <div key={wfh.id} className="flex items-start gap-3 rounded-xl border border-slate-100 bg-slate-50 p-3">
+                    <div className="mt-0.5">
+                      <span className="inline-flex items-center px-2 py-0.5 rounded-full text-[11px] font-medium bg-purple-100 text-purple-700">
+                        ðŸ  WFH
                       </span>
                     </div>
-                  ))}
-                </div>
-              </section>
-            )}
+                    <div className="flex-1 min-w-0">
+                      <p className="text-sm font-medium text-slate-600">{new Date(wfh.date + 'T00:00:00').toLocaleDateString('en-IN', { day: 'numeric', month: 'short', weekday: 'short' })}</p>
+                      {wfh.reason && <p className="text-xs text-slate-400 mt-0.5 truncate">{wfh.reason}</p>}
+                    </div>
+                    <span className={`text-[11px] px-2 py-0.5 rounded-full font-medium flex-shrink-0 ${STATUS_COLORS[wfh.status] || 'bg-slate-100 text-slate-500'}`}>
+                      {wfh.status}
+                    </span>
+                  </div>
+                ))}
+              </div>
+            </section>
+          )}
 
-            {data.upcoming_leaves.length === 0 && data.upcoming_wfh.length === 0 &&
-             data.past_leaves.length === 0 && data.past_wfh.length === 0 && (
+          {data.upcoming_leaves.length === 0 && data.upcoming_wfh.length === 0 &&
+            data.past_leaves.length === 0 && data.past_wfh.length === 0 && (
               <p className="text-sm text-slate-400 text-center py-6">No leave or WFH records in the past or next 30 days.</p>
             )}
         </Modal.Body>
@@ -583,6 +583,7 @@ const EmployeesPage = () => {
   const [currentPage, setCurrentPage] = useState(1);
   const [formDesignation, setFormDesignation] = useState('Annotator/ Reviewer');
   const [formEmployeeType, setFormEmployeeType] = useState('Full-time');
+  const [formWorkModel, setFormWorkModel] = useState('WFO');
   const [formEmpStatus, setFormEmpStatus] = useState('active');
   const PAGE_SIZE = 10;
 
@@ -695,6 +696,7 @@ const EmployeesPage = () => {
     setEditingEmployee(null);
     setFormDesignation('Annotator/ Reviewer');
     setFormEmployeeType('Full-time');
+    setFormWorkModel('WFO');
     setFormEmpStatus('active');
   };
 
@@ -713,8 +715,8 @@ const EmployeesPage = () => {
       name: formData.get('name'),
       email: formData.get('email'),
       razorpay_email: formData.get('razorpay_email') || null,
-      encord_id: formData.get('encord_id') || null,
       employee_type: formData.get('employee_type'),
+      work_model: formData.get('work_model') || 'WFO',
       designation: formData.get('designation') || 'Annotator/ Reviewer',
       working_hours_per_day: parseFloat(formData.get('working_hours_per_day')),
       weekly_availability: parseFloat(formData.get('weekly_availability')),
@@ -812,11 +814,10 @@ const EmployeesPage = () => {
               params.delete('status');
               setSearchParams(params);
             }}
-            className={`px-4 py-2 text-sm font-semibold border-b-2 -mb-px transition-colors ${
-              statusParam !== 'archived'
-                ? 'border-indigo-600 text-indigo-600'
-                : 'border-transparent text-slate-500 hover:text-slate-700'
-            }`}
+            className={`px-4 py-2 text-sm font-semibold border-b-2 -mb-px transition-colors ${statusParam !== 'archived'
+              ? 'border-indigo-600 text-indigo-600'
+              : 'border-transparent text-slate-500 hover:text-slate-700'
+              }`}
           >
             Active Team
           </button>
@@ -826,11 +827,10 @@ const EmployeesPage = () => {
               params.set('status', 'archived');
               setSearchParams(params);
             }}
-            className={`px-4 py-2 text-sm font-semibold border-b-2 -mb-px transition-colors ${
-              statusParam === 'archived'
-                ? 'border-indigo-600 text-indigo-600'
-                : 'border-transparent text-slate-500 hover:text-slate-700'
-            }`}
+            className={`px-4 py-2 text-sm font-semibold border-b-2 -mb-px transition-colors ${statusParam === 'archived'
+              ? 'border-indigo-600 text-indigo-600'
+              : 'border-transparent text-slate-500 hover:text-slate-700'
+              }`}
           >
             Archived / Former
           </button>
@@ -869,11 +869,10 @@ const EmployeesPage = () => {
                       }
                       setSearchParams(params);
                     }}
-                    className={`px-3 py-1.5 text-xs font-semibold rounded-lg transition-all ${
-                      isActive
-                        ? 'bg-white text-indigo-600 shadow-sm'
-                        : 'text-slate-500 hover:text-slate-800 hover:bg-white/50'
-                    }`}
+                    className={`px-3 py-1.5 text-xs font-semibold rounded-lg transition-all ${isActive
+                      ? 'bg-white text-indigo-600 shadow-sm'
+                      : 'text-slate-500 hover:text-slate-800 hover:bg-white/50'
+                      }`}
                   >
                     {label}
                   </button>
@@ -888,7 +887,7 @@ const EmployeesPage = () => {
             placeholder="Search employees..."
           />
 
-          <Button onClick={() => { setEditingEmployee(null); setFormDesignation('Annotator/ Reviewer'); setFormEmployeeType('Full-time'); setFormEmpStatus('active'); setIsModalOpen(true); }}>
+          <Button onClick={() => { setEditingEmployee(null); setFormDesignation('Annotator/ Reviewer'); setFormEmployeeType('Full-time'); setFormWorkModel('WFO'); setFormEmpStatus('active'); setIsModalOpen(true); }}>
             <Plus className="w-4 h-4" />
             Add Employee
           </Button>
@@ -922,74 +921,253 @@ const EmployeesPage = () => {
       )}
 
       <Table
+        variant="compact"
         loading={isLoading || skillsLoading || allocationsLoading}
         columns={[
-          ColumnTemplates.avatarInfo('name', 'Employee', 'email'),
-          ColumnTemplates.text('designation', 'Designation'),
           {
-            key: 'employee_type',
-            label: 'Type',
-            align: 'center',
+            key: 'name',
+            label: 'Employee',
+            width: 'w-[16%]',
             render: (value, row) => (
-              <div className="flex flex-col items-center gap-1">
-                <span className={`inline-flex px-3.5 py-1.5 rounded-full text-xs font-semibold tracking-wide min-w-[95px] justify-center ${
-                  value === 'Full-time' ? 'bg-emerald-50 text-emerald-700 border border-emerald-200' :
-                  value === 'Part-time' ? 'bg-blue-50 text-blue-700 border border-blue-200' :
-                  'bg-slate-50 text-slate-600 border border-slate-200'
-                }`}>
-                  {value}
-                </span>
-                {row.converted_to_fulltime_at && (
-                  <p className="text-[10px] text-slate-400 font-medium" title={`Promoted from ${row.previous_employee_type || 'Intern'} on ${formatDateDeterministic(row.converted_to_fulltime_at)}`}>
-                    promoted {formatDateDeterministic(row.converted_to_fulltime_at)}
-                  </p>
-                )}
+              <div className="flex items-center gap-2.5">
+                <div className="w-8 h-8 rounded-lg flex items-center justify-center flex-shrink-0 text-white text-xs font-bold bg-gradient-to-br from-indigo-500 to-purple-600">
+                  {String(value || '?')[0].toUpperCase()}
+                </div>
+                <div className="min-w-0 max-w-[150px]">
+                  <div className="font-semibold text-slate-800 truncate" title={value}>
+                    {value}
+                  </div>
+                  <div
+                    onClick={(e) => {
+                      e.stopPropagation();
+                      if (row.email) {
+                        navigator.clipboard.writeText(row.email);
+                        toast.success('Email copied to clipboard');
+                      }
+                    }}
+                    className="text-xs text-slate-400 truncate cursor-pointer hover:text-indigo-600 transition-colors"
+                    title={`Click to copy: ${row.email}`}
+                  >
+                    {row.email}
+                  </div>
+                </div>
               </div>
             ),
           },
           {
-            key: 'working_hours_per_day',
-            label: 'Hours/Day',
-            align: 'center',
-            render: (value) => <span className="font-semibold text-slate-800">{value}h</span>,
+            key: 'designation',
+            label: 'Designation',
+            width: 'w-[11%]',
+            render: (value) => (
+              <span
+                className="text-xs font-medium text-slate-600 whitespace-nowrap truncate max-w-[130px] inline-block align-middle"
+                title={value || '—'}
+              >
+                {value || '—'}
+              </span>
+            ),
+          },
+          {
+            key: 'employee_type',
+            label: 'Type',
+            align: 'left',
+            width: 'w-[8%]',
+            render: (value, row) => {
+              const valStr = String(value || '').toLowerCase().replace('-', ' ').trim();
+              const isFulltime = valStr.includes('full time') || valStr === 'fulltime';
+              const isIntern = valStr.includes('intern');
+              const isContract = valStr.includes('contractor') || valStr.includes('part time');
+              const hasPromotion = Boolean(row.converted_to_fulltime_at);
+
+              let textColorClass = 'text-slate-600 font-medium';
+              let glowClass = '';
+
+              if (isFulltime) {
+                textColorClass = 'text-emerald-600 font-semibold';
+                if (hasPromotion) glowClass = 'drop-shadow-[0_0_6px_rgba(16,185,129,0.75)]';
+              } else if (isIntern) {
+                textColorClass = 'text-amber-600 font-semibold';
+                if (hasPromotion) glowClass = 'drop-shadow-[0_0_6px_rgba(245,158,11,0.75)]';
+              } else if (isContract) {
+                textColorClass = 'text-sky-500 font-semibold';
+                if (hasPromotion) glowClass = 'drop-shadow-[0_0_6px_rgba(56,189,248,0.75)]';
+              }
+
+              const visibleRows = filteredEmployees.slice((currentPage - 1) * PAGE_SIZE, currentPage * PAGE_SIZE);
+              const pageIndex = visibleRows.indexOf(row);
+              const totalVisible = visibleRows.length;
+              const isNearTop = totalVisible <= 2 ? pageIndex === 0 : pageIndex <= 1;
+              const positionClass = isNearTop ? 'top-full mt-1.5' : 'bottom-full mb-1.5';
+
+              return (
+                <div className="group relative flex items-center gap-1.5 whitespace-nowrap cursor-pointer">
+                  <span className={`text-xs ${textColorClass} ${glowClass} transition-all duration-200`}>
+                    {value || '—'}
+                  </span>
+
+                  {hasPromotion && (
+                    <span className="relative flex h-1.5 w-1.5">
+                      <span className="animate-ping absolute inline-flex h-full w-full rounded-full bg-emerald-400 opacity-75"></span>
+                      <span className="relative inline-flex rounded-full h-1.5 w-1.5 bg-emerald-500"></span>
+                    </span>
+                  )}
+
+                  {hasPromotion && (
+                    <div className={`absolute left-0 ${positionClass} hidden group-hover:flex flex-col gap-1.5 z-30 p-2.5 bg-slate-900 text-white rounded-xl shadow-xl border border-slate-700 min-w-[190px] max-w-[250px] pointer-events-none whitespace-normal`}>
+                      <div className="text-[11px] font-semibold text-slate-400 uppercase tracking-wider">
+                        Promotion Details
+                      </div>
+                      <div className="text-xs text-slate-200 leading-relaxed">
+                        Promoted from <span className="font-semibold text-emerald-400">{row.previous_employee_type || 'Intern'}</span> on <span className="font-semibold text-white">{formatDateDeterministic(row.converted_to_fulltime_at)}</span>
+                      </div>
+                    </div>
+                  )}
+                </div>
+              );
+            },
+          },
+          {
+            key: 'work_model',
+            label: 'Work Model',
+            align: 'left',
+            width: 'w-[8%]',
+            render: (value, row) => (
+              <span className="text-xs font-medium text-slate-600 whitespace-nowrap">
+                {row.work_model || value || 'WFO'}
+              </span>
+            ),
+          },
+          {
+            key: 'reporting_manager',
+            label: 'Reporting Manager',
+            align: 'left',
+            width: 'w-[15%]',
+            render: (_, row) => {
+              const manager =
+                row.reporting_manager_name ||
+                row.reporting_manager ||
+                row.manager_name ||
+                row.manager ||
+                (Array.isArray(row.reporting_managers) && row.reporting_managers.length > 0
+                  ? row.reporting_managers.join(', ')
+                  : Array.isArray(row.reporting_manager_names) && row.reporting_manager_names.length > 0
+                    ? row.reporting_manager_names.join(', ')
+                    : null);
+
+              if (!manager) {
+                return <span className="text-xs text-slate-400 font-medium">-</span>;
+              }
+
+              const managerText = typeof manager === 'object' ? (manager.name || manager.email) : String(manager);
+
+              return (
+                <span
+                  className="text-xs font-medium text-slate-700 whitespace-nowrap truncate max-w-[150px] inline-block align-middle"
+                  title={managerText}
+                >
+                  {managerText}
+                </span>
+              );
+            },
           },
           {
             key: 'skills',
             label: 'Skills',
-            render: (value) => (
-              <div className="text-xs text-slate-600 font-medium">
-                {value && value.length > 0 ? (
-                  <>
-                    <span>{value.slice(0, 3).join(', ')}</span>
-                    {value.length > 3 && <span className="text-slate-400"> +{value.length - 3}</span>}
-                  </>
-                ) : (
-                  <span className="text-slate-400">â€”</span>
-                )}
-              </div>
-            ),
+            width: 'w-[14%]',
+            render: (value, row) => {
+              const skillsList = Array.isArray(value) ? value : [];
+              if (skillsList.length === 0) {
+                return <span className="text-xs text-slate-400">—</span>;
+              }
+
+              const visibleRows = filteredEmployees.slice((currentPage - 1) * PAGE_SIZE, currentPage * PAGE_SIZE);
+              const pageIndex = visibleRows.indexOf(row);
+              const totalVisible = visibleRows.length;
+              const isNearTop = totalVisible <= 2 ? pageIndex === 0 : pageIndex <= 1;
+              const positionClass = isNearTop ? 'top-full mt-1.5' : 'bottom-full mb-1.5';
+              const rawSkillsText = skillsList.slice(0, 2).join(', ');
+              const displaySkillsText = rawSkillsText.length > 20 ? rawSkillsText.slice(0, 19) + '…' : rawSkillsText;
+
+              return (
+                <div className="group relative flex items-center gap-1 flex-nowrap whitespace-nowrap cursor-pointer">
+                  <div className="text-xs text-slate-600 font-medium">
+                    {displaySkillsText}
+                  </div>
+                  {skillsList.length > 2 && (
+                    <span className="inline-flex items-center px-1.5 py-0.5 rounded-md text-xs font-semibold bg-slate-100 text-slate-600 border border-slate-200 hover:bg-indigo-100 hover:text-indigo-700 transition-colors flex-shrink-0">
+                      +{skillsList.length - 2}
+                    </span>
+                  )}
+
+                  {skillsList.length > 2 && (
+                    <div className={`absolute left-0 ${positionClass} hidden group-hover:flex flex-col gap-1.5 z-30 p-2.5 bg-slate-900 text-white rounded-xl shadow-xl border border-slate-700 min-w-[180px] max-w-[260px] pointer-events-none`}>
+                      <div className="text-xs font-semibold text-slate-400 uppercase tracking-wider">
+                        All Skills ({skillsList.length})
+                      </div>
+                      <div className="flex flex-wrap gap-1">
+                        {skillsList.map((skill, idx) => (
+                          <span
+                            key={idx}
+                            className="inline-flex items-center px-2 py-0.5 rounded-md text-xs font-medium bg-blue-500/20 text-blue-200 border border-blue-400/30"
+                          >
+                            {skill}
+                          </span>
+                        ))}
+                      </div>
+                    </div>
+                  )}
+                </div>
+              );
+            },
           },
           {
             key: 'assigned_projects',
             label: 'Assigned Projects',
+            width: 'w-[17%]',
             render: (_, row) => {
               const projects = employeeProjectsMap[row.id];
               if (!projects || projects.size === 0) {
-                return <span className="inline-flex items-center px-2 py-0.5 rounded-full text-xs font-medium bg-amber-50 text-amber-700 border border-amber-200">Idle</span>;
+                return (
+                  <span className="text-xs text-slate-600 font-medium">
+                    Idle
+                  </span>
+                );
               }
               const list = [...projects];
+              const visibleRows = filteredEmployees.slice((currentPage - 1) * PAGE_SIZE, currentPage * PAGE_SIZE);
+              const pageIndex = visibleRows.indexOf(row);
+              const totalVisible = visibleRows.length;
+              const isNearTop = totalVisible <= 2 ? pageIndex === 0 : pageIndex <= 1;
+              const positionClass = isNearTop ? 'top-full mt-1.5' : 'bottom-full mb-1.5';
+              const rawProjectText = list.slice(0, 2).join(', ');
+              const displayProjectText = rawProjectText.length > 20 ? rawProjectText.slice(0, 19) + '…' : rawProjectText;
+
               return (
-                <div className="flex flex-wrap gap-1">
-                  {list.slice(0, 2).map((name, idx) => (
-                    <span key={idx} className="inline-flex items-center px-2 py-0.5 rounded-full text-xs font-medium bg-indigo-50 text-indigo-700 border border-indigo-100 max-w-[140px] truncate" title={name}>
-                      {name}
-                    </span>
-                  ))}
+                <div className="group relative flex items-center gap-1 flex-nowrap whitespace-nowrap cursor-pointer">
+                  <div className="text-xs text-slate-600 font-medium">
+                    {displayProjectText}
+                  </div>
                   {list.length > 2 && (
-                    <span className="text-xs text-slate-400 self-center" title={list.slice(2).join(', ')}>
+                    <span className="inline-flex items-center px-1.5 py-0.5 rounded-md text-xs font-semibold bg-slate-100 text-slate-600 border border-slate-200 hover:bg-indigo-100 hover:text-indigo-700 transition-colors flex-shrink-0">
                       +{list.length - 2}
                     </span>
                   )}
+
+                  <div className={`absolute left-0 ${positionClass} hidden group-hover:flex flex-col gap-1.5 z-30 p-2.5 bg-slate-900 text-white rounded-xl shadow-xl border border-slate-700 min-w-[200px] max-w-[280px] pointer-events-none whitespace-normal`}>
+                    <div className="text-xs font-semibold text-slate-400 uppercase tracking-wider">
+                      All Assigned Projects ({list.length})
+                    </div>
+                    <div className="flex flex-wrap gap-1">
+                      {list.map((name, idx) => (
+                        <span
+                          key={idx}
+                          className="inline-flex items-center px-2 py-0.5 rounded-md text-xs font-medium bg-indigo-500/20 text-indigo-200 border border-indigo-400/30"
+                        >
+                          {name}
+                        </span>
+                      ))}
+                    </div>
+                  </div>
                 </div>
               );
             },
@@ -997,15 +1175,15 @@ const EmployeesPage = () => {
           {
             key: 'status',
             label: 'Status',
-            align: 'center',
+            align: 'left',
+            width: 'w-[9%]',
             render: (value) => (
-              <div className="flex items-center justify-center gap-2">
-                <span className={`w-2 h-2 rounded-full ${
-                  value === 'active' ? 'bg-emerald-500' :
+              <div className="flex items-center justify-start gap-1.5">
+                <span className={`w-2 h-2 rounded-full flex-shrink-0 ${value === 'active' ? 'bg-emerald-500' :
                   value === 'on-leave' ? 'bg-amber-500' :
-                  'bg-slate-400'
-                }`}></span>
-                <span className="text-sm text-slate-600 capitalize">{value}</span>
+                    'bg-slate-400'
+                  }`}></span>
+                <span className="text-xs font-medium text-slate-600 capitalize whitespace-nowrap">{value}</span>
               </div>
             ),
           },
@@ -1013,6 +1191,7 @@ const EmployeesPage = () => {
             key: 'actions',
             label: 'Actions',
             align: 'right',
+            width: 'w-[7%]',
             render: (_, row) => (
               <div className="flex items-center justify-end gap-1">
                 {statusParam === 'archived' ? (
@@ -1041,6 +1220,7 @@ const EmployeesPage = () => {
                         setEditingEmployee(row);
                         setFormDesignation(row.designation || 'Annotator/ Reviewer');
                         setFormEmployeeType(row.employee_type || 'Full-time');
+                        setFormWorkModel(row.work_model || 'WFO');
                         setFormEmpStatus(row.status || 'active');
                         setIsModalOpen(true);
                       }}
@@ -1126,157 +1306,161 @@ const EmployeesPage = () => {
         </Modal.Header>
         <form onSubmit={handleSubmit} className="flex-1 flex flex-col min-h-0" id="employee-form">
           <Modal.Body className="space-y-4">
-                  <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
-                    <div>
-                      <label className="block text-sm font-medium text-gray-700 mb-1">
-                        Full Name <span className="text-red-500">*</span>
-                      </label>
-                      <input
-                        type="text"
-                        name="name"
-                        required
-                        defaultValue={editingEmployee?.name}
-                        className="input"
-                        placeholder="John Doe"
-                      />
-                    </div>
-                    <div>
-                      <label className="block text-sm font-medium text-gray-700 mb-1">
-                        Slack Email <span className="text-red-500">*</span>
-                      </label>
-                      <input
-                        type="email"
-                        name="email"
-                        required
-                        defaultValue={editingEmployee?.email}
-                        className="input"
-                        placeholder="john@example.com"
-                      />
-                    </div>
-                  </div>
+            <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+              <div>
+                <label className="block text-sm font-medium text-gray-700 mb-1">
+                  Full Name <span className="text-red-500">*</span>
+                </label>
+                <input
+                  type="text"
+                  name="name"
+                  required
+                  defaultValue={editingEmployee?.name}
+                  className="input"
+                  placeholder="John Doe"
+                />
+              </div>
+              <div>
+                <label className="block text-sm font-medium text-gray-700 mb-1">
+                  Slack Email <span className="text-red-500">*</span>
+                </label>
+                <input
+                  type="email"
+                  name="email"
+                  required
+                  defaultValue={editingEmployee?.email}
+                  className="input"
+                  placeholder="john@example.com"
+                />
+              </div>
+            </div>
 
-                  <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
-                    <div>
-                      <label className="block text-sm font-medium text-gray-700 mb-1">
-                        Razorpay Email
-                      </label>
-                      <input
-                        type="email"
-                        name="razorpay_email"
-                        defaultValue={editingEmployee?.razorpay_email}
-                        className="input"
-                        placeholder="john.razorpay@example.com"
-                      />
-                    </div>
-                    <div>
-                      <label className="block text-sm font-medium text-gray-700 mb-1">
-                        Encord ID / Email
-                      </label>
-                      <input
-                        type="text"
-                        name="encord_id"
-                        defaultValue={editingEmployee?.encord_id}
-                        className="input"
-                        placeholder="john.encord@example.com"
-                      />
-                    </div>
-                  </div>
+            <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+              <div>
+                <label className="block text-sm font-medium text-gray-700 mb-1">
+                  Razorpay Email
+                </label>
+                <input
+                  type="email"
+                  name="razorpay_email"
+                  defaultValue={editingEmployee?.razorpay_email}
+                  className="input"
+                  placeholder="john.razorpay@example.com"
+                />
+              </div>
+            </div>
 
-                  <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
-                    <div>
-                      <label className="block text-sm font-medium text-gray-700 mb-1">
-                        Designation <span className="text-red-500">*</span>
-                      </label>
-                      <input type="hidden" name="designation" value={formDesignation} />
-                      <Dropdown
-                        options={ALLOWED_DESIGNATIONS.map(d => ({ value: d, label: d }))}
-                        value={formDesignation}
-                        onChange={setFormDesignation}
-                        placeholder="Select designation"
-                      />
-                    </div>
-                    <div>
-                      <label className="block text-sm font-medium text-gray-700 mb-1">
-                        Type <span className="text-red-500">*</span>
-                      </label>
-                      <input type="hidden" name="employee_type" value={formEmployeeType} />
-                      <Dropdown
-                        options={[
-                          { value: 'Full-time', label: 'Full-time' },
-                          { value: 'Part-time', label: 'Part-time' },
-                          { value: 'Intern', label: 'Intern' },
-                          { value: 'Contract', label: 'Contract' },
-                        ]}
-                        value={formEmployeeType}
-                        onChange={setFormEmployeeType}
-                        placeholder="Select type"
-                      />
-                    </div>
-                  </div>
+            <div className="grid grid-cols-1 sm:grid-cols-3 gap-4">
+              <div>
+                <label className="block text-sm font-medium text-gray-700 mb-1">
+                  Designation <span className="text-red-500">*</span>
+                </label>
+                <input type="hidden" name="designation" value={formDesignation} />
+                <Dropdown
+                  options={ALLOWED_DESIGNATIONS.map(d => ({ value: d, label: d }))}
+                  value={formDesignation}
+                  onChange={setFormDesignation}
+                  placeholder="Select designation"
+                />
+              </div>
+              <div>
+                <label className="block text-sm font-medium text-gray-700 mb-1">
+                  Type <span className="text-red-500">*</span>
+                </label>
+                <input type="hidden" name="employee_type" value={formEmployeeType} />
+                <Dropdown
+                  options={[
+                    { value: 'Full-time', label: 'Full-time' },
+                    { value: 'Part-time', label: 'Part-time' },
+                    { value: 'Intern', label: 'Intern' },
+                    { value: 'Contract', label: 'Contract' },
+                  ]}
+                  value={formEmployeeType}
+                  onChange={setFormEmployeeType}
+                  placeholder="Select type"
+                />
+              </div>
+              <div>
+                <label className="block text-sm font-medium text-gray-700 mb-1">
+                  Work Model <span className="text-red-500">*</span>
+                </label>
+                <input type="hidden" name="work_model" value={formWorkModel} />
+                <Dropdown
+                  options={[
+                    { value: 'WFO', label: 'WFO' },
+                    { value: 'WFH', label: 'WFH' },
+                    { value: 'Hybrid', label: 'Hybrid' },
+                  ]}
+                  value={formWorkModel}
+                  onChange={setFormWorkModel}
+                  placeholder="Select work model"
+                />
+              </div>
+            </div>
 
-                  <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
-                    <div>
-                      <label className="block text-sm font-medium text-gray-700 mb-1">
-                        Hours/Day <span className="text-red-500">*</span>
-                      </label>
-                      <input
-                        type="number"
-                        name="working_hours_per_day"
-                        required
-                        step="0.5"
-                        min="1"
-                        max="24"
-                        defaultValue={editingEmployee?.working_hours_per_day || 8}
-                        className="input"
-                      />
-                    </div>
-                    <div>
-                      <label className="block text-sm font-medium text-gray-700 mb-1">
-                        Hours/Week <span className="text-red-500">*</span>
-                      </label>
-                      <input
-                        type="number"
-                        name="weekly_availability"
-                        required
-                        step="0.5"
-                        min="1"
-                        max="168"
-                        defaultValue={editingEmployee?.weekly_availability || 40}
-                        className="input"
-                      />
-                    </div>
-                  </div>
+            <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+              <div>
+                <label className="block text-sm font-medium text-gray-700 mb-1">
+                  Hours/Day <span className="text-red-500">*</span>
+                </label>
+                <input
+                  type="number"
+                  name="working_hours_per_day"
+                  required
+                  step="0.5"
+                  min="1"
+                  max="24"
+                  defaultValue={editingEmployee?.working_hours_per_day || 8}
+                  className="input"
+                />
+              </div>
+              <div>
+                <label className="block text-sm font-medium text-gray-700 mb-1">
+                  Hours/Week <span className="text-red-500">*</span>
+                </label>
+                <input
+                  type="number"
+                  name="weekly_availability"
+                  required
+                  step="0.5"
+                  min="1"
+                  max="168"
+                  defaultValue={editingEmployee?.weekly_availability || 40}
+                  className="input"
+                />
+              </div>
+            </div>
 
-                  <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
-                    <div>
-                      <label className="block text-sm font-medium text-gray-700 mb-1">
-                        Status <span className="text-red-500">*</span>
-                      </label>
-                      <input type="hidden" name="status" value={formEmpStatus} />
-                      <Dropdown
-                        options={[
-                          { value: 'active', label: 'Active' },
-                          { value: 'inactive', label: 'Inactive' },
-                          { value: 'on-leave', label: 'On Leave' },
-                        ]}
-                        value={formEmpStatus}
-                        onChange={setFormEmpStatus}
-                        placeholder="Select status"
-                      />
-                    </div>
-                  </div>
+            <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+              <div>
+                <label className="block text-sm font-medium text-gray-700 mb-1">
+                  Status <span className="text-red-500">*</span>
+                </label>
+                <input type="hidden" name="status" value={formEmpStatus} />
+                <Dropdown
+                  options={[
+                    { value: 'active', label: 'Active' },
+                    { value: 'inactive', label: 'Inactive' },
+                    { value: 'on-leave', label: 'On Leave' },
+                  ]}
+                  value={formEmpStatus}
+                  onChange={setFormEmpStatus}
+                  placeholder="Select status"
+                />
+              </div>
+            </div>
 
-                  <div>
-                    <label className="block text-sm font-medium text-gray-700 mb-1">
-                      Skills <span className="text-red-500">*</span>
-                    </label>
-                    <MultiSelectDropdown
-                      name="skills"
-                      defaultValue={editingEmployee?.skills || []}
-                      predefinedSkills={predefinedSkills}
-                      queryClient={queryClient}
-                    />
-                  </div>
+            <div>
+              <label className="block text-sm font-medium text-gray-700 mb-1">
+                Skills <span className="text-red-500">*</span>
+              </label>
+              <MultiSelectDropdown
+                name="skills"
+                defaultValue={editingEmployee?.skills || []}
+                predefinedSkills={predefinedSkills}
+                queryClient={queryClient}
+              />
+            </div>
           </Modal.Body>
           <Modal.Footer>
             <Button type="button" variant="cancel" onClick={closeEmployeeModal}>
