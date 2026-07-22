@@ -438,7 +438,7 @@ const ProjectsPage = () => {
     const durationDays = endDate ? Math.ceil((new Date(endDate) - start) / (1000 * 60 * 60 * 24)) + 1 : 0;
     const durationWeeks = endDate ? Math.floor(durationDays / 7) : 0;
 
-    const employeesRequired = parseInt(formData.get('employees_required')) || 0;
+    const num = (name) => parseInt(formData.get(name)) || 0;
 
     const data = {
       name: formData.get('name'),
@@ -451,7 +451,13 @@ const ProjectsPage = () => {
       priority: formData.get('priority') || 'medium',
       required_expertise: selectedSkills,
       assigned_employee_ids: [],
-      required_manpower: employeesRequired,
+      // Team composition (required_manpower is auto-computed server-side from the Autonex counts)
+      annotators_total: num('annotators_total'),
+      workforce_annotators: num('workforce_annotators'),
+      autonex_annotators: num('autonex_annotators'),
+      autonex_reviewers: num('autonex_reviewers'),
+      workforce_reviewers: num('workforce_reviewers'),
+      qc_count: num('qc_count'),
       project_duration_weeks: durationWeeks,
       project_duration_days: durationDays,
       project_status: formData.get('project_status') || 'active',
@@ -979,57 +985,47 @@ toast.success(wasEditing ? 'Project updated successfully' : 'Project created suc
                   <label className="block text-sm font-medium text-gray-700 mb-1">
                     Project Sentiment
                   </label>
-                  <textarea
+                  <select
                     name="sentiment"
-                    rows={2}
                     defaultValue={(editingProject || copyingProject)?.sentiment || ''}
-                    className="input resize-none"
-                    placeholder="e.g. On track / At risk — a short note visible to admins"
-                  />
+                    className="input"
+                  >
+                    <option value="">Not set</option>
+                    <option value="GOOD">GOOD</option>
+                    <option value="AVG">AVG</option>
+                    <option value="Poor">Poor</option>
+                  </select>
                 </div>
 
                 <div>
-                  <label className="block text-sm font-medium text-gray-700 mb-1">
-                    Number of Employees Required <span className="text-red-500">*</span>
+                  <label className="block text-sm font-medium text-gray-700 mb-2">
+                    Team Composition
                   </label>
-                  <input
-                    type="number"
-                    name="employees_required"
-                    required
-                    min="1"
-                    defaultValue={(editingProject || copyingProject)?.required_manpower || ''}
-                    className="input"
-                    placeholder="Enter number of employees needed"
-                  />
-
-                  {(() => {
-                    const matchingCount = selectedSkills.length > 0
-                      ? employees.filter(emp =>
-                          emp.status === 'active' &&
-                          selectedSkills.some(skill =>
-                            emp.skills?.some(empSkill =>
-                              empSkill.toLowerCase().includes(skill.toLowerCase())
-                            )
-                          )
-                        ).length
-                      : employees.filter(emp => emp.status === 'active').length;
-
-                    return (
-                      <div className={`mt-2 p-3 rounded border ${matchingCount > 0 ? 'bg-green-50 border-green-200' : 'bg-red-50 border-red-200'}`}>
-                        <div className="flex items-center gap-2">
-                          <UserCheck className={`w-4 h-4 ${matchingCount > 0 ? 'text-green-600' : 'text-red-600'}`} />
-                          <span className={`text-sm font-medium ${matchingCount > 0 ? 'text-green-800' : 'text-red-800'}`}>
-                            {matchingCount} employee{matchingCount !== 1 ? 's' : ''} available{selectedSkills.length > 0 ? ' with matching skills' : ''}
-                          </span>
-                        </div>
-                        {matchingCount === 0 && (
-                          <p className="text-xs text-red-600 mt-1 ml-6">
-                            {selectedSkills.length > 0 ? 'No employees found with the specified skills' : 'No active employees found'}
-                          </p>
-                        )}
+                  <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
+                    {[
+                      ['annotators_total', 'Total no. of Annotators'],
+                      ['workforce_annotators', 'No. of Workforce'],
+                      ['autonex_annotators', 'No. of Autonex Annotators'],
+                      ['autonex_reviewers', 'No. of Autonex Reviewers'],
+                      ['workforce_reviewers', 'No. of Workforce Reviewers'],
+                      ['qc_count', 'No. of QC'],
+                    ].map(([field, label]) => (
+                      <div key={field}>
+                        <label className="block text-xs font-medium text-gray-500 mb-1">{label}</label>
+                        <input
+                          type="number"
+                          name={field}
+                          min="0"
+                          defaultValue={(editingProject || copyingProject)?.[field] ?? ''}
+                          className="input"
+                          placeholder="0"
+                        />
                       </div>
-                    );
-                  })()}
+                    ))}
+                  </div>
+                  <p className="mt-1 text-xs text-gray-500">
+                    Required headcount is auto-set to Autonex Annotators + Autonex Reviewers + QC.
+                  </p>
                 </div>
 
                 <div>

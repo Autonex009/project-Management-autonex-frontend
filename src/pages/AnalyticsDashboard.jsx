@@ -11,8 +11,8 @@ import toast from 'react-hot-toast';
 const sentimentStyle = (s) => {
     const v = (s || '').toLowerCase();
     if (/(green|positive|good|on track)/.test(v)) return 'bg-emerald-50 text-emerald-700';
-    if (/(red|risk|at-risk|bad|blocked|critical)/.test(v)) return 'bg-red-50 text-red-700';
-    if (/(amber|yellow|neutral|watch)/.test(v)) return 'bg-amber-50 text-amber-700';
+    if (/(red|risk|at-risk|bad|blocked|critical|poor)/.test(v)) return 'bg-red-50 text-red-700';
+    if (/(amber|yellow|neutral|watch|avg|average)/.test(v)) return 'bg-amber-50 text-amber-700';
     return 'bg-slate-100 text-slate-600';
 };
 
@@ -23,6 +23,8 @@ const AnalyticsDashboard = () => {
     const { data: rows = [], isLoading } = useQuery({
         queryKey: ['analytics-summary'],
         queryFn: analyticsApi.getSummary,
+        refetchInterval: 10 * 60 * 1000,   // auto-refresh every 10 min
+        refetchOnWindowFocus: true,
     });
 
     const syncMutation = useMutation({
