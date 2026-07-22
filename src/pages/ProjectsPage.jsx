@@ -290,6 +290,7 @@ const ProjectsPage = () => {
   const [isDragActive, setIsDragActive] = useState(false);
   const fileInputRef = useRef(null);
   const [formMainProjectId, setFormMainProjectId] = useState('');
+  const [formOrg, setFormOrg] = useState('');
   const [formPriority, setFormPriority] = useState('medium');
   const [formProjectStatus, setFormProjectStatus] = useState('active');
 
@@ -335,6 +336,20 @@ const ProjectsPage = () => {
   const visibleMainProjects = isPm ? getPmProjects(mainProjects, pmEmployeeId) : mainProjects;
   const visibleProjects = isPm ? getPmSubProjects(projects, mainProjects, pmEmployeeId, allocations) : projects;
 
+  // Organization → Project cascade for the create/edit modal. "Organization" is
+  // the free-text `client` on a main project (same concept as the Organizations
+  // page); a sub-project still attaches to a specific main project (main_project_id),
+  // so the org selection just narrows which projects are offered.
+  const NO_ORG = '— No Organization —';
+  const clientOf = (mp) => (mp?.client || NO_ORG);
+  const organizations = [...new Set(visibleMainProjects.map(clientOf))]
+    .sort((a, b) => (a === NO_ORG ? 1 : b === NO_ORG ? -1 : a.localeCompare(b)));
+  // The organization a given main-project id belongs to (used to prefill on edit/copy).
+  const orgOfMainProject = (mpId) => {
+    const mp = visibleMainProjects.find((p) => p.id === parseInt(mpId));
+    return mp ? clientOf(mp) : '';
+  };
+
   const createMutation = useMutation({
     mutationFn: subProjectApi.create,
   });
@@ -360,6 +375,7 @@ const ProjectsPage = () => {
     setGuidelineFiles([]);
     setIsDragActive(false);
     setFormMainProjectId('');
+    setFormOrg('');
     setFormPriority('medium');
     setFormProjectStatus('active');
   };
@@ -651,7 +667,7 @@ toast.success(wasEditing ? 'Project updated successfully' : 'Project created suc
               Organizations
             </Link>
           )}
-          <Button onClick={() => { setEditingProject(null); setSelectedSkills([]); setGuidelineFiles([]); setFormMainProjectId(filterMainProjectId || ''); setFormPriority('medium'); setFormProjectStatus('active'); setIsModalOpen(true); }}>
+          <Button onClick={() => { setEditingProject(null); setSelectedSkills([]); setGuidelineFiles([]); setFormMainProjectId(filterMainProjectId || ''); setFormOrg(filterMainProjectId ? orgOfMainProject(filterMainProjectId) : ''); setFormPriority('medium'); setFormProjectStatus('active'); setIsModalOpen(true); }}>
             <Plus className="w-4 h-4" />
             Add Project
           </Button>
@@ -703,7 +719,7 @@ toast.success(wasEditing ? 'Project updated successfully' : 'Project created suc
                     )}
                   </div>
                   <div className="text-xs text-slate-400 mt-0.5 whitespace-nowrap">
-                    {parentProject?.name || '—'} • {parentProject?.project_type || '—'}
+                    {parentProject?.client || '—'} • {parentProject?.project_type || '—'}
                   </div>
                 </div>
               );
@@ -791,6 +807,7 @@ toast.success(wasEditing ? 'Project updated successfully' : 'Project created suc
                     setSelectedSkills(project.required_expertise || []);
                     setGuidelineFiles([]);
                     setFormMainProjectId(String(project.main_project_id || ''));
+                    setFormOrg(orgOfMainProject(project.main_project_id));
                     setFormPriority(project.priority || 'medium');
                     setFormProjectStatus(project.project_status || 'active');
                     setIsModalOpen(true);
@@ -806,6 +823,7 @@ toast.success(wasEditing ? 'Project updated successfully' : 'Project created suc
                     setSelectedSkills(project.required_expertise || []);
                     setGuidelineFiles([]);
                     setFormMainProjectId(String(project.main_project_id || ''));
+                    setFormOrg(orgOfMainProject(project.main_project_id));
                     setFormPriority(project.priority || 'medium');
                     setFormProjectStatus(project.project_status || 'active');
                     setIsModalOpen(true);
@@ -864,14 +882,21 @@ toast.success(wasEditing ? 'Project updated successfully' : 'Project created suc
                     </label>
                     <input type="hidden" name="main_project_id" value={filterMainProjectId && !editingProject && !copyingProject ? filterMainProjectId : formMainProjectId} />
                     <Dropdown
-                      options={[{ value: '', label: 'Select a Project' }, ...visibleMainProjects.map(p => ({ value: String(p.id), label: p.name }))]}
-                      value={filterMainProjectId && !editingProject && !copyingProject ? String(filterMainProjectId) : formMainProjectId}
-                      onChange={setFormMainProjectId}
-                      placeholder="Select a Project"
+                      editable={true}
+                      options={organizations.map(org => ({ value: org, label: org }))}
+                      value={formOrg}
+                      onChange={(val) => {
+                        setFormOrg(val);
+                        // Resolve the org's project behind the scenes (its most recent one if several).
+                        const projs = visibleMainProjects.filter(p => clientOf(p) === val);
+                        setFormMainProjectId(projs.length ? String(projs[projs.length - 1].id) : '');
+                      }}
+                      placeholder="Select or type an organization"
                       disabled={!!filterMainProjectId && !editingProject && !copyingProject}
                     />
                   </div>
                 </div>
+                
 
                 <div>
                   <label className="block text-sm font-medium text-gray-700 mb-1">

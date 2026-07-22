@@ -406,7 +406,7 @@ const ParentProjectsPage = () => {
             <Modal isOpen={isModalOpen} onClose={() => { setIsModalOpen(false); setEditingProject(null); }} size="2xl" maxHeight="95vh">
                 <Modal.Header onClose={() => { setIsModalOpen(false); setEditingProject(null); }}>
                     <h2 className="text-base font-semibold text-slate-800">
-                        {editingProject ? 'Edit Project' : 'Create Project'}
+                        {editingProject ? 'Edit Organization' : 'Create Organization'}
                     </h2>
                 </Modal.Header>
                 <form onSubmit={handleSubmit} className="flex-1 flex flex-col min-h-0">
