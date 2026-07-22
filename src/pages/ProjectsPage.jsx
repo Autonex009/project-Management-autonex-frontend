@@ -434,7 +434,11 @@ const ProjectsPage = () => {
       daily_target: parseInt(formData.get('daily_target')) || 0,
       priority: formData.get('priority') || 'medium',
       required_expertise: selectedSkills,
-      assigned_employee_ids: [],
+      // Preserve existing assignments when editing. On create, if a PM makes the
+      // project, attach them so it lands in their scope.
+      assigned_employee_ids: editingProject
+        ? (editingProject.assigned_employee_ids || [])
+        : (isPm && pmEmployeeId ? [pmEmployeeId] : []),
       required_manpower: employeesRequired,
       project_duration_weeks: durationWeeks,
       project_duration_days: durationDays,
