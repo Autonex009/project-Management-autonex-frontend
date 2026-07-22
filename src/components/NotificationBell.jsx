@@ -163,12 +163,12 @@ const NotificationBell = () => {
     <div className="relative" ref={panelRef}>
       <button
         onClick={() => setOpen(o => { const next = !o; if (next && userId) refetch(); return next; })}
-        className={`relative p-2 text-slate-500 hover:text-slate-700 hover:bg-slate-100/80 rounded-xl transition-all duration-200 ${open ? 'bg-slate-100 text-slate-800' : ''}`}
+        className={`relative p-2 text-slate-500 hover:text-slate-700 hover:bg-slate-100/80 dark:text-slate-400 dark:hover:text-white dark:hover:bg-white/[0.06] rounded-xl transition-all duration-200 ${open ? 'bg-slate-100 text-slate-800 dark:bg-white/[0.08] dark:text-white' : ''}`}
         aria-label="Notifications"
       >
         <Bell className="w-5 h-5 transition-transform duration-300 hover:rotate-12" />
         {unreadCount > 0 && (
-          <span className="absolute -top-0.5 -right-0.5 flex h-4 w-4 items-center justify-center rounded-full bg-red-500 text-[9px] font-extrabold text-white leading-none shadow-sm animate-pulse">
+          <span className="absolute -top-0.5 -right-0.5 flex h-4 w-4 items-center justify-center rounded-full bg-blue-600 text-[9px] font-bold text-white dark:bg-blue-500/25 dark:text-blue-100 dark:border dark:border-blue-400/70 leading-none shadow-sm">
             {unreadCount > 9 ? '9+' : unreadCount}
           </span>
         )}
@@ -182,7 +182,7 @@ const NotificationBell = () => {
             <div>
               <h3 className="text-sm font-bold text-slate-800">Notifications</h3>
               {unreadCount > 0 ? (
-                <p className="text-[11px] font-semibold text-indigo-600 mt-0.5">{unreadCount} unread</p>
+                <p className="text-[11px] font-semibold text-blue-600 mt-0.5">{unreadCount} unread</p>
               ) : (
                 <p className="text-[11px] font-medium text-slate-400 mt-0.5">All caught up</p>
               )}
@@ -192,7 +192,7 @@ const NotificationBell = () => {
               {unreadCount > 0 && (
                 <button
                   onClick={() => markAllReadMutation.mutate()}
-                  className="flex items-center gap-1 rounded-lg border border-indigo-100 bg-indigo-50/50 px-2.5 py-1.5 text-xs font-semibold text-indigo-700 transition-all hover:bg-indigo-100"
+                  className="flex items-center gap-1 rounded-lg border border-blue-100 bg-blue-50/50 px-2.5 py-1.5 text-xs font-semibold text-blue-700 transition-all hover:bg-blue-100"
                   title="Mark all as read"
                 >
                   <CheckCheck className="w-3.5 h-3.5" />
@@ -239,7 +239,7 @@ const NotificationBell = () => {
                     }}
                     className={`relative w-full text-left px-5 py-3.5 transition-all duration-200 border-l-[3px] hover:bg-slate-50/70 flex gap-3.5 items-start ${
                       !n.is_read 
-                        ? 'bg-indigo-50/25 border-l-indigo-600' 
+                        ? 'bg-blue-50/25 border-l-blue-600' 
                         : 'border-l-transparent'
                     }`}
                   >
@@ -256,8 +256,8 @@ const NotificationBell = () => {
                         </p>
                         {!n.is_read && (
                           <span className="shrink-0 mt-1.5 flex h-2 w-2 relative">
-                            <span className="animate-ping absolute inline-flex h-full w-full rounded-full bg-indigo-400 opacity-75"></span>
-                            <span className="relative inline-flex rounded-full h-2 w-2 bg-indigo-500"></span>
+                            <span className="animate-ping absolute inline-flex h-full w-full rounded-full bg-blue-400 opacity-75"></span>
+                            <span className="relative inline-flex rounded-full h-2 w-2 bg-blue-500"></span>
                           </span>
                         )}
                       </div>

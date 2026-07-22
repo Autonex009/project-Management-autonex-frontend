@@ -5,7 +5,7 @@ import { subProjectApi, employeeApi, allocationApi, leaveApi, skillsApi } from '
 import { FolderKanban, Calendar, Users, AlertTriangle, ArrowUpRight, Activity, Zap, Target, TrendingUp, Plus, ChevronRight } from 'lucide-react';
 import Table from '../components/ui/Table';
 import Button from '../components/ui/Button';
-import { Card, CardHeader, CardContent, CardFooter, MetricCard } from '../components/ui/Card';
+import { MetricCard } from '../components/ui/Card';
 import { format, isValid, isWithinInterval, parseISO } from 'date-fns';
 import { getWorkingDays } from '../utils/dateCalculations';
 
@@ -119,41 +119,32 @@ const Dashboard = () => {
   const overburdenProjects = projectAnalyses.filter(pa => pa.analysis.status === 'overburden');
   const underutilizedEmployees = employees.filter(e => e.status === 'active' && !allocatedEmployeeIds.has(e.id));
 
-  // Status Badge Component
+  // Status indicator — minimal dot + colored label (Linear/dark friendly)
   const StatusBadge = ({ status }) => {
-    const styles = {
-      balanced: 'bg-emerald-50 text-emerald-700 border-emerald-200',
-      overburden: 'bg-red-50 text-red-700 border-red-200',
-      underutilized: 'bg-amber-50 text-amber-700 border-amber-200',
-      no_staff: 'bg-slate-100 text-slate-600 border-slate-200',
-      overdue: 'bg-red-50 text-red-700 border-red-200',
+    const config = {
+      balanced: { dot: 'bg-emerald-500', text: 'text-emerald-600 dark:text-emerald-400', label: 'On Track' },
+      overburden: { dot: 'bg-red-500', text: 'text-red-600 dark:text-red-400', label: 'At Risk' },
+      underutilized: { dot: 'bg-amber-500', text: 'text-amber-600 dark:text-amber-400', label: 'Optimize' },
+      no_staff: { dot: 'bg-slate-400 dark:bg-zinc-500', text: 'text-slate-500 dark:text-zinc-400', label: 'Unassigned' },
+      overdue: { dot: 'bg-red-500', text: 'text-red-600 dark:text-red-400', label: 'Overdue' },
     };
-    const labels = {
-      balanced: 'On Track',
-      overburden: 'At Risk',
-      underutilized: 'Optimize',
-      no_staff: 'Unassigned',
-      overdue: 'Overdue',
-    };
+    const c = config[status] || { text: 'text-amber-600 dark:text-amber-400' };
     return (
-      <span className={`inline-flex items-center gap-1.5 px-2.5 py-1 rounded-full text-xs font-medium border ${styles[status] || styles.no_staff}`}>
-        <span className={`w-1.5 h-1.5 rounded-full ${status === 'balanced' ? 'bg-emerald-500' : status === 'overburden' || status === 'overdue' ? 'bg-red-500' : 'bg-amber-500'}`}></span>
-        {labels[status] || status}
-      </span>
+      <span className={`text-xs font-medium capitalize ${c.text}`}>{c.label || status}</span>
     );
   };
 
   return (
-    <div className="space-y-8 p-2">
+    <div className="space-y-5">
       {/* Page Header */}
       <div>
-        <h1 className="text-2xl font-bold text-slate-900">Dashboard</h1>
-        <p className="text-slate-500 text-sm mt-1">Resource allocation & project insights</p>
+        <h1 className="text-lg font-semibold text-slate-900 dark:text-zinc-100">Dashboard</h1>
+        <p className="text-slate-500 dark:text-zinc-500 text-[13px] mt-0.5">Resource allocation & project insights</p>
       </div>
 
       {/* ===== BENTO GRID LAYOUT ===== */}
       {/* Row 1: KPI Metric Cards (4 columns) */}
-      <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-5">
+      <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4">
         <MetricCard
           title="Active Projects"
           value={activeProjects}
@@ -189,25 +180,21 @@ const Dashboard = () => {
 
       {/* Row 2-3: Project Status (full width) */}
       <div>
-        <div>
-          <Card>
-            <CardHeader
-              title="Project Status"
-              subtitle="Overview of active sub-projects"
-            />
-            <CardContent className="p-0">
-              <Table
-                variant="borderless"
-                loading={projectsLoading}
-                rowClassName={() => 'group'}
-                columns={[
+        <div className="mb-3">
+          <h3 className="font-semibold text-slate-800 dark:text-zinc-100">Project Status</h3>
+          <p className="text-sm text-slate-500 dark:text-zinc-500 mt-0.5">Overview of active sub-projects</p>
+        </div>
+        <Table
+          loading={projectsLoading}
+          rowClassName={() => 'group'}
+          columns={[
                   {
                     key: 'project',
                     label: 'Project',
                     render: (project) => (
                       <div>
-                        <div className="font-medium text-slate-800 group-hover:text-indigo-600 transition-colors">{project.name}</div>
-                        <div className="text-xs text-slate-400">{project.client}</div>
+                        <div className="font-medium text-slate-800 dark:text-zinc-200">{project.name}</div>
+                        <div className="text-xs text-slate-400 dark:text-zinc-500">{project.client}</div>
                       </div>
                     ),
                   },
@@ -222,7 +209,7 @@ const Dashboard = () => {
                     label: 'Deadline',
                     align: 'center',
                     render: (_, row) => (
-                      <span className="text-sm text-slate-600 font-mono">
+                      <span className="text-sm text-slate-600 dark:text-zinc-400 font-mono">
                         {row.project.end_date ? format(parseISO(row.project.end_date), 'MMM dd') : '—'}
                       </span>
                     ),
@@ -232,22 +219,19 @@ const Dashboard = () => {
                     label: 'Insight',
                     align: 'right',
                     render: (_, row) => row.analysis.recommendation ? (
-                      <span className="text-xs font-medium text-slate-500">{row.analysis.recommendation.message}</span>
+                      <span className="text-xs font-medium text-slate-500 dark:text-zinc-500">{row.analysis.recommendation.message}</span>
                     ) : (
-                      <span className="text-xs text-slate-400">—</span>
+                      <span className="text-xs text-slate-400 dark:text-zinc-600">—</span>
                     ),
                   },
-                ]}
-                data={projectAnalyses.slice(0, 10)}
-                emptyState={{ title: 'No projects', description: 'Active projects will appear here' }}
-              />
-            </CardContent>
-            <CardFooter>
-              <Button variant="link" onClick={() => navigate('/admin/sub-projects')}>
-                View all projects <ChevronRight className="w-4 h-4" />
-              </Button>
-            </CardFooter>
-          </Card>
+          ]}
+          data={projectAnalyses.slice(0, 10)}
+          emptyState={{ title: 'No projects', description: 'Active projects will appear here' }}
+        />
+        <div className="mt-3">
+          <Button variant="link" onClick={() => navigate('/admin/sub-projects')}>
+            View all projects <ChevronRight className="w-4 h-4" />
+          </Button>
         </div>
       </div>
     </div>

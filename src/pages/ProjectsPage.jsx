@@ -804,20 +804,18 @@ toast.success(wasEditing ? 'Project updated successfully' : 'Project created suc
       <div className="bg-white border border-slate-200 rounded-xl p-4">
         <div className="flex flex-col md:flex-row md:items-center gap-3">
 
-          <div className="flex flex-col">
-            <select
+          <div className="flex flex-col w-72 relative z-50">
+            <Dropdown
               value={selectedOrganization}
-              onChange={(e) => setSelectedOrganization(e.target.value)}
-              className="w-72 rounded-lg border border-slate-300 px-3 py-2 text-sm focus:ring-2 focus:ring-indigo-500 focus:outline-none"
-            >
-              <option value="all">Organizations</option>
-
-              {organizations.map(org => (
-                <option key={org} value={org}>
-                  {org}
-                </option>
-              ))}
-            </select>
+              onChange={(val) => setSelectedOrganization(val)}
+              options={[
+                { value: 'all', label: 'Organizations' },
+                ...organizations.map(org => ({ value: org, label: org }))
+              ]}
+              editable={true}
+              allowCreate={false}
+              className="w-full"
+            />
           </div>
 
           {selectedOrganization !== "all" && (
@@ -963,11 +961,19 @@ toast.success(wasEditing ? 'Project updated successfully' : 'Project created suc
                       </div>
 
                       <div className="rounded-xl bg-slate-50 p-3">
-                        <p className="text-xs text-slate-500">Manpower</p>
+                        <p className="text-xs text-slate-500 mb-1">Manpower</p>
 
-                        <p className="mt-1 text-sm font-semibold text-slate-800">
-                          {allocatedManpower} / {project.required_manpower || 0}
-                        </p>
+                        <AllocationPopover
+                          project={project}
+                          allocations={allocations}
+                          employees={employees}
+                          triggerClassName="inline-flex text-sm font-semibold text-slate-800 hover:text-indigo-600 transition-colors cursor-pointer"
+                          badgeContent={
+                            <span>
+                              {allocatedManpower} / {project.required_manpower || 0}
+                            </span>
+                          }
+                        />
                       </div>
                     </div>
 

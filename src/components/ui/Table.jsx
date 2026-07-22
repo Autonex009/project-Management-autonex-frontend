@@ -31,28 +31,28 @@ export const Table = ({
     const isStriped = variant === 'striped';
     const isBorderless = variant === 'borderless';
 
-    const cellPad = isCompact ? 'px-4 py-2.5' : 'px-5 py-4';
-    const headPad = isCompact ? 'px-4 py-3' : 'px-5 py-4';
-    const headTextSize = isCompact ? 'text-[11px]' : 'text-xs';
+    const cellPad = isCompact ? 'px-4 py-2' : 'px-4 py-2.5';
+    const headPad = isCompact ? 'px-4 py-2.5' : 'px-4 py-2.5';
+    const headTextSize = isCompact ? 'text-[11px]' : 'text-[11px]';
 
     const context = { onEdit, onDelete };
 
     const outerClass = isBorderless
         ? `${className}`
-        : `bg-white rounded-2xl border border-slate-200/60 shadow-[0_1px_3px_rgba(0,0,0,0.04)] ${className}`;
+        : `bg-white dark:bg-[#0f0f0f] rounded-2xl border border-slate-200/60 dark:border-neutral-800 shadow-[0_1px_3px_rgba(0,0,0,0.04)] ${className}`;
 
     return (
         <div className={outerClass}>
             <div className="overflow-visible">
                 <table className="w-full table-fixed border-separate border-spacing-0">
-                    <thead className="bg-slate-50/80 border-b border-slate-100">
+                    <thead className="bg-slate-50/80 dark:bg-white/[0.02] border-b border-slate-100 dark:border-neutral-800">
                         <tr>
                             {columns.map((col, cIdx) => (
                                 <th
                                     key={col.key}
-                                    className={`${headPad} ${headTextSize} font-bold text-slate-600 uppercase tracking-wider whitespace-nowrap ${cIdx === 0 ? 'rounded-tl-2xl' : cIdx === columns.length - 1 ? 'rounded-tr-2xl' : ''
+                                    className={`${headPad} ${headTextSize} font-medium text-slate-400 dark:text-zinc-500 uppercase tracking-wider whitespace-nowrap ${cIdx === 0 ? 'rounded-tl-2xl' : cIdx === columns.length - 1 ? 'rounded-tr-2xl' : ''
                                         } ${col.align === 'center' ? 'text-center' : col.align === 'right' ? 'text-right' : 'text-left'
-                                        } ${col.width ? (col.width.startsWith('w-') ? col.width : `w-${col.width}`) : ''} ${col.sticky === 'right' ? `sticky ${col.stickyOffset || 'right-0'} bg-slate-50/80 shadow-[-8px_0_8px_-8px_rgba(0,0,0,0.1)]` : ''}`}
+                                        } ${col.width ? (col.width.startsWith('w-') ? col.width : `w-${col.width}`) : ''} ${col.sticky === 'right' ? `sticky ${col.stickyOffset || 'right-0'} bg-slate-50/80 dark:bg-[#161616] shadow-[-8px_0_8px_-8px_rgba(0,0,0,0.1)]` : ''}`}
                                 >
                                     {col.label}
                                 </th>
@@ -60,7 +60,7 @@ export const Table = ({
                         </tr>
                     </thead>
 
-                    <tbody className="divide-y divide-slate-100">
+                    <tbody className="divide-y divide-slate-100 dark:divide-neutral-800">
                         {loading ? (
                             Array.from({ length: skeletonRows }).map((_, i) => (
                                 <tr key={i} className="bg-white">
@@ -76,7 +76,7 @@ export const Table = ({
                         ) : paginatedData.length === 0 ? (
                             <tr>
                                 <td colSpan={columns.length} className="px-5 py-16 text-center">
-                                    <div className="text-slate-400">
+                                    <div className="text-slate-400 dark:text-zinc-500">
                                         <p className="text-lg font-medium mb-1">
                                             {emptyState?.title || 'No data found'}
                                         </p>
@@ -88,14 +88,14 @@ export const Table = ({
                             </tr>
                         ) : (
                             paginatedData.map((row, idx) => {
-                                const rowBg = isStriped && idx % 2 !== 0 ? 'bg-slate-50/50' : 'bg-white';
+                                const rowBg = isStriped && idx % 2 !== 0 ? 'bg-slate-50/50 dark:bg-[#161616]' : 'bg-white dark:bg-[#0f0f0f]';
                                 const extraClass = rowClassName ? rowClassName(row, idx) : '';
                                 const isLast = idx === paginatedData.length - 1;
                                 return (
                                     <React.Fragment key={getRowId(row) ?? idx}>
                                         <tr
                                             onClick={onRowClick ? () => onRowClick(row, idx) : undefined}
-                                            className={`${rowBg} hover:bg-slate-50 transition-colors ${onRowClick ? 'cursor-pointer' : ''
+                                            className={`${rowBg} hover:bg-slate-50 dark:hover:bg-white/[0.03] transition-colors ${onRowClick ? 'cursor-pointer' : ''
                                                 } ${extraClass}`}
                                         >
                                             {columns.map((col, cIdx) => (
@@ -133,8 +133,8 @@ export const Table = ({
             </div>
 
             {!loading && totalPages > 1 && onPageChange && (
-                <div className="flex items-center justify-between px-5 py-3 border-t border-slate-100">
-                    <p className="text-sm text-slate-500">
+                <div className="flex items-center justify-between px-5 py-3 border-t border-slate-100 dark:border-neutral-800">
+                    <p className="text-sm text-slate-500 dark:text-zinc-400">
                         Showing {paginatedData.length === 0 ? 0 : startIndex + 1}–
                         {Math.min(startIndex + pageSize, data.length)} of {data.length} items
                     </p>
@@ -142,7 +142,7 @@ export const Table = ({
                         <button
                             onClick={() => onPageChange(Math.max(1, currentPage - 1))}
                             disabled={currentPage === 1}
-                            className="px-3 py-1.5 text-sm rounded-lg border border-slate-200 text-slate-600 hover:bg-slate-50 disabled:opacity-40 disabled:cursor-not-allowed transition-colors"
+                            className="px-3 py-1.5 text-sm rounded-lg border border-slate-200 text-slate-600 hover:bg-slate-50 dark:border-neutral-800 dark:text-zinc-300 dark:hover:bg-white/[0.05] disabled:opacity-40 disabled:cursor-not-allowed transition-colors"
                         >
                             Previous
                         </button>
@@ -161,8 +161,8 @@ export const Table = ({
                                         key={p}
                                         onClick={() => onPageChange(p)}
                                         className={`px-3 py-1.5 text-sm rounded-lg border transition-colors ${currentPage === p
-                                            ? 'bg-indigo-600 border-indigo-600 text-white font-medium'
-                                            : 'border-slate-200 text-slate-600 hover:bg-slate-50'
+                                            ? 'bg-blue-600 border-blue-600 text-white font-medium'
+                                            : 'border-slate-200 text-slate-600 hover:bg-slate-50 dark:border-neutral-800 dark:text-zinc-300 dark:hover:bg-white/[0.05]'
                                             }`}
                                     >
                                         {p}
@@ -172,7 +172,7 @@ export const Table = ({
                         <button
                             onClick={() => onPageChange(Math.min(totalPages, currentPage + 1))}
                             disabled={currentPage === totalPages}
-                            className="px-3 py-1.5 text-sm rounded-lg border border-slate-200 text-slate-600 hover:bg-slate-50 disabled:opacity-40 disabled:cursor-not-allowed transition-colors"
+                            className="px-3 py-1.5 text-sm rounded-lg border border-slate-200 text-slate-600 hover:bg-slate-50 dark:border-neutral-800 dark:text-zinc-300 dark:hover:bg-white/[0.05] disabled:opacity-40 disabled:cursor-not-allowed transition-colors"
                         >
                             Next
                         </button>
@@ -212,7 +212,7 @@ export const ColumnTemplates = {
         label,
         render: (value, row) => (
             <div className="flex items-center gap-3">
-                <div className={`w-10 h-10 rounded-lg flex items-center justify-center flex-shrink-0 text-white text-sm font-bold ${opts.avatarClass || 'bg-gradient-to-br from-indigo-500 to-purple-600'}`}>
+                <div className={`w-10 h-10 rounded-lg flex items-center justify-center flex-shrink-0 text-white text-sm font-bold ${opts.avatarClass || 'bg-gradient-to-br from-blue-500 to-purple-600'}`}>
                     {String(value || '?')[0].toUpperCase()}
                 </div>
                 <div className="min-w-0">
@@ -341,7 +341,7 @@ export const ColumnTemplates = {
                 {ctx?.onEdit && (
                     <button
                         onClick={(e) => { e.stopPropagation(); ctx.onEdit(row); }}
-                        className="p-2 text-slate-500 hover:text-indigo-600 hover:bg-indigo-50 rounded-lg transition-colors"
+                        className="p-2 text-slate-500 hover:text-blue-600 hover:bg-blue-50 rounded-lg transition-colors"
                         title="Edit"
                     >
                         <Edit className="w-4 h-4" />
