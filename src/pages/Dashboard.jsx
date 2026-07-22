@@ -1,12 +1,12 @@
 import { useQuery } from '@tanstack/react-query';
-import { useMemo } from 'react';
+import { useMemo, useState } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { subProjectApi, employeeApi, allocationApi, leaveApi, skillsApi } from '../services/api';
-import { FolderKanban, Calendar, Users, AlertTriangle, ArrowUpRight, Activity, Zap, Target, TrendingUp, Plus, ChevronRight } from 'lucide-react';
+import { FolderKanban, Calendar, Users, AlertTriangle, ArrowUpRight, Activity, Zap, Target, TrendingUp, Plus, ChevronRight, UserCog, ClipboardCheck } from 'lucide-react';
 import Table from '../components/ui/Table';
 import Button from '../components/ui/Button';
-import { MetricCard } from '../components/ui/Card';
-import { format, isValid, isWithinInterval, parseISO } from 'date-fns';
+import StatCard from '../components/dashboard/StatCard';
+import { isWithinInterval, parseISO } from 'date-fns'; 
 import { getWorkingDays } from '../utils/dateCalculations';
 
 // ===============================================
@@ -15,6 +15,7 @@ import { getWorkingDays } from '../utils/dateCalculations';
 
 const Dashboard = () => {
   const navigate = useNavigate();
+  const [projectPage, setProjectPage] = useState(1);
 
   const { data: projects = [], isLoading: projectsLoading } = useQuery({
     queryKey: ['sub-projects'],
@@ -55,7 +56,6 @@ const Dashboard = () => {
   const activeProjects = projects.filter(p => p.project_status === 'active').length;
   const activeEmployees = employees.filter(e => e.status === 'active').length;
   const allocatedEmployeeIds = new Set(allocations.map(a => a.employee_id));
-  const utilizationRate = Math.round((allocatedEmployeeIds.size / activeEmployees) * 100) || 0;
 
   const today = new Date();
   const employeesOnLeave = leaves.filter(leave => {
@@ -116,122 +116,181 @@ const Dashboard = () => {
   }, [allocations, leaves]);
 
   const projectAnalyses = projects.map(p => ({ project: p, analysis: getProjectAnalysis(p) }));
-  const overburdenProjects = projectAnalyses.filter(pa => pa.analysis.status === 'overburden');
-  const underutilizedEmployees = employees.filter(e => e.status === 'active' && !allocatedEmployeeIds.has(e.id));
 
-  // Status indicator — minimal dot + colored label (Linear/dark friendly)
-  const StatusBadge = ({ status }) => {
+  // Delivery risks are now driven by PM-set project sentiment: any active project
+  // marked "Poor" is considered at risk.
+  const atRiskProjects = projects.filter(p => p.project_status === 'active' && p.sentiment === 'Poor');
+
+  // ── People breakdowns (active employees only) ──────────────────────────────
+  const isPmDesig = (d) => (d || '').toLowerCase().includes('program manager') || (d || '').toLowerCase().includes('project manager');
+  const isReviewerAnnotator = (d) => {
+    const s = (d || '').toLowerCase();
+    return s.includes('annotator') || s.includes('reviewer');
+  };
+  const activeEmployeesList = employees.filter(e => e.status === 'active');
+  const typeBreakdown = (list) => {
+    const norm = (t) => (t || '').toLowerCase();
+    return [
+      { label: 'Full-time', value: list.filter(e => norm(e.employee_type) === 'full-time').length },
+      { label: 'Interns', value: list.filter(e => norm(e.employee_type) === 'intern').length },
+      { label: 'Contract', value: list.filter(e => norm(e.employee_type) === 'contract' || norm(e.employee_type) === 'contractor').length },
+    ];
+  };
+  const projectManagers = activeEmployeesList.filter(e => isPmDesig(e.designation));
+  const reviewersAnnotators = activeEmployeesList.filter(e => isReviewerAnnotator(e.designation));
+  const teamAvailable = activeEmployees - employeesOnLeave.length;
+
+  // ── Top performers: total allocated daily hours per employee ───────────────
+  const topPerformers = useMemo(() => {
+    const hoursByEmp = new Map();
+    allocations.forEach((a) => {
+      const h = Number(a.total_daily_hours) || 0;
+      hoursByEmp.set(a.employee_id, (hoursByEmp.get(a.employee_id) || 0) + h);
+    });
+    return employees
+      .map((e) => ({ employee: e, hours: hoursByEmp.get(e.id) || 0 }))
+      .filter((r) => r.hours > 0)
+      .sort((a, b) => b.hours - a.hours)
+      .slice(0, 5);
+  }, [allocations, employees]);
+
+  // Project sentiment badge (PM-set): GOOD / AVG / Poor.
+  const SentimentBadge = ({ sentiment }) => {
     const config = {
-      balanced: { dot: 'bg-emerald-500', text: 'text-emerald-600 dark:text-emerald-400', label: 'On Track' },
-      overburden: { dot: 'bg-red-500', text: 'text-red-600 dark:text-red-400', label: 'At Risk' },
-      underutilized: { dot: 'bg-amber-500', text: 'text-amber-600 dark:text-amber-400', label: 'Optimize' },
-      no_staff: { dot: 'bg-slate-400 dark:bg-zinc-500', text: 'text-slate-500 dark:text-zinc-400', label: 'Unassigned' },
-      overdue: { dot: 'bg-red-500', text: 'text-red-600 dark:text-red-400', label: 'Overdue' },
+      GOOD: { text: 'text-emerald-600 dark:text-emerald-400', bg: 'bg-emerald-50 dark:bg-emerald-500/10', label: 'GOOD' },
+      AVG: { text: 'text-amber-600 dark:text-amber-400', bg: 'bg-amber-50 dark:bg-amber-500/10', label: 'AVG' },
+      Poor: { text: 'text-red-600 dark:text-red-400', bg: 'bg-red-50 dark:bg-red-500/10', label: 'Poor' },
     };
-    const c = config[status] || { text: 'text-amber-600 dark:text-amber-400' };
+    const c = config[sentiment];
+    if (!c) return <span className="text-xs text-slate-400 dark:text-zinc-600">Not set</span>;
     return (
-      <span className={`text-xs font-medium capitalize ${c.text}`}>{c.label || status}</span>
+      <span className={`inline-flex items-center rounded-full px-2.5 py-1 text-xs font-semibold ${c.bg} ${c.text}`}>{c.label}</span>
     );
   };
 
   return (
-    <div className="space-y-5">
+    <div className="space-y-4">
       {/* Page Header */}
       <div>
         <h1 className="text-lg font-semibold text-slate-900 dark:text-zinc-100">Dashboard</h1>
         <p className="text-slate-500 dark:text-zinc-500 text-[13px] mt-0.5">Resource allocation & project insights</p>
       </div>
 
-      {/* ===== BENTO GRID LAYOUT ===== */}
-      {/* Row 1: KPI Metric Cards (4 columns) */}
-      <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4">
-        <MetricCard
+      {/* ===== KPI Cards ===== */}
+      <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-5 gap-3">
+        <StatCard
           title="Active Projects"
           value={activeProjects}
-          subtitle={`${totalProjects} total`}
           icon={FolderKanban}
-          loading={projectsLoading}
+          tone="emerald"
+          pill="Live"
           onClick={() => navigate('/admin/sub-projects?status=active')}
         />
-        <MetricCard
+        <StatCard
           title="Delivery Risks"
-          value={overburdenProjects.length}
-          subtitle="Need attention"
+          value={atRiskProjects.length}
           icon={AlertTriangle}
-          trend={overburdenProjects.length > 0 ? '!' : null}
-          trendPositive={false}
-          onClick={() => navigate('/admin/sub-projects?recommendation=overburdened')}
+          tone="rose"
+          pill={atRiskProjects.length > 0 ? 'Action' : 'Clear'}
+          onClick={() => navigate('/admin/sub-projects')}
         />
-        <MetricCard
-          title="Utilization"
-          value={`${utilizationRate}%`}
-          subtitle={`${underutilizedEmployees.length} unallocated`}
-          icon={TrendingUp}
-          onClick={() => navigate('/admin/allocations')}
+        <StatCard
+          title="Project Managers"
+          value={projectManagers.length}
+          icon={UserCog}
+          tone="violet"
+          breakdown={typeBreakdown(projectManagers)}
+          onClick={() => navigate('/admin/employees')}
         />
-        <MetricCard
+        <StatCard
+          title="Reviewers / Annotators"
+          value={reviewersAnnotators.length}
+          icon={ClipboardCheck}
+          tone="sky"
+          breakdown={typeBreakdown(reviewersAnnotators)}
+          onClick={() => navigate('/admin/employees')}
+        />
+        <StatCard
           title="Team Available"
-          value={activeEmployees - employeesOnLeave.length}
-          subtitle={`${employeesOnLeave.length} on leave`}
+          value={teamAvailable}
           icon={Users}
+          tone="amber"
+          pill={`${employeesOnLeave.length} on leave`}
+          breakdown={typeBreakdown(activeEmployeesList)}
           onClick={() => navigate('/admin/employees')}
         />
       </div>
 
-      {/* Row 2-3: Project Status (full width) */}
-      <div>
-        <div className="mb-3">
-          <h3 className="font-semibold text-slate-800 dark:text-zinc-100">Project Status</h3>
-          <p className="text-sm text-slate-500 dark:text-zinc-500 mt-0.5">Overview of active sub-projects</p>
+      {/* Row 2: Project Status table + Top Performers side panel */}
+      <div className="grid grid-cols-1 gap-4 lg:grid-cols-3">
+        {/* Project Status */}
+        <div className="lg:col-span-2">
+          <div className="mb-3">
+            <h3 className="font-semibold text-slate-800 dark:text-zinc-100">Project Status</h3>
+            <p className="text-sm text-slate-500 dark:text-zinc-500 mt-0.5">Overview of active sub-projects</p>
+          </div>
+          <Table
+            loading={projectsLoading}
+            rowClassName={() => 'group'}
+            currentPage={projectPage}
+            pageSize={5}
+            onPageChange={setProjectPage}
+            columns={[
+                    {
+                      key: 'project',
+                      label: 'Project',
+                      render: (project) => (
+                        <div>
+                          <div className="font-medium text-slate-800 dark:text-zinc-200">{project.name}</div>
+                          <div className="text-xs text-slate-400 dark:text-zinc-500">{project.client}</div>
+                        </div>
+                      ),
+                    },
+                    {
+                      key: '_sentiment',
+                      label: 'Sentiment',
+                      align: 'left',
+                      width: 'w-32',
+                      render: (_, row) => <SentimentBadge sentiment={row.project.sentiment} />,
+                    },
+            ]}
+            data={projectAnalyses}
+            emptyState={{ title: 'No projects', description: 'Active projects will appear here' }}
+          />
+          <div className="mt-3">
+            <Button variant="link" onClick={() => navigate('/admin/sub-projects')}>
+              View all projects <ChevronRight className="w-4 h-4" />
+            </Button>
+          </div>
         </div>
-        <Table
-          loading={projectsLoading}
-          rowClassName={() => 'group'}
-          columns={[
-                  {
-                    key: 'project',
-                    label: 'Project',
-                    render: (project) => (
-                      <div>
-                        <div className="font-medium text-slate-800 dark:text-zinc-200">{project.name}</div>
-                        <div className="text-xs text-slate-400 dark:text-zinc-500">{project.client}</div>
+
+        {/* Top Performers */}
+        <div>
+          <div className="mb-3">
+            <h3 className="font-semibold text-slate-800 dark:text-zinc-100">Top Performers</h3>
+            <p className="text-sm text-slate-500 dark:text-zinc-500 mt-0.5">By total allocated hours</p>
+          </div>
+          <div className="rounded-2xl border border-slate-200/60 bg-white p-3 shadow-[0_1px_3px_rgba(0,0,0,0.04)] dark:border-neutral-800 dark:bg-[#0f0f0f]">
+            {topPerformers.length === 0 ? (
+              <div className="py-10 text-center text-sm text-slate-400">No allocations yet</div>
+            ) : (
+              <ul className="space-y-1">
+                {topPerformers.map((row, idx) => {
+                  const medal = ['bg-amber-100 text-amber-700', 'bg-slate-100 text-slate-600', 'bg-orange-100 text-orange-700'][idx] || 'bg-slate-50 text-slate-500';
+                  return (
+                    <li key={row.employee.id} className="flex items-center gap-3 rounded-xl px-2.5 py-2 transition-colors hover:bg-slate-50 dark:hover:bg-white/[0.03]">
+                      <span className={`flex h-7 w-7 shrink-0 items-center justify-center rounded-full text-xs font-bold ${medal}`}>{idx + 1}</span>
+                      <div className="min-w-0 flex-1">
+                        <p className="truncate text-sm font-medium text-slate-800 dark:text-zinc-200">{row.employee.name}</p>
+                        <p className="truncate text-xs text-slate-400">{row.employee.designation || 'Team Member'}</p>
                       </div>
-                    ),
-                  },
-                  {
-                    key: 'analysis',
-                    label: 'Status',
-                    align: 'center',
-                    render: (analysis) => <StatusBadge status={analysis.status} />,
-                  },
-                  {
-                    key: '_deadline',
-                    label: 'Deadline',
-                    align: 'center',
-                    render: (_, row) => (
-                      <span className="text-sm text-slate-600 dark:text-zinc-400 font-mono">
-                        {row.project.end_date ? format(parseISO(row.project.end_date), 'MMM dd') : '—'}
-                      </span>
-                    ),
-                  },
-                  {
-                    key: '_insight',
-                    label: 'Insight',
-                    align: 'right',
-                    render: (_, row) => row.analysis.recommendation ? (
-                      <span className="text-xs font-medium text-slate-500 dark:text-zinc-500">{row.analysis.recommendation.message}</span>
-                    ) : (
-                      <span className="text-xs text-slate-400 dark:text-zinc-600">—</span>
-                    ),
-                  },
-          ]}
-          data={projectAnalyses.slice(0, 10)}
-          emptyState={{ title: 'No projects', description: 'Active projects will appear here' }}
-        />
-        <div className="mt-3">
-          <Button variant="link" onClick={() => navigate('/admin/sub-projects')}>
-            View all projects <ChevronRight className="w-4 h-4" />
-          </Button>
+                      <span className="shrink-0 rounded-full bg-indigo-50 px-2.5 py-1 text-xs font-semibold text-indigo-700">{row.hours}h</span>
+                    </li>
+                  );
+                })}
+              </ul>
+            )}
+          </div>
         </div>
       </div>
     </div>

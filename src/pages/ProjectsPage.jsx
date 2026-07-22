@@ -359,6 +359,16 @@ const ProjectsPage = () => {
     mutationFn: ({ id, data }) => subProjectApi.update(id, data),
   });
 
+  // Inline PM/admin update of a project's sentiment directly from the card.
+  const sentimentMutation = useMutation({
+    mutationFn: ({ id, sentiment }) => subProjectApi.update(id, { sentiment: sentiment || null }),
+    onSuccess: () => {
+      queryClient.invalidateQueries(['sub-projects']);
+      toast.success('Sentiment updated');
+    },
+    onError: (err) => toast.error(err.response?.data?.detail || 'Failed to update sentiment'),
+  });
+
   const deleteMutation = useMutation({
     mutationFn: subProjectApi.delete,
     onSuccess: () => {
@@ -901,7 +911,6 @@ toast.success(wasEditing ? 'Project updated successfully' : 'Project created suc
 
                 const allocatedManpower = getAllocatedManpower(project);
                 const matchingEmployees = getMatchingEmployees(project).length;
-                const recommendation = getSystemRecommendation(project);
 
                 return (
                   <div
@@ -1003,23 +1012,31 @@ toast.success(wasEditing ? 'Project updated successfully' : 'Project created suc
                       </div>
                     )}
 
-                    {/* Recommendation */}
+                    {/* Project Sentiment (PM/admin can update inline) */}
                     <div className="mt-4 flex items-center justify-between rounded-xl border border-slate-200 px-3 py-2.5">
                       <span className="text-xs font-medium text-slate-500">
-                        System Recommendation
+                        Project Sentiment
                       </span>
 
-                      <span
-                        className={`text-xs font-bold ${
-                          recommendation.label === 'Overburdened'
-                            ? 'text-red-600'
-                            : recommendation.label === 'Balanced'
-                              ? 'text-emerald-600'
-                              : 'text-amber-600'
+                      <select
+                        value={project.sentiment || ''}
+                        onChange={(e) => sentimentMutation.mutate({ id: project.id, sentiment: e.target.value })}
+                        disabled={sentimentMutation.isPending}
+                        className={`rounded-lg border px-2 py-1 text-xs font-bold outline-none transition focus:ring-2 disabled:opacity-60 ${
+                          project.sentiment === 'GOOD'
+                            ? 'border-emerald-200 bg-emerald-50 text-emerald-700 focus:ring-emerald-100'
+                            : project.sentiment === 'AVG'
+                              ? 'border-amber-200 bg-amber-50 text-amber-700 focus:ring-amber-100'
+                              : project.sentiment === 'Poor'
+                                ? 'border-red-200 bg-red-50 text-red-600 focus:ring-red-100'
+                                : 'border-slate-200 bg-white text-slate-500 focus:ring-slate-100'
                         }`}
                       >
-                        {recommendation.label}
-                      </span>
+                        <option value="">Not set</option>
+                        <option value="GOOD">GOOD</option>
+                        <option value="AVG">AVG</option>
+                        <option value="Poor">Poor</option>
+                      </select>
                     </div>
 
                     {/* Actions */}
