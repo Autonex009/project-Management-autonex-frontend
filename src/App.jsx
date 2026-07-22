@@ -16,6 +16,8 @@ import ResetPassword from './pages/auth/ResetPassword';
 
 // Lazy Loaded Pages
 const Dashboard = lazy(() => import('./pages/Dashboard'));
+const AnalyticsDashboard = lazy(() => import('./pages/AnalyticsDashboard'));
+const ProjectAnalyticsPage = lazy(() => import('./pages/ProjectAnalyticsPage'));
 const EmployeesPage = lazy(() => import('./pages/EmployeesPage'));
 const SubProjectsPage = lazy(() => import('./pages/ProjectsPage'));
 const AllocationsPage = lazy(() => import('./pages/AllocationsPage'));
@@ -94,6 +96,8 @@ function App() {
             }>
               <Route index element={<Navigate to="/admin/dashboard" replace />} />
               <Route path="dashboard" element={<Dashboard />} />
+              <Route path="analytics" element={<AnalyticsDashboard />} />
+              <Route path="analytics/:mainProjectId" element={<ProjectAnalyticsPage />} />
               {/* Organizations page removed on admin — redirect to Projects */}
               <Route path="projects" element={<Navigate to="/admin/sub-projects" replace />} />
               <Route path="employees" element={<EmployeesPage />} />

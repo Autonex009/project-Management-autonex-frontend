@@ -40,6 +40,6 @@ export default defineConfig(({ isSsrBuild }) => ({
   },
   // Optimize dependencies
   optimizeDeps: {
-    include: ['react', 'react-dom', 'react-router-dom', '@tanstack/react-query']
+    include: ['react', 'react-dom', 'react-router-dom', '@tanstack/react-query', 'recharts']
   }
 }))

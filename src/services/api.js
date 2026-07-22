@@ -85,6 +85,16 @@ export const recommendationsApi = {
             .then(res => res.data),
 };
 
+// === Encord Analytics API ===
+export const analyticsApi = {
+    getProjectAnalytics: (mainProjectId, params) =>
+        api.get(`/analytics/project/${mainProjectId}`, { params }).then(res => res.data),
+    getSummary: () => api.get('/analytics/summary').then(res => res.data),
+    // Manual Encord pull (admin) — optional { date_from, date_to }
+    runSync: (body) => api.post('/encord/sync', body || {}).then(res => res.data),
+    previewSync: () => api.get('/encord/preview').then(res => res.data),
+};
+
 // Backward compatibility alias
 export const parentProjectApi = projectApi;
 

@@ -1,9 +1,31 @@
 import React, { useMemo, useState } from 'react';
 import { useQuery } from '@tanstack/react-query';
 import { employeeApi, subProjectApi, perfEvalApi } from '../../services/api';
-import { ChevronDown, ChevronUp, ClipboardList, Search, X, CheckCircle2, Lock, Gift } from 'lucide-react';
+import { ChevronDown, ChevronUp, ClipboardList, Search, CheckCircle2, Lock, Gift, UserCog } from 'lucide-react';
 import StarRating, { formatPeriod } from '../../components/perf/StarRating';
 import EvaluationDetail from '../../components/perf/EvaluationDetail';
+import EvalReviewCard from '../../components/perf/EvalReviewCard';
+
+const isPm = (emp) => (emp?.designation || '').toLowerCase().includes('program manager') || (emp?.designation || '').toLowerCase().includes('project manager');
+
+// Role filter buttons -> predicate over an employee record.
+const ROLE_FILTERS = [
+    { key: 'all', label: 'All' },
+    { key: 'Full-time', label: 'Full-time' },
+    { key: 'Intern', label: 'Interns' },
+    { key: 'pm', label: 'PMs' },
+    { key: 'Contract', label: 'Contract' },
+];
+
+const matchesRole = (emp, key) => {
+    if (key === 'all') return true;
+    if (key === 'pm') return isPm(emp);
+    const t = (emp?.employee_type || '').toLowerCase();
+    if (key === 'Full-time') return t === 'full-time';
+    if (key === 'Intern') return t === 'intern';
+    if (key === 'Contract') return t === 'contract' || t === 'contractor';
+    return true;
+};
 
 const StatusPill = ({ status }) => (
     status === 'reviewed'
@@ -40,6 +62,7 @@ const SummaryRow = ({ evaluation, employeeName, projectName }) => {
 };
 
 const AdminPerformancePage = () => {
+    const user = JSON.parse(localStorage.getItem('user') || '{}');
     const { data: employees = [], isLoading: empLoading } = useQuery({ queryKey: ['employees'], queryFn: employeeApi.getAll });
     const { data: projects = [] } = useQuery({ queryKey: ['sub-projects'], queryFn: subProjectApi.getAll });
     // Admin sees ALL evaluations (submitted + reviewed).
@@ -48,35 +71,45 @@ const AdminPerformancePage = () => {
         queryFn: () => perfEvalApi.getAll(),
     });
 
+    const [tab, setTab] = useState('employees'); // 'employees' | 'pm'
     const [search, setSearch] = useState('');
-    const [projectFilter, setProjectFilter] = useState('all');
+    const [roleFilter, setRoleFilter] = useState('all');
 
-    const empName = (id) => employees.find((e) => e.id === id)?.name || `Employee #${id}`;
+    const empById = useMemo(() => new Map(employees.map((e) => [e.id, e])), [employees]);
+    const empName = (id) => empById.get(id)?.name || `Employee #${id}`;
     const projName = (id) => projects.find((p) => p.id === id)?.name || `Project #${id}`;
+
+    // Employee summary excludes PM self-reports (project_id 0 — shown on the PM Approvals tab).
+    const employeeEvals = useMemo(() => evaluations.filter((e) => e.project_id !== 0), [evaluations]);
+
+    // PM self-reports (project_id 0) — admin reviews/approves these.
+    const pmSelfEvals = useMemo(
+        () => evaluations.filter((e) => e.project_id === 0).sort((a, b) => {
+            if (a.status !== b.status) return a.status === 'submitted' ? -1 : 1;
+            return (b.period || '').localeCompare(a.period || '');
+        }),
+        [evaluations],
+    );
+    const pmPendingCount = pmSelfEvals.filter((e) => e.status === 'submitted').length;
 
     const filtered = useMemo(() => {
         const term = search.trim().toLowerCase();
-        return evaluations
-            .filter((e) => projectFilter === 'all' || String(e.project_id) === projectFilter)
+        return employeeEvals
+            .filter((e) => matchesRole(empById.get(e.employee_id), roleFilter))
             .filter((e) => !term || empName(e.employee_id).toLowerCase().includes(term))
             .sort((a, b) => (b.period || '').localeCompare(a.period || ''));
-    }, [evaluations, search, projectFilter, employees]);
+    }, [employeeEvals, search, roleFilter, empById]);
 
     const bonusEvals = useMemo(
-        () => evaluations.filter((e) => e.bonus_suggested).sort((a, b) => (b.period || '').localeCompare(a.period || '')),
-        [evaluations],
+        () => employeeEvals.filter((e) => e.bonus_suggested).sort((a, b) => (b.period || '').localeCompare(a.period || '')),
+        [employeeEvals],
     );
 
     const avgAll = useMemo(() => {
-        const vals = evaluations.map((e) => Number(e.overall_rating)).filter((n) => n >= 1);
+        const vals = employeeEvals.map((e) => Number(e.overall_rating)).filter((n) => n >= 1);
         if (vals.length === 0) return null;
         return Math.round((vals.reduce((a, b) => a + b, 0) / vals.length) * 100) / 100;
-    }, [evaluations]);
-
-    const projectsWithEvals = useMemo(() => {
-        const ids = new Set(evaluations.map((e) => e.project_id));
-        return projects.filter((p) => ids.has(p.id));
-    }, [projects, evaluations]);
+    }, [employeeEvals]);
 
     const isLoading = empLoading || evalLoading;
 
@@ -94,7 +127,7 @@ const AdminPerformancePage = () => {
                     <div className="grid gap-3 sm:grid-cols-3">
                         <div className="rounded-2xl border border-white/70 bg-white/80 px-4 py-3 shadow-sm">
                             <p className="text-xs font-medium uppercase tracking-[0.14em] text-slate-400">Reviews</p>
-                            <p className="text-xl font-semibold text-slate-900">{evaluations.length}</p>
+                            <p className="text-xl font-semibold text-slate-900">{employeeEvals.length}</p>
                         </div>
                         <div className="rounded-2xl border border-white/70 bg-white/80 px-4 py-3 shadow-sm">
                             <p className="text-xs font-medium uppercase tracking-[0.14em] text-slate-400">Avg Rating</p>
@@ -108,6 +141,45 @@ const AdminPerformancePage = () => {
                 </div>
             </section>
 
+            {/* Tabs */}
+            <div className="flex gap-2 border-b border-slate-200">
+                <button
+                    type="button"
+                    onClick={() => setTab('employees')}
+                    className={`-mb-px border-b-2 px-4 py-2.5 text-sm font-medium transition ${tab === 'employees' ? 'border-indigo-600 text-indigo-700' : 'border-transparent text-slate-500 hover:text-slate-700'}`}
+                >
+                    Employees
+                </button>
+                <button
+                    type="button"
+                    onClick={() => setTab('pm')}
+                    className={`-mb-px flex items-center gap-2 border-b-2 px-4 py-2.5 text-sm font-medium transition ${tab === 'pm' ? 'border-indigo-600 text-indigo-700' : 'border-transparent text-slate-500 hover:text-slate-700'}`}
+                >
+                    PM Approvals
+                    {pmPendingCount > 0 && (
+                        <span className="rounded-full bg-amber-100 px-2 py-0.5 text-xs font-semibold text-amber-700">{pmPendingCount}</span>
+                    )}
+                </button>
+            </div>
+
+            {tab === 'pm' ? (
+                isLoading ? (
+                    <div className="rounded-2xl border border-slate-200 bg-white p-10 text-center text-sm text-slate-400 shadow-sm">Loading…</div>
+                ) : pmSelfEvals.length === 0 ? (
+                    <div className="rounded-3xl border border-dashed border-slate-200 bg-white p-12 text-center shadow-sm">
+                        <UserCog className="mx-auto h-10 w-10 text-slate-300" />
+                        <h2 className="mt-4 text-lg font-semibold text-slate-800">No PM self-evaluations yet</h2>
+                        <p className="mt-2 text-sm text-slate-500">When a PM submits their monthly self-evaluation, it appears here for approval.</p>
+                    </div>
+                ) : (
+                    <div className="space-y-3">
+                        {pmSelfEvals.map((ev) => (
+                            <EvalReviewCard key={ev.id} evaluation={ev} personName={empName(ev.employee_id)} reviewerId={user.id} />
+                        ))}
+                    </div>
+                )
+            ) : (
+            <>
             {/* Suggested for Bonus */}
             {!isLoading && bonusEvals.length > 0 && (
                 <section className="rounded-3xl border border-amber-200 bg-amber-50/50 p-5 shadow-sm">
@@ -133,7 +205,7 @@ const AdminPerformancePage = () => {
                 </section>
             )}
 
-            {!isLoading && evaluations.length > 0 && (
+            {!isLoading && employeeEvals.length > 0 && (
                 <section className="rounded-2xl border border-slate-200/70 bg-white p-4 shadow-sm">
                     <div className="flex flex-col gap-3 lg:flex-row lg:items-center">
                         <div className="relative flex-1">
@@ -146,27 +218,26 @@ const AdminPerformancePage = () => {
                                 className="w-full rounded-xl border border-slate-200 bg-slate-50 py-2.5 pl-10 pr-3 text-sm text-slate-700 outline-none transition focus:border-indigo-300 focus:bg-white focus:ring-2 focus:ring-indigo-100"
                             />
                         </div>
-                        <select
-                            value={projectFilter}
-                            onChange={(e) => setProjectFilter(e.target.value)}
-                            className="rounded-xl border border-slate-200 bg-slate-50 px-3 py-2.5 text-sm text-slate-700 outline-none transition focus:border-indigo-300 focus:bg-white focus:ring-2 focus:ring-indigo-100"
-                        >
-                            <option value="all">All projects</option>
-                            {projectsWithEvals.map((p) => <option key={p.id} value={String(p.id)}>{p.name}</option>)}
-                        </select>
-                        {(search || projectFilter !== 'all') && (
-                            <button type="button" onClick={() => { setSearch(''); setProjectFilter('all'); }} className="inline-flex items-center justify-center gap-1.5 rounded-xl border border-slate-200 bg-white px-3 py-2.5 text-sm font-medium text-slate-600 transition hover:bg-slate-50">
-                                <X className="h-4 w-4" /> Clear
-                            </button>
-                        )}
+                        <div className="flex flex-wrap gap-2">
+                            {ROLE_FILTERS.map((r) => (
+                                <button
+                                    key={r.key}
+                                    type="button"
+                                    onClick={() => setRoleFilter(r.key)}
+                                    className={`rounded-xl px-3 py-2 text-sm font-medium transition ${roleFilter === r.key ? 'bg-indigo-600 text-white' : 'border border-slate-200 bg-white text-slate-600 hover:bg-slate-50'}`}
+                                >
+                                    {r.label}
+                                </button>
+                            ))}
+                        </div>
                     </div>
-                    <p className="mt-3 text-xs font-medium text-slate-400">Showing {filtered.length} of {evaluations.length} reviews</p>
+                    <p className="mt-3 text-xs font-medium text-slate-400">Showing {filtered.length} of {employeeEvals.length} reviews</p>
                 </section>
             )}
 
             {isLoading ? (
                 <div className="rounded-2xl border border-slate-200 bg-white p-10 text-center text-sm text-slate-400 shadow-sm">Loading…</div>
-            ) : evaluations.length === 0 ? (
+            ) : employeeEvals.length === 0 ? (
                 <div className="rounded-3xl border border-dashed border-slate-200 bg-white p-12 text-center shadow-sm">
                     <ClipboardList className="mx-auto h-10 w-10 text-slate-300" />
                     <h2 className="mt-4 text-lg font-semibold text-slate-800">No evaluations yet</h2>
@@ -183,6 +254,8 @@ const AdminPerformancePage = () => {
                         <SummaryRow key={ev.id} evaluation={ev} employeeName={empName(ev.employee_id)} projectName={projName(ev.project_id)} />
                     ))}
                 </div>
+            )}
+            </>
             )}
         </div>
     );

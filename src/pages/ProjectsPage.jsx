@@ -434,12 +434,18 @@ const ProjectsPage = () => {
       daily_target: parseInt(formData.get('daily_target')) || 0,
       priority: formData.get('priority') || 'medium',
       required_expertise: selectedSkills,
-      assigned_employee_ids: [],
+      // Preserve existing assignments when editing. On create, if a PM makes the
+      // project, attach them so it lands in their scope.
+      assigned_employee_ids: editingProject
+        ? (editingProject.assigned_employee_ids || [])
+        : (isPm && pmEmployeeId ? [pmEmployeeId] : []),
       required_manpower: employeesRequired,
       project_duration_weeks: durationWeeks,
       project_duration_days: durationDays,
       project_status: formData.get('project_status') || 'active',
       is_annotation: formData.get('is_annotation') === 'true',
+      encord_project_hash: (formData.get('encord_project_hash') || '').trim() || null,
+      sentiment: (formData.get('sentiment') || '').trim() || null,
     };
 
     let savedProject;
@@ -929,6 +935,35 @@ toast.success(wasEditing ? 'Project updated successfully' : 'Project created suc
                     required
                     defaultValue={(editingProject || copyingProject)?.start_date}
                     className="input"
+                  />
+                </div>
+
+                <div>
+                  <label className="block text-sm font-medium text-gray-700 mb-1">
+                    Encord Project ID
+                  </label>
+                  <input
+                    type="text"
+                    name="encord_project_hash"
+                    defaultValue={(editingProject || copyingProject)?.encord_project_hash || ''}
+                    className="input font-mono text-sm"
+                    placeholder="Encord project hash (enables analytics for this project)"
+                  />
+                  <p className="mt-1 text-xs text-gray-500">
+                    Paste the Encord project hash to pull platform analytics for this project.
+                  </p>
+                </div>
+
+                <div>
+                  <label className="block text-sm font-medium text-gray-700 mb-1">
+                    Project Sentiment
+                  </label>
+                  <textarea
+                    name="sentiment"
+                    rows={2}
+                    defaultValue={(editingProject || copyingProject)?.sentiment || ''}
+                    className="input resize-none"
+                    placeholder="e.g. On track / At risk — a short note visible to admins"
                   />
                 </div>
 
