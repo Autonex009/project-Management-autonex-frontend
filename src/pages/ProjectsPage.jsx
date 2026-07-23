@@ -474,12 +474,38 @@ const ProjectsPage = () => {
     // Guard against double-submission (e.g. rapid double-clicks on Save)
     if (createMutation.isPending || updateMutation.isPending) return;
     const formData = new FormData(e.target);
-    const selectedMainProjectId = parseInt(formData.get('main_project_id') || filterMainProjectId || '', 10) || null;
+    let selectedMainProjectId = parseInt(formData.get('main_project_id') || filterMainProjectId || '', 10) || null;
 
-
+    // "Organization" is just a name. Reuse an existing organization with the
+    // same name if one exists; only create a new one when the typed name is
+    // genuinely new (attaching the creating PM).
     if (!selectedMainProjectId) {
-      toast.error('Please select a parent project');
-      return;
+      const orgName = (formOrg || '').trim();
+      if (!orgName || orgName === NO_ORG) {
+        toast.error('Please enter an organization');
+        return;
+      }
+
+      const existingOrg = visibleMainProjects.find(
+        (p) => (p.name || '').trim().toLowerCase() === orgName.toLowerCase()
+      );
+
+      if (existingOrg) {
+        selectedMainProjectId = existingOrg.id;
+      } else {
+        try {
+          const createdOrg = await parentProjectApi.create({
+            name: orgName,
+            client: orgName,
+            program_manager_ids: isPm && pmEmployeeId ? [pmEmployeeId] : [],
+          });
+          selectedMainProjectId = createdOrg.id;
+          queryClient.invalidateQueries({ queryKey: ['parent-projects'] });
+        } catch (error) {
+          toast.error(error.response?.data?.detail || 'Failed to create organization');
+          return;
+        }
+      }
     }
 
     const startDate = formData.get('start_date');
@@ -510,7 +536,6 @@ const ProjectsPage = () => {
       daily_target: parseInt(formData.get('daily_target')) || 0,
       priority: formData.get('priority') || 'medium',
       required_expertise: selectedSkills,
-      assigned_employee_ids: [],
       // Team composition (required_manpower is auto-computed server-side from the Autonex counts)
       annotators_total: num('annotators_total'),
       workforce_vendors: selectedVendors,
@@ -522,7 +547,7 @@ const ProjectsPage = () => {
       assigned_employee_ids: editingProject
         ? (editingProject.assigned_employee_ids || [])
         : (isPm && pmEmployeeId ? [pmEmployeeId] : []),
-      required_manpower: employeesRequired,
+      required_manpower: num('autonex_annotators') + num('autonex_reviewers') + num('qc_count'),
       project_duration_weeks: durationWeeks,
       project_duration_days: durationDays,
       project_status: formData.get('project_status') || 'active',
@@ -1016,18 +1041,36 @@ toast.success(wasEditing ? 'Project updated successfully' : 'Project created suc
                       </span>
                     </div>
 
-                    {/* Project details */}
-                    <div className="mt-5 grid grid-cols-2 gap-3">
+                    {/* Project Type chips */}
+                    <div className="mt-4">
+                      {project.project_types && Object.keys(project.project_types).length > 0 ? (
+                        <div className="flex flex-wrap gap-1.5">
+                          {Object.entries(project.project_types).map(([cat, sub]) => (
+                            <span
+                              key={cat}
+                              title={`${cat}: ${sub}`}
+                              className="cursor-default inline-flex items-center rounded-full bg-indigo-50 px-2.5 py-1 text-[11px] font-medium text-indigo-700 ring-1 ring-inset ring-indigo-100"
+                            >
+                              {sub}
+                            </span>
+                          ))}
+                        </div>
+                      ) : (
+                        <span className="text-[11px] text-slate-400">No project type set</span>
+                      )}
+                    </div>
+
+                    {/* Key metrics */}
+                    <div className="mt-4 grid grid-cols-2 gap-2.5">
                       <div className="rounded-xl bg-slate-50 p-3">
-                        <p className="text-xs text-slate-500">Project Manager</p>
+                        <p className="text-[11px] font-medium text-slate-500">Project Manager</p>
                         <p className="mt-1 text-sm font-semibold text-slate-800 truncate">
                           {pmNames.length ? pmNames.join(', ') : '—'}
                         </p>
                       </div>
 
                       <div className="rounded-xl bg-slate-50 p-3">
-                        <p className="text-xs text-slate-500 mb-1">Manpower</p>
-
+                        <p className="text-[11px] font-medium text-slate-500 mb-1">Manpower</p>
                         <AllocationPopover
                           project={project}
                           allocations={allocations}
@@ -1040,64 +1083,30 @@ toast.success(wasEditing ? 'Project updated successfully' : 'Project created suc
                           }
                         />
                       </div>
-                    </div>
 
-                    {/* Project Type + Autonex team */}
-                    <div className="mt-4 flex flex-wrap items-start gap-x-6 gap-y-3">
-                      {/* Project Type (hover a chip to see its subtype) */}
-                      <div>
-                        <p className="mb-2 text-xs font-medium text-slate-500">
-                          Project Type
-                        </p>
-                        {project.project_types && Object.keys(project.project_types).length > 0 ? (
-                          <div className="flex flex-wrap gap-1.5">
-                            {Object.entries(project.project_types).map(([cat, sub]) => (
-                              <span
-                                key={cat}
-                                title={sub}
-                                className="cursor-default rounded-md bg-indigo-50 px-2 py-1 text-[11px] font-medium text-indigo-700"
-                              >
-                                {cat}
-                              </span>
-                            ))}
-                          </div>
-                        ) : (
-                          <span className="text-[11px] text-slate-400">Not set</span>
-                        )}
-                      </div>
-
-                      {/* Autonex Annotators */}
-                      <div>
-                        <p className="mb-2 text-xs font-medium text-slate-500">
-                          Autonex Annotators
-                        </p>
-                        <span className="rounded-md bg-slate-100 px-2 py-1 text-[11px] font-semibold text-slate-700">
+                      <div className="rounded-xl bg-slate-50 p-3">
+                        <p className="text-[11px] font-medium text-slate-500">Autonex Annotators</p>
+                        <p className="mt-1 text-sm font-semibold text-slate-800">
                           {project.autonex_annotators ?? 0}
-                        </span>
+                        </p>
                       </div>
 
-                      {/* Autonex Reviewers */}
-                      <div>
-                        <p className="mb-2 text-xs font-medium text-slate-500">
-                          Autonex Reviewers
-                        </p>
-                        <span className="rounded-md bg-slate-100 px-2 py-1 text-[11px] font-semibold text-slate-700">
+                      <div className="rounded-xl bg-slate-50 p-3">
+                        <p className="text-[11px] font-medium text-slate-500">Autonex Reviewers</p>
+                        <p className="mt-1 text-sm font-semibold text-slate-800">
                           {project.autonex_reviewers ?? 0}
-                        </span>
+                        </p>
                       </div>
                     </div>
 
                     {/* Client Sentiment (PM/admin can update inline) */}
-                    <div className="mt-4 flex items-center justify-between gap-3 rounded-xl border border-slate-200 px-3 py-2.5">
-                      <span className="text-xs font-medium text-slate-500">
-                        Client Sentiment
-                      </span>
-
-                      <div className="inline-flex items-center gap-1 rounded-lg bg-slate-100 p-0.5">
+                    <div className="mt-4">
+                      <p className="mb-1.5 text-[11px] font-medium text-slate-500">Client Sentiment</p>
+                      <div className="grid grid-cols-3 gap-1.5">
                         {[
-                          { value: 'GOOD', label: 'Good', active: 'bg-emerald-500 text-white shadow-sm', idle: 'text-emerald-700 hover:bg-emerald-50' },
-                          { value: 'AVG', label: 'Avg', active: 'bg-amber-500 text-white shadow-sm', idle: 'text-amber-700 hover:bg-amber-50' },
-                          { value: 'Poor', label: 'Poor', active: 'bg-red-500 text-white shadow-sm', idle: 'text-red-600 hover:bg-red-50' },
+                          { value: 'GOOD', label: 'Good', active: 'bg-emerald-500 text-white shadow-sm ring-emerald-500', idle: 'bg-emerald-50 text-emerald-700 ring-emerald-100 hover:bg-emerald-100' },
+                          { value: 'AVG', label: 'Avg', active: 'bg-amber-500 text-white shadow-sm ring-amber-500', idle: 'bg-amber-50 text-amber-700 ring-amber-100 hover:bg-amber-100' },
+                          { value: 'Poor', label: 'Poor', active: 'bg-red-500 text-white shadow-sm ring-red-500', idle: 'bg-red-50 text-red-600 ring-red-100 hover:bg-red-100' },
                         ].map((opt) => {
                           const selected = project.sentiment === opt.value;
                           return (
@@ -1108,7 +1117,7 @@ toast.success(wasEditing ? 'Project updated successfully' : 'Project created suc
                               onClick={() =>
                                 sentimentMutation.mutate({ id: project.id, sentiment: selected ? '' : opt.value })
                               }
-                              className={`rounded-md px-2.5 py-1 text-[11px] font-semibold transition-colors disabled:opacity-60 ${
+                              className={`rounded-lg px-2 py-1.5 text-xs font-semibold ring-1 ring-inset transition-colors disabled:opacity-60 ${
                                 selected ? opt.active : opt.idle
                               }`}
                             >
@@ -1803,7 +1812,7 @@ toast.success(wasEditing ? 'Project updated successfully' : 'Project created suc
               disabled={createMutation.isPending || updateMutation.isPending}
               isLoading={createMutation.isPending || updateMutation.isPending}
             >
-              {!(createMutation.isPending || updateMutation.isPending) && (editingProject ? 'Update Sub-Project' : 'Create Sub-Project')}
+              {!(createMutation.isPending || updateMutation.isPending) && (editingProject ? 'Update Project' : 'Create Project')}
             </Button>
           </Modal.Compact.Footer>
         </form>
@@ -1812,7 +1821,7 @@ toast.success(wasEditing ? 'Project updated successfully' : 'Project created suc
         isOpen={deleteConfirm !== null}
         onClose={() => setDeleteConfirm(null)}
         onConfirm={() => { deleteMutation.mutate(deleteConfirm.id); setDeleteConfirm(null); }}
-        title="Delete Sub-Project"
+        title="Delete Project"
         message={`Are you sure you want to delete "${deleteConfirm?.name}"? This action cannot be undone.`}
         isPending={deleteMutation.isPending}
       />
