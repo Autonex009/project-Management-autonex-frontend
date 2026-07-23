@@ -2,7 +2,7 @@ import { useState, useRef, useEffect } from 'react';
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import { useSearchParams } from 'react-router-dom';
 import { employeeApi, skillApi, allocationApi } from '../services/api';
-import { Plus, Edit, Trash2, X, User, ChevronDown, CheckCircle, AlertCircle, Clock, ArrowUpCircle, RotateCcw } from 'lucide-react';
+import { Plus, Edit, Trash2, X, User, ChevronDown, CheckCircle, AlertCircle, Clock, ArrowUpCircle, RotateCcw, MoreVertical, Users, UserCheck, Briefcase, Award, ShieldCheck } from 'lucide-react';
 import toast from 'react-hot-toast';
 import SearchBar from '../components/ui/SearchBar';
 import Table, { ColumnTemplates, formatDateDeterministic } from '../components/ui/Table';
@@ -566,6 +566,127 @@ const DesignationMultiSelect = ({ options, value, onChange }) => {
   );
 };
 
+function EmployeeActionMenu({
+  row,
+  statusParam,
+  setRestoreTarget,
+  handleConvertToFulltime,
+  setEditingEmployee,
+  setFormDesignation,
+  setFormEmployeeType,
+  setFormWorkModel,
+  setFormEmpStatus,
+  setIsModalOpen,
+  setArchiveTarget,
+  convertPending,
+  restorePending,
+  archivePending,
+  isNearBottom,
+}) {
+  const [isOpen, setIsOpen] = useState(false);
+  const menuRef = useRef(null);
+
+  useEffect(() => {
+    function handleClickOutside(event) {
+      if (menuRef.current && !menuRef.current.contains(event.target)) {
+        setIsOpen(false);
+      }
+    }
+    if (isOpen) {
+      document.addEventListener('mousedown', handleClickOutside);
+    }
+    return () => {
+      document.removeEventListener('mousedown', handleClickOutside);
+    };
+  }, [isOpen]);
+
+  const positionClass = isNearBottom ? 'bottom-full mb-1.5' : 'top-full mt-1.5';
+
+  return (
+    <div className="relative inline-block text-left" ref={menuRef}>
+      <button
+        type="button"
+        onClick={(e) => {
+          e.stopPropagation();
+          setIsOpen((prev) => !prev);
+        }}
+        className={`p-1.5 rounded-lg text-slate-400 hover:text-slate-700 dark:hover:text-zinc-200 hover:bg-slate-100 dark:hover:bg-neutral-800 transition-colors ${isOpen ? 'bg-slate-100 text-slate-700 dark:bg-neutral-800 dark:text-zinc-200' : ''
+          }`}
+        title="More Actions"
+      >
+        <MoreVertical className="w-4 h-4" />
+      </button>
+
+      {isOpen && (
+        <div
+          className={`absolute right-0 ${positionClass} z-40 w-44 bg-white dark:bg-neutral-900 rounded-xl shadow-xl border border-slate-200/80 dark:border-neutral-800 py-1 text-xs font-medium focus:outline-none`}
+          onClick={(e) => e.stopPropagation()}
+        >
+          {statusParam === 'archived' ? (
+            <button
+              onClick={() => {
+                setIsOpen(false);
+                setRestoreTarget(row);
+              }}
+              disabled={restorePending}
+              className="w-full text-left px-3 py-2 text-slate-700 dark:text-zinc-300 hover:bg-indigo-50 dark:hover:bg-indigo-950/40 hover:text-indigo-600 dark:hover:text-indigo-400 flex items-center gap-2 transition-colors disabled:opacity-50"
+            >
+              <RotateCcw className="w-3.5 h-3.5 text-indigo-500" />
+              <span>Restore Employee</span>
+            </button>
+          ) : (
+            <>
+              <button
+                onClick={() => {
+                  setIsOpen(false);
+                  setEditingEmployee(row);
+                  setFormDesignation(row.designation || 'Annotator/ Reviewer');
+                  setFormEmployeeType(row.employee_type || 'Full-time');
+                  setFormWorkModel(row.work_model || 'WFO');
+                  setFormEmpStatus(row.status || 'active');
+                  setIsModalOpen(true);
+                }}
+                className="w-full text-left px-3 py-2 text-slate-700 dark:text-zinc-300 hover:bg-slate-50 dark:hover:bg-neutral-800/60 hover:text-indigo-600 dark:hover:text-indigo-400 flex items-center gap-2 transition-colors"
+              >
+                <Edit className="w-3.5 h-3.5 text-slate-400" />
+                <span>Edit Profile</span>
+              </button>
+
+              {row.employee_type === 'Intern' && (
+                <button
+                  onClick={() => {
+                    setIsOpen(false);
+                    handleConvertToFulltime(row);
+                  }}
+                  disabled={convertPending}
+                  className="w-full text-left px-3 py-2 text-slate-700 dark:text-zinc-300 hover:bg-emerald-50 dark:hover:bg-emerald-950/30 hover:text-emerald-600 dark:hover:text-emerald-400 flex items-center gap-2 transition-colors disabled:opacity-50"
+                >
+                  <ArrowUpCircle className="w-3.5 h-3.5 text-emerald-500" />
+                  <span>Promote to Full-time</span>
+                </button>
+              )}
+
+              <div className="my-1 border-t border-slate-100 dark:border-neutral-800" />
+
+              <button
+                onClick={() => {
+                  setIsOpen(false);
+                  setArchiveTarget(row);
+                }}
+                disabled={archivePending}
+                className="w-full text-left px-3 py-2 text-rose-600 dark:text-rose-400 hover:bg-rose-50 dark:hover:bg-rose-950/30 flex items-center gap-2 transition-colors disabled:opacity-50"
+              >
+                <Trash2 className="w-3.5 h-3.5 text-rose-500" />
+                <span>Archive</span>
+              </button>
+            </>
+          )}
+        </div>
+      )}
+    </div>
+  );
+}
+
 const EmployeesPage = () => {
   const queryClient = useQueryClient();
   const [searchParams, setSearchParams] = useSearchParams();
@@ -609,14 +730,98 @@ const EmployeesPage = () => {
     queryFn: allocationApi.getAll,
   });
 
-  // Build employee_id â†’ Set<project_name> map
+  // Fetch all employees for organization KPI calculations
+  const { data: allEmployeesData = [] } = useQuery({
+    queryKey: ['all-employees-kpis'],
+    queryFn: () => employeeApi.getAll(),
+  });
+
+  const allStaff = allEmployeesData.length > 0 ? allEmployeesData : employees;
+
+  // Build employee_id -> Set<project_name> map (excluding inactive employees)
   const employeeProjectsMap = allocations.reduce((map, alloc) => {
+    const emp = allStaff.find(e => String(e.id) === String(alloc.employee_id));
+    if (emp && (emp.status || '').toLowerCase() === 'inactive') {
+      return map;
+    }
     const projectName = alloc.sub_project_name || alloc.project_name;
     if (!projectName) return map;
     if (!map[alloc.employee_id]) map[alloc.employee_id] = new Set();
     map[alloc.employee_id].add(projectName);
     return map;
   }, {});
+
+  // Auto-cleanup: remove any existing database allocations for employees currently set to 'inactive'
+  useEffect(() => {
+    if (allocations.length > 0 && allStaff.length > 0) {
+      const inactiveEmpIds = new Set(
+        allStaff.filter(e => (e.status || '').toLowerCase() === 'inactive').map(e => String(e.id))
+      );
+      const staleAllocations = allocations.filter(a => inactiveEmpIds.has(String(a.employee_id)));
+      if (staleAllocations.length > 0) {
+        Promise.allSettled(staleAllocations.map(a => allocationApi.delete(a.id))).then(() => {
+          queryClient.invalidateQueries(['allocations']);
+        });
+      }
+    }
+  }, [allocations, allStaff, queryClient]);
+
+  // KPI Classification 1: Status (Active, Inactive, Idle)
+  const activeCount = allStaff.filter(e => (e.status || 'active').toLowerCase() === 'active').length;
+  const inactiveCount = allStaff.filter(e => (e.status || '').toLowerCase() === 'inactive').length;
+  const idleCount = allStaff.filter(e => {
+    const isActive = (e.status || 'active').toLowerCase() === 'active';
+    const isIdle = !employeeProjectsMap[e.id] || employeeProjectsMap[e.id].size === 0;
+    return isActive && isIdle;
+  }).length;
+
+  // KPI Classification 2: Type (Full-time, Intern, Contract)
+  const fullTimeCount = allStaff.filter(e => {
+    const t = (e.employee_type || '').toLowerCase();
+    return t.includes('full') || t === 'fulltime';
+  }).length;
+
+  const internCount = allStaff.filter(e => {
+    const t = (e.employee_type || '').toLowerCase();
+    return t.includes('intern');
+  }).length;
+
+  const contractCount = allStaff.filter(e => {
+    const t = (e.employee_type || '').toLowerCase();
+    return t.includes('contract') || t.includes('part');
+  }).length;
+
+  // KPI Classification 3: Roles (Project Managers, Annotator/Reviewer, QC)
+  const pmCount = allStaff.filter(e => {
+    const d = (e.designation || '').toLowerCase();
+    return d.includes('manager') || d.includes('pm') || d.includes('lead');
+  }).length;
+
+  const annotatorCount = allStaff.filter(e => {
+    const d = (e.designation || '').toLowerCase();
+    return d.includes('annotator') || d.includes('reviewer');
+  }).length;
+
+  const qcCount = allStaff.filter(e => {
+    const d = (e.designation || '').toLowerCase();
+    return d.includes('qc') || d.includes('quality');
+  }).length;
+
+  // KPI Classification 4: Work Model (WFO, WFH, Hybrid)
+  const wfoCount = allStaff.filter(e => {
+    const wm = (e.work_model || 'WFO').toUpperCase();
+    return wm === 'WFO' || wm.includes('OFFICE');
+  }).length;
+
+  const wfhCount = allStaff.filter(e => {
+    const wm = (e.work_model || '').toUpperCase();
+    return wm === 'WFH' || wm.includes('HOME');
+  }).length;
+
+  const hybridCount = allStaff.filter(e => {
+    const wm = (e.work_model || '').toUpperCase();
+    return wm === 'HYBRID';
+  }).length;
 
   // Fetch skills from API
   const { data: skillsData = [], isLoading: skillsLoading } = useQuery({
@@ -641,13 +846,35 @@ const EmployeesPage = () => {
   });
 
   const updateMutation = useMutation({
-    mutationFn: ({ id, data }) => employeeApi.update(id, data),
-    onSuccess: () => {
+    mutationFn: async ({ id, data, previousStatus }) => {
+      const res = await employeeApi.update(id, data);
+      const newStatus = (data.status || '').toLowerCase();
+      const oldStatus = (previousStatus || '').toLowerCase();
+
+      // If status changed to 'inactive', automatically remove all assigned project allocations
+      if (newStatus === 'inactive' && oldStatus !== 'inactive') {
+        const empAllocations = allocations.filter(a => String(a.employee_id) === String(id));
+        if (empAllocations.length > 0) {
+          await Promise.allSettled(empAllocations.map(a => allocationApi.delete(a.id)));
+        }
+      }
+      return res;
+    },
+    onSuccess: (res, variables) => {
       queryClient.invalidateQueries(['employees']);
-      queryClient.invalidateQueries(['skills']); // Refresh skills in case new ones were added
+      queryClient.invalidateQueries(['all-employees-kpis']);
+      queryClient.invalidateQueries(['allocations']);
+      queryClient.invalidateQueries(['skills']);
       setIsModalOpen(false);
       setEditingEmployee(null);
-      toast.success('Employee updated successfully');
+
+      const newStatus = (variables?.data?.status || '').toLowerCase();
+      const oldStatus = (variables?.previousStatus || '').toLowerCase();
+      if (newStatus === 'inactive' && oldStatus !== 'inactive') {
+        toast.success('Status updated to Inactive and assigned projects removed');
+      } else {
+        toast.success('Employee updated successfully');
+      }
     },
     onError: (err) => {
       toast.error(err.response?.data?.detail || 'Failed to update employee');
@@ -655,10 +882,19 @@ const EmployeesPage = () => {
   });
 
   const archiveMutation = useMutation({
-    mutationFn: employeeApi.delete,
+    mutationFn: async (id) => {
+      const res = await employeeApi.delete(id);
+      const empAllocations = allocations.filter(a => String(a.employee_id) === String(id));
+      if (empAllocations.length > 0) {
+        await Promise.allSettled(empAllocations.map(a => allocationApi.delete(a.id)));
+      }
+      return res;
+    },
     onSuccess: () => {
       queryClient.invalidateQueries(['employees']);
-      toast.success('Employee archived successfully');
+      queryClient.invalidateQueries(['all-employees-kpis']);
+      queryClient.invalidateQueries(['allocations']);
+      toast.success('Employee archived and projects unassigned');
     },
     onError: (err) => {
       toast.error(err.response?.data?.detail || 'Failed to archive employee');
@@ -669,6 +905,8 @@ const EmployeesPage = () => {
     mutationFn: employeeApi.restore,
     onSuccess: () => {
       queryClient.invalidateQueries(['employees']);
+      queryClient.invalidateQueries(['all-employees-kpis']);
+      queryClient.invalidateQueries(['allocations']);
       toast.success('Employee restored successfully');
     },
     onError: (err) => {
@@ -680,6 +918,7 @@ const EmployeesPage = () => {
     mutationFn: ({ id, converted_by }) => employeeApi.convertToFulltime(id, { converted_by }),
     onSuccess: (emp) => {
       queryClient.invalidateQueries(['employees']);
+      queryClient.invalidateQueries(['all-employees-kpis']);
       toast.success(`${emp.name} converted to Full-time`);
     },
     onError: (err) => {
@@ -726,7 +965,11 @@ const EmployeesPage = () => {
     };
 
     if (editingEmployee) {
-      updateMutation.mutate({ id: editingEmployee.id, data });
+      updateMutation.mutate({
+        id: editingEmployee.id,
+        data,
+        previousStatus: editingEmployee.status || 'active'
+      });
     } else {
       createMutation.mutate(data);
     }
@@ -797,12 +1040,151 @@ const EmployeesPage = () => {
         <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-2">
           <div className="flex items-center gap-4">
             <div>
-              <h1 className="text-2xl font-bold text-slate-900">Employees</h1>
-              <p className="text-slate-500 text-sm mt-0.5">Manage team members and their availability</p>
+              <h1 className="text-2xl font-bold text-slate-900 dark:text-white">Employees</h1>
+              <p className="text-slate-500 dark:text-zinc-400 text-sm mt-0.5">Manage team members and their availability</p>
             </div>
-            <div className="flex flex-col items-center px-4 py-2 bg-indigo-50 border border-indigo-100 rounded-xl">
-              <span className="text-2xl font-bold text-indigo-700 leading-none">{filteredEmployees.length}</span>
-              <span className="text-xs text-indigo-500 mt-0.5">{filteredEmployees.length === employees.length ? 'employees' : `of ${employees.length}`}</span>
+          </div>
+        </div>
+
+        {/* KPI Overview Cards Grid */}
+        <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-3.5 mt-1 mb-1">
+          {/* KPI 1: Total Employees */}
+          <div className="bg-white dark:bg-[#0f0f0f] border border-slate-200/60 dark:border-neutral-800 rounded-2xl p-3.5 shadow-[0_1px_3px_rgba(0,0,0,0.04)] flex flex-col justify-between hover:shadow-md transition-all duration-200">
+            <div className="flex items-center justify-between gap-2 mb-2.5">
+              <div className="flex items-center gap-2.5 min-w-0">
+                <div className="w-8 h-8 rounded-xl bg-indigo-500 text-white flex items-center justify-center shadow-sm flex-shrink-0">
+                  <Users className="w-4 h-4" />
+                </div>
+                <div className="text-[11px] font-bold text-slate-700 dark:text-zinc-200 uppercase tracking-wider truncate">
+                  TOTAL EMPLOYEES
+                </div>
+              </div>
+              <div className="text-xl sm:text-2xl font-normal text-slate-800 dark:text-white tracking-tight flex-shrink-0">
+                {allStaff.length}
+              </div>
+            </div>
+
+            <div className="pt-2 border-t border-slate-100 dark:border-neutral-800/80 flex items-center justify-between text-[11px] gap-1 flex-wrap">
+              <div className="flex items-center gap-1">
+                <span className="w-1.5 h-1.5 rounded-full bg-indigo-500" />
+                <span className="text-slate-500 dark:text-zinc-400 font-normal">WFO:</span>
+                <span className="font-normal text-indigo-600 dark:text-indigo-400">{wfoCount}</span>
+              </div>
+              <div className="flex items-center gap-1">
+                <span className="w-1.5 h-1.5 rounded-full bg-cyan-500" />
+                <span className="text-slate-500 dark:text-zinc-400 font-normal">WFH:</span>
+                <span className="font-normal text-cyan-600 dark:text-cyan-400">{wfhCount}</span>
+              </div>
+              <div className="flex items-center gap-1">
+                <span className="w-1.5 h-1.5 rounded-full bg-purple-500" />
+                <span className="text-slate-500 dark:text-zinc-400 font-normal">Hybrid:</span>
+                <span className="font-normal text-purple-600 dark:text-purple-400">{hybridCount}</span>
+              </div>
+            </div>
+          </div>
+
+          {/* KPI 2: Workforce Status */}
+          <div className="bg-white dark:bg-[#0f0f0f] border border-slate-200/60 dark:border-neutral-800 rounded-2xl p-3.5 shadow-[0_1px_3px_rgba(0,0,0,0.04)] flex flex-col justify-between hover:shadow-md transition-all duration-200">
+            <div className="flex items-center justify-between gap-2 mb-2.5">
+              <div className="flex items-center gap-2.5 min-w-0">
+                <div className="w-8 h-8 rounded-xl bg-emerald-500 text-white flex items-center justify-center shadow-sm flex-shrink-0">
+                  <UserCheck className="w-4 h-4" />
+                </div>
+                <div className="text-[11px] font-bold text-slate-700 dark:text-zinc-200 uppercase tracking-wider truncate">
+                  WORKFORCE STATUS
+                </div>
+              </div>
+              <div className="text-xl sm:text-2xl font-normal text-slate-800 dark:text-white tracking-tight flex-shrink-0">
+                {activeCount}
+              </div>
+            </div>
+
+            <div className="pt-2 border-t border-slate-100 dark:border-neutral-800/80 flex items-center justify-between text-[11px] gap-1 flex-wrap">
+              <div className="flex items-center gap-1">
+                <span className="w-1.5 h-1.5 rounded-full bg-emerald-500" />
+                <span className="text-slate-500 dark:text-zinc-400 font-normal">Active:</span>
+                <span className="font-normal text-emerald-600 dark:text-emerald-400">{activeCount}</span>
+              </div>
+              <div className="flex items-center gap-1">
+                <span className="w-1.5 h-1.5 rounded-full bg-slate-400" />
+                <span className="text-slate-500 dark:text-zinc-400 font-normal">Inactive:</span>
+                <span className="font-normal text-slate-500 dark:text-slate-400">{inactiveCount}</span>
+              </div>
+              <div className="flex items-center gap-1">
+                <span className="w-1.5 h-1.5 rounded-full bg-amber-500" />
+                <span className="text-slate-500 dark:text-zinc-400 font-normal">Idle:</span>
+                <span className="font-normal text-amber-600 dark:text-amber-400">{idleCount}</span>
+              </div>
+            </div>
+          </div>
+
+          {/* KPI 3: Employment Type */}
+          <div className="bg-white dark:bg-[#0f0f0f] border border-slate-200/60 dark:border-neutral-800 rounded-2xl p-3.5 shadow-[0_1px_3px_rgba(0,0,0,0.04)] flex flex-col justify-between hover:shadow-md transition-all duration-200">
+            <div className="flex items-center justify-between gap-2 mb-2.5">
+              <div className="flex items-center gap-2.5 min-w-0">
+                <div className="w-8 h-8 rounded-xl bg-purple-500 text-white flex items-center justify-center shadow-sm flex-shrink-0">
+                  <Briefcase className="w-4 h-4" />
+                </div>
+                <div className="text-[11px] font-bold text-slate-700 dark:text-zinc-200 uppercase tracking-wider truncate">
+                  EMPLOYEE TYPES
+                </div>
+              </div>
+              <div className="text-xl sm:text-2xl font-normal text-slate-800 dark:text-white tracking-tight flex-shrink-0">
+                {fullTimeCount}
+              </div>
+            </div>
+
+            <div className="pt-2 border-t border-slate-100 dark:border-neutral-800/80 flex items-center justify-between text-[11px] gap-1 flex-wrap">
+              <div className="flex items-center gap-1">
+                <span className="w-1.5 h-1.5 rounded-full bg-emerald-500" />
+                <span className="text-slate-500 dark:text-zinc-400 font-normal">Full-time:</span>
+                <span className="font-normal text-emerald-600 dark:text-emerald-400">{fullTimeCount}</span>
+              </div>
+              <div className="flex items-center gap-1">
+                <span className="w-1.5 h-1.5 rounded-full bg-amber-500" />
+                <span className="text-slate-500 dark:text-zinc-400 font-normal">Intern:</span>
+                <span className="font-normal text-amber-600 dark:text-amber-400">{internCount}</span>
+              </div>
+              <div className="flex items-center gap-1">
+                <span className="w-1.5 h-1.5 rounded-full bg-sky-500" />
+                <span className="text-slate-500 dark:text-zinc-400 font-normal">Contract:</span>
+                <span className="font-normal text-sky-500 dark:text-sky-400">{contractCount}</span>
+              </div>
+            </div>
+          </div>
+
+          {/* KPI 4: Role Designations */}
+          <div className="bg-white dark:bg-[#0f0f0f] border border-slate-200/60 dark:border-neutral-800 rounded-2xl p-3.5 shadow-[0_1px_3px_rgba(0,0,0,0.04)] flex flex-col justify-between hover:shadow-md transition-all duration-200">
+            <div className="flex items-center justify-between gap-2 mb-2.5">
+              <div className="flex items-center gap-2.5 min-w-0">
+                <div className="w-8 h-8 rounded-xl bg-sky-500 text-white flex items-center justify-center shadow-sm flex-shrink-0">
+                  <Award className="w-4 h-4" />
+                </div>
+                <div className="text-[11px] font-bold text-slate-700 dark:text-zinc-200 uppercase tracking-wider truncate">
+                  DESIGNATION ROLES
+                </div>
+              </div>
+              <div className="text-xl sm:text-2xl font-normal text-slate-800 dark:text-white tracking-tight flex-shrink-0">
+                {annotatorCount}
+              </div>
+            </div>
+
+            <div className="pt-2 border-t border-slate-100 dark:border-neutral-800/80 flex items-center justify-between text-[11px] gap-1 flex-wrap">
+              <div className="flex items-center gap-1">
+                <span className="w-1.5 h-1.5 rounded-full bg-indigo-500" />
+                <span className="text-slate-500 dark:text-zinc-400 font-normal">PMs:</span>
+                <span className="font-normal text-slate-700 dark:text-zinc-300">{pmCount}</span>
+              </div>
+              <div className="flex items-center gap-1">
+                <span className="w-1.5 h-1.5 rounded-full bg-sky-500" />
+                <span className="text-slate-500 dark:text-zinc-400 font-normal">Annotators:</span>
+                <span className="font-normal text-slate-700 dark:text-zinc-300">{annotatorCount}</span>
+              </div>
+              <div className="flex items-center gap-1">
+                <span className="w-1.5 h-1.5 rounded-full bg-purple-500" />
+                <span className="text-slate-500 dark:text-zinc-400 font-normal">QC:</span>
+                <span className="font-normal text-slate-700 dark:text-zinc-300">{qcCount}</span>
+              </div>
             </div>
           </div>
         </div>
@@ -1041,7 +1423,7 @@ const EmployeesPage = () => {
             key: 'reporting_manager',
             label: 'Reporting Manager',
             align: 'left',
-            width: 'w-[15%]',
+            width: 'w-[14%]',
             render: (_, row) => {
               const manager =
                 row.reporting_manager_name ||
@@ -1123,8 +1505,15 @@ const EmployeesPage = () => {
           {
             key: 'assigned_projects',
             label: 'Assigned Projects',
-            width: 'w-[17%]',
+            width: 'w-[15%]',
             render: (_, row) => {
+              if ((row.status || '').toLowerCase() === 'inactive') {
+                return (
+                  <span className="text-xs text-slate-400 font-medium">
+                    —
+                  </span>
+                );
+              }
               const projects = employeeProjectsMap[row.id];
               if (!projects || projects.size === 0) {
                 return (
@@ -1176,7 +1565,7 @@ const EmployeesPage = () => {
             key: 'status',
             label: 'Status',
             align: 'left',
-            width: 'w-[9%]',
+            width: 'w-[6%]',
             render: (value) => (
               <div className="flex items-center justify-start gap-1.5">
                 <span className={`w-2 h-2 rounded-full flex-shrink-0 ${value === 'active' ? 'bg-emerald-500' :
@@ -1190,57 +1579,36 @@ const EmployeesPage = () => {
           {
             key: 'actions',
             label: 'Actions',
-            align: 'right',
-            width: 'w-[7%]',
-            render: (_, row) => (
-              <div className="flex items-center justify-end gap-1">
-                {statusParam === 'archived' ? (
-                  <button
-                    onClick={() => setRestoreTarget(row)}
-                    disabled={restoreMutation.isPending}
-                    className="p-2 text-slate-500 hover:text-indigo-600 hover:bg-indigo-50 rounded-lg transition-colors disabled:opacity-50"
-                    title="Restore Employee"
-                  >
-                    <RotateCcw className="w-4 h-4" />
-                  </button>
-                ) : (
-                  <>
-                    {row.employee_type === 'Intern' && (
-                      <button
-                        onClick={() => handleConvertToFulltime(row)}
-                        disabled={convertMutation.isPending}
-                        className="p-2 text-slate-500 hover:text-emerald-600 hover:bg-emerald-50 rounded-lg transition-colors disabled:opacity-50"
-                        title="Convert to Full-time employee"
-                      >
-                        <ArrowUpCircle className="w-4 h-4" />
-                      </button>
-                    )}
-                    <button
-                      onClick={() => {
-                        setEditingEmployee(row);
-                        setFormDesignation(row.designation || 'Annotator/ Reviewer');
-                        setFormEmployeeType(row.employee_type || 'Full-time');
-                        setFormWorkModel(row.work_model || 'WFO');
-                        setFormEmpStatus(row.status || 'active');
-                        setIsModalOpen(true);
-                      }}
-                      className="p-2 text-slate-500 hover:text-indigo-600 hover:bg-indigo-50 rounded-lg transition-colors"
-                      title="Edit"
-                    >
-                      <Edit className="w-4 h-4" />
-                    </button>
-                    <button
-                      onClick={() => setArchiveTarget(row)}
-                      disabled={archiveMutation.isPending}
-                      className="p-2 text-slate-500 hover:text-amber-600 hover:bg-amber-50 rounded-lg transition-colors disabled:opacity-50"
-                      title="Archive"
-                    >
-                      <Trash2 className="w-4 h-4" />
-                    </button>
-                  </>
-                )}
-              </div>
-            ),
+            align: 'center',
+            width: 'w-[8%]',
+            render: (_, row) => {
+              const visibleRows = filteredEmployees.slice((currentPage - 1) * PAGE_SIZE, currentPage * PAGE_SIZE);
+              const pageIndex = visibleRows.indexOf(row);
+              const totalVisible = visibleRows.length;
+              const isNearBottom = totalVisible <= 2 ? pageIndex === totalVisible - 1 : pageIndex >= totalVisible - 2;
+
+              return (
+                <div className="flex items-center justify-center">
+                  <EmployeeActionMenu
+                    row={row}
+                    statusParam={statusParam}
+                    setRestoreTarget={setRestoreTarget}
+                    handleConvertToFulltime={handleConvertToFulltime}
+                    setEditingEmployee={setEditingEmployee}
+                    setFormDesignation={setFormDesignation}
+                    setFormEmployeeType={setFormEmployeeType}
+                    setFormWorkModel={setFormWorkModel}
+                    setFormEmpStatus={setFormEmpStatus}
+                    setIsModalOpen={setIsModalOpen}
+                    setArchiveTarget={setArchiveTarget}
+                    convertPending={convertMutation.isPending}
+                    restorePending={restoreMutation.isPending}
+                    archivePending={archiveMutation.isPending}
+                    isNearBottom={isNearBottom}
+                  />
+                </div>
+              );
+            },
           },
         ]}
         data={filteredEmployees}
