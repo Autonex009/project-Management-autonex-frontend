@@ -33,20 +33,23 @@ export const Table = ({
     const isCompact = variant === 'compact';
     const isStriped = variant === 'striped';
     const isBorderless = variant === 'borderless';
-    const isV1 = variant === 'v1';   // airy, sentence-case, card-header (Untitled-UI style)
+    const isV1 = variant === 'v1';               // compact card table w/ header (dashboard)
+    const isUntitled = variant === 'untitled';   // full-page Untitled-UI table (Employees etc.)
+    const airy = isV1 || isUntitled;             // shared airy Untitled-UI styling
 
-    const cellPad = isCompact ? 'px-4 py-2' : isV1 ? 'px-5 py-3.5' : 'px-4 py-2.5';
-    const headPad = isCompact ? 'px-4 py-2.5' : isV1 ? 'px-5 py-3' : 'px-4 py-2.5';
-    const headTextSize = isCompact ? 'text-[11px]' : isV1 ? 'text-xs' : 'text-[11px]';
-    const headCase = isV1 ? 'normal-case tracking-normal text-slate-600 dark:text-zinc-300' : 'uppercase tracking-wider text-slate-700 dark:text-zinc-300';
-    const headWeight = isV1 ? 'font-semibold' : 'font-bold';
-    const theadBg = isV1 ? 'bg-slate-50 dark:bg-[#161616]' : 'bg-slate-50/80 dark:bg-white/[0.02]';
+    const cellPad = isCompact ? 'px-4 py-2' : isV1 ? 'px-5 py-3.5' : isUntitled ? 'px-4 py-2.5' : 'px-4 py-2.5';
+    const headPad = isCompact ? 'px-4 py-2.5' : isV1 ? 'px-5 py-3' : isUntitled ? 'px-4 py-2.5' : 'px-4 py-2.5';
+    const headTextSize = isCompact ? 'text-[11px]' : airy ? 'text-xs' : 'text-[11px]';
+    const cellText = airy ? 'text-[13px]' : 'text-sm';
+    const headCase = airy ? 'normal-case tracking-normal text-slate-600 dark:text-zinc-300' : 'uppercase tracking-wider text-slate-700 dark:text-zinc-300';
+    const headWeight = airy ? 'font-semibold' : 'font-bold';
+    const theadBg = airy ? 'bg-slate-50 dark:bg-[#161616]' : 'bg-slate-50/80 dark:bg-white/[0.02]';
 
     const context = { onEdit, onDelete };
 
     const outerClass = isBorderless
         ? `${className}`
-        : `bg-white dark:bg-[#0f0f0f] rounded-2xl border border-slate-200/60 dark:border-neutral-800 shadow-[0_1px_3px_rgba(0,0,0,0.04)] ${isV1 ? 'overflow-hidden' : ''} ${className}`;
+        : `bg-white dark:bg-[#0f0f0f] rounded-2xl border border-slate-200/60 dark:border-neutral-800 shadow-[0_1px_3px_rgba(0,0,0,0.04)] ${airy ? 'overflow-hidden' : ''} ${className}`;
 
     return (
         <div className={outerClass}>
@@ -119,7 +122,7 @@ export const Table = ({
                                             {columns.map((col, cIdx) => (
                                                 <td
                                                     key={col.key}
-                                                    className={`${cellPad} text-sm ${isLast && cIdx === 0 ? 'rounded-bl-2xl' : isLast && cIdx === columns.length - 1 ? 'rounded-br-2xl' : ''
+                                                    className={`${cellPad} ${cellText} ${isLast && cIdx === 0 ? 'rounded-bl-2xl' : isLast && cIdx === columns.length - 1 ? 'rounded-br-2xl' : ''
                                                         } ${col.align === 'center'
                                                             ? 'text-center'
                                                             : col.align === 'right'

@@ -268,7 +268,7 @@ const PerformanceReviewsPage = () => {
                 <div className="flex flex-col gap-5 lg:flex-row lg:items-end lg:justify-between">
                     <div>
                         <p className="text-sm font-medium uppercase tracking-[0.18em] text-blue-700">Performance</p>
-                        <h1 className="mt-1 text-2xl font-bold tracking-tight text-slate-900">Monthly Performance Reviews</h1>
+                        <h1 className="mt-1 text-lg font-semibold tracking-tight text-slate-900">Monthly Performance Reviews</h1>
                         <p className="mt-2 max-w-2xl text-sm text-slate-500">
                             Review your team's monthly self-ratings — approve or reject each parameter, add your own rating, and suggest bonuses.
                         </p>

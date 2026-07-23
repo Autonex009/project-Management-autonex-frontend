@@ -21,9 +21,6 @@ const AdminLayout = () => {
   const [width, setWidth] = useState(DEFAULT_WIDTH);        // desktop sidebar width
   const widthRef = useRef(DEFAULT_WIDTH);
   const [user, setUser] = useState({});
-  // Default to dark (Linear look); real preference is read from localStorage
-  // after hydration so SSR markup stays consistent.
-  const [theme, setTheme] = useState('dark');
 
   useEffect(() => {
     // Client-side initialization after hydration
@@ -34,11 +31,6 @@ const AdminLayout = () => {
       } catch (e) {
         console.error("Failed to parse user from localStorage", e);
       }
-    }
-
-    const savedTheme = localStorage.getItem('admin-theme');
-    if (savedTheme === 'light' || savedTheme === 'dark') {
-      setTheme(savedTheme);
     }
 
     const savedCollapsed = localStorage.getItem('admin-sidebar-collapsed');
@@ -52,22 +44,10 @@ const AdminLayout = () => {
     }
   }, []);
 
-  const toggleTheme = () => {
-    setTheme((prev) => {
-      const next = prev === 'dark' ? 'light' : 'dark';
-      localStorage.setItem('admin-theme', next);
-      return next;
-    });
-  };
-
-  // Drive the `dark` class on <html> so every `dark:` style in the document
-  // (including portals — modals, toasts, notification panel) responds to the
-  // toggle. Cleaned up when leaving the admin area.
+  // Light-only mode: ensure the document never carries the `dark` class.
   useEffect(() => {
-    const root = document.documentElement;
-    root.classList.toggle('dark', theme === 'dark');
-    return () => root.classList.remove('dark');
-  }, [theme]);
+    document.documentElement.classList.remove('dark');
+  }, []);
 
   const toggleCollapsed = () => {
     setCollapsed((prev) => {
@@ -162,8 +142,6 @@ const AdminLayout = () => {
     pendingSignupCount,
     onNavigate: closeOverlays,
     onLogout: handleLogout,
-    theme,
-    onToggleTheme: toggleTheme,
   };
 
   return (

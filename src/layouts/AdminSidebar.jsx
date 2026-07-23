@@ -1,5 +1,5 @@
 import { Link, useLocation } from 'react-router-dom';
-import { LogOut, GraduationCap, FileSpreadsheet, Sparkles, Sun, Moon, Settings, ChevronDown } from 'lucide-react';
+import { LogOut, GraduationCap, FileSpreadsheet, Sparkles, Settings, ChevronDown } from 'lucide-react';
 import { navigation } from '../config/navigation';
 import { useState } from 'react';
 
@@ -25,7 +25,7 @@ const iconClass = (isActive) =>
     ? 'text-blue-600 dark:text-zinc-100'
     : 'text-slate-400 group-hover:text-slate-600 dark:text-zinc-500 dark:group-hover:text-zinc-200'}`;
 
-const AdminSidebar = ({ user = {}, pendingSignupCount = 0, onNavigate, onLogout, theme = 'dark', onToggleTheme }) => {
+const AdminSidebar = ({ user = {}, pendingSignupCount = 0, onNavigate, onLogout }) => {
   const location = useLocation();
   const [openSections, setOpenSections] = useState({ platform: true, onboarding: true });
   const toggleSection = (id) => setOpenSections((prev) => ({ ...prev, [id]: !prev[id] }));
@@ -121,13 +121,6 @@ const AdminSidebar = ({ user = {}, pendingSignupCount = 0, onNavigate, onLogout,
           >
             <Settings className="w-4 h-4" />
           </Link>
-          <button
-            onClick={onToggleTheme}
-            title={theme === 'dark' ? 'Switch to light mode' : 'Switch to dark mode'}
-            className={iconBtn}
-          >
-            {theme === 'dark' ? <Sun className="w-4 h-4" /> : <Moon className="w-4 h-4" />}
-          </button>
           <button
             onClick={onLogout}
             title="Sign Out"

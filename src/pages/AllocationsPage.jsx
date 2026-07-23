@@ -354,7 +354,7 @@ const AllocationsPage = () => {
       {/* Page Header */}
       <div className="flex flex-col sm:flex-row sm:justify-between sm:items-center gap-3">
         <div>
-          <h1 className="text-2xl font-bold text-slate-800">Allocations</h1>
+          <h1 className="text-lg font-semibold text-slate-800">Allocations</h1>
           <p className="mt-1 text-sm text-slate-500">Assign employees to projects</p>
         </div>
         <Button onClick={() => { setSelectedProject(null); setSelectedEmployees([]); setIsModalOpen(true); }}>

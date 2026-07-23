@@ -337,7 +337,7 @@ const ProfilePage = () => {
                         </div>
                         <div>
                             <p className="text-sm font-medium uppercase tracking-[0.18em] text-emerald-700">Profile</p>
-                            <h1 className="mt-1 text-2xl font-bold tracking-tight text-slate-900">{mergedProfile.name || 'Employee'}</h1>
+                            <h1 className="mt-1 text-lg font-semibold tracking-tight text-slate-900">{mergedProfile.name || 'Employee'}</h1>
                             <p className="mt-1 text-sm text-slate-500">Your account and work details in one place.</p>
 
                             {/* avatar actions */}

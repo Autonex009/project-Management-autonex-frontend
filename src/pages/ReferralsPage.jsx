@@ -104,7 +104,7 @@ const ReferralsPage = () => {
             {/* Header */}
             <div>
                 <div className="flex items-center gap-3">
-                    <h1 className="text-2xl font-bold text-slate-800">Employee Referrals</h1>
+                    <h1 className="text-lg font-semibold text-slate-800">Employee Referrals</h1>
                     {stats.pending > 0 && (
                         <span className="inline-flex items-center justify-center h-6 min-w-[24px] px-1.5 rounded-full text-xs font-bold bg-amber-500 text-white">
                             {stats.pending}

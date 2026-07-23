@@ -2,7 +2,6 @@ import { useMemo, useState } from 'react';
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import { useNavigate } from 'react-router-dom';
 import { analyticsApi } from '../services/api';
-
 import Table from '../components/ui/Table';
 import Button from '../components/ui/Button';
 import { FolderKanban, Clock, Users, RefreshCw, BarChart3, Timer, ClipboardCheck } from 'lucide-react';
@@ -89,11 +88,11 @@ const AnalyticsDashboard = () => {
     });
 
     return (
-        <div className="space-y-6">
+        <div className="space-y-4">
             <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3">
                 <div>
-                    <h1 className="text-2xl font-bold text-slate-900">Project Analytics</h1>
-                    <p className="text-slate-500 text-sm mt-1">Encord platform activity across all mapped projects (this month).</p>
+                    <h1 className="text-lg font-semibold text-slate-900">Project Analytics</h1>
+                    <p className="text-slate-500 text-[13px] mt-0.5">Encord platform activity across all mapped projects (this month).</p>
                 </div>
                 <Button variant="secondary" onClick={() => syncMutation.mutate()} disabled={syncMutation.isPending}>
                     <RefreshCw className={`w-4 h-4 ${syncMutation.isPending ? 'animate-spin' : ''}`} />
@@ -150,6 +149,7 @@ const AnalyticsDashboard = () => {
             </div>
 
             <Table
+                variant="untitled"
                 loading={isLoading}
                 onRowClick={(row) => navigate(`/admin/analytics/${row.project_id}`)}
                 columns={[

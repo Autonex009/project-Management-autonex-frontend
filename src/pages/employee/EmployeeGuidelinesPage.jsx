@@ -26,7 +26,7 @@ const EmployeeGuidelinesPage = () => {
     return (
         <div className="space-y-6">
             <div>
-                <h1 className="text-2xl font-bold text-slate-900">Project Guidelines</h1>
+                <h1 className="text-lg font-semibold text-slate-900">Project Guidelines</h1>
                 <p className="text-slate-500 text-sm mt-1">Guidelines for your allocated projects</p>
             </div>
 

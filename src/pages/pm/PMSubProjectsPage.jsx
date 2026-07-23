@@ -40,7 +40,7 @@ const PMSubProjectsPage = () => {
         <div className="space-y-6">
             <div className="flex items-center justify-between gap-4">
                 <div>
-                    <h1 className="text-2xl font-bold text-slate-900">
+                    <h1 className="text-lg font-semibold text-slate-900">
                         {currentProject ? `Sub-Projects for ${currentProject.name}` : 'Sub-Projects'}
                     </h1>
                     <p className="text-slate-500 text-sm mt-1">

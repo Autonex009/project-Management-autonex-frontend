@@ -4,7 +4,7 @@ import { useNavigate, useSearchParams } from 'react-router-dom';
 import Button from '../components/ui/Button';
 import Spinner from '../components/ui/LoadingSpinner';
 import { subProjectApi, parentProjectApi, employeeApi, allocationApi, skillApi, leaveApi, guidelineApi } from '../services/api';
-import { Plus, Edit, Trash2, X, UserCheck, Users, ChevronDown, ArrowRight, Copy, Settings, UploadCloud, FileText, BarChart3 } from 'lucide-react';
+import { Plus, Edit, Trash2, X, UserCheck, Users, ChevronDown, ArrowRight, Copy, Settings, UploadCloud, FileText, BarChart3, SlidersHorizontal } from 'lucide-react';
 import { Link } from 'react-router-dom';
 import { format } from 'date-fns';
 import toast from 'react-hot-toast';
@@ -295,6 +295,9 @@ const ProjectsPage = () => {
   const [formPriority, setFormPriority] = useState('medium');
   const [formProjectStatus, setFormProjectStatus] = useState('active');
   const [selectedOrganization, setSelectedOrganization] = useState("all");
+  const [selectedPm, setSelectedPm] = useState("all");
+  const [filtersOpen, setFiltersOpen] = useState(false);
+  const filtersRef = useRef(null);
 
   const { data: projects = [], isLoading } = useQuery({
     queryKey: ['sub-projects'],
@@ -634,6 +637,38 @@ toast.success(wasEditing ? 'Project updated successfully' : 'Project created suc
   const [currentPage, setCurrentPage] = useState(1);
   const PAGE_SIZE = 10;
 
+  // Program managers present across the visible parent projects (for the PM filter)
+  const projectManagers = useMemo(() => {
+    const map = new Map();
+    visibleMainProjects.forEach((mp) => {
+      const ids = mp.program_manager_ids?.length
+        ? mp.program_manager_ids
+        : (mp.program_manager_id ? [mp.program_manager_id] : []);
+      ids.forEach((id) => {
+        if (!map.has(id)) {
+          const emp = employees.find((e) => e.id === id);
+          map.set(id, emp?.name || `Manager #${id}`);
+        }
+      });
+    });
+    return [...map.entries()]
+      .map(([id, name]) => ({ id, name }))
+      .sort((a, b) => a.name.localeCompare(b.name));
+  }, [visibleMainProjects, employees]);
+
+  // Close the Filters popover on outside click
+  useEffect(() => {
+    const handler = (e) => {
+      if (filtersRef.current && !filtersRef.current.contains(e.target)) setFiltersOpen(false);
+    };
+    document.addEventListener('mousedown', handler);
+    return () => document.removeEventListener('mousedown', handler);
+  }, []);
+
+  const pmIdsOf = (mp) => (mp?.program_manager_ids?.length
+    ? mp.program_manager_ids
+    : (mp?.program_manager_id ? [mp.program_manager_id] : []));
+
   const filteredProjects = (
     filterMainProjectId
       ? visibleProjects.filter(
@@ -649,6 +684,11 @@ toast.success(wasEditing ? 'Project updated successfully' : 'Project created suc
     );
 
     return (parentProject?.client || NO_ORG) === selectedOrganization;
+  })
+  .filter(project => {
+    if (selectedPm === "all") return true;
+    const parentProject = visibleMainProjects.find(p => p.id === project.main_project_id);
+    return pmIdsOf(parentProject).includes(Number(selectedPm));
   })
   .filter(p => {
     if (statusParam && p.project_status !== statusParam) return false;
@@ -670,7 +710,7 @@ toast.success(wasEditing ? 'Project updated successfully' : 'Project created suc
   // Reset to page 1 when filters change
   useEffect(() => {
     setCurrentPage(1);
-  }, [subProjectSearch, filterMainProjectId, statusParam, recommendationParam]);
+  }, [subProjectSearch, filterMainProjectId, statusParam, recommendationParam, selectedOrganization, selectedPm]);
 
 
   const currentMainProject = visibleMainProjects.find(p => p.id === parseInt(filterMainProjectId));
@@ -704,7 +744,7 @@ toast.success(wasEditing ? 'Project updated successfully' : 'Project created suc
 }, [filteredProjects, allocations, employees, leaves]);
 
   return (
-    <div className="space-y-6 p-2">
+    <div className="space-y-4">
       <div className="flex flex-col md:flex-row md:items-center justify-between gap-4">
         <div>
           <h1 className="text-lg font-semibold text-slate-900">
@@ -716,26 +756,6 @@ toast.success(wasEditing ? 'Project updated successfully' : 'Project created suc
               : 'Manage tasks and resource allocation across all projects'}
           </p>
         </div>
-        <div className="flex flex-wrap items-center gap-2">
-          <SearchBar responsive
-            value={subProjectSearch}
-            onChange={setSubProjectSearch}
-            placeholder="Search projects..."
-          />
-          {isPm && (
-            <Link
-              to={`${prefix}/projects`}
-              className="inline-flex items-center gap-2 px-4 py-2.5 bg-white border border-slate-200 text-slate-700 font-medium text-sm rounded-xl shadow-sm hover:bg-slate-50 transition-colors"
-            >
-              <Settings className="w-4 h-4" />
-              Organizations
-            </Link>
-          )}
-          <Button onClick={() => { setEditingProject(null); setSelectedSkills([]); setGuidelineFiles([]); setFormMainProjectId(filterMainProjectId || ''); setFormOrg(filterMainProjectId ? orgOfMainProject(filterMainProjectId) : ''); setFormPriority('medium'); setFormProjectStatus('active'); setIsModalOpen(true); }}>
-            <Plus className="w-4 h-4" />
-            Add Project
-          </Button>
-        </div>
       </div>
 
       <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-5 gap-3">
@@ -746,32 +766,92 @@ toast.success(wasEditing ? 'Project updated successfully' : 'Project created suc
         <StatCard title="Balanced" value={projectMetrics.balancedProjects} icon={Settings} tone="sky" hint="well staffed" />
       </div>
 
-      <div className="bg-white border border-slate-200 rounded-xl p-4">
-        <div className="flex flex-col md:flex-row md:items-center gap-3">
+      <div className="flex flex-wrap items-center gap-2">
+        <SearchBar responsive
+          value={subProjectSearch}
+          onChange={setSubProjectSearch}
+          placeholder="Search projects..."
+        />
+        {isPm && (
+          <Link
+            to={`${prefix}/projects`}
+            className="inline-flex items-center gap-2 rounded-lg border border-slate-200 bg-white px-3 py-2 text-sm font-medium text-slate-700 shadow-sm hover:bg-slate-50 transition-colors"
+          >
+            <Settings className="w-4 h-4" />
+            Organizations
+          </Link>
+        )}
+        <button
+          type="button"
+          onClick={() => { setEditingProject(null); setSelectedSkills([]); setGuidelineFiles([]); setFormMainProjectId(filterMainProjectId || ''); setFormOrg(filterMainProjectId ? orgOfMainProject(filterMainProjectId) : ''); setFormPriority('medium'); setFormProjectStatus('active'); setIsModalOpen(true); }}
+          className="inline-flex items-center gap-1.5 rounded-lg bg-indigo-600 px-3.5 py-2 text-sm font-medium text-white shadow-sm hover:bg-indigo-700 transition-colors"
+        >
+          <Plus className="w-4 h-4" />
+          Add Project
+        </button>
 
-          <div className="flex flex-col w-72 relative z-50">
-            <Dropdown
-              value={selectedOrganization}
-              onChange={(val) => setSelectedOrganization(val)}
-              options={[
-                { value: 'all', label: 'Organizations' },
-                ...organizations.map(org => ({ value: org, label: org }))
-              ]}
-              editable={true}
-              allowCreate={false}
-              className="w-full"
-            />
-          </div>
-
-          {selectedOrganization !== "all" && (
-            <button
-              onClick={() => setSelectedOrganization("all")}
-              className="text-sm text-indigo-600 hover:underline mt-6"
-            >
-              Clear Filter
-            </button>
+        {/* Right side: active chips + Filters dropdown */}
+        <div className="ml-auto flex flex-wrap items-center gap-2">
+          {selectedOrganization !== 'all' && (
+            <span className="inline-flex items-center gap-1.5 rounded-lg border border-indigo-200 bg-indigo-50 px-2.5 py-1.5 text-xs font-medium text-indigo-700">
+              {selectedOrganization}
+              <button type="button" onClick={() => setSelectedOrganization('all')} className="hover:text-indigo-900"><X className="w-3 h-3" /></button>
+            </span>
+          )}
+          {selectedPm !== 'all' && (
+            <span className="inline-flex items-center gap-1.5 rounded-lg border border-indigo-200 bg-indigo-50 px-2.5 py-1.5 text-xs font-medium text-indigo-700">
+              {projectManagers.find((pm) => String(pm.id) === String(selectedPm))?.name || 'Manager'}
+              <button type="button" onClick={() => setSelectedPm('all')} className="hover:text-indigo-900"><X className="w-3 h-3" /></button>
+            </span>
           )}
 
+          <div className="relative" ref={filtersRef}>
+            <button
+              type="button"
+              onClick={() => setFiltersOpen((o) => !o)}
+              className="inline-flex items-center gap-2 rounded-lg border border-slate-200 bg-white px-3 py-2 text-sm font-medium text-slate-600 shadow-sm hover:bg-slate-50 transition-colors"
+            >
+              <SlidersHorizontal className="w-4 h-4 text-slate-400" />
+              Filters
+              {[selectedOrganization, selectedPm].some((v) => v !== 'all') && (
+                <span className="ml-0.5 inline-flex items-center justify-center rounded-full bg-indigo-100 px-1.5 text-[10px] font-semibold text-indigo-700">
+                  {[selectedOrganization, selectedPm].filter((v) => v !== 'all').length}
+                </span>
+              )}
+              <ChevronDown className={`w-4 h-4 text-slate-400 transition-transform ${filtersOpen ? 'rotate-180' : ''}`} />
+            </button>
+
+            {filtersOpen && (
+              <div className="absolute right-0 top-full z-50 mt-2 w-72 rounded-xl border border-slate-200 bg-white p-3 shadow-xl">
+                <div className="mb-3">
+                  <label className="mb-1 block text-xs font-medium text-slate-500">Organization</label>
+                  <Dropdown
+                    value={selectedOrganization}
+                    onChange={setSelectedOrganization}
+                    options={[{ value: 'all', label: 'All organizations' }, ...organizations.map((org) => ({ value: org, label: org }))]}
+                    className="w-full"
+                  />
+                </div>
+                <div>
+                  <label className="mb-1 block text-xs font-medium text-slate-500">Project Manager</label>
+                  <Dropdown
+                    value={selectedPm}
+                    onChange={setSelectedPm}
+                    options={[{ value: 'all', label: 'All managers' }, ...projectManagers.map((pm) => ({ value: String(pm.id), label: pm.name }))]}
+                    className="w-full"
+                  />
+                </div>
+                {[selectedOrganization, selectedPm].some((v) => v !== 'all') && (
+                  <button
+                    onClick={() => { setSelectedOrganization('all'); setSelectedPm('all'); }}
+                    className="mt-3 w-full rounded-lg border border-slate-200 py-1.5 text-xs font-medium text-slate-500 hover:bg-slate-50"
+                  >
+                    Clear filters
+                  </button>
+                )}
+              </div>
+            )}
+          </div>
         </div>
       </div>
 
