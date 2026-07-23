@@ -18,7 +18,7 @@ const StatusBadge = ({ status }) => {
     return null;
 };
 
-const ProjectEvalPanel = ({ project, employeeId, submittedBy, existing }) => {
+const ProjectEvalPanel = ({ project, employeeId, submittedBy, existing, reviewerLabel = 'PM' }) => {
     const [expanded, setExpanded] = useState(false);
     const queryClient = useQueryClient();
 
@@ -110,8 +110,8 @@ const ProjectEvalPanel = ({ project, employeeId, submittedBy, existing }) => {
                         <div className="space-y-4">
                             <p className="rounded-xl bg-amber-50 px-3 py-2 text-xs font-medium text-amber-700">
                                 {currentEval.status === 'reviewed'
-                                    ? "Your PM has reviewed this month's evaluation. See their ratings and feedback below."
-                                    : "You've already submitted this month's evaluation. It's locked and pending your PM's review."}
+                                    ? `Your ${reviewerLabel} has reviewed this month's evaluation. See the ratings and feedback below.`
+                                    : `You've already submitted this month's evaluation. It's locked and pending your ${reviewerLabel}'s review.`}
                             </p>
                             <EvaluationDetail evaluation={currentEval} />
                         </div>
@@ -172,16 +172,22 @@ const ProjectEvalPanel = ({ project, employeeId, submittedBy, existing }) => {
     );
 };
 
+// PM self-report: a single monthly form, not tied to any project (project_id 0),
+// reviewed by the Admin.
+const PM_SELF_PROJECT = { id: 0, name: 'My Self-Evaluation', client: 'Reviewed by Admin' };
+
 const SelfEvaluationPage = () => {
     const user = JSON.parse(localStorage.getItem('user') || '{}');
+    const role = localStorage.getItem('role') || user.role || 'employee';
+    const isPm = role === 'pm';
     const employeeId = user.employee_id;
 
     const { data: allocations = [], isLoading: allocLoading } = useQuery({
         queryKey: ['my-allocations', employeeId],
         queryFn: () => allocationApi.getByEmployee(employeeId),
-        enabled: !!employeeId,
+        enabled: !!employeeId && !isPm,
     });
-    const { data: projects = [] } = useQuery({ queryKey: ['sub-projects'], queryFn: subProjectApi.getAll });
+    const { data: projects = [] } = useQuery({ queryKey: ['sub-projects'], queryFn: subProjectApi.getAll, enabled: !isPm });
     const { data: myEvals = [], isLoading: evalsLoading } = useQuery({
         queryKey: ['my-perf-evals', employeeId],
         queryFn: () => perfEvalApi.getAll({ employee_id: employeeId }),
@@ -194,8 +200,36 @@ const SelfEvaluationPage = () => {
     }, [allocations, projects]);
 
     const evalsByProject = (projectId) => myEvals.filter((e) => e.project_id === projectId);
-    const isLoading = allocLoading || evalsLoading;
+    const isLoading = evalsLoading || (!isPm && allocLoading);
 
+    // ── PM view: one self-report, reviewed by Admin ──
+    if (isPm) {
+        return (
+            <div className="space-y-6">
+                <section className="overflow-hidden rounded-[28px] border border-blue-100 bg-[linear-gradient(135deg,rgba(37,99,235,0.12),rgba(255,255,255,0.94)_42%,rgba(239,246,255,1))] p-6 shadow-sm">
+                    <p className="text-sm font-medium uppercase tracking-[0.18em] text-blue-700">Self Evaluation</p>
+                    <h1 className="mt-1 text-2xl font-bold tracking-tight text-slate-900">Monthly Self-Evaluation</h1>
+                    <p className="mt-2 max-w-2xl text-sm text-slate-500">
+                        Rate yourself on each parameter once a month. Your submission is locked and reviewed by the Admin.
+                    </p>
+                </section>
+
+                {isLoading ? (
+                    <div className="rounded-2xl border border-slate-200 bg-white p-10 text-center text-sm text-slate-400 shadow-sm">Loading…</div>
+                ) : (
+                    <ProjectEvalPanel
+                        project={PM_SELF_PROJECT}
+                        employeeId={employeeId}
+                        submittedBy={user.id}
+                        existing={evalsByProject(0)}
+                        reviewerLabel="Admin"
+                    />
+                )}
+            </div>
+        );
+    }
+
+    // ── Employee view: one form per allocated project ──
     return (
         <div className="space-y-6">
             <section className="overflow-hidden rounded-[28px] border border-emerald-100 bg-[linear-gradient(135deg,rgba(5,150,105,0.12),rgba(255,255,255,0.94)_42%,rgba(236,253,245,1))] p-6 shadow-sm">

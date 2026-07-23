@@ -473,6 +473,12 @@ const ProjectsPage = () => {
       autonex_reviewers: num('autonex_reviewers'),
       workforce_reviewers: num('workforce_reviewers'),
       qc_count: num('qc_count'),
+      // Preserve existing assignments when editing. On create, if a PM makes the
+      // project, attach them so it lands in their scope.
+      assigned_employee_ids: editingProject
+        ? (editingProject.assigned_employee_ids || [])
+        : (isPm && pmEmployeeId ? [pmEmployeeId] : []),
+      required_manpower: employeesRequired,
       project_duration_weeks: durationWeeks,
       project_duration_days: durationDays,
       project_status: formData.get('project_status') || 'active',

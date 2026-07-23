@@ -27,6 +27,8 @@ const TYPE_CONFIG = {
   signup_approved: { icon: CheckCircle2, bg: 'bg-emerald-50 text-emerald-600 border border-emerald-100/50' },
   employee_converted: { icon: CheckCircle2, bg: 'bg-emerald-50 text-emerald-600 border border-emerald-100/50' },
   referral: { icon: UserPlus, bg: 'bg-blue-50 text-blue-600 border border-blue-100/50' },
+  perf_submitted: { icon: FileText, bg: 'bg-blue-50 text-blue-600 border border-blue-100/50' },
+  perf_pm_submitted: { icon: FileText, bg: 'bg-indigo-50 text-indigo-600 border border-indigo-100/50' },
 };
 
 const getNotificationConfig = (type) => {
@@ -73,6 +75,17 @@ const getNotificationRoute = (notification, userRole) => {
     } else if (userRole === 'employee') {
       return '/employee/referrals';
     }
+  }
+
+  // Employee self-eval submitted -> PM reviews on their performance page.
+  if (type === 'perf_submitted') {
+    if (userRole === 'pm') return '/pm/performance';
+    if (userRole === 'admin') return '/admin/performance';
+  }
+
+  // PM self-eval submitted -> admin approves on the Performance page (PM Approvals tab).
+  if (type === 'perf_pm_submitted') {
+    if (userRole === 'admin') return '/admin/performance';
   }
 
   // Fallback routes based on role
