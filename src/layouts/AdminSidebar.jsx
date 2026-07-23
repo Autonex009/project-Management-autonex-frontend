@@ -77,12 +77,12 @@ const AdminSidebar = ({ user = {}, pendingSignupCount = 0, onNavigate, onLogout,
   return (
     <div className="h-full flex flex-col overflow-visible bg-[#f4f5f7] dark:bg-[#070707]">
       {/* Brand Header — compact workspace-style row (Linear) */}
-      <div className="shrink-0 px-3 py-3">
+      <div className="shrink-0 px-3 pt-5 pb-4">
         <div className="flex items-center gap-2.5">
-          <img src="/favicon.png" alt="Autonex" className="h-8 w-8 rounded-lg border border-slate-200 bg-white dark:border-white/10 dark:bg-white/5 p-1 shrink-0" />
+          <img src="/favicon.png" alt="Autonex" className="h-9 w-9 rounded-lg border border-slate-200 bg-white dark:border-white/10 dark:bg-white/5 p-1 shrink-0" />
           <div className="min-w-0">
-            <p className="text-[13px] font-semibold text-slate-900 dark:text-zinc-100 truncate leading-tight">Autonex</p>
-            <p className="text-[11px] text-slate-400 dark:text-zinc-500 truncate leading-tight">Admin Control Center</p>
+            <p className="text-[15px] font-semibold text-slate-900 dark:text-zinc-100 truncate leading-tight">Autonex</p>
+            <p className="text-[12px] text-slate-400 dark:text-zinc-500 truncate leading-tight">Admin Control Center</p>
           </div>
         </div>
       </div>

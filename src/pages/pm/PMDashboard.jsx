@@ -6,6 +6,7 @@ import { format, parseISO, isWithinInterval, isFuture } from 'date-fns';
 import { parentProjectApi } from '../../services/api';
 import { getPmEmployeeId, getPmSubProjects } from '../../utils/pmScope';
 import Table from '../../components/ui/Table';
+import StatCard from '../../components/dashboard/StatCard';
 
 const PMDashboard = () => {
     const user = JSON.parse(localStorage.getItem('user') || '{}');
@@ -74,37 +75,31 @@ const PMDashboard = () => {
     });
 
     return (
-        <div className="space-y-8">
+        <div className="space-y-4">
             {/* Header */}
             <div>
-                <h1 className="text-2xl font-bold text-slate-900">
+                <h1 className="text-lg font-semibold text-slate-900">
                     PM Dashboard — <span className="text-blue-600">{user.name?.split(' ')[0] || 'Manager'}</span>
                 </h1>
-                <p className="text-slate-500 text-sm mt-1">Project oversight & team management</p>
+                <p className="text-slate-500 text-[13px] mt-0.5">Project oversight & team management</p>
             </div>
 
             {/* KPIs */}
-            <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-5">
-                <KpiCard icon={FolderKanban} label="Active Projects" value={activeProjects.length} color="blue" sub={`${completedProjects.length} completed`} />
-                <KpiCard icon={Users} label="Team Members" value={teamMembers.length} color="indigo" sub={`${currentLeaves.length} on leave`} />
-                <KpiCard icon={AlertTriangle} label="At Risk" value={atRiskProjects.length} color="red" sub="Under-staffed" />
-                <KpiCard icon={Calendar} label="Upcoming Leaves" value={pendingLeaves.length} color="amber" sub="Need attention" />
+            <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-3">
+                <StatCard icon={FolderKanban} title="Active Projects" value={activeProjects.length} tone="emerald" hint={`${completedProjects.length} completed`} />
+                <StatCard icon={Users} title="Team Members" value={teamMembers.length} tone="violet" hint={`${currentLeaves.length} on leave`} />
+                <StatCard icon={AlertTriangle} title="At Risk" value={atRiskProjects.length} tone="rose" hint="under-staffed" />
+                <StatCard icon={Calendar} title="Upcoming Leaves" value={pendingLeaves.length} tone="amber" hint="need attention" />
             </div>
 
             {/* Main Grid */}
-            <div className="grid grid-cols-1 xl:grid-cols-12 gap-6">
+            <div className="grid grid-cols-1 xl:grid-cols-12 gap-4">
                 {/* Projects Table (8 cols) */}
                 <div className="xl:col-span-8">
-                    <div className="bg-white rounded-2xl border border-slate-200/60 shadow-sm">
-                        <div className="flex items-center justify-between p-5 pb-3">
-                            <div>
-                                <h3 className="font-semibold text-slate-800">Project Overview</h3>
-                                <p className="text-sm text-slate-400 mt-0.5">All daily sheets and their staffing</p>
-                            </div>
-                        </div>
-
-                        <Table
-                            variant="borderless"
+                    <Table
+                            variant="v1"
+                            title="Project Overview"
+                            count={`${activeProjects.length} active`}
                             loading={projLoading}
                             columns={[
                                 {
@@ -160,11 +155,10 @@ const PMDashboard = () => {
                             data={activeProjects.slice(0, 8)}
                             emptyState={{ title: 'No active projects', description: 'Active projects will appear here' }}
                         />
-                    </div>
                 </div>
 
                 {/* Sidebar (4 cols) */}
-                <div className="xl:col-span-4 space-y-6">
+                <div className="xl:col-span-4 space-y-4">
                     {/* Team On Leave */}
                     <div className="bg-white rounded-2xl border border-slate-200/60 shadow-sm p-5">
                         <h3 className="font-semibold text-slate-800 mb-4">Team On Leave</h3>
@@ -221,20 +215,5 @@ const PMDashboard = () => {
         </div>
     );
 };
-
-const KpiCard = ({ icon: Icon, label, value, color, sub }) => (
-    <div className="bg-white rounded-2xl border border-slate-200/60 shadow-sm p-5">
-        <div className="flex items-start justify-between">
-            <div>
-                <p className="text-sm font-medium text-slate-500">{label}</p>
-                <p className="text-2xl font-bold text-slate-900 mt-1">{value}</p>
-                {sub && <p className="text-xs text-slate-400 mt-0.5">{sub}</p>}
-            </div>
-            <div className={`p-2.5 rounded-xl bg-${color}-50`}>
-                <Icon className={`w-5 h-5 text-${color}-600`} />
-            </div>
-        </div>
-    </div>
-);
 
 export default PMDashboard;

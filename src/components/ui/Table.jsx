@@ -14,10 +14,13 @@ export const Table = ({
     loading = false,
     skeletonRows = 5,
     emptyState,
-    variant = 'default',   // 'default' | 'compact' | 'striped' | 'borderless'
+    variant = 'default',   // 'default' | 'compact' | 'striped' | 'borderless' | 'v1'
     onRowClick,
     rowClassName,          // (row, index) => string — for conditional row styles
     className = '',
+    title,                 // optional card-header title (v1)
+    count,                 // optional count badge shown next to the title
+    headerAction,          // optional node rendered on the right of the header
     // NEW
     expandedRowId,
     getRowId = (row) => row.id,
@@ -30,27 +33,42 @@ export const Table = ({
     const isCompact = variant === 'compact';
     const isStriped = variant === 'striped';
     const isBorderless = variant === 'borderless';
+    const isV1 = variant === 'v1';   // airy, sentence-case, card-header (Untitled-UI style)
 
-    const cellPad = isCompact ? 'px-4 py-2' : 'px-4 py-2.5';
-    const headPad = isCompact ? 'px-4 py-2.5' : 'px-4 py-2.5';
-    const headTextSize = isCompact ? 'text-[11px]' : 'text-[11px]';
+    const cellPad = isCompact ? 'px-4 py-2' : isV1 ? 'px-5 py-3.5' : 'px-4 py-2.5';
+    const headPad = isCompact ? 'px-4 py-2.5' : isV1 ? 'px-5 py-3' : 'px-4 py-2.5';
+    const headTextSize = isCompact ? 'text-[11px]' : isV1 ? 'text-xs' : 'text-[11px]';
+    const headCase = isV1 ? 'normal-case tracking-normal text-slate-600 dark:text-zinc-300' : 'uppercase tracking-wider text-slate-400 dark:text-zinc-500';
+    const headWeight = isV1 ? 'font-semibold' : 'font-medium';
+    const theadBg = isV1 ? 'bg-slate-50 dark:bg-[#161616]' : 'bg-slate-50/80 dark:bg-white/[0.02]';
 
     const context = { onEdit, onDelete };
 
     const outerClass = isBorderless
         ? `${className}`
-        : `bg-white dark:bg-[#0f0f0f] rounded-2xl border border-slate-200/60 dark:border-neutral-800 shadow-[0_1px_3px_rgba(0,0,0,0.04)] ${className}`;
+        : `bg-white dark:bg-[#0f0f0f] rounded-2xl border border-slate-200/60 dark:border-neutral-800 shadow-[0_1px_3px_rgba(0,0,0,0.04)] ${isV1 ? 'overflow-hidden' : ''} ${className}`;
 
     return (
         <div className={outerClass}>
+            {title && (
+                <div className="flex items-center justify-between gap-3 px-5 py-4 border-b border-slate-100 dark:border-neutral-800">
+                    <div className="flex items-center gap-2">
+                        <h3 className="text-sm font-semibold text-slate-800 dark:text-zinc-100">{title}</h3>
+                        {count != null && (
+                            <span className="rounded-full border border-slate-200 px-2 py-0.5 text-[11px] font-medium text-slate-500 dark:border-neutral-700 dark:text-zinc-400">{count}</span>
+                        )}
+                    </div>
+                    {headerAction}
+                </div>
+            )}
             <div className="overflow-visible">
                 <table className="w-full table-fixed border-separate border-spacing-0">
-                    <thead className="bg-slate-50/80 dark:bg-white/[0.02] border-b border-slate-100 dark:border-neutral-800">
+                    <thead className={`${theadBg} border-b border-slate-100 dark:border-neutral-800`}>
                         <tr>
                             {columns.map((col, cIdx) => (
                                 <th
                                     key={col.key}
-                                    className={`${headPad} ${headTextSize} font-medium text-slate-400 dark:text-zinc-500 uppercase tracking-wider whitespace-nowrap ${cIdx === 0 ? 'rounded-tl-2xl' : cIdx === columns.length - 1 ? 'rounded-tr-2xl' : ''
+                                    className={`${headPad} ${headTextSize} ${headWeight} ${headCase} whitespace-nowrap ${cIdx === 0 ? 'rounded-tl-2xl' : cIdx === columns.length - 1 ? 'rounded-tr-2xl' : ''
                                         } ${col.align === 'center' ? 'text-center' : col.align === 'right' ? 'text-right' : 'text-left'
                                         } ${col.width ? (col.width.startsWith('w-') ? col.width : `w-${col.width}`) : ''} ${col.sticky === 'right' ? `sticky ${col.stickyOffset || 'right-0'} bg-slate-50/80 dark:bg-[#161616] shadow-[-8px_0_8px_-8px_rgba(0,0,0,0.1)]` : ''}`}
                                 >

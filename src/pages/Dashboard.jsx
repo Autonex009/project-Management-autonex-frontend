@@ -2,7 +2,7 @@ import { useQuery } from '@tanstack/react-query';
 import { useMemo, useState } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { subProjectApi, employeeApi, allocationApi, leaveApi, skillsApi } from '../services/api';
-import { FolderKanban, Calendar, Users, AlertTriangle, ArrowUpRight, Activity, Zap, Target, TrendingUp, Plus, ChevronRight, UserCog, ClipboardCheck } from 'lucide-react';
+import { FolderKanban, Calendar, Users, AlertTriangle, ArrowUpRight, Activity, Zap, Target, TrendingUp, Plus, ChevronRight, UserCog, ClipboardCheck, Clock } from 'lucide-react';
 import Table from '../components/ui/Table';
 import Button from '../components/ui/Button';
 import StatCard from '../components/dashboard/StatCard';
@@ -183,7 +183,7 @@ const Dashboard = () => {
           value={activeProjects}
           icon={FolderKanban}
           tone="emerald"
-          pill="Live"
+          hint={`of ${totalProjects} total`}
           onClick={() => navigate('/admin/sub-projects?status=active')}
         />
         <StatCard
@@ -191,7 +191,7 @@ const Dashboard = () => {
           value={atRiskProjects.length}
           icon={AlertTriangle}
           tone="rose"
-          pill={atRiskProjects.length > 0 ? 'Action' : 'Clear'}
+          hint={atRiskProjects.length > 0 ? 'need attention' : 'all clear'}
           onClick={() => navigate('/admin/sub-projects')}
         />
         <StatCard
@@ -199,6 +199,7 @@ const Dashboard = () => {
           value={projectManagers.length}
           icon={UserCog}
           tone="violet"
+          hint="program managers"
           breakdown={typeBreakdown(projectManagers)}
           onClick={() => navigate('/admin/employees')}
         />
@@ -207,6 +208,7 @@ const Dashboard = () => {
           value={reviewersAnnotators.length}
           icon={ClipboardCheck}
           tone="sky"
+          hint="annotators & reviewers"
           breakdown={typeBreakdown(reviewersAnnotators)}
           onClick={() => navigate('/admin/employees')}
         />
@@ -215,7 +217,7 @@ const Dashboard = () => {
           value={teamAvailable}
           icon={Users}
           tone="amber"
-          pill={`${employeesOnLeave.length} on leave`}
+          hint={`${employeesOnLeave.length} on leave`}
           breakdown={typeBreakdown(activeEmployeesList)}
           onClick={() => navigate('/admin/employees')}
         />
@@ -225,11 +227,15 @@ const Dashboard = () => {
       <div className="grid grid-cols-1 gap-4 lg:grid-cols-3">
         {/* Project Status */}
         <div className="lg:col-span-2">
-          <div className="mb-3">
-            <h3 className="font-semibold text-slate-800 dark:text-zinc-100">Project Status</h3>
-            <p className="text-sm text-slate-500 dark:text-zinc-500 mt-0.5">Overview of active sub-projects</p>
-          </div>
           <Table
+            variant="v1"
+            title="Project Status"
+            count={`${projectAnalyses.length} projects`}
+            headerAction={
+              <Button variant="link" onClick={() => navigate('/admin/sub-projects')}>
+                View all <ChevronRight className="w-4 h-4" />
+              </Button>
+            }
             loading={projectsLoading}
             rowClassName={() => 'group'}
             currentPage={projectPage}
@@ -240,9 +246,9 @@ const Dashboard = () => {
                       key: 'project',
                       label: 'Project',
                       render: (project) => (
-                        <div>
-                          <div className="font-medium text-slate-800 dark:text-zinc-200">{project.name}</div>
-                          <div className="text-xs text-slate-400 dark:text-zinc-500">{project.client}</div>
+                        <div className="min-w-0">
+                          <div className="truncate font-medium text-slate-800 dark:text-zinc-200">{project.name}</div>
+                          <div className="truncate text-xs text-slate-400 dark:text-zinc-500">{project.client}</div>
                         </div>
                       ),
                     },
@@ -257,39 +263,47 @@ const Dashboard = () => {
             data={projectAnalyses}
             emptyState={{ title: 'No projects', description: 'Active projects will appear here' }}
           />
-          <div className="mt-3">
-            <Button variant="link" onClick={() => navigate('/admin/sub-projects')}>
-              View all projects <ChevronRight className="w-4 h-4" />
-            </Button>
-          </div>
         </div>
 
-        {/* Top Performers */}
+        {/* Top Performers — Recent-Users style card */}
         <div>
-          <div className="mb-3">
-            <h3 className="font-semibold text-slate-800 dark:text-zinc-100">Top Performers</h3>
-            <p className="text-sm text-slate-500 dark:text-zinc-500 mt-0.5">By total allocated hours</p>
-          </div>
-          <div className="rounded-2xl border border-slate-200/60 bg-white p-3 shadow-[0_1px_3px_rgba(0,0,0,0.04)] dark:border-neutral-800 dark:bg-[#0f0f0f]">
+          <div className="rounded-2xl border border-slate-200/60 bg-white shadow-[0_1px_3px_rgba(0,0,0,0.04)] dark:border-neutral-800 dark:bg-[#0f0f0f]">
+            <div className="flex items-center justify-between px-5 py-4 border-b border-slate-100 dark:border-neutral-800">
+              <h3 className="text-sm font-semibold text-slate-800 dark:text-zinc-100">Top Performers</h3>
+              <span className="text-xs text-slate-400">By hours</span>
+            </div>
+
             {topPerformers.length === 0 ? (
               <div className="py-10 text-center text-sm text-slate-400">No allocations yet</div>
             ) : (
-              <ul className="space-y-1">
-                {topPerformers.map((row, idx) => {
-                  const medal = ['bg-amber-100 text-amber-700', 'bg-slate-100 text-slate-600', 'bg-orange-100 text-orange-700'][idx] || 'bg-slate-50 text-slate-500';
-                  return (
-                    <li key={row.employee.id} className="flex items-center gap-3 rounded-xl px-2.5 py-2 transition-colors hover:bg-slate-50 dark:hover:bg-white/[0.03]">
-                      <span className={`flex h-7 w-7 shrink-0 items-center justify-center rounded-full text-xs font-bold ${medal}`}>{idx + 1}</span>
-                      <div className="min-w-0 flex-1">
-                        <p className="truncate text-sm font-medium text-slate-800 dark:text-zinc-200">{row.employee.name}</p>
-                        <p className="truncate text-xs text-slate-400">{row.employee.designation || 'Team Member'}</p>
-                      </div>
-                      <span className="shrink-0 rounded-full bg-indigo-50 px-2.5 py-1 text-xs font-semibold text-indigo-700">{row.hours}h</span>
-                    </li>
-                  );
-                })}
+              <ul className="divide-y divide-slate-100 px-3 dark:divide-neutral-800">
+                {topPerformers.map((row) => (
+                  <li key={row.employee.id} className="flex items-center gap-3 rounded-lg px-2 py-3 transition-colors hover:bg-slate-50 dark:hover:bg-white/[0.03]">
+                    <span className="flex h-9 w-9 shrink-0 items-center justify-center overflow-hidden rounded-full bg-slate-100 text-xs font-semibold text-slate-600 dark:bg-white/[0.06] dark:text-zinc-300">
+                      {row.employee.avatar_url
+                        ? <img src={row.employee.avatar_url} alt="" className="h-full w-full object-cover" />
+                        : (row.employee.name || '?').charAt(0).toUpperCase()}
+                    </span>
+                    <div className="min-w-0 flex-1">
+                      <p className="truncate text-sm font-semibold text-slate-800 dark:text-zinc-200">{row.employee.name}</p>
+                      <p className="truncate text-xs text-slate-400">{row.employee.designation || 'Team Member'}</p>
+                    </div>
+                    <span className="inline-flex shrink-0 items-center gap-1 rounded-full bg-slate-100 px-2.5 py-1 text-xs font-semibold text-slate-600 dark:bg-white/[0.06] dark:text-zinc-300">
+                      <Clock className="h-3 w-3" />{row.hours}h
+                    </span>
+                  </li>
+                ))}
               </ul>
             )}
+
+            <div className="border-t border-slate-100 py-3 text-center dark:border-neutral-800">
+              <button
+                onClick={() => navigate('/admin/employees')}
+                className="text-sm font-medium text-slate-600 underline decoration-slate-300 underline-offset-4 transition-colors hover:text-slate-900 dark:text-zinc-400 dark:hover:text-zinc-100"
+              >
+                View all
+              </button>
+            </div>
           </div>
         </div>
       </div>

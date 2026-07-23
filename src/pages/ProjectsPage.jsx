@@ -16,6 +16,7 @@ import Table, { ColumnTemplates } from '../components/ui/Table';
 import Dropdown from '../components/ui/Dropdown';
 import ConfirmDialog from '../components/ui/ConfirmDialog';
 import Modal from '../components/ui/Modal';
+import StatCard from '../components/dashboard/StatCard';
 
 const SkillMultiSelect = ({ options, value, onChange }) => {
   const [isOpen, setIsOpen] = useState(false);
@@ -706,10 +707,10 @@ toast.success(wasEditing ? 'Project updated successfully' : 'Project created suc
     <div className="space-y-6 p-2">
       <div className="flex flex-col md:flex-row md:items-center justify-between gap-4">
         <div>
-          <h1 className="text-2xl font-bold text-slate-900">
+          <h1 className="text-lg font-semibold text-slate-900">
             {currentMainProject ? `Projects for ${currentMainProject.name}` : 'All Projects'}
           </h1>
-          <p className="text-slate-500 text-sm mt-1">
+          <p className="text-slate-500 text-[13px] mt-0.5">
             {currentMainProject
               ? `Manage tasks and resource allocation for ${currentMainProject.name}`
               : 'Manage tasks and resource allocation across all projects'}
@@ -737,78 +738,12 @@ toast.success(wasEditing ? 'Project updated successfully' : 'Project created suc
         </div>
       </div>
 
-      <div className="grid grid-cols-1 sm:grid-cols-2 xl:grid-cols-5 gap-5">
-  
-        <div className="bg-white border border-slate-200 rounded-2xl p-5">
-          <div className="flex items-center justify-between">
-            <div>
-              <p className="text-sm text-slate-500">Total Projects</p>
-              <h3 className="text-3xl font-bold text-slate-900 mt-2">
-                {projectMetrics.totalProjects}
-              </h3>
-            </div>
-            <div className="h-12 w-12 rounded-xl bg-indigo-100 flex items-center justify-center">
-              <FileText className="w-6 h-6 text-indigo-600" />
-            </div>
-          </div>
-        </div>
-
-        <div className="bg-white border border-slate-200 rounded-2xl p-5">
-          <div className="flex items-center justify-between">
-            <div>
-              <p className="text-sm text-slate-500">Active Projects</p>
-              <h3 className="text-3xl font-bold text-emerald-600 mt-2">
-                {projectMetrics.activeProjects}
-              </h3>
-            </div>
-            <div className="h-12 w-12 rounded-xl bg-emerald-100 flex items-center justify-center">
-              <UserCheck className="w-6 h-6 text-emerald-600" />
-            </div>
-          </div>
-        </div>
-
-        <div className="bg-white border border-slate-200 rounded-2xl p-5">
-          <div className="flex items-center justify-between">
-            <div>
-              <p className="text-sm text-slate-500">Overburdened</p>
-              <h3 className="text-3xl font-bold text-red-600 mt-2">
-                {projectMetrics.overburdenedProjects}
-              </h3>
-            </div>
-            <div className="h-12 w-12 rounded-xl bg-red-100 flex items-center justify-center">
-              <BarChart3 className="w-6 h-6 text-red-600" />
-            </div>
-          </div>
-        </div>
-
-        <div className="bg-white border border-slate-200 rounded-2xl p-5">
-          <div className="flex items-center justify-between">
-            <div>
-              <p className="text-sm text-slate-500">Unstaffed</p>
-              <h3 className="text-3xl font-bold text-amber-600 mt-2">
-                {projectMetrics.unstaffedProjects}
-              </h3>
-            </div>
-            <div className="h-12 w-12 rounded-xl bg-amber-100 flex items-center justify-center">
-              <Users className="w-6 h-6 text-amber-600" />
-            </div>
-          </div>
-        </div>
-
-        <div className="bg-white border border-slate-200 rounded-2xl p-5">
-          <div className="flex items-center justify-between">
-            <div>
-              <p className="text-sm text-slate-500">Balanced</p>
-              <h3 className="text-3xl font-bold text-blue-600 mt-2">
-                {projectMetrics.balancedProjects}
-              </h3>
-            </div>
-            <div className="h-12 w-12 rounded-xl bg-blue-100 flex items-center justify-center">
-              <Settings className="w-6 h-6 text-blue-600" />
-            </div>
-          </div>
-        </div>
-
+      <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-5 gap-3">
+        <StatCard title="Total Projects" value={projectMetrics.totalProjects} icon={FileText} tone="indigo" hint="all projects" />
+        <StatCard title="Active Projects" value={projectMetrics.activeProjects} icon={UserCheck} tone="emerald" hint="currently active" />
+        <StatCard title="Overburdened" value={projectMetrics.overburdenedProjects} icon={BarChart3} tone="rose" hint="need staffing" />
+        <StatCard title="Unstaffed" value={projectMetrics.unstaffedProjects} icon={Users} tone="amber" hint="no one allocated" />
+        <StatCard title="Balanced" value={projectMetrics.balancedProjects} icon={Settings} tone="sky" hint="well staffed" />
       </div>
 
       <div className="bg-white border border-slate-200 rounded-xl p-4">

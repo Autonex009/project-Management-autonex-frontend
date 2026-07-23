@@ -212,7 +212,7 @@ const AdminLayout = () => {
       )}
 
       {/* Main Content Panel — Linear-style inset rounded card floating on the app canvas */}
-      <div className="flex-1 flex flex-col min-w-0 overflow-hidden m-2 rounded-xl border bg-white border-slate-200 dark:bg-[#0c0c0c] dark:border-neutral-800">
+      <div className="flex-1 flex flex-col min-w-0 overflow-hidden m-2 rounded-xl border bg-[#f8fafc] border-slate-200 dark:bg-[#0c0c0c] dark:border-neutral-800">
         {/* Top Header — Linear-style breadcrumb bar */}
         <header className="h-12 shrink-0 flex items-center justify-between px-4 sm:px-5 border-b border-slate-200/70 dark:border-neutral-800">
           <div className="flex items-center gap-2 min-w-0">
