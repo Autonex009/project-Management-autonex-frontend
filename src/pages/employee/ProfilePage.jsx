@@ -192,6 +192,7 @@ const ProfilePage = () => {
         weeklyAvailability: employee?.weekly_availability,
         skills: employee?.skills || account?.skills || localUser.skills || [],
         slackUserId: employee?.slack_user_id || '',
+        encordId: employee?.encord_id || '',
         avatarUrl: employee?.avatar_url || account?.avatar_url || localUser.avatar_url || '',
     };
 
@@ -200,6 +201,7 @@ const ProfilePage = () => {
     const [editPhone, setEditPhone] = useState('');
     const [editSkills, setEditSkills] = useState([]);
     const [editSlackId, setEditSlackId] = useState('');
+    const [editEncordId, setEditEncordId] = useState('');
     const [saveError, setSaveError] = useState('');
     const [saveSuccess, setSaveSuccess] = useState(false);
 
@@ -208,6 +210,7 @@ const ProfilePage = () => {
         setEditPhone(mergedProfile.phone || '');
         setEditSkills([...(mergedProfile.skills || [])]);
         setEditSlackId(mergedProfile.slackUserId || '');
+        setEditEncordId(mergedProfile.encordId || '');
         setSaveError('');
         setSaveSuccess(false);
         setIsEditing(true);
@@ -239,6 +242,7 @@ const ProfilePage = () => {
             phone: editPhone || null,
             skills: editSkills,
             slack_user_id: editSlackId || null,
+            encord_id: editEncordId || null,
         });
     };
 
@@ -333,7 +337,7 @@ const ProfilePage = () => {
                         </div>
                         <div>
                             <p className="text-sm font-medium uppercase tracking-[0.18em] text-emerald-700">Profile</p>
-                            <h1 className="mt-1 text-2xl font-bold tracking-tight text-slate-900">{mergedProfile.name || 'Employee'}</h1>
+                            <h1 className="mt-1 text-lg font-semibold tracking-tight text-slate-900">{mergedProfile.name || 'Employee'}</h1>
                             <p className="mt-1 text-sm text-slate-500">Your account and work details in one place.</p>
 
                             {/* avatar actions */}
@@ -461,6 +465,19 @@ const ProfilePage = () => {
 
                         {/* Status — always read-only */}
                         <FieldCard icon={BadgeCheck} label="Status" value={mergedProfile.status} />
+
+                        {/* Encord ID — editable */}
+                        {isEditing ? (
+                            <EditableFieldCard
+                                icon={Mail}
+                                label="Encord ID / Email"
+                                value={editEncordId}
+                                onChange={setEditEncordId}
+                                placeholder="john.encord@example.com"
+                            />
+                        ) : (
+                            <FieldCard icon={Mail} label="Encord ID / Email" value={mergedProfile.encordId} />
+                        )}
 
                         {/* Slack User ID — editable */}
                         {isEditing ? (

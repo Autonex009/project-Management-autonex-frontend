@@ -127,7 +127,7 @@ const PayTab = () => {
     return (
         <div className="space-y-6">
             <div>
-                <h1 className="text-2xl font-bold text-slate-800">Pay</h1>
+                <h1 className="text-lg font-semibold text-slate-800">Pay</h1>
                 <p className="mt-1 text-sm text-slate-500">
                     Salary records for everyone. Edit monthly pay here, and toggle Active/Inactive — inactive people are left out of the Monthly Pay run.
                 </p>
@@ -177,11 +177,11 @@ const PayTab = () => {
                         <table className="w-full text-sm">
                             <thead className="bg-slate-50/80 border-b border-slate-100">
                                 <tr>
-                                    <th className="px-5 py-4 text-left text-xs font-semibold text-slate-400 uppercase tracking-wider">Employee</th>
-                                    <th className="px-5 py-4 text-left text-xs font-semibold text-slate-400 uppercase tracking-wider">Status</th>
-                                    <th className="px-5 py-4 text-right text-xs font-semibold text-slate-400 uppercase tracking-wider">Base Pay (Monthly)</th>
-                                    <th className="px-5 py-4 text-right text-xs font-semibold text-slate-400 uppercase tracking-wider">Bonus (Monthly)</th>
-                                    <th className="px-5 py-4 text-center text-xs font-semibold text-slate-400 uppercase tracking-wider">Actions</th>
+                                    <th className="px-5 py-4 text-left text-xs font-bold text-slate-700 uppercase tracking-wider">Employee</th>
+                                    <th className="px-5 py-4 text-left text-xs font-bold text-slate-700 uppercase tracking-wider">Status</th>
+                                    <th className="px-5 py-4 text-right text-xs font-bold text-slate-700 uppercase tracking-wider">Base Pay (Monthly)</th>
+                                    <th className="px-5 py-4 text-right text-xs font-bold text-slate-700 uppercase tracking-wider">Bonus (Monthly)</th>
+                                    <th className="px-5 py-4 text-center text-xs font-bold text-slate-700 uppercase tracking-wider">Actions</th>
                                 </tr>
                             </thead>
                             <tbody className="divide-y divide-slate-100">
@@ -210,11 +210,10 @@ const PayTab = () => {
                                                         onClick={() => toggleStatus(row)}
                                                         disabled={statusMutation.isPending}
                                                         title={active ? 'Click to mark Inactive' : 'Click to mark Active'}
-                                                        className={`inline-flex items-center gap-1.5 px-2.5 py-1 rounded-full text-xs font-medium transition-colors disabled:opacity-50 ${
-                                                            active
+                                                        className={`inline-flex items-center gap-1.5 px-2.5 py-1 rounded-full text-xs font-medium transition-colors disabled:opacity-50 ${active
                                                                 ? 'bg-emerald-50 text-emerald-700 hover:bg-emerald-100'
                                                                 : 'bg-slate-200 text-slate-500 hover:bg-slate-300'
-                                                        }`}
+                                                            }`}
                                                     >
                                                         <span className={`w-1.5 h-1.5 rounded-full ${active ? 'bg-emerald-500' : 'bg-slate-400'}`} />
                                                         {active ? 'Active' : 'Inactive'}

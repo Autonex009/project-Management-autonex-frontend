@@ -127,7 +127,7 @@ const SignupRequestsPage = () => {
             {/* Header */}
             <div>
                 <div className="flex items-center gap-3">
-                    <h1 className="text-2xl font-bold text-slate-800">Signup Requests</h1>
+                    <h1 className="text-lg font-semibold text-slate-800">Signup Requests</h1>
                     {pendingCount > 0 && (
                         <span className="inline-flex items-center justify-center h-6 min-w-[24px] px-1.5 rounded-full text-xs font-bold bg-red-500 text-white">
                             {pendingCount}

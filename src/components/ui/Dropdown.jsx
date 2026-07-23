@@ -127,7 +127,7 @@ const Dropdown = ({ options = [], value, onChange, placeholder = 'Select', disab
                 <ChevronDown className={`w-3.5 h-3.5 text-slate-400 transition-transform ${open ? 'rotate-180' : ''}`} />
             </button>
             {open && !disabled && (
-                <div className={`absolute left-0 top-full mt-1 z-[9999] ${optionsClassName} bg-white border border-slate-200 rounded-xl shadow-lg py-1 overflow-hidden`}>
+                <div className={`absolute left-0 top-full mt-1 z-[9999] ${optionsClassName} bg-white border border-slate-200 rounded-xl shadow-lg py-1 max-h-64 overflow-y-auto`}>
                     {options.map(opt => {
                         const optValue = typeof opt === 'string' ? opt : opt.value;
                         const optLabel = typeof opt === 'string' ? opt : opt.label;

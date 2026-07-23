@@ -156,7 +156,7 @@ const AdminCompanySettingsPage = () => {
         <div className="space-y-6 max-w-4xl">
             {/* Page Header */}
             <div>
-                <h1 className="text-2xl font-bold text-slate-900 flex items-center gap-2">
+                <h1 className="text-lg font-semibold text-slate-900 flex items-center gap-2">
                     <Settings className="w-6 h-6 text-indigo-500" />
                     Company Settings
                 </h1>

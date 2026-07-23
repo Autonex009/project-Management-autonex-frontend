@@ -366,27 +366,90 @@ const EmployeeKPIPanel = ({ employees = [], leaves = [], wfhRequests = [] }) => 
             {/* Scorecard Table */}
             <div className="bg-white rounded-2xl border border-slate-200/60 shadow-sm overflow-hidden">
                 <div className="overflow-x-auto">
-                    <table className="w-full border-collapse">
+                    {/* <table className="w-full border-collapse"> */}
+                    <table className="w-full border-collapse table-fixed">
+                        <colgroup>
+                            {/* Employee */}
+                            <col className="w-[300px]" />
+
+                            {/* Leaves */}
+                            <col className="w-[90px]" />
+
+                            {/* WFH */}
+                            <col className="w-[80px]" />
+
+                            {/* Status */}
+                            <col className="w-[130px]" />
+
+                            {/* Reliability */}
+                            <col className="w-[120px]" />
+
+                            {/* Breakdown */}
+                            <col className="w-[210px]" />
+
+                            {/* Action */}
+                            <col className="w-[40px]" />
+                        </colgroup>
                         <thead>
                             <tr className="border-b border-slate-100 bg-slate-50/50">
-                                <th onClick={() => handleSort('name')} className="cursor-pointer hover:bg-slate-100/50 px-6 py-4 text-left text-xs font-semibold text-slate-500 uppercase tracking-wider select-none">
-                                    <span className="flex items-center">Employee {renderSortIcon('name')}</span>
+
+                                {/* Employee */}
+                                <th
+                                    onClick={() => handleSort('name')}
+                                    className="cursor-pointer hover:bg-slate-100/50 px-4 py-3 text-left text-[11px] font-semibold text-slate-500 uppercase tracking-wider select-none"
+                                >
+                                    <span className="flex items-center">
+                                        Employee
+                                        {renderSortIcon('name')}
+                                    </span>
                                 </th>
-                                <th onClick={() => handleSort('leaves')} className="cursor-pointer hover:bg-slate-100/50 px-5 py-4 text-center text-xs font-semibold text-slate-500 uppercase tracking-wider select-none">
-                                    <span className="flex items-center justify-center">Approved Leaves {renderSortIcon('leaves')}</span>
+
+                                {/* Approved Leaves */}
+                                <th
+                                    onClick={() => handleSort('leaves')}
+                                    className="cursor-pointer hover:bg-slate-100/50 px-2 py-3 text-center text-[11px] font-semibold text-slate-500 uppercase tracking-wider select-none"
+                                >
+                                    <span className="flex items-center justify-center gap-1">
+                                        Leaves
+                                        {renderSortIcon('leaves')}
+                                    </span>
                                 </th>
-                                <th onClick={() => handleSort('wfh')} className="cursor-pointer hover:bg-slate-100/50 px-5 py-4 text-center text-xs font-semibold text-slate-500 uppercase tracking-wider select-none">
-                                    <span className="flex items-center justify-center">Approved WFH {renderSortIcon('wfh')}</span>
+
+                                {/* Approved WFH */}
+                                <th
+                                    onClick={() => handleSort('wfh')}
+                                    className="cursor-pointer hover:bg-slate-100/50 px-2 py-3 text-center text-[11px] font-semibold text-slate-500 uppercase tracking-wider select-none"
+                                >
+                                    <span className="flex items-center justify-center gap-1">
+                                        WFH
+                                        {renderSortIcon('wfh')}
+                                    </span>
                                 </th>
-                                <th className="px-5 py-4 text-center text-xs font-semibold text-slate-500 uppercase tracking-wider select-none">
+
+                                {/* Status */}
+                                <th className="px-2 py-3 text-center text-[11px] font-semibold text-slate-500 uppercase tracking-wider select-none">
                                     Status
                                 </th>
-                                <th onClick={() => handleSort('reliability')} className="cursor-pointer hover:bg-slate-100/50 px-5 py-4 text-center text-xs font-semibold text-slate-500 uppercase tracking-wider select-none">
-                                    <span className="flex items-center justify-center font-bold">Reliability Score {renderSortIcon('reliability')}</span>
+
+                                {/* Reliability */}
+                                <th
+                                    onClick={() => handleSort('reliability')}
+                                    className="cursor-pointer hover:bg-slate-100/50 px-2 py-3 text-center text-[11px] font-semibold text-slate-500 uppercase tracking-wider select-none"
+                                >
+                                    <span className="flex items-center justify-center gap-1">
+                                        Reliability
+                                        {renderSortIcon('reliability')}
+                                    </span>
                                 </th>
-                                <th className="px-6 py-4 text-right text-xs font-semibold text-slate-500 uppercase tracking-wider select-none">
-                                    Breakdown (PL | SL | FL)
+
+                                {/* Breakdown */}
+                                <th className="px-3 py-3 text-right text-[11px] font-semibold text-slate-500 uppercase tracking-wider select-none">
+                                    Breakdown
                                 </th>
+
+                                {/* Action */}
+                                <th className="w-[40px]"></th>
+
                             </tr>
                         </thead>
                         <tbody className="divide-y divide-slate-100">
@@ -403,78 +466,114 @@ const EmployeeKPIPanel = ({ employees = [], leaves = [], wfhRequests = [] }) => 
                                         onClick={() => setSelectedEmployeeId(stat.employee.id)}
                                         className="hover:bg-indigo-50/10 cursor-pointer transition-colors group"
                                     >
-                                        <td className="px-6 py-4">
-                                            <div className="flex items-center gap-3">
-                                                <div className="w-10 h-10 rounded-xl bg-gradient-to-br from-slate-100 to-indigo-50 flex items-center justify-center group-hover:from-indigo-100 group-hover:to-indigo-50 transition-colors shrink-0">
+                                        <td className="px-4 py-3">
+                                            <div className="flex items-center gap-2.5 min-w-0">
+
+                                                <div className="w-9 h-9 rounded-xl bg-gradient-to-br from-slate-100 to-indigo-50 flex items-center justify-center group-hover:from-indigo-100 group-hover:to-indigo-50 transition-colors shrink-0">
                                                     <span className="text-sm font-bold text-indigo-600">
                                                         {stat.employee.name.charAt(0).toUpperCase()}
                                                     </span>
                                                 </div>
-                                                <div>
-                                                    <p className="font-semibold text-slate-800">{stat.employee.name}</p>
-                                                    <div className="flex items-center gap-2 mt-0.5">
-                                                        <span className="text-xs text-slate-400">{stat.employee.designation || 'No title'}</span>
-                                                        <span className="w-1 h-1 rounded-full bg-slate-300"></span>
-                                                        <span className="text-[10px] font-medium bg-slate-100 text-slate-600 px-1.5 py-0.5 rounded">
+
+                                                <div className="min-w-0">
+                                                    <p className="font-semibold text-slate-800 text-sm truncate">
+                                                        {stat.employee.name}
+                                                    </p>
+
+                                                    <div className="flex items-center gap-1.5 mt-0.5 min-w-0">
+                                                        <span className="text-xs text-slate-400 truncate">
+                                                            {stat.employee.designation || 'No title'}
+                                                        </span>
+
+                                                        <span className="w-1 h-1 rounded-full bg-slate-300 shrink-0"></span>
+
+                                                        <span className="text-[10px] font-medium bg-slate-100 text-slate-600 px-1.5 py-0.5 rounded whitespace-nowrap">
                                                             {stat.employee.employee_type || 'Full-time'}
                                                         </span>
                                                     </div>
                                                 </div>
+
                                             </div>
                                         </td>
-                                        <td className="px-5 py-4 text-center font-mono text-sm font-semibold text-slate-700">
+                                        <td className="px-2 py-3 text-center font-mono text-sm font-semibold text-slate-700">
                                             {stat.approvedLeaveDays}d
+
                                             {stat.pendingLeaveDays > 0 && (
-                                                <span className="ml-1 text-xs font-normal text-amber-500" title="Pending approval">
+                                                <span
+                                                    className="ml-1 text-[10px] font-normal text-amber-500"
+                                                    title="Pending approval"
+                                                >
                                                     (+{stat.pendingLeaveDays}d)
                                                 </span>
                                             )}
                                         </td>
-                                        <td className="px-5 py-4 text-center font-mono text-sm text-slate-600">
+                                        <td className="px-2 py-3 text-center font-mono text-sm text-slate-600">
                                             {stat.approvedWfhCount}d
+
                                             {stat.pendingWfhCount > 0 && (
-                                                <span className="ml-1 text-xs text-amber-500" title="Pending approval">
+                                                <span
+                                                    className="ml-1 text-[10px] text-amber-500"
+                                                    title="Pending approval"
+                                                >
                                                     (+{stat.pendingWfhCount}d)
                                                 </span>
                                             )}
                                         </td>
-                                        <td className="px-5 py-4 text-center">
-                                            <span className={`inline-flex items-center gap-1.5 px-2.5 py-0.5 rounded-full text-xs font-medium border ${stat.ratingColor}`}>
-                                                <span className={`w-1.5 h-1.5 rounded-full ${stat.ratingDot}`}></span>
+                                        <td className="px-2 py-3 text-center">
+                                            <span
+                                                className={`inline-flex items-center gap-1.5 px-2 py-0.5 rounded-full text-xs font-medium border ${stat.ratingColor}`}
+                                            >
+                                                <span
+                                                    className={`w-1.5 h-1.5 rounded-full ${stat.ratingDot}`}
+                                                ></span>
+
                                                 {stat.rating}
                                             </span>
                                         </td>
-                                        <td className="px-5 py-4 text-center">
+                                        <td className="px-2 py-3 text-center">
                                             <div className="flex flex-col items-center gap-1">
-                                                <span className={`text-base font-extrabold ${
-                                                    stat.reliabilityScore >= 90 ? 'text-emerald-600' :
-                                                    stat.reliabilityScore >= 75 ? 'text-indigo-600' :
-                                                    stat.reliabilityScore >= 50 ? 'text-amber-500' : 'text-red-500'
-                                                }`}>
+
+                                                <span
+                                                    className={`text-base font-extrabold ${
+                                                        stat.reliabilityScore >= 90
+                                                            ? 'text-emerald-600'
+                                                            : stat.reliabilityScore >= 75
+                                                                ? 'text-indigo-600'
+                                                                : stat.reliabilityScore >= 50
+                                                                    ? 'text-amber-500'
+                                                                    : 'text-red-500'
+                                                    }`}
+                                                >
                                                     {stat.reliabilityScore}%
                                                 </span>
+
                                                 {stat.flaggedCount > 0 && (
                                                     <span className="inline-flex items-center gap-0.5 px-1.5 py-0.5 rounded text-[9px] font-bold bg-orange-100 text-orange-700 border border-orange-200">
-                                                        <AlertTriangle className="w-2 h-2 shrink-0" /> {stat.flaggedCount} overlimit
+                                                        <AlertTriangle className="w-2 h-2 shrink-0" />
+                                                        {stat.flaggedCount}
                                                     </span>
                                                 )}
                                             </div>
                                         </td>
-                                        <td className="px-6 py-4 text-right">
-                                            <div className="flex items-center justify-end gap-3 select-none">
-                                                <div className="flex items-center gap-1.5 flex-wrap justify-end">
-                                                    <span className="inline-flex items-center px-2 py-0.5 rounded-lg text-xs font-semibold font-mono bg-blue-50 text-blue-700 border border-blue-200">
-                                                        PL: {stat.typeBreakdown.paid || 0}d
-                                                    </span>
-                                                    <span className="inline-flex items-center px-2 py-0.5 rounded-lg text-xs font-semibold font-mono bg-emerald-50 text-emerald-700 border border-emerald-200">
-                                                        SL: {stat.typeBreakdown.casual_sick || 0}d
-                                                    </span>
-                                                    <span className="inline-flex items-center px-2 py-0.5 rounded-lg text-xs font-semibold font-mono bg-amber-50 text-amber-700 border border-amber-200">
-                                                        FL: {stat.typeBreakdown.floater || 0}d
-                                                    </span>
-                                                </div>
-                                                <ChevronRight className="w-4 h-4 text-slate-400 group-hover:text-indigo-600 group-hover:translate-x-0.5 transition-all shrink-0" />
+                                        <td className="px-2 py-3 text-center">
+                                            <div className="flex items-center justify-center gap-1">
+
+                                                <span className="inline-flex items-center px-1.5 py-0.5 rounded-md text-[10px] font-semibold font-mono bg-blue-50 text-blue-700 border border-blue-200">
+                                                    PL {stat.typeBreakdown.paid || 0}d
+                                                </span>
+
+                                                <span className="inline-flex items-center px-1.5 py-0.5 rounded-md text-[10px] font-semibold font-mono bg-emerald-50 text-emerald-700 border border-emerald-200">
+                                                    SL {stat.typeBreakdown.casual_sick || 0}d
+                                                </span>
+
+                                                <span className="inline-flex items-center px-1.5 py-0.5 rounded-md text-[10px] font-semibold font-mono bg-amber-50 text-amber-700 border border-amber-200">
+                                                    FL {stat.typeBreakdown.floater || 0}d
+                                                </span>
+
                                             </div>
+                                        </td>
+                                        <td className="px-2 py-3 text-center">
+                                            <ChevronRight className="w-4 h-4 text-slate-400 group-hover:text-indigo-600 group-hover:translate-x-0.5 transition-all" />
                                         </td>
                                     </tr>
                                 ))

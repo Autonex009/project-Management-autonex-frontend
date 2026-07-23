@@ -234,7 +234,7 @@ const SelfEvaluationPage = () => {
         <div className="space-y-6">
             <section className="overflow-hidden rounded-[28px] border border-emerald-100 bg-[linear-gradient(135deg,rgba(5,150,105,0.12),rgba(255,255,255,0.94)_42%,rgba(236,253,245,1))] p-6 shadow-sm">
                 <p className="text-sm font-medium uppercase tracking-[0.18em] text-emerald-700">Self Evaluation</p>
-                <h1 className="mt-1 text-2xl font-bold tracking-tight text-slate-900">Monthly Performance Review</h1>
+                <h1 className="mt-1 text-lg font-semibold tracking-tight text-slate-900">Monthly Performance Review</h1>
                 <p className="mt-2 max-w-2xl text-sm text-slate-500">
                     Rate yourself on each parameter for every project you're allocated to. Submissions are locked and reviewed by your PM.
                 </p>

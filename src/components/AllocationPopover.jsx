@@ -51,6 +51,7 @@ const AllocationPopover = ({
   employees = [],
   onOpenAllocations,
   badgeContent,
+  triggerClassName,
 }) => {
   const [open, setOpen] = useState(false);
   const [position, setPosition] = useState({ top: 0, left: 0, placement: 'bottom', arrowLeft: 0 });
@@ -315,7 +316,7 @@ const AllocationPopover = ({
         onClick={() => onOpenAllocations && onOpenAllocations()}
         onMouseEnter={() => { cancelClose(); setOpen(true); }}
         onMouseLeave={scheduleClose}
-        className="inline-flex items-center gap-1.5 px-3 py-1.5 bg-emerald-50 hover:bg-emerald-100 text-emerald-700 rounded-lg font-medium text-sm transition-colors border border-emerald-200 shadow-sm"
+        className={triggerClassName || "inline-flex items-center gap-1.5 px-3 py-1.5 bg-emerald-50 hover:bg-emerald-100 text-emerald-700 rounded-lg font-medium text-sm transition-colors border border-emerald-200 shadow-sm"}
         aria-expanded={open}
       >
         {badgeContent || (
