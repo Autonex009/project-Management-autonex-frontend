@@ -370,7 +370,7 @@ const AllocationsPage = () => {
         <SearchBar responsive
           value={searchQuery}
           onChange={(val) => { setSearchQuery(val); setCurrentPage(1); }}
-          placeholder="Search allocations by project or employee..."
+          placeholder="Search projects or employees..."
         />
       </div>
 
