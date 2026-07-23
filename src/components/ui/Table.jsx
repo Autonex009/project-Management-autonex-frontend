@@ -38,8 +38,8 @@ export const Table = ({
     const cellPad = isCompact ? 'px-4 py-2' : isV1 ? 'px-5 py-3.5' : 'px-4 py-2.5';
     const headPad = isCompact ? 'px-4 py-2.5' : isV1 ? 'px-5 py-3' : 'px-4 py-2.5';
     const headTextSize = isCompact ? 'text-[11px]' : isV1 ? 'text-xs' : 'text-[11px]';
-    const headCase = isV1 ? 'normal-case tracking-normal text-slate-600 dark:text-zinc-300' : 'uppercase tracking-wider text-slate-400 dark:text-zinc-500';
-    const headWeight = isV1 ? 'font-semibold' : 'font-medium';
+    const headCase = isV1 ? 'normal-case tracking-normal text-slate-600 dark:text-zinc-300' : 'uppercase tracking-wider text-slate-700 dark:text-zinc-300';
+    const headWeight = isV1 ? 'font-semibold' : 'font-bold';
     const theadBg = isV1 ? 'bg-slate-50 dark:bg-[#161616]' : 'bg-slate-50/80 dark:bg-white/[0.02]';
 
     const context = { onEdit, onDelete };
