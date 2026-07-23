@@ -116,6 +116,7 @@ const ProjectAnalyticsPage = () => {
         refetchOnWindowFocus: true,
     });
 
+
     const annotators = data?.annotators || [];
     // default selection: top 3 by hours
     const activeSel = selected ?? annotators.slice(0, 3).map((a) => a.user_email);

@@ -1,7 +1,7 @@
 import { useQuery } from '@tanstack/react-query';
 import { useMemo, useState } from 'react';
 import { useNavigate } from 'react-router-dom';
-import { subProjectApi, employeeApi, allocationApi, leaveApi, skillsApi } from '../services/api';
+import { subProjectApi, employeeApi, allocationApi, leaveApi, skillsApi, analyticsApi } from '../services/api'; 
 import { FolderKanban, Calendar, Users, AlertTriangle, ArrowUpRight, Activity, Zap, Target, TrendingUp, Plus, ChevronRight, UserCog, ClipboardCheck, Clock } from 'lucide-react';
 import Table from '../components/ui/Table';
 import Button from '../components/ui/Button';
@@ -50,6 +50,15 @@ const Dashboard = () => {
     queryKey: ['skillsSummary'],
     queryFn: skillsApi.getSummary,
   });
+
+  // Autonex most-active user + project (this month, by time spent on Encord).
+  const { data: autonexOverview } = useQuery({
+    queryKey: ['autonex-overview'],
+    queryFn: analyticsApi.getAutonexOverview,
+    refetchInterval: 10 * 60 * 1000,
+  });
+  const topUsers = autonexOverview?.top_users || [];
+  const topActiveProjects = autonexOverview?.top_projects || [];
 
   // Stats
   const totalProjects = projects.length;
@@ -140,19 +149,6 @@ const Dashboard = () => {
   const reviewersAnnotators = activeEmployeesList.filter(e => isReviewerAnnotator(e.designation));
   const teamAvailable = activeEmployees - employeesOnLeave.length;
 
-  // ── Top performers: total allocated daily hours per employee ───────────────
-  const topPerformers = useMemo(() => {
-    const hoursByEmp = new Map();
-    allocations.forEach((a) => {
-      const h = Number(a.total_daily_hours) || 0;
-      hoursByEmp.set(a.employee_id, (hoursByEmp.get(a.employee_id) || 0) + h);
-    });
-    return employees
-      .map((e) => ({ employee: e, hours: hoursByEmp.get(e.id) || 0 }))
-      .filter((r) => r.hours > 0)
-      .sort((a, b) => b.hours - a.hours)
-      .slice(0, 5);
-  }, [allocations, employees]);
 
   // Project sentiment badge (PM-set): GOOD / AVG / Poor.
   const SentimentBadge = ({ sentiment }) => {
@@ -265,45 +261,52 @@ const Dashboard = () => {
           />
         </div>
 
-        {/* Top Performers — Recent-Users style card */}
-        <div>
+        {/* Most Active — Autonex users & projects (Encord, this month) */}
+        <div className="space-y-4">
+          {/* Most Active User */}
           <div className="rounded-2xl border border-slate-200/60 bg-white shadow-[0_1px_3px_rgba(0,0,0,0.04)] dark:border-neutral-800 dark:bg-[#0f0f0f]">
             <div className="flex items-center justify-between px-5 py-4 border-b border-slate-100 dark:border-neutral-800">
-              <h3 className="text-sm font-semibold text-slate-800 dark:text-zinc-100">Top Performers</h3>
+              <h3 className="text-sm font-semibold text-slate-800 dark:text-zinc-100">Most Active Autonex Users</h3>
               <span className="text-xs text-slate-400">By hours</span>
             </div>
-
-            {topPerformers.length === 0 ? (
-              <div className="py-10 text-center text-sm text-slate-400">No allocations yet</div>
+            {topUsers.length === 0 ? (
+              <div className="py-8 text-center text-sm text-slate-400">No activity yet</div>
             ) : (
               <ul className="divide-y divide-slate-100 px-3 dark:divide-neutral-800">
-                {topPerformers.map((row) => (
-                  <li key={row.employee.id} className="flex items-center gap-3 rounded-lg px-2 py-3 transition-colors hover:bg-slate-50 dark:hover:bg-white/[0.03]">
-                    <span className="flex h-9 w-9 shrink-0 items-center justify-center overflow-hidden rounded-full bg-slate-100 text-xs font-semibold text-slate-600 dark:bg-white/[0.06] dark:text-zinc-300">
-                      {row.employee.avatar_url
-                        ? <img src={row.employee.avatar_url} alt="" className="h-full w-full object-cover" />
-                        : (row.employee.name || '?').charAt(0).toUpperCase()}
-                    </span>
-                    <div className="min-w-0 flex-1">
-                      <p className="truncate text-sm font-semibold text-slate-800 dark:text-zinc-200">{row.employee.name}</p>
-                      <p className="truncate text-xs text-slate-400">{row.employee.designation || 'Team Member'}</p>
-                    </div>
-                    <span className="inline-flex shrink-0 items-center gap-1 rounded-full bg-slate-100 px-2.5 py-1 text-xs font-semibold text-slate-600 dark:bg-white/[0.06] dark:text-zinc-300">
-                      <Clock className="h-3 w-3" />{row.hours}h
-                    </span>
+                {topUsers.map((u, idx) => (
+                  <li key={u.user_email} className="flex items-center gap-3 rounded-lg px-2 py-2.5">
+                    <span className={`flex h-7 w-7 shrink-0 items-center justify-center rounded-full text-xs font-bold ${['bg-amber-100 text-amber-700','bg-slate-100 text-slate-600','bg-orange-100 text-orange-700'][idx] || 'bg-slate-50 text-slate-500'}`}>{idx + 1}</span>
+                    <p className="min-w-0 flex-1 truncate text-sm font-medium text-slate-800 dark:text-zinc-200">{u.employee_name || u.user_email}</p>
+                    <span className="inline-flex shrink-0 items-center gap-1 rounded-full bg-indigo-50 px-2.5 py-1 text-xs font-semibold text-indigo-700"><Clock className="h-3 w-3" />{u.hours}h</span>
                   </li>
                 ))}
               </ul>
             )}
+          </div>
 
-            <div className="border-t border-slate-100 py-3 text-center dark:border-neutral-800">
-              <button
-                onClick={() => navigate('/admin/employees')}
-                className="text-sm font-medium text-slate-600 underline decoration-slate-300 underline-offset-4 transition-colors hover:text-slate-900 dark:text-zinc-400 dark:hover:text-zinc-100"
-              >
-                View all
-              </button>
+          {/* Most Active Project */}
+          <div className="rounded-2xl border border-slate-200/60 bg-white shadow-[0_1px_3px_rgba(0,0,0,0.04)] dark:border-neutral-800 dark:bg-[#0f0f0f]">
+            <div className="flex items-center justify-between px-5 py-4 border-b border-slate-100 dark:border-neutral-800">
+              <h3 className="text-sm font-semibold text-slate-800 dark:text-zinc-100">Most Active Projects</h3>
+              <span className="text-xs text-slate-400">By hours</span>
             </div>
+            {topActiveProjects.length === 0 ? (
+              <div className="py-8 text-center text-sm text-slate-400">No activity yet</div>
+            ) : (
+              <ul className="divide-y divide-slate-100 px-3 dark:divide-neutral-800">
+                {topActiveProjects.map((p, idx) => (
+                  <li
+                    key={p.encord_project_hash}
+                    onClick={() => p.project_id && navigate(`/admin/analytics/${p.project_id}`)}
+                    className={`flex items-center gap-3 rounded-lg px-2 py-2.5 ${p.project_id ? 'cursor-pointer hover:bg-slate-50 dark:hover:bg-white/[0.03]' : ''}`}
+                  >
+                    <span className={`flex h-7 w-7 shrink-0 items-center justify-center rounded-full text-xs font-bold ${['bg-amber-100 text-amber-700','bg-slate-100 text-slate-600','bg-orange-100 text-orange-700'][idx] || 'bg-slate-50 text-slate-500'}`}>{idx + 1}</span>
+                    <p className="min-w-0 flex-1 truncate text-sm font-medium text-slate-800 dark:text-zinc-200">{p.name}</p>
+                    <span className="inline-flex shrink-0 items-center gap-1 rounded-full bg-emerald-50 px-2.5 py-1 text-xs font-semibold text-emerald-700"><Clock className="h-3 w-3" />{p.hours}h</span>
+                  </li>
+                ))}
+              </ul>
+            )}
           </div>
         </div>
       </div>
