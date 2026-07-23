@@ -1,35 +1,29 @@
-import { Link, useLocation, Outlet } from 'react-router-dom';
-import { LogOut, Menu, GraduationCap, FileSpreadsheet, ChevronLeft, ChevronRight, Sparkles } from 'lucide-react';
+import { useLocation, Outlet } from 'react-router-dom';
+import { Menu, ChevronRight, PanelLeft } from 'lucide-react';
 import { navigation } from '../config/navigation';
 import api, { signupRequestApi, employeeApi, subProjectApi } from '../services/api';
-import { useState, useEffect } from 'react';
+import { useState, useEffect, useRef } from 'react';
 import { useQuery, useQueryClient } from '@tanstack/react-query';
-import BrandLockup from '../components/brand/BrandLockup';
 import NotificationBell from '../components/NotificationBell';
+import AdminSidebar from './AdminSidebar';
 import ChatWidget from '../components/chat/ChatWidget';
 
-const onboardingNavigation = [
-  { name: 'Training Modules', href: '/admin/modules', icon: GraduationCap },
-  { name: 'Newly Onboarded', href: '/admin/newly-onboarded', icon: Sparkles },
-  { name: 'Progress Reports', href: '/admin/onboarding-reports', icon: FileSpreadsheet },
-];
+const MIN_WIDTH = 208;
+const MAX_WIDTH = 400;
+const DEFAULT_WIDTH = 256;
 
 const AdminLayout = () => {
   const location = useLocation();
   const queryClient = useQueryClient();
-  const [sidebarOpen, setSidebarOpen] = useState(false);
-  const [isCollapsed, setIsCollapsed] = useState(true);
-  const [isHovered, setIsHovered] = useState(false);
-  const [isMobile, setIsMobile] = useState(false);
+  const [sidebarOpen, setSidebarOpen] = useState(false);   // mobile drawer
+  const [collapsed, setCollapsed] = useState(false);        // desktop collapse
+  const [peek, setPeek] = useState(false);                  // edge-peek when collapsed
+  const [width, setWidth] = useState(DEFAULT_WIDTH);        // desktop sidebar width
+  const widthRef = useRef(DEFAULT_WIDTH);
   const [user, setUser] = useState({});
 
   useEffect(() => {
     // Client-side initialization after hydration
-    const saved = localStorage.getItem('sidebar-collapsed');
-    if (saved !== null) {
-      setIsCollapsed(saved === 'true');
-    }
-
     const savedUser = localStorage.getItem('user');
     if (savedUser) {
       try {
@@ -39,21 +33,66 @@ const AdminLayout = () => {
       }
     }
 
-    setIsMobile(window.innerWidth < 1024);
+    const savedCollapsed = localStorage.getItem('admin-sidebar-collapsed');
+    if (savedCollapsed === 'true') setCollapsed(true);
 
-    const handleResize = () => {
-      setIsMobile(window.innerWidth < 1024);
-    };
-    window.addEventListener('resize', handleResize);
-    return () => window.removeEventListener('resize', handleResize);
+    const savedWidth = parseInt(localStorage.getItem('admin-sidebar-width'), 10);
+    if (!Number.isNaN(savedWidth)) {
+      const clamped = Math.min(MAX_WIDTH, Math.max(MIN_WIDTH, savedWidth));
+      widthRef.current = clamped;
+      setWidth(clamped);
+    }
   }, []);
 
-  const toggleCollapse = () => {
-    setIsCollapsed(prev => {
+  // Light-only mode: ensure the document never carries the `dark` class.
+  useEffect(() => {
+    document.documentElement.classList.remove('dark');
+  }, []);
+
+  const toggleCollapsed = () => {
+    setCollapsed((prev) => {
       const next = !prev;
-      localStorage.setItem('sidebar-collapsed', String(next));
+      localStorage.setItem('admin-sidebar-collapsed', String(next));
+      if (next) setPeek(false);
       return next;
     });
+  };
+
+  // Drag the divider to resize; a click without dragging collapses the sidebar.
+  const startResize = (e) => {
+    e.preventDefault();
+    const startX = e.clientX;
+    const startW = widthRef.current;
+    let moved = false;
+
+    const onMove = (ev) => {
+      const dx = ev.clientX - startX;
+      if (Math.abs(dx) > 3) moved = true;
+      const w = Math.min(MAX_WIDTH, Math.max(MIN_WIDTH, startW + dx));
+      widthRef.current = w;
+      setWidth(w);
+    };
+    const onUp = () => {
+      document.removeEventListener('mousemove', onMove);
+      document.removeEventListener('mouseup', onUp);
+      document.body.style.cursor = '';
+      document.body.style.userSelect = '';
+      if (!moved) {
+        toggleCollapsed();
+      } else {
+        localStorage.setItem('admin-sidebar-width', String(widthRef.current));
+      }
+    };
+
+    document.body.style.cursor = 'col-resize';
+    document.body.style.userSelect = 'none';
+    document.addEventListener('mousemove', onMove);
+    document.addEventListener('mouseup', onUp);
+  };
+
+  const closeOverlays = () => {
+    setSidebarOpen(false);
+    setPeek(false);
   };
 
   // Fetch data for global search (background)
@@ -98,196 +137,103 @@ const AdminLayout = () => {
     }
   };
 
-  const isSidebarCollapsed = !isMobile && isCollapsed && !isHovered;
+  const sidebarProps = {
+    user,
+    pendingSignupCount,
+    onNavigate: closeOverlays,
+    onLogout: handleLogout,
+  };
 
   return (
-    <div className="min-h-screen flex bg-slate-100 font-sans text-slate-900">
-      {/* Desktop Sidebar Width Placeholder */}
-      <div className={`hidden lg:block flex-shrink-0 transition-all duration-300 ${isCollapsed ? 'w-20' : 'w-72'}`} />
-
-      {/* Sidebar - Dark Professional Theme */}
-      <aside
-        onMouseEnter={() => isCollapsed && setIsHovered(true)}
-        onMouseLeave={() => isCollapsed && setIsHovered(false)}
-        className={`fixed inset-y-0 left-0 z-50 bg-[linear-gradient(180deg,#020617_0%,#07142d_50%,#0b1b44_100%)] text-white transition-all duration-300 ease-in-out shadow-2xl flex flex-col overflow-visible
-          ${sidebarOpen ? 'translate-x-0' : '-translate-x-full lg:translate-x-0'}
-          ${isSidebarCollapsed ? 'lg:w-20' : 'w-72'}
-        `}
-      >
-
-        {/* Brand Header */}
-        <div className={`relative overflow-hidden border-b border-white/10 shrink-0 transition-all ${isSidebarCollapsed ? 'px-4 py-6' : 'px-6 py-6'}`}>
-          <div className="absolute inset-0 bg-[radial-gradient(circle_at_top_right,_rgba(59,130,246,0.18),_transparent_55%)]" />
-          <div className="relative flex items-center justify-center">
-            <BrandLockup subtitle="Admin Control Center" tone="dark" compact={isSidebarCollapsed} collapsed={isSidebarCollapsed} />
+    <div className="h-screen flex font-sans overflow-hidden bg-[#f4f5f7] text-slate-900 dark:bg-[#070707] dark:text-zinc-100">
+      {/* Desktop sidebar (in-flow, resizable) — hidden when collapsed */}
+      {!collapsed && (
+        <div className="hidden lg:block shrink-0 relative" style={{ width }}>
+          <AdminSidebar {...sidebarProps} />
+          {/* Resize / collapse handle sitting between the panels */}
+          <div
+            onMouseDown={startResize}
+            title="Drag to resize · Click to collapse"
+            className="group absolute inset-y-0 -right-1 w-2 cursor-col-resize z-50 flex justify-center"
+          >
+            <div className="w-px h-full bg-transparent group-hover:bg-blue-500/70 transition-colors duration-150" />
           </div>
         </div>
+      )}
 
-        {/* Navigation */}
-        <nav 
-          className="flex-1 p-4 space-y-1 overflow-y-auto"
-          style={{ scrollbarWidth: 'none', msOverflowStyle: 'none' }}
+      {/* Desktop collapsed: thin trigger zone at the extreme left + floating peek panel */}
+      {collapsed && (
+        <div
+          className="hidden lg:block fixed left-0 top-0 h-full w-2.5 z-40"
+          onMouseEnter={() => setPeek(true)}
+        />
+      )}
+      {collapsed && peek && (
+        <div
+          className="hidden lg:block fixed left-2 top-2  bottom-2 z-50 rounded-xl overflow-hidden border border-slate-200 dark:border-neutral-800 shadow-2xl"
+          style={{ width }}
+          onMouseLeave={() => setPeek(false)}
         >
-          {isSidebarCollapsed ? (
-            <div className="border-t border-white/10 my-4 mx-2" />
-          ) : (
-            <p className="px-4 text-xs font-semibold text-slate-500 uppercase tracking-wider mb-2 mt-2 truncate">
-              Platform Overview
-            </p>
-          )}
-          {navigation.map((item) => {
-            const isActive = location.pathname === item.href;
-            const Icon = item.icon;
-
-            return (
-              <Link
-                key={item.name}
-                to={item.href}
-                onClick={() => setSidebarOpen(false)}
-                title={isSidebarCollapsed ? item.name : undefined}
-                className={`
-                  flex items-center rounded-xl text-sm font-medium transition-all duration-200 group relative
-                  ${isActive
-                    ? 'bg-gradient-to-r from-blue-600 to-indigo-600 text-white shadow-lg shadow-blue-900/20'
-                    : 'text-slate-400 hover:text-white hover:bg-slate-800/50'
-                  }
-                  ${isSidebarCollapsed 
-                    ? 'lg:justify-center lg:w-12 lg:h-12 lg:px-0 lg:mx-auto gap-0' 
-                    : 'px-4 py-3 gap-3 w-full'
-                  }
-                `}
-              >
-                <Icon className={`w-5 h-5 transition-colors shrink-0 ${isActive ? 'text-white' : 'text-slate-500 group-hover:text-white'}`} />
-                <span className={`transition-all duration-200 truncate ${isSidebarCollapsed ? 'lg:hidden opacity-0 w-0' : 'opacity-100 w-auto'}`}>
-                  {item.name}
-                </span>
-                {!isSidebarCollapsed && item.href === '/admin/signup-requests' && pendingSignupCount > 0 && (
-                  <span className="ml-auto inline-flex items-center justify-center h-5 min-w-[20px] px-1 rounded-full text-[10px] font-bold bg-red-500 text-white shrink-0">
-                    {pendingSignupCount}
-                  </span>
-                )}
-                {isSidebarCollapsed && item.href === '/admin/signup-requests' && pendingSignupCount > 0 && (
-                  <span className="absolute top-1 right-1 flex h-2 w-2">
-                    <span className="animate-ping absolute inline-flex h-full w-full rounded-full bg-red-400 opacity-75"></span>
-                    <span className="relative inline-flex rounded-full h-2 w-2 bg-red-500"></span>
-                  </span>
-                )}
-              </Link>
-            );
-          })}
-
-          {isSidebarCollapsed ? (
-            <div className="border-t border-white/10 my-4 mx-2" />
-          ) : (
-            <p className="px-4 text-xs font-semibold text-slate-500 uppercase tracking-wider mb-2 mt-4 truncate">
-              Onboarding Portal
-            </p>
-          )}
-          {onboardingNavigation.map((item) => {
-            const isActive = location.pathname === item.href || location.pathname.startsWith(item.href + '/');
-            const Icon = item.icon;
-
-            return (
-              <Link
-                key={item.name}
-                to={item.href}
-                onClick={() => setSidebarOpen(false)}
-                title={isSidebarCollapsed ? item.name : undefined}
-                className={`
-                  flex items-center rounded-xl text-sm font-medium transition-all duration-200 group relative
-                  ${isActive
-                    ? 'bg-gradient-to-r from-blue-600 to-indigo-600 text-white shadow-lg shadow-blue-900/20'
-                    : 'text-slate-400 hover:text-white hover:bg-slate-800/50'
-                  }
-                  ${isSidebarCollapsed 
-                    ? 'lg:justify-center lg:w-12 lg:h-12 lg:px-0 lg:mx-auto gap-0' 
-                    : 'px-4 py-3 gap-3 w-full'
-                  }
-                `}
-              >
-                <Icon className={`w-5 h-5 transition-colors shrink-0 ${isActive ? 'text-white' : 'text-slate-500 group-hover:text-white'}`} />
-                <span className={`transition-all duration-200 truncate ${isSidebarCollapsed ? 'lg:hidden opacity-0 w-0' : 'opacity-100 w-auto'}`}>
-                  {item.name}
-                </span>
-              </Link>
-            );
-          })}
-        </nav>
-
-        {/* User Profile Section (Sidebar Bottom) */}
-        <div className={`p-4 border-t border-slate-800/50 bg-slate-950/30 transition-all flex flex-col gap-3 items-center ${isSidebarCollapsed ? 'lg:px-2 lg:py-4' : ''}`}>
-          {isSidebarCollapsed ? (
-            <div className="group relative">
-              <img src="/favicon.png" alt="Autonex" className="h-10 w-10 rounded-xl border border-white/10 bg-white/5 p-1.5 transition-all hover:border-white/30 cursor-pointer" />
-              <div className="absolute left-16 top-1/2 -translate-y-1/2 bg-slate-900 text-white text-xs px-2.5 py-1.5 rounded-lg border border-slate-700 opacity-0 group-hover:opacity-100 transition-opacity duration-200 whitespace-nowrap pointer-events-none z-50 shadow-xl">
-                {user.email || 'Admin'} (Super Admin)
-              </div>
-            </div>
-          ) : (
-            <div className="w-full flex items-center gap-3 p-3 rounded-xl bg-slate-800/50 border border-slate-700/50">
-              <img src="/favicon.png" alt="Autonex" className="h-10 w-10 rounded-xl border border-white/10 bg-white/5 p-1.5 shrink-0" />
-              <div className="flex-1 min-w-0">
-                <p className="text-sm font-semibold text-white truncate">
-                  {user.email || 'Administrator'}
-                </p>
-                <p className="text-xs text-slate-400 truncate">Super Admin</p>
-              </div>
-            </div>
-          )}
-
-          <button
-            onClick={handleLogout}
-            title={isSidebarCollapsed ? "Sign Out" : undefined}
-            className={`flex items-center justify-center text-white/70 hover:text-white hover:bg-red-600/20 hover:border-red-500/30 border border-transparent rounded-lg transition-all
-              ${isSidebarCollapsed 
-                ? 'w-10 h-10 lg:p-0' 
-                : 'w-full gap-2 px-3 py-2.5 text-xs font-semibold uppercase tracking-wide'
-              }
-            `}
-          >
-            <LogOut className="w-4 h-4 shrink-0" />
-            {!isSidebarCollapsed && <span>Sign Out</span>}
-          </button>
+          <AdminSidebar {...sidebarProps} />
         </div>
-      </aside>
+      )}
 
-      {/* Main Content Area */}
-      <div className="flex-1 flex flex-col min-w-0 overflow-hidden">
-        {/* Top Header */}
-        <header className="h-20 bg-white border-b border-slate-200/60 flex items-center justify-between px-4 sm:px-8 sticky top-0 z-40 bg-white/80 backdrop-blur-md">
-          <div className="flex items-center gap-4">
+      {/* Mobile off-canvas drawer */}
+      <div className={`lg:hidden fixed inset-y-0 left-0 z-50 w-64 transition-transform duration-300 ease-in-out ${sidebarOpen ? 'translate-x-0' : '-translate-x-full'}`}>
+        <AdminSidebar {...sidebarProps} />
+      </div>
+      {sidebarOpen && (
+        <div
+          className="lg:hidden fixed inset-0 z-40 bg-slate-900/50 backdrop-blur-sm"
+          onClick={() => setSidebarOpen(false)}
+        />
+      )}
+
+      {/* Main Content Panel — Linear-style inset rounded card floating on the app canvas */}
+      <div className="flex-1 flex flex-col min-w-0 overflow-hidden m-2 rounded-xl border bg-[#f8fafc] border-slate-200 dark:bg-[#0c0c0c] dark:border-neutral-800">
+        {/* Top Header — Linear-style breadcrumb bar */}
+        <header className="h-12 shrink-0 flex items-center justify-between px-4 sm:px-5 border-b border-slate-200/70 dark:border-neutral-800">
+          <div className="flex items-center gap-2 min-w-0">
+            {/* Mobile drawer toggle */}
             <button
               onClick={() => setSidebarOpen(!sidebarOpen)}
-              className="p-2 text-slate-500 hover:bg-slate-100 rounded-lg lg:hidden"
+              className="p-1.5 -ml-1 text-slate-500 hover:bg-slate-100 rounded-md lg:hidden dark:text-zinc-400 dark:hover:bg-white/[0.06]"
             >
-              <Menu className="w-6 h-6" />
+              <Menu className="w-5 h-5" />
             </button>
-            <h1 className="text-xl font-bold bg-gradient-to-r from-slate-900 to-slate-700 bg-clip-text text-transparent">
-              {navigation.find(n => n.href === location.pathname)?.name || 'Dashboard'}
-            </h1>
+            {/* Desktop collapse / expand toggle */}
+            <button
+              onClick={toggleCollapsed}
+              title={collapsed ? 'Expand sidebar' : 'Collapse sidebar'}
+              className="hidden lg:flex p-1.5 -ml-1 text-slate-500 hover:bg-slate-100 rounded-md dark:text-zinc-400 dark:hover:bg-white/[0.06] transition-colors"
+            >
+              <PanelLeft className="w-4 h-4" />
+            </button>
+            <nav className="flex items-center gap-1.5 text-[13px] min-w-0">
+              <span className="flex items-center gap-1.5 text-slate-500 dark:text-zinc-400 shrink-0">
+                <img src="/favicon.png" alt="" className="h-[18px] w-[18px] rounded-[5px] border border-slate-200 bg-white dark:border-white/10 dark:bg-white/5 p-0.5" />
+                <span className="hidden sm:inline">Autonex</span>
+              </span>
+              <ChevronRight className="w-3.5 h-3.5 text-slate-300 dark:text-zinc-600 shrink-0" />
+              <span className="font-medium text-slate-900 dark:text-zinc-100 truncate">
+                {navigation.find(n => n.href === location.pathname)?.name || 'Dashboard'}
+              </span>
+            </nav>
           </div>
 
-          <div className="flex items-center gap-4">
+          <div className="flex items-center gap-2">
             {/* Notification Bell */}
             <NotificationBell />
           </div>
         </header>
 
         {/* Content */}
-        <main className="flex-1 overflow-auto p-4 sm:p-8 relative">
-          <div className="max-w-[1600px] mx-auto space-y-6">
+        <main className="flex-1 overflow-auto p-4 sm:p-6 relative">
+          <div className="max-w-[1600px] mx-auto space-y-5">
             <Outlet />
           </div>
         </main>
       </div>
-
-      {/* Backdrop — closes sidebar on outside click on all screen sizes */}
-      {sidebarOpen && (
-        <div
-          className="fixed inset-0 z-40 bg-slate-900/50 backdrop-blur-sm lg:hidden"
-          onClick={() => setSidebarOpen(false)}
-        />
-      )}
 
       {/* AI Chat Widget */}
       {/* <ChatWidget role="admin" /> */}

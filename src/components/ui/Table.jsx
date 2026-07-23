@@ -14,10 +14,13 @@ export const Table = ({
     loading = false,
     skeletonRows = 5,
     emptyState,
-    variant = 'default',   // 'default' | 'compact' | 'striped' | 'borderless'
+    variant = 'default',   // 'default' | 'compact' | 'striped' | 'borderless' | 'v1'
     onRowClick,
     rowClassName,          // (row, index) => string — for conditional row styles
     className = '',
+    title,                 // optional card-header title (v1)
+    count,                 // optional count badge shown next to the title
+    headerAction,          // optional node rendered on the right of the header
     // NEW
     expandedRowId,
     getRowId = (row) => row.id,
@@ -30,29 +33,47 @@ export const Table = ({
     const isCompact = variant === 'compact';
     const isStriped = variant === 'striped';
     const isBorderless = variant === 'borderless';
+    const isV1 = variant === 'v1';               // compact card table w/ header (dashboard)
+    const isUntitled = variant === 'untitled';   // full-page Untitled-UI table (Employees etc.)
+    const airy = isV1 || isUntitled;             // shared airy Untitled-UI styling
 
-    const cellPad = isCompact ? 'px-4 py-2.5' : 'px-5 py-4';
-    const headPad = isCompact ? 'px-4 py-3' : 'px-5 py-4';
-    const headTextSize = isCompact ? 'text-[11px]' : 'text-xs';
+    const cellPad = isCompact ? 'px-4 py-2' : isV1 ? 'px-5 py-3.5' : isUntitled ? 'px-4 py-2.5' : 'px-4 py-2.5';
+    const headPad = isCompact ? 'px-4 py-2.5' : isV1 ? 'px-5 py-3' : isUntitled ? 'px-4 py-2.5' : 'px-4 py-2.5';
+    const headTextSize = isCompact ? 'text-[11px]' : airy ? 'text-xs' : 'text-[11px]';
+    const cellText = airy ? 'text-[13px]' : 'text-sm';
+    const headCase = airy ? 'normal-case tracking-normal text-slate-600 dark:text-zinc-300' : 'uppercase tracking-wider text-slate-700 dark:text-zinc-300';
+    const headWeight = airy ? 'font-semibold' : 'font-bold';
+    const theadBg = airy ? 'bg-slate-50 dark:bg-[#161616]' : 'bg-slate-50/80 dark:bg-white/[0.02]';
 
     const context = { onEdit, onDelete };
 
     const outerClass = isBorderless
-        ? `overflow-hidden ${className}`
-        : `bg-white rounded-2xl border border-slate-200/60 shadow-[0_1px_3px_rgba(0,0,0,0.04)] overflow-hidden ${className}`;
+        ? `${className}`
+        : `bg-white dark:bg-[#0f0f0f] rounded-2xl border border-slate-200/60 dark:border-neutral-800 shadow-[0_1px_3px_rgba(0,0,0,0.04)] ${airy ? 'overflow-hidden' : ''} ${className}`;
 
     return (
         <div className={outerClass}>
-            <div className="overflow-x-auto">
-                <table className="w-full">
-                    <thead className="bg-slate-50/80 border-b border-slate-100">
+            {title && (
+                <div className="flex items-center justify-between gap-3 px-5 py-4 border-b border-slate-100 dark:border-neutral-800">
+                    <div className="flex items-center gap-2">
+                        <h3 className="text-sm font-semibold text-slate-800 dark:text-zinc-100">{title}</h3>
+                        {count != null && (
+                            <span className="rounded-full border border-slate-200 px-2 py-0.5 text-[11px] font-medium text-slate-500 dark:border-neutral-700 dark:text-zinc-400">{count}</span>
+                        )}
+                    </div>
+                    {headerAction}
+                </div>
+            )}
+            <div className="overflow-visible">
+                <table className="w-full table-fixed border-separate border-spacing-0">
+                    <thead className={`${theadBg} border-b border-slate-100 dark:border-neutral-800`}>
                         <tr>
-                            {columns.map((col) => (
+                            {columns.map((col, cIdx) => (
                                 <th
                                     key={col.key}
-                                    className={`${headPad} ${headTextSize} font-medium text-slate-400 uppercase tracking-wider ${
-                                        col.align === 'center' ? 'text-center' : col.align === 'right' ? 'text-right' : 'text-left'
-                                    } ${col.width ? `w-${col.width}` : ''} ${col.sticky === 'right' ? `sticky ${col.stickyOffset || 'right-0'} bg-slate-50/80 shadow-[-8px_0_8px_-8px_rgba(0,0,0,0.1)]` : ''}`}
+                                    className={`${headPad} ${headTextSize} ${headWeight} ${headCase} whitespace-nowrap ${cIdx === 0 ? 'rounded-tl-2xl' : cIdx === columns.length - 1 ? 'rounded-tr-2xl' : ''
+                                        } ${col.align === 'center' ? 'text-center' : col.align === 'right' ? 'text-right' : 'text-left'
+                                        } ${col.width ? (col.width.startsWith('w-') ? col.width : `w-${col.width}`) : ''} ${col.sticky === 'right' ? `sticky ${col.stickyOffset || 'right-0'} bg-slate-50/80 dark:bg-[#161616] shadow-[-8px_0_8px_-8px_rgba(0,0,0,0.1)]` : ''}`}
                                 >
                                     {col.label}
                                 </th>
@@ -60,16 +81,15 @@ export const Table = ({
                         </tr>
                     </thead>
 
-                    <tbody className="divide-y divide-slate-100">
+                    <tbody className="divide-y divide-slate-100 dark:divide-neutral-800">
                         {loading ? (
                             Array.from({ length: skeletonRows }).map((_, i) => (
                                 <tr key={i} className="bg-white">
                                     {columns.map((col) => (
                                         <td key={col.key} className={cellPad}>
-                                            <div className={`h-4 rounded ${shimmer} ${
-                                                col.align === 'center' ? 'mx-auto w-2/3' :
+                                            <div className={`h-4 rounded ${shimmer} ${col.align === 'center' ? 'mx-auto w-2/3' :
                                                 col.align === 'right' ? 'ml-auto w-1/2' : 'w-3/4'
-                                            }`} />
+                                                }`} />
                                         </td>
                                     ))}
                                 </tr>
@@ -77,7 +97,7 @@ export const Table = ({
                         ) : paginatedData.length === 0 ? (
                             <tr>
                                 <td colSpan={columns.length} className="px-5 py-16 text-center">
-                                    <div className="text-slate-400">
+                                    <div className="text-slate-400 dark:text-zinc-500">
                                         <p className="text-lg font-medium mb-1">
                                             {emptyState?.title || 'No data found'}
                                         </p>
@@ -89,30 +109,29 @@ export const Table = ({
                             </tr>
                         ) : (
                             paginatedData.map((row, idx) => {
-                                const rowBg = isStriped && idx % 2 !== 0 ? 'bg-slate-50/50' : 'bg-white';
+                                const rowBg = isStriped && idx % 2 !== 0 ? 'bg-slate-50/50 dark:bg-[#161616]' : 'bg-white dark:bg-[#0f0f0f]';
                                 const extraClass = rowClassName ? rowClassName(row, idx) : '';
+                                const isLast = idx === paginatedData.length - 1;
                                 return (
                                     <React.Fragment key={getRowId(row) ?? idx}>
                                         <tr
                                             onClick={onRowClick ? () => onRowClick(row, idx) : undefined}
-                                            className={`${rowBg} hover:bg-slate-50 transition-colors ${
-                                                onRowClick ? 'cursor-pointer' : ''
-                                            } ${extraClass}`}
+                                            className={`${rowBg} hover:bg-slate-50 dark:hover:bg-white/[0.03] transition-colors ${onRowClick ? 'cursor-pointer' : ''
+                                                } ${extraClass}`}
                                         >
-                                            {columns.map((col) => (
+                                            {columns.map((col, cIdx) => (
                                                 <td
                                                     key={col.key}
-                                                    className={`${cellPad} text-sm ${
-                                                        col.align === 'center'
+                                                    className={`${cellPad} ${cellText} ${isLast && cIdx === 0 ? 'rounded-bl-2xl' : isLast && cIdx === columns.length - 1 ? 'rounded-br-2xl' : ''
+                                                        } ${col.align === 'center'
                                                             ? 'text-center'
                                                             : col.align === 'right'
-                                                            ? 'text-right'
-                                                            : 'text-left'
-                                                    } ${
-                                                        col.sticky === 'right'
+                                                                ? 'text-right'
+                                                                : 'text-left'
+                                                        } ${col.sticky === 'right'
                                                             ? `sticky ${col.stickyOffset || 'right-0'} ${rowBg} shadow-[-8px_0_8px_-8px_rgba(0,0,0,0.1)]`
                                                             : ''
-                                                    }`}
+                                                        }`}
                                                 >
                                                     {col.render ? col.render(row[col.key], row, context) : row[col.key] ?? '—'}
                                                 </td>
@@ -135,8 +154,8 @@ export const Table = ({
             </div>
 
             {!loading && totalPages > 1 && onPageChange && (
-                <div className="flex items-center justify-between px-5 py-3 border-t border-slate-100">
-                    <p className="text-sm text-slate-500">
+                <div className="flex items-center justify-between px-5 py-3 border-t border-slate-100 dark:border-neutral-800">
+                    <p className="text-sm text-slate-500 dark:text-zinc-400">
                         Showing {paginatedData.length === 0 ? 0 : startIndex + 1}–
                         {Math.min(startIndex + pageSize, data.length)} of {data.length} items
                     </p>
@@ -144,7 +163,7 @@ export const Table = ({
                         <button
                             onClick={() => onPageChange(Math.max(1, currentPage - 1))}
                             disabled={currentPage === 1}
-                            className="px-3 py-1.5 text-sm rounded-lg border border-slate-200 text-slate-600 hover:bg-slate-50 disabled:opacity-40 disabled:cursor-not-allowed transition-colors"
+                            className="px-3 py-1.5 text-sm rounded-lg border border-slate-200 text-slate-600 hover:bg-slate-50 dark:border-neutral-800 dark:text-zinc-300 dark:hover:bg-white/[0.05] disabled:opacity-40 disabled:cursor-not-allowed transition-colors"
                         >
                             Previous
                         </button>
@@ -162,11 +181,10 @@ export const Table = ({
                                     <button
                                         key={p}
                                         onClick={() => onPageChange(p)}
-                                        className={`px-3 py-1.5 text-sm rounded-lg border transition-colors ${
-                                            currentPage === p
-                                                ? 'bg-indigo-600 border-indigo-600 text-white font-medium'
-                                                : 'border-slate-200 text-slate-600 hover:bg-slate-50'
-                                        }`}
+                                        className={`px-3 py-1.5 text-sm rounded-lg border transition-colors ${currentPage === p
+                                            ? 'bg-blue-600 border-blue-600 text-white font-medium'
+                                            : 'border-slate-200 text-slate-600 hover:bg-slate-50 dark:border-neutral-800 dark:text-zinc-300 dark:hover:bg-white/[0.05]'
+                                            }`}
                                     >
                                         {p}
                                     </button>
@@ -175,7 +193,7 @@ export const Table = ({
                         <button
                             onClick={() => onPageChange(Math.min(totalPages, currentPage + 1))}
                             disabled={currentPage === totalPages}
-                            className="px-3 py-1.5 text-sm rounded-lg border border-slate-200 text-slate-600 hover:bg-slate-50 disabled:opacity-40 disabled:cursor-not-allowed transition-colors"
+                            className="px-3 py-1.5 text-sm rounded-lg border border-slate-200 text-slate-600 hover:bg-slate-50 dark:border-neutral-800 dark:text-zinc-300 dark:hover:bg-white/[0.05] disabled:opacity-40 disabled:cursor-not-allowed transition-colors"
                         >
                             Next
                         </button>
@@ -215,7 +233,7 @@ export const ColumnTemplates = {
         label,
         render: (value, row) => (
             <div className="flex items-center gap-3">
-                <div className={`w-10 h-10 rounded-lg flex items-center justify-center flex-shrink-0 text-white text-sm font-bold ${opts.avatarClass || 'bg-gradient-to-br from-indigo-500 to-purple-600'}`}>
+                <div className={`w-10 h-10 rounded-lg flex items-center justify-center flex-shrink-0 text-white text-sm font-bold ${opts.avatarClass || 'bg-gradient-to-br from-blue-500 to-purple-600'}`}>
                     {String(value || '?')[0].toUpperCase()}
                 </div>
                 <div className="min-w-0">
@@ -344,7 +362,7 @@ export const ColumnTemplates = {
                 {ctx?.onEdit && (
                     <button
                         onClick={(e) => { e.stopPropagation(); ctx.onEdit(row); }}
-                        className="p-2 text-slate-500 hover:text-indigo-600 hover:bg-indigo-50 rounded-lg transition-colors"
+                        className="p-2 text-slate-500 hover:text-blue-600 hover:bg-blue-50 rounded-lg transition-colors"
                         title="Edit"
                     >
                         <Edit className="w-4 h-4" />

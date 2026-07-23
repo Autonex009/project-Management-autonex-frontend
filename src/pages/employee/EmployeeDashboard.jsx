@@ -62,7 +62,7 @@ const EmployeeDashboard = () => {
         <div className="space-y-8">
             {/* Welcome Header */}
             <div>
-                <h1 className="text-2xl font-bold text-slate-900">
+                <h1 className="text-lg font-semibold text-slate-900">
                     Welcome back, <span className="text-emerald-600">{user.name?.split(' ')[0] || 'there'}</span> 👋
                 </h1>
                 <p className="text-slate-500 text-sm mt-1">Here&apos;s your work overview for today.</p>

@@ -104,7 +104,7 @@ const ReferralsPage = () => {
             {/* Header */}
             <div>
                 <div className="flex items-center gap-3">
-                    <h1 className="text-2xl font-bold text-slate-800">Employee Referrals</h1>
+                    <h1 className="text-lg font-semibold text-slate-800">Employee Referrals</h1>
                     {stats.pending > 0 && (
                         <span className="inline-flex items-center justify-center h-6 min-w-[24px] px-1.5 rounded-full text-xs font-bold bg-amber-500 text-white">
                             {stats.pending}
@@ -117,19 +117,73 @@ const ReferralsPage = () => {
             </div>
 
             {/* Stats */}
-            <div className="grid grid-cols-2 lg:grid-cols-4 gap-4">
+            <div className="grid grid-cols-1 sm:grid-cols-2 xl:grid-cols-4 gap-5">
                 {[
-                    { label: 'Total', value: stats.total, icon: Users2, color: 'text-slate-600', bg: 'bg-slate-100' },
-                    { label: 'Pending Review', value: stats.pending, icon: Clock, color: 'text-amber-600', bg: 'bg-amber-100' },
-                    { label: 'In Progress', value: stats.active, icon: TrendingUp, color: 'text-blue-600', bg: 'bg-blue-100' },
-                    { label: 'Hired', value: stats.hired, icon: UserCheck, color: 'text-emerald-600', bg: 'bg-emerald-100' },
-                ].map(s => (
-                    <div key={s.label} className="bg-white rounded-2xl border border-slate-200/60 p-5 shadow-sm">
-                        <div className={`inline-flex p-2 rounded-xl ${s.bg} mb-3`}>
-                            <s.icon className={`w-5 h-5 ${s.color}`} />
+                    {
+                        label: 'Total',
+                        value: stats.total,
+                        icon: Users2,
+                        color: 'text-slate-700',
+                        bg: 'bg-slate-100',
+                        accent: 'bg-slate-500',
+                    },
+                    {
+                        label: 'Pending Review',
+                        value: stats.pending,
+                        icon: Clock,
+                        color: 'text-amber-600',
+                        bg: 'bg-amber-100',
+                        accent: 'bg-amber-500',
+                    },
+                    {
+                        label: 'In Progress',
+                        value: stats.active,
+                        icon: TrendingUp,
+                        color: 'text-blue-600',
+                        bg: 'bg-blue-100',
+                        accent: 'bg-blue-500',
+                    },
+                    {
+                        label: 'Hired',
+                        value: stats.hired,
+                        icon: UserCheck,
+                        color: 'text-emerald-600',
+                        bg: 'bg-emerald-100',
+                        accent: 'bg-emerald-500',
+                    },
+                ].map((s) => (
+                    <div
+                        key={s.label}
+                        className="relative overflow-hidden bg-white border border-slate-200 rounded-2xl p-5 transition-all duration-200 hover:-translate-y-1 hover:shadow-lg"
+                    >
+                        {/* Colored accent */}
+                        <div
+                            className={`absolute left-0 top-0 h-full w-1 ${s.accent}`}
+                        />
+
+                        <div className="flex items-center justify-between">
+                            <div>
+                                <p className="text-sm font-medium text-slate-500">
+                                    {s.label}
+                                </p>
+
+                                <h3
+                                    className={`text-3xl font-bold ${s.color} mt-2`}
+                                >
+                                    {s.value}
+                                </h3>
+
+                                <p className="text-xs text-slate-400 mt-1">
+                                    Candidates
+                                </p>
+                            </div>
+
+                            <div
+                                className={`h-12 w-12 rounded-xl ${s.bg} flex items-center justify-center`}
+                            >
+                                <s.icon className={`w-6 h-6 ${s.color}`} />
+                            </div>
                         </div>
-                        <p className={`text-2xl font-bold ${s.color}`}>{s.value}</p>
-                        <p className="text-xs text-slate-400 mt-1">{s.label}</p>
                     </div>
                 ))}
             </div>

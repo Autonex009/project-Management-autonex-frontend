@@ -90,6 +90,14 @@ export const analyticsApi = {
     getProjectAnalytics: (mainProjectId, params) =>
         api.get(`/analytics/project/${mainProjectId}`, { params }).then(res => res.data),
     getSummary: () => api.get('/analytics/summary').then(res => res.data),
+    // Autonex-only KPIs + daily graph for a project. range = '1' | '7' | '30'
+    getAutonexProjectKpis: (subProjectId, range) =>
+        api.get(`/analytics/autonex/project/${subProjectId}`, { params: { range } }).then(res => res.data),
+    // Autonex-only KPIs + daily graph across ALL mapped projects. range = '1' | '7' | '30'
+    getAutonexKpis: (range) =>
+        api.get('/analytics/autonex/kpis', { params: { range } }).then(res => res.data),
+    // Dashboard: most active Autonex user + project (this month)
+    getAutonexOverview: () => api.get('/analytics/autonex/overview').then(res => res.data),
     // Manual Encord pull (admin) — optional { date_from, date_to }
     runSync: (body) => api.post('/encord/sync', body || {}).then(res => res.data),
     previewSync: () => api.get('/encord/preview').then(res => res.data),

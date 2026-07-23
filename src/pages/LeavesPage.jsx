@@ -258,7 +258,7 @@ const LeavesPage = () => {
       {/* Header */}
       <div className="flex flex-col sm:flex-row sm:justify-between sm:items-center gap-3">
         <div>
-          <h1 className="text-2xl font-bold text-slate-800">Leave Management</h1>
+          <h1 className="text-lg font-semibold text-slate-800">Leave Management</h1>
           <p className="mt-1 text-sm text-slate-500">Track employee leaves, WFH requests, and attendance</p>
         </div>
         {activeTab === 'Leave List' && (
@@ -295,6 +295,7 @@ const LeavesPage = () => {
       {/* ── Tab: Leave List ── */}
       {activeTab === 'Leave List' && (
         <Table
+          variant="untitled"
           columns={[
             {
               key: 'employee_id',
@@ -342,7 +343,7 @@ const LeavesPage = () => {
                 const duration = getWorkingDayCount(leave.start_date, leave.end_date, leave.is_half_day);
                 return (
                   <span>
-                    <span className="text-lg font-semibold text-slate-800">{duration}</span>
+                    <span className="text-sm font-semibold text-slate-800">{duration}</span>
                     <span className="text-xs text-slate-400 ml-1">
                       {leave.is_half_day ? (
                         <>day ({leave.half_day_slot === 'first_half' ? 'First Half' : 'Second Half'})</>
@@ -366,30 +367,35 @@ const LeavesPage = () => {
               align: 'right',
               render: (_, leave) => {
                 const isPending = !leave.status || leave.status === 'pending';
+                const btn = 'inline-flex items-center gap-1 rounded-md border px-2 py-1 text-xs font-medium transition-colors disabled:opacity-50';
                 return (
-                  <div className="flex items-center justify-end gap-2">
+                  <div className="flex items-center justify-end gap-1.5">
                     {isPending && (
                       <>
-                        <Button variant="success" size="sm" onClick={() => handleApprove(leave)} disabled={approveMutation.isPending}>
+                        <button onClick={() => handleApprove(leave)} disabled={approveMutation.isPending}
+                          className={`${btn} border-emerald-200 bg-emerald-50 text-emerald-700 hover:bg-emerald-100`}>
                           <CheckCircle className="w-3.5 h-3.5"/>Approve
-                        </Button>
-                        <Button variant="danger" size="sm" onClick={() => rejectMutation.mutate(leave.leave_id)} disabled={rejectMutation.isPending}>
+                        </button>
+                        <button onClick={() => rejectMutation.mutate(leave.leave_id)} disabled={rejectMutation.isPending}
+                          className={`${btn} border-red-200 bg-red-50 text-red-700 hover:bg-red-100`}>
                           <XCircle className="w-3.5 h-3.5"/>Reject
-                        </Button>
+                        </button>
                       </>
                     )}
                     {leave.status === 'approved' && (
-                      <Button variant="secondary" size="sm" onClick={() => undoApproveMutation.mutate(leave.leave_id)} disabled={undoApproveMutation.isPending}>
+                      <button onClick={() => undoApproveMutation.mutate(leave.leave_id)} disabled={undoApproveMutation.isPending}
+                        className={`${btn} border-slate-200 bg-white text-slate-600 hover:bg-slate-50`}>
                         <RotateCcw className="w-3.5 h-3.5"/>Undo
-                      </Button>
+                      </button>
                     )}
                     {leave.status === 'rejected' && (
-                      <Button variant="secondary" size="sm" onClick={() => undoRejectMutation.mutate(leave.leave_id)} disabled={undoRejectMutation.isPending}>
+                      <button onClick={() => undoRejectMutation.mutate(leave.leave_id)} disabled={undoRejectMutation.isPending}
+                        className={`${btn} border-slate-200 bg-white text-slate-600 hover:bg-slate-50`}>
                         <RotateCcw className="w-3.5 h-3.5"/>Undo
-                      </Button>
+                      </button>
                     )}
                     <button onClick={() => setDeleteTarget(leave)}
-                      className="p-2 text-slate-400 hover:text-red-600 hover:bg-red-50 rounded-lg transition-colors">
+                      className="p-1.5 text-slate-400 hover:text-red-600 hover:bg-red-50 rounded-md transition-colors">
                       <Trash2 className="w-4 h-4"/>
                     </button>
                   </div>
@@ -412,6 +418,7 @@ const LeavesPage = () => {
       {/* ── Tab: WFH Requests ── */}
       {activeTab === 'WFH Requests' && (
         <Table
+          variant="untitled"
           loading={wfhLoading}
           columns={[
             {
