@@ -185,6 +185,13 @@ export const skillsApi = {
 // Alias for inconsistency in naming if any
 export const skillApi = skillsApi;
 
+// === Vendors API (workforce vendors) ===
+export const vendorApi = {
+    getAll: () => api.get('/vendors').then(res => res.data),
+    create: (name) => api.post('/vendors', { name }).then(res => res.data),
+    delete: (id) => api.delete(`/vendors/${id}`).then(res => res.data),
+};
+
 // === Auth API ===
 export const authApi = {
     signup: (data) => api.post('/auth/signup', data).then(res => res.data),

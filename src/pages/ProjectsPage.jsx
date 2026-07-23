@@ -3,7 +3,7 @@ import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import { useNavigate, useSearchParams } from 'react-router-dom';
 import Button from '../components/ui/Button';
 import Spinner from '../components/ui/LoadingSpinner';
-import { subProjectApi, parentProjectApi, employeeApi, allocationApi, skillApi, leaveApi, guidelineApi } from '../services/api';
+import { subProjectApi, parentProjectApi, employeeApi, allocationApi, skillApi, leaveApi, guidelineApi, vendorApi } from '../services/api';
 import { Plus, Edit, Trash2, X, UserCheck, Users, ChevronDown, ArrowRight, Copy, Settings, UploadCloud, FileText, BarChart3, SlidersHorizontal } from 'lucide-react';
 import { Link } from 'react-router-dom';
 import { format } from 'date-fns';
@@ -17,6 +17,31 @@ import Dropdown from '../components/ui/Dropdown';
 import ConfirmDialog from '../components/ui/ConfirmDialog';
 import Modal from '../components/ui/Modal';
 import StatCard from '../components/dashboard/StatCard';
+
+// Project type classification: category → available subtypes. One subtype may be
+// selected per category (stored as { category: subtype }).
+const PROJECT_TYPE_CATEGORIES = [
+  {
+    key: 'Data Modalities',
+    subtypes: [
+      'Image (RGB)', 'Video', 'Medical Imaging', '3D & Point Cloud',
+      'Multimodal Data (e.g., RGB + 3D Cloud)', 'Audio', 'Text & Documents',
+      'Time Series & Signals',
+    ],
+  },
+  {
+    key: 'Annotation Types (By Data)',
+    subtypes: [
+      'VLA Captions', 'Image Segmentation', 'Video Segmentation',
+      'Video Segmentation + Tracking', 'Classification',
+      '3D Point Cloud Segmentation', 'Text Segmentation',
+    ],
+  },
+  {
+    key: 'Object Segmentation Types',
+    subtypes: ['2D Bounding Box'],
+  },
+];
 
 const SkillMultiSelect = ({ options, value, onChange }) => {
   const [isOpen, setIsOpen] = useState(false);
@@ -287,6 +312,9 @@ const ProjectsPage = () => {
   const [editingProject, setEditingProject] = useState(null);
   const [copyingProject, setCopyingProject] = useState(null);
   const [selectedSkills, setSelectedSkills] = useState([]);
+  const [selectedVendors, setSelectedVendors] = useState([]);
+  const [projectTypes, setProjectTypes] = useState({});        // { category: subtype }
+  const [activeTypeTab, setActiveTypeTab] = useState(PROJECT_TYPE_CATEGORIES[0].key);
   const [guidelineFiles, setGuidelineFiles] = useState([]);
   const [isDragActive, setIsDragActive] = useState(false);
   const fileInputRef = useRef(null);
@@ -317,6 +345,16 @@ const ProjectsPage = () => {
   const { data: skillsData = [] } = useQuery({
     queryKey: ['skills'],
     queryFn: skillApi.getAll,
+  });
+
+  const { data: vendorsData = [] } = useQuery({
+    queryKey: ['vendors'],
+    queryFn: vendorApi.getAll,
+  });
+
+  const createVendorMutation = useMutation({
+    mutationFn: (name) => vendorApi.create(name),
+    onSuccess: () => queryClient.invalidateQueries(['vendors']),
   });
 
   const { data: allocations = [] } = useQuery({
@@ -387,6 +425,9 @@ const ProjectsPage = () => {
     setEditingProject(null);
     setCopyingProject(null);
     setSelectedSkills([]);
+    setSelectedVendors([]);
+    setProjectTypes({});
+    setActiveTypeTab(PROJECT_TYPE_CATEGORIES[0].key);
     setGuidelineFiles([]);
     setIsDragActive(false);
     setFormMainProjectId('');
@@ -459,7 +500,11 @@ const ProjectsPage = () => {
       name: formData.get('name'),
       main_project_id: selectedMainProjectId,
       total_tasks: parseInt(formData.get('total_tasks')) || 0,
-      estimated_time_per_task: parseFloat(formData.get('estimated_time_per_task')) / 60, // Store as hours, input is minutes
+      estimated_time_per_task: parseFloat(formData.get('estimated_time_per_task')) / 60, // annotation time; stored as hours, input in minutes
+      review_time_per_task: formData.get('review_time_per_task')
+        ? parseFloat(formData.get('review_time_per_task')) / 60   // stored as hours, input in minutes
+        : null,
+      gearing_ratio: formData.get('gearing_ratio') ? parseFloat(formData.get('gearing_ratio')) : null,
       start_date: startDate,
       end_date: endDate,
       daily_target: parseInt(formData.get('daily_target')) || 0,
@@ -468,10 +513,9 @@ const ProjectsPage = () => {
       assigned_employee_ids: [],
       // Team composition (required_manpower is auto-computed server-side from the Autonex counts)
       annotators_total: num('annotators_total'),
-      workforce_annotators: num('workforce_annotators'),
+      workforce_vendors: selectedVendors,
       autonex_annotators: num('autonex_annotators'),
       autonex_reviewers: num('autonex_reviewers'),
-      workforce_reviewers: num('workforce_reviewers'),
       qc_count: num('qc_count'),
       // Preserve existing assignments when editing. On create, if a PM makes the
       // project, attach them so it lands in their scope.
@@ -482,7 +526,7 @@ const ProjectsPage = () => {
       project_duration_weeks: durationWeeks,
       project_duration_days: durationDays,
       project_status: formData.get('project_status') || 'active',
-      is_annotation: formData.get('is_annotation') === 'true',
+      project_types: projectTypes,
       encord_project_hash: (formData.get('encord_project_hash') || '').trim() || null,
       sentiment: (formData.get('sentiment') || '').trim() || null,
     };
@@ -789,7 +833,7 @@ toast.success(wasEditing ? 'Project updated successfully' : 'Project created suc
         )}
         <button
           type="button"
-          onClick={() => { setEditingProject(null); setSelectedSkills([]); setGuidelineFiles([]); setFormMainProjectId(filterMainProjectId || ''); setFormOrg(filterMainProjectId ? orgOfMainProject(filterMainProjectId) : ''); setFormPriority('medium'); setFormProjectStatus('active'); setIsModalOpen(true); }}
+          onClick={() => { setEditingProject(null); setSelectedSkills([]); setSelectedVendors([]); setProjectTypes({}); setActiveTypeTab(PROJECT_TYPE_CATEGORIES[0].key); setGuidelineFiles([]); setFormMainProjectId(filterMainProjectId || ''); setFormOrg(filterMainProjectId ? orgOfMainProject(filterMainProjectId) : ''); setFormPriority('medium'); setFormProjectStatus('active'); setIsModalOpen(true); }}
           className="inline-flex items-center gap-1.5 rounded-lg bg-indigo-600 px-3.5 py-2 text-sm font-medium text-white shadow-sm hover:bg-indigo-700 transition-colors"
         >
           <Plus className="w-4 h-4" />
@@ -972,15 +1016,6 @@ toast.success(wasEditing ? 'Project updated successfully' : 'Project created suc
                       </span>
                     </div>
 
-                    {/* Annotation badge */}
-                    {project.is_annotation && (
-                      <div className="mt-4">
-                        <span className="inline-flex items-center rounded-full bg-indigo-50 px-2.5 py-1 text-[11px] font-semibold text-indigo-700 border border-indigo-200">
-                          Annotation Project
-                        </span>
-                      </div>
-                    )}
-
                     {/* Project details */}
                     <div className="mt-5 grid grid-cols-2 gap-3">
                       <div className="rounded-xl bg-slate-50 p-3">
@@ -1007,57 +1042,81 @@ toast.success(wasEditing ? 'Project updated successfully' : 'Project created suc
                       </div>
                     </div>
 
-                    {/* Skills */}
-                    {project.required_expertise?.length > 0 && (
-                      <div className="mt-4">
+                    {/* Project Type + Autonex team */}
+                    <div className="mt-4 flex flex-wrap items-start gap-x-6 gap-y-3">
+                      {/* Project Type (hover a chip to see its subtype) */}
+                      <div>
                         <p className="mb-2 text-xs font-medium text-slate-500">
-                          Required Skills
+                          Project Type
                         </p>
-
-                        <div className="flex flex-wrap gap-1.5">
-                          {project.required_expertise.slice(0, 3).map((skill) => (
-                            <span
-                              key={skill}
-                              className="rounded-md bg-indigo-50 px-2 py-1 text-[11px] font-medium text-indigo-700"
-                            >
-                              {skill}
-                            </span>
-                          ))}
-
-                          {project.required_expertise.length > 3 && (
-                            <span className="rounded-md bg-slate-100 px-2 py-1 text-[11px] text-slate-500">
-                              +{project.required_expertise.length - 3} more
-                            </span>
-                          )}
-                        </div>
+                        {project.project_types && Object.keys(project.project_types).length > 0 ? (
+                          <div className="flex flex-wrap gap-1.5">
+                            {Object.entries(project.project_types).map(([cat, sub]) => (
+                              <span
+                                key={cat}
+                                title={sub}
+                                className="cursor-default rounded-md bg-indigo-50 px-2 py-1 text-[11px] font-medium text-indigo-700"
+                              >
+                                {cat}
+                              </span>
+                            ))}
+                          </div>
+                        ) : (
+                          <span className="text-[11px] text-slate-400">Not set</span>
+                        )}
                       </div>
-                    )}
 
-                    {/* Project Sentiment (PM/admin can update inline) */}
-                    <div className="mt-4 flex items-center justify-between rounded-xl border border-slate-200 px-3 py-2.5">
+                      {/* Autonex Annotators */}
+                      <div>
+                        <p className="mb-2 text-xs font-medium text-slate-500">
+                          Autonex Annotators
+                        </p>
+                        <span className="rounded-md bg-slate-100 px-2 py-1 text-[11px] font-semibold text-slate-700">
+                          {project.autonex_annotators ?? 0}
+                        </span>
+                      </div>
+
+                      {/* Autonex Reviewers */}
+                      <div>
+                        <p className="mb-2 text-xs font-medium text-slate-500">
+                          Autonex Reviewers
+                        </p>
+                        <span className="rounded-md bg-slate-100 px-2 py-1 text-[11px] font-semibold text-slate-700">
+                          {project.autonex_reviewers ?? 0}
+                        </span>
+                      </div>
+                    </div>
+
+                    {/* Client Sentiment (PM/admin can update inline) */}
+                    <div className="mt-4 flex items-center justify-between gap-3 rounded-xl border border-slate-200 px-3 py-2.5">
                       <span className="text-xs font-medium text-slate-500">
-                        Project Sentiment
+                        Client Sentiment
                       </span>
 
-                      <select
-                        value={project.sentiment || ''}
-                        onChange={(e) => sentimentMutation.mutate({ id: project.id, sentiment: e.target.value })}
-                        disabled={sentimentMutation.isPending}
-                        className={`rounded-lg border px-2 py-1 text-xs font-bold outline-none transition focus:ring-2 disabled:opacity-60 ${
-                          project.sentiment === 'GOOD'
-                            ? 'border-emerald-200 bg-emerald-50 text-emerald-700 focus:ring-emerald-100'
-                            : project.sentiment === 'AVG'
-                              ? 'border-amber-200 bg-amber-50 text-amber-700 focus:ring-amber-100'
-                              : project.sentiment === 'Poor'
-                                ? 'border-red-200 bg-red-50 text-red-600 focus:ring-red-100'
-                                : 'border-slate-200 bg-white text-slate-500 focus:ring-slate-100'
-                        }`}
-                      >
-                        <option value="">Not set</option>
-                        <option value="GOOD">GOOD</option>
-                        <option value="AVG">AVG</option>
-                        <option value="Poor">Poor</option>
-                      </select>
+                      <div className="inline-flex items-center gap-1 rounded-lg bg-slate-100 p-0.5">
+                        {[
+                          { value: 'GOOD', label: 'Good', active: 'bg-emerald-500 text-white shadow-sm', idle: 'text-emerald-700 hover:bg-emerald-50' },
+                          { value: 'AVG', label: 'Avg', active: 'bg-amber-500 text-white shadow-sm', idle: 'text-amber-700 hover:bg-amber-50' },
+                          { value: 'Poor', label: 'Poor', active: 'bg-red-500 text-white shadow-sm', idle: 'text-red-600 hover:bg-red-50' },
+                        ].map((opt) => {
+                          const selected = project.sentiment === opt.value;
+                          return (
+                            <button
+                              key={opt.value}
+                              type="button"
+                              disabled={sentimentMutation.isPending}
+                              onClick={() =>
+                                sentimentMutation.mutate({ id: project.id, sentiment: selected ? '' : opt.value })
+                              }
+                              className={`rounded-md px-2.5 py-1 text-[11px] font-semibold transition-colors disabled:opacity-60 ${
+                                selected ? opt.active : opt.idle
+                              }`}
+                            >
+                              {opt.label}
+                            </button>
+                          );
+                        })}
+                      </div>
                     </div>
 
                     {/* Actions */}
@@ -1112,6 +1171,8 @@ toast.success(wasEditing ? 'Project updated successfully' : 'Project created suc
                           onClick={() => {
                             setEditingProject(project);
                             setSelectedSkills(project.required_expertise || []);
+                            setSelectedVendors(project.workforce_vendors || []);
+                            setProjectTypes(project.project_types || {});
                             setGuidelineFiles([]);
                             setFormMainProjectId(String(project.main_project_id || ''));
                             setFormOrg(orgOfMainProject(project.main_project_id));
@@ -1132,6 +1193,8 @@ toast.success(wasEditing ? 'Project updated successfully' : 'Project created suc
                               name: `${project.name} (Copy)`,
                             });
                             setSelectedSkills(project.required_expertise || []);
+                            setSelectedVendors(project.workforce_vendors || []);
+                            setProjectTypes(project.project_types || {});
                             setGuidelineFiles([]);
                             setFormMainProjectId(String(project.main_project_id || ''));
                             setFormOrg(orgOfMainProject(project.main_project_id));
@@ -1355,10 +1418,10 @@ toast.success(wasEditing ? 'Project updated successfully' : 'Project created suc
                 />
               </div>
 
-              {/* Time per Task */}
+              {/* Annotation Time per Task */}
               <div>
                 <label className="block text-xs font-semibold text-slate-600 mb-1">
-                  Time per Task (Minutes) <span className="text-red-500">*</span>
+                  Annotation Time per Task (Minutes) <span className="text-red-500">*</span>
                 </label>
 
                 <input
@@ -1380,6 +1443,46 @@ toast.success(wasEditing ? 'Project updated successfully' : 'Project created suc
                   }
                   className="input"
                   placeholder="30"
+                />
+              </div>
+
+              {/* Reviewer Time per Task */}
+              <div>
+                <label className="block text-xs font-semibold text-slate-600 mb-1">
+                  Reviewer Time per Task (Minutes)
+                </label>
+
+                <input
+                  type="number"
+                  name="review_time_per_task"
+                  min="0.1"
+                  step="0.1"
+                  defaultValue={
+                    (editingProject || copyingProject)?.review_time_per_task
+                      ? parseFloat(
+                          ((editingProject || copyingProject).review_time_per_task * 60).toFixed(1)
+                        )
+                      : ''
+                  }
+                  className="input"
+                  placeholder="15"
+                />
+              </div>
+
+              {/* Gearing Ratio */}
+              <div>
+                <label className="block text-xs font-semibold text-slate-600 mb-1">
+                  Gearing Ratio
+                </label>
+
+                <input
+                  type="number"
+                  name="gearing_ratio"
+                  min="0"
+                  step="0.1"
+                  defaultValue={(editingProject || copyingProject)?.gearing_ratio ?? ''}
+                  className="input"
+                  placeholder="e.g. 3 or 3.1"
                 />
               </div>
 
@@ -1415,10 +1518,10 @@ toast.success(wasEditing ? 'Project updated successfully' : 'Project created suc
                 />
               </div>
 
-              {/* Project Sentiment */}
+              {/* Client Sentiment */}
               <div>
                 <label className="block text-xs font-semibold text-slate-600 mb-1">
-                  Project Sentiment
+                  Client Sentiment
                 </label>
 
                 <select
@@ -1438,26 +1541,71 @@ toast.success(wasEditing ? 'Project updated successfully' : 'Project created suc
             </div>
 
 
-            {/* Annotation Project */}
-            <label className="flex items-center gap-2.5 rounded-lg border border-indigo-100 bg-indigo-50/40 px-3 py-2 cursor-pointer">
-              <input
-                type="checkbox"
-                name="is_annotation"
-                id="is_annotation"
-                value="true"
-                defaultChecked={
-                  (editingProject || copyingProject)?.is_annotation || false
-                }
-                className="h-4 w-4 border-slate-300 rounded accent-indigo-600 cursor-pointer"
-              />
+            {/* Project Types */}
+            <div className="rounded-xl border border-slate-200 bg-slate-50/40 p-3">
+              <div className="mb-2 flex items-center justify-between">
+                <label className="text-xs font-semibold text-slate-700">Project Types</label>
+                <span className="text-[11px] text-slate-400">Pick one subtype per category</span>
+              </div>
 
-              <span className="text-xs font-semibold text-slate-700">
-                Is Annotation Project
-                <span className="ml-1 font-normal text-slate-500">
-                  (links allocated candidates to PM for Onboarding tracking)
-                </span>
-              </span>
-            </label>
+              {/* Category tabs */}
+              <div className="flex flex-wrap gap-2">
+                {PROJECT_TYPE_CATEGORIES.map((cat) => {
+                  const isActive = activeTypeTab === cat.key;
+                  const chosen = projectTypes[cat.key];
+                  return (
+                    <button
+                      key={cat.key}
+                      type="button"
+                      onClick={() => setActiveTypeTab(cat.key)}
+                      className={`inline-flex items-center gap-1.5 rounded-lg px-3 py-1.5 text-xs font-medium transition-colors ${
+                        isActive
+                          ? 'bg-indigo-600 text-white'
+                          : 'border border-slate-200 bg-white text-slate-600 hover:bg-slate-50'
+                      }`}
+                    >
+                      {cat.key}
+                      {chosen && (
+                        <span className={`rounded-full px-1.5 py-0.5 text-[10px] ${isActive ? 'bg-white/20 text-white' : 'bg-indigo-50 text-indigo-600'}`}>1</span>
+                      )}
+                    </button>
+                  );
+                })}
+              </div>
+
+              {/* Subtype dropdown for the active category */}
+              {PROJECT_TYPE_CATEGORIES.filter((c) => c.key === activeTypeTab).map((cat) => (
+                <div key={cat.key} className="mt-3">
+                  <label className="mb-1 block text-[11px] font-medium text-slate-500">{cat.key} — Subtype</label>
+                  <Dropdown
+                    options={[{ value: '', label: 'Not set' }, ...cat.subtypes.map((s) => ({ value: s, label: s }))]}
+                    value={projectTypes[cat.key] || ''}
+                    onChange={(val) =>
+                      setProjectTypes((prev) => {
+                        const next = { ...prev };
+                        if (val) next[cat.key] = val; else delete next[cat.key];
+                        return next;
+                      })
+                    }
+                    placeholder="Select a subtype"
+                  />
+                </div>
+              ))}
+
+              {/* Selected summary across all categories */}
+              {Object.keys(projectTypes).length > 0 && (
+                <div className="mt-3 flex flex-wrap gap-1.5">
+                  {Object.entries(projectTypes).map(([cat, sub]) => (
+                    <span key={cat} className="inline-flex items-center gap-1 rounded-full bg-indigo-50 px-2.5 py-1 text-xs font-medium text-indigo-700">
+                      <span className="text-indigo-400">{cat}:</span> {sub}
+                      <button type="button" onClick={() => setProjectTypes((prev) => { const n = { ...prev }; delete n[cat]; return n; })} className="text-indigo-400 hover:text-indigo-700">
+                        <X className="h-3 w-3" />
+                      </button>
+                    </span>
+                  ))}
+                </div>
+              )}
+            </div>
 
 
             {/* Team Composition */}
@@ -1473,14 +1621,47 @@ toast.success(wasEditing ? 'Project updated successfully' : 'Project created suc
                 </span>
               </div>
 
-              <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-6 gap-2">
+              {/* Workforce vendors (multi-select with inline create) */}
+              <div className="mb-3">
+                <label className="block text-[11px] font-medium text-slate-500 mb-1">Workforce Vendors</label>
+                <Dropdown
+                  editable={true}
+                  allowCreate={true}
+                  placeholder="Select or create a vendor"
+                  value=""
+                  options={vendorsData
+                    .filter((v) => !selectedVendors.includes(v.name))
+                    .map((v) => ({ value: v.name, label: v.name }))}
+                  onChange={(val) => {
+                    const name = (val || '').trim();
+                    if (!name || selectedVendors.includes(name)) return;
+                    setSelectedVendors((prev) => [...prev, name]);
+                    // Persist a brand-new vendor so it's reusable next time.
+                    if (!vendorsData.some((v) => v.name.toLowerCase() === name.toLowerCase())) {
+                      createVendorMutation.mutate(name);
+                    }
+                  }}
+                />
+                {selectedVendors.length > 0 && (
+                  <div className="mt-2 flex flex-wrap gap-1.5">
+                    {selectedVendors.map((name) => (
+                      <span key={name} className="inline-flex items-center gap-1 rounded-full bg-indigo-50 px-2.5 py-1 text-xs font-medium text-indigo-700">
+                        {name}
+                        <button type="button" onClick={() => setSelectedVendors((prev) => prev.filter((v) => v !== name))} className="text-indigo-400 hover:text-indigo-700">
+                          <X className="h-3 w-3" />
+                        </button>
+                      </span>
+                    ))}
+                  </div>
+                )}
+              </div>
+
+              <div className="grid grid-cols-2 sm:grid-cols-4 gap-2">
 
                 {[
                   ['annotators_total', 'Total Annotators'],
-                  ['workforce_annotators', 'Workforce'],
                   ['autonex_annotators', 'Autonex Annotators'],
                   ['autonex_reviewers', 'Autonex Reviewers'],
-                  ['workforce_reviewers', 'Workforce Reviewers'],
                   ['qc_count', 'QC'],
                 ].map(([field, label]) => (
                   <div key={field}>
