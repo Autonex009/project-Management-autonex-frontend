@@ -11,6 +11,8 @@ import { perfEvalApi } from '../../services/api';
 // Reusable review card. Used by PMs (reviewing employees) and admins (reviewing
 // PM self-reports). `personName` is whoever the evaluation belongs to.
 const EvalReviewCard = ({ evaluation, personName, reviewerId }) => {
+    const role = localStorage.getItem('role') || 'employee';
+    const isAdmin = role === 'admin';
     const queryClient = useQueryClient();
     const reviewed = evaluation.status === 'reviewed';
     const [editing, setEditing] = useState(!reviewed);
@@ -77,7 +79,7 @@ const EvalReviewCard = ({ evaluation, personName, reviewerId }) => {
                     {reviewed
                         ? <span className="inline-flex items-center gap-1 rounded-full bg-emerald-50 px-2 py-0.5 text-xs font-medium text-emerald-700"><CheckCircle2 className="h-3 w-3" /> Reviewed</span>
                         : <span className="rounded-full bg-amber-50 px-2 py-0.5 text-xs font-medium text-amber-700">Pending review</span>}
-                    {reviewed && evaluation.bonus_suggested && (
+                    {isAdmin && reviewed && evaluation.bonus_suggested && (
                         <span className="inline-flex items-center gap-1 rounded-full bg-amber-100 px-2 py-0.5 text-xs font-medium text-amber-800"><Gift className="h-3 w-3" /> Bonus</span>
                     )}
                 </div>
