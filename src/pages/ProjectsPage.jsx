@@ -354,6 +354,7 @@ const ProjectsPage = () => {
   const [selectedOrganization, setSelectedOrganization] = useState("all");
   const [selectedPm, setSelectedPm] = useState("all");
   const [selectedStatus, setSelectedStatus] = useState("all");
+  const [selectedPmIds, setSelectedPmIds] = useState([]);
   const [filtersOpen, setFiltersOpen] = useState(false);
   const filtersRef = useRef(null);
 
@@ -572,11 +573,9 @@ const ProjectsPage = () => {
       autonex_annotators: num('autonex_annotators'),
       autonex_reviewers: num('autonex_reviewers'),
       qc_count: num('qc_count'),
-      // Preserve existing assignments when editing. On create, if a PM makes the
-      // project, attach them so it lands in their scope.
-      assigned_employee_ids: editingProject
-        ? (editingProject.assigned_employee_ids || [])
-        : (isPm && pmEmployeeId ? [pmEmployeeId] : []),
+      // Assigned PMs / Employees
+      assigned_employee_ids: selectedPmIds,
+      pm_id: selectedPmIds[0] || null,
       required_manpower: num('autonex_annotators') + num('autonex_reviewers') + num('qc_count'),
       project_duration_weeks: durationWeeks,
       project_duration_days: durationDays,
@@ -901,7 +900,7 @@ toast.success(wasEditing ? 'Project updated successfully' : 'Project created suc
         )}
         <button
           type="button"
-          onClick={() => { setEditingProject(null); setSelectedSkills([]); setSelectedVendors([]); setProjectTypes({}); setActiveTypeTab(PROJECT_TYPE_CATEGORIES[0].key); setGuidelineFiles([]); setFormMainProjectId(filterMainProjectId || ''); setFormOrg(filterMainProjectId ? orgOfMainProject(filterMainProjectId) : ''); setFormPriority('medium'); setFormProjectStatus('active'); setIsModalOpen(true); }}
+          onClick={() => { setEditingProject(null); setSelectedSkills([]); setSelectedVendors([]); setProjectTypes({}); setActiveTypeTab(PROJECT_TYPE_CATEGORIES[0].key); setGuidelineFiles([]); setFormMainProjectId(filterMainProjectId || ''); setFormOrg(filterMainProjectId ? orgOfMainProject(filterMainProjectId) : ''); setFormPriority('medium'); setFormProjectStatus('active'); setSelectedPmIds(isPm && pmEmployeeId ? [pmEmployeeId] : []); setIsModalOpen(true); }}
           className="inline-flex items-center gap-1.5 rounded-lg bg-indigo-600 px-3.5 py-2 text-sm font-medium text-white shadow-sm hover:bg-indigo-700 transition-colors"
         >
           <Plus className="w-4 h-4" />
@@ -1054,11 +1053,13 @@ toast.success(wasEditing ? 'Project updated successfully' : 'Project created suc
 
                 const mainProject = parentProject;
 
-                const pmIds = mainProject?.program_manager_ids?.length
-                  ? mainProject.program_manager_ids
-                  : mainProject?.program_manager_id
-                    ? [mainProject.program_manager_id]
-                    : [];
+                const pmIds = project?.assigned_employee_ids?.length
+                  ? project.assigned_employee_ids
+                  : (project?.pm_id
+                    ? [project.pm_id]
+                    : (mainProject?.program_manager_ids?.length
+                      ? mainProject.program_manager_ids
+                      : (mainProject?.program_manager_id ? [mainProject.program_manager_id] : [])));
 
                 const pmNames = pmIds
                   .map((id) => employees.find((e) => e.id === id)?.name)
@@ -1257,6 +1258,7 @@ toast.success(wasEditing ? 'Project updated successfully' : 'Project created suc
                             setFormOrg(orgOfMainProject(project.main_project_id));
                             setFormPriority(project.priority || 'medium');
                             setFormProjectStatus(project.project_status || 'active');
+                            setSelectedPmIds(project.assigned_employee_ids?.length ? project.assigned_employee_ids : (project.pm_id ? [project.pm_id] : (isPm && pmEmployeeId ? [pmEmployeeId] : [])));
                             setIsModalOpen(true);
                           }}
                           className="rounded-lg p-2 text-slate-500 hover:bg-indigo-50 hover:text-indigo-600"
@@ -1279,6 +1281,7 @@ toast.success(wasEditing ? 'Project updated successfully' : 'Project created suc
                             setFormOrg(orgOfMainProject(project.main_project_id));
                             setFormPriority(project.priority || 'medium');
                             setFormProjectStatus(project.project_status || 'active');
+                            setSelectedPmIds(project.assigned_employee_ids?.length ? project.assigned_employee_ids : (project.pm_id ? [project.pm_id] : (isPm && pmEmployeeId ? [pmEmployeeId] : [])));
                             setIsModalOpen(true);
                           }}
                           className="rounded-lg p-2 text-slate-500 hover:bg-emerald-50 hover:text-emerald-600"
@@ -1578,6 +1581,63 @@ toast.success(wasEditing ? 'Project updated successfully' : 'Project created suc
                   required
                   defaultValue={(editingProject || copyingProject)?.start_date}
                   className="input"
+                />
+              </div>
+
+              {/* Program Manager(s) */}
+              <div>
+                <label className="block text-xs font-semibold text-slate-600 mb-1">
+                  Program Manager(s)
+                </label>
+
+                {/* Selected PM chips */}
+                {selectedPmIds.length > 0 && (
+                  <div className="flex flex-wrap gap-1.5 mb-1.5">
+                    {selectedPmIds.map((id) => {
+                      const emp = employees.find(e => e.id === id);
+                      if (!emp) return null;
+                      return (
+                        <span
+                          key={id}
+                          className="inline-flex items-center gap-1 pl-2.5 pr-1 py-0.5 bg-indigo-50 text-indigo-700 rounded-full text-xs font-medium"
+                        >
+                          {emp.name}
+                          {selectedPmIds[0] === id && (
+                            <span className="text-[9px] uppercase tracking-wide text-indigo-400 font-semibold">
+                              primary
+                            </span>
+                          )}
+                          {!(isPm && id === pmEmployeeId) && (
+                            <button
+                              type="button"
+                              onClick={() => setSelectedPmIds(prev => prev.filter(p => p !== id))}
+                              className="p-0.5 hover:bg-indigo-100 rounded-full transition-colors"
+                            >
+                              <X className="w-3 h-3" />
+                            </button>
+                          )}
+                        </span>
+                      );
+                    })}
+                  </div>
+                )}
+
+                <Dropdown
+                  editable={true}
+                  allowCreate={false}
+                  value=""
+                  placeholder="+ Add Program Manager"
+                  options={employees
+                    .filter(e => e.status === 'active' && !selectedPmIds.includes(e.id))
+                    .map((emp) => ({
+                      value: emp.id,
+                      label: emp.name
+                    }))}
+                  onChange={(id) => {
+                    if (id && !selectedPmIds.includes(id)) {
+                      setSelectedPmIds(prev => [...prev, id]);
+                    }
+                  }}
                 />
               </div>
 
