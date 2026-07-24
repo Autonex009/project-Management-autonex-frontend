@@ -353,6 +353,7 @@ const ProjectsPage = () => {
   const [formProjectStatus, setFormProjectStatus] = useState('active');
   const [selectedOrganization, setSelectedOrganization] = useState("all");
   const [selectedPm, setSelectedPm] = useState("all");
+  const [selectedStatus, setSelectedStatus] = useState("all");
   const [filtersOpen, setFiltersOpen] = useState(false);
   const filtersRef = useRef(null);
 
@@ -794,6 +795,17 @@ toast.success(wasEditing ? 'Project updated successfully' : 'Project created suc
     const parentProject = visibleMainProjects.find(p => p.id === project.main_project_id);
     return pmIdsOf(parentProject).includes(Number(selectedPm));
   })
+  .filter(project => {
+    if (selectedStatus === 'all') return true;
+    const status = (project.project_status || 'active').toLowerCase().trim();
+    if (selectedStatus === 'active') {
+      return status === 'active' || status === 'in-progress' || status === 'in progress';
+    }
+    if (selectedStatus === 'poc') {
+      return status === 'poc';
+    }
+    return status === selectedStatus.toLowerCase();
+  })
   .filter(p => {
     if (statusParam && p.project_status !== statusParam) return false;
 
@@ -814,7 +826,7 @@ toast.success(wasEditing ? 'Project updated successfully' : 'Project created suc
   // Reset to page 1 when filters change
   useEffect(() => {
     setCurrentPage(1);
-  }, [subProjectSearch, filterMainProjectId, statusParam, recommendationParam, selectedOrganization, selectedPm]);
+  }, [subProjectSearch, filterMainProjectId, statusParam, recommendationParam, selectedOrganization, selectedPm, selectedStatus]);
 
 
   const currentMainProject = visibleMainProjects.find(p => p.id === parseInt(filterMainProjectId));
@@ -898,6 +910,12 @@ toast.success(wasEditing ? 'Project updated successfully' : 'Project created suc
 
         {/* Right side: active chips + Filters dropdown */}
         <div className="ml-auto flex flex-wrap items-center gap-2">
+          {selectedStatus !== 'all' && (
+            <span className="inline-flex items-center gap-1.5 rounded-lg border border-indigo-200 bg-indigo-50 px-2.5 py-1.5 text-xs font-medium text-indigo-700">
+              Status: {selectedStatus === 'active' ? 'In Progress' : selectedStatus === 'poc' ? 'POC' : selectedStatus}
+              <button type="button" onClick={() => setSelectedStatus('all')} className="hover:text-indigo-900"><X className="w-3 h-3" /></button>
+            </span>
+          )}
           {selectedOrganization !== 'all' && (
             <span className="inline-flex items-center gap-1.5 rounded-lg border border-indigo-200 bg-indigo-50 px-2.5 py-1.5 text-xs font-medium text-indigo-700">
               {selectedOrganization}
@@ -919,17 +937,33 @@ toast.success(wasEditing ? 'Project updated successfully' : 'Project created suc
             >
               <SlidersHorizontal className="w-4 h-4 text-slate-400" />
               Filters
-              {[selectedOrganization, selectedPm].some((v) => v !== 'all') && (
+              {[selectedOrganization, selectedPm, selectedStatus].some((v) => v !== 'all') && (
                 <span className="ml-0.5 inline-flex items-center justify-center rounded-full bg-indigo-100 px-1.5 text-[10px] font-semibold text-indigo-700">
-                  {[selectedOrganization, selectedPm].filter((v) => v !== 'all').length}
+                  {[selectedOrganization, selectedPm, selectedStatus].filter((v) => v !== 'all').length}
                 </span>
               )}
               <ChevronDown className={`w-4 h-4 text-slate-400 transition-transform ${filtersOpen ? 'rotate-180' : ''}`} />
             </button>
 
             {filtersOpen && (
-              <div className="absolute right-0 top-full z-50 mt-2 w-72 rounded-xl border border-slate-200 bg-white p-3 shadow-xl">
-                <div className="mb-3">
+              <div className="absolute right-0 top-full z-50 mt-2 w-72 rounded-xl border border-slate-200 bg-white p-3 shadow-xl space-y-3">
+                <div>
+                  <label className="mb-1 block text-xs font-medium text-slate-500">Status</label>
+                  <Dropdown
+                    value={selectedStatus}
+                    onChange={setSelectedStatus}
+                    options={[
+                      { value: 'all', label: 'All statuses' },
+                      { value: 'active', label: 'In Progress' },
+                      { value: 'poc', label: 'POC' },
+                      { value: 'completed', label: 'Completed' },
+                      { value: 'on-hold', label: 'On Hold' },
+                      { value: 'cancelled', label: 'Cancelled' },
+                    ]}
+                    className="w-full"
+                  />
+                </div>
+                <div>
                   <label className="mb-1 block text-xs font-medium text-slate-500">Organization</label>
                   <Dropdown
                     value={selectedOrganization}
@@ -947,10 +981,10 @@ toast.success(wasEditing ? 'Project updated successfully' : 'Project created suc
                     className="w-full"
                   />
                 </div>
-                {[selectedOrganization, selectedPm].some((v) => v !== 'all') && (
+                {[selectedOrganization, selectedPm, selectedStatus].some((v) => v !== 'all') && (
                   <button
-                    onClick={() => { setSelectedOrganization('all'); setSelectedPm('all'); }}
-                    className="mt-3 w-full rounded-lg border border-slate-200 py-1.5 text-xs font-medium text-slate-500 hover:bg-slate-50"
+                    onClick={() => { setSelectedOrganization('all'); setSelectedPm('all'); setSelectedStatus('all'); }}
+                    className="w-full rounded-lg border border-slate-200 py-1.5 text-xs font-medium text-slate-500 hover:bg-slate-50"
                   >
                     Clear filters
                   </button>
@@ -1055,23 +1089,26 @@ toast.success(wasEditing ? 'Project updated successfully' : 'Project created suc
                             {' • '}
                             {parentProject?.project_type || '—'}
                           </p>
-                          {(project.created_at || project.start_date) && (
-                            <p className="mt-1 text-[11px] font-medium text-slate-400">
-                              Created: {formatCreatedDate(project.created_at || project.start_date)}
-                            </p>
-                          )}
                         </div>
                       </div>
 
-                      {/* Status */}
-                      {(() => {
-                        const { label, style } = getStatusBadgeConfig(project.project_status);
-                        return (
-                          <span className={`shrink-0 rounded-full px-2.5 py-1 text-xs font-semibold ${style}`}>
-                            {label}
+                      {/* Status & Creation Date */}
+                      <div className="flex flex-col items-end shrink-0 gap-1">
+                        {(() => {
+                          const { label, style } = getStatusBadgeConfig(project.project_status);
+                          return (
+                            <span className={`rounded-full px-2.5 py-1 text-xs font-semibold ${style}`}>
+                              {label}
+                            </span>
+                          );
+                        })()}
+
+                        {(project.created_at || project.start_date) && (
+                          <span className="text-[11px] font-medium text-slate-400">
+                            Created: {formatCreatedDate(project.created_at || project.start_date)}
                           </span>
-                        );
-                      })()}
+                        )}
+                      </div>
                     </div>
 
                     {/* Project Type chips */}
