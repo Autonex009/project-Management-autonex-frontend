@@ -60,7 +60,7 @@ const AllocationsPage = () => {
   const [selectedEmployees, setSelectedEmployees] = useState([]);
   const [availableEmployees, setAvailableEmployees] = useState([]);
   const [allocatedEmployeesOther, setAllocatedEmployeesOther] = useState([]);
-  const [filterTab, setFilterTab] = useState('unallocated');
+  const [filterTab, setFilterTab] = useState('all');
   const [editingAllocation, setEditingAllocation] = useState(null);
   const [confirmState, setConfirmState] = useState(null);
 
@@ -135,7 +135,7 @@ const AllocationsPage = () => {
     setSelectedRoleTags([]);
     setTimeDistribution({});
     setTotalDailyHours(8);
-    setFilterTab('unallocated');
+    setFilterTab('all');
   };
 
   const deleteMutation = useMutation({
@@ -297,9 +297,7 @@ const AllocationsPage = () => {
   const handleSelectAll = () => {
     const displayEmployees = filterTab === 'unallocated'
       ? availableEmployees
-      : filterTab === 'allocated'
-        ? allocatedEmployeesOther
-        : [...availableEmployees, ...allocatedEmployeesOther];
+      : [...availableEmployees, ...allocatedEmployeesOther];
 
     if (selectedEmployees.length === displayEmployees.length) {
       setSelectedEmployees([]);
@@ -644,32 +642,11 @@ const AllocationsPage = () => {
                         className="flex items-center gap-1 text-sm text-blue-600 hover:text-blue-800"
                       >
                         <CheckSquare className="w-4 h-4" />
-                        {selectedEmployees.length === (filterTab === 'unallocated' ? availableEmployees : filterTab === 'allocated' ? allocatedEmployeesOther : [...availableEmployees, ...allocatedEmployeesOther]).length ? 'Deselect All' : 'Select All'}
+                        {selectedEmployees.length === (filterTab === 'unallocated' ? availableEmployees : [...availableEmployees, ...allocatedEmployeesOther]).length ? 'Deselect All' : 'Select All'}
                       </button>
                     </div>
-
                     {/* Filter Tabs */}
                     <div className="flex gap-1 mb-3 p-1 bg-gray-100 rounded-lg">
-                      <button
-                        type="button"
-                        onClick={() => setFilterTab('unallocated')}
-                        className={`flex-1 px-3 py-2 text-sm font-medium rounded-md transition-colors ${filterTab === 'unallocated'
-                          ? 'bg-white text-indigo-700 shadow-sm'
-                          : 'text-gray-600 hover:text-gray-900'
-                          }`}
-                      >
-                        Available ({availableEmployees.length})
-                      </button>
-                      <button
-                        type="button"
-                        onClick={() => setFilterTab('allocated')}
-                        className={`flex-1 px-3 py-2 text-sm font-medium rounded-md transition-colors ${filterTab === 'allocated'
-                          ? 'bg-white text-indigo-700 shadow-sm'
-                          : 'text-gray-600 hover:text-gray-900'
-                          }`}
-                      >
-                        On Other Projects ({allocatedEmployeesOther.length})
-                      </button>
                       <button
                         type="button"
                         onClick={() => setFilterTab('all')}
@@ -679,6 +656,16 @@ const AllocationsPage = () => {
                           }`}
                       >
                         All ({availableEmployees.length + allocatedEmployeesOther.length})
+                      </button>
+                      <button
+                        type="button"
+                        onClick={() => setFilterTab('unallocated')}
+                        className={`flex-1 px-3 py-2 text-sm font-medium rounded-md transition-colors ${filterTab === 'unallocated'
+                          ? 'bg-white text-indigo-700 shadow-sm'
+                          : 'text-gray-600 hover:text-gray-900'
+                          }`}
+                      >
+                        Available ({availableEmployees.length})
                       </button>
                     </div>
 
@@ -698,9 +685,7 @@ const AllocationsPage = () => {
                     {(() => {
                       const allTabEmployees = filterTab === 'unallocated'
                         ? availableEmployees
-                        : filterTab === 'allocated'
-                          ? allocatedEmployeesOther
-                          : [...availableEmployees, ...allocatedEmployeesOther];
+                        : [...availableEmployees, ...allocatedEmployeesOther];
                       const q = employeeSearch.trim().toLowerCase();
                       const displayEmployees = q
                         ? allTabEmployees.filter(emp =>
@@ -715,9 +700,7 @@ const AllocationsPage = () => {
                             <p className="text-gray-500">
                               {filterTab === 'unallocated'
                                 ? 'No unallocated employees with matching skills'
-                                : filterTab === 'allocated'
-                                  ? 'No allocated employees available'
-                                  : 'No employees available with matching skills'}
+                                : 'No employees available with matching skills'}
                             </p>
                           </div>
                         );
