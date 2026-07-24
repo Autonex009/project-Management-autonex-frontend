@@ -6,7 +6,7 @@ import Spinner from '../components/ui/LoadingSpinner';
 import { subProjectApi, parentProjectApi, employeeApi, allocationApi, skillApi, leaveApi, guidelineApi, vendorApi } from '../services/api';
 import { Plus, Edit, Trash2, X, UserCheck, Users, ChevronDown, ArrowRight, Copy, Settings, UploadCloud, FileText, BarChart3, SlidersHorizontal } from 'lucide-react';
 import { Link } from 'react-router-dom';
-import { format } from 'date-fns';
+import { format, parseISO } from 'date-fns';
 import toast from 'react-hot-toast';
 import SearchBar from '../components/ui/SearchBar';
 import { getPmEmployeeId, getPmProjects, getPmSubProjects } from '../utils/pmScope';
@@ -17,6 +17,35 @@ import Dropdown from '../components/ui/Dropdown';
 import ConfirmDialog from '../components/ui/ConfirmDialog';
 import Modal from '../components/ui/Modal';
 import StatCard from '../components/dashboard/StatCard';
+
+const STATUS_CONFIG = {
+  poc: { label: 'POC', style: 'bg-purple-50 text-purple-700 border border-purple-200' },
+  active: { label: 'In Progress', style: 'bg-emerald-50 text-emerald-700 border border-emerald-200' },
+  'in-progress': { label: 'In Progress', style: 'bg-emerald-50 text-emerald-700 border border-emerald-200' },
+  'in progress': { label: 'In Progress', style: 'bg-emerald-50 text-emerald-700 border border-emerald-200' },
+  completed: { label: 'Completed', style: 'bg-blue-50 text-blue-700 border border-blue-200' },
+  'on-hold': { label: 'On Hold', style: 'bg-amber-50 text-amber-700 border border-amber-200' },
+  cancelled: { label: 'Cancelled', style: 'bg-red-50 text-red-700 border border-red-200' },
+};
+
+const getStatusBadgeConfig = (statusRaw) => {
+  const key = (statusRaw || 'active').toLowerCase().trim();
+  return STATUS_CONFIG[key] || {
+    label: statusRaw || 'In Progress',
+    style: 'bg-slate-100 text-slate-600 border border-slate-200',
+  };
+};
+
+const formatCreatedDate = (dateStr) => {
+  if (!dateStr) return null;
+  try {
+    const parsed = typeof dateStr === 'string' ? parseISO(dateStr) : dateStr;
+    if (!parsed || isNaN(parsed.getTime())) return null;
+    return format(parsed, 'MMM dd, yyyy');
+  } catch {
+    return null;
+  }
+};
 
 // Project type classification: category → available subtypes. One subtype may be
 // selected per category (stored as { category: subtype }).
@@ -1026,21 +1055,23 @@ toast.success(wasEditing ? 'Project updated successfully' : 'Project created suc
                             {' • '}
                             {parentProject?.project_type || '—'}
                           </p>
+                          {(project.created_at || project.start_date) && (
+                            <p className="mt-1 text-[11px] font-medium text-slate-400">
+                              Created: {formatCreatedDate(project.created_at || project.start_date)}
+                            </p>
+                          )}
                         </div>
                       </div>
 
                       {/* Status */}
-                      <span
-                        className={`shrink-0 rounded-full px-2.5 py-1 text-xs font-semibold ${
-                          project.project_status === 'active'
-                            ? 'bg-emerald-50 text-emerald-700 border border-emerald-200'
-                            : project.project_status === 'completed'
-                              ? 'bg-blue-50 text-blue-700 border border-blue-200'
-                              : 'bg-slate-100 text-slate-600 border border-slate-200'
-                        }`}
-                      >
-                        {project.project_status}
-                      </span>
+                      {(() => {
+                        const { label, style } = getStatusBadgeConfig(project.project_status);
+                        return (
+                          <span className={`shrink-0 rounded-full px-2.5 py-1 text-xs font-semibold ${style}`}>
+                            {label}
+                          </span>
+                        );
+                      })()}
                     </div>
 
                     {/* Project Type chips */}
@@ -1418,6 +1449,7 @@ toast.success(wasEditing ? 'Project updated successfully' : 'Project created suc
 
                 <Dropdown
                   options={[
+                    { value: 'poc', label: 'POC' },
                     { value: 'active', label: 'In Progress' },
                     { value: 'completed', label: 'Completed' },
                     { value: 'on-hold', label: 'On Hold' },
