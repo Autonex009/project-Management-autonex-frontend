@@ -1146,6 +1146,11 @@ toast.success(wasEditing ? 'Project updated successfully' : 'Project created suc
                           project={project}
                           allocations={allocations}
                           employees={employees}
+                          onOpenAllocations={() =>
+                            navigate(`${prefix}/allocations`, {
+                              state: { projectId: project.id },
+                            })
+                          }
                           triggerClassName="inline-flex text-sm font-semibold text-slate-800 hover:text-indigo-600 transition-colors cursor-pointer"
                           badgeContent={
                             <span>
