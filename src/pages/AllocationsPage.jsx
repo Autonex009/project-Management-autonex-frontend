@@ -1,4 +1,4 @@
-﻿import { useState, useEffect, useRef, useMemo } from 'react';
+import { useState, useEffect, useRef, useMemo } from 'react';
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import { useLocation } from 'react-router-dom';
 import { allocationApi, subProjectApi, employeeApi, leaveApi, parentProjectApi } from '../services/api';
@@ -428,7 +428,7 @@ const AllocationsPage = () => {
                       <UserPlus className="w-3.5 h-3.5" />
                     </button>
                   </div>
-                  <div className="flex items-center gap-2">
+                  <div className="flex items-center gap-2 shrink-0 whitespace-nowrap">
                     {(() => {
                       const assignedCount = projectAllocs.length;
                       const todayStr = new Date().toISOString().slice(0, 10);
@@ -443,9 +443,9 @@ const AllocationsPage = () => {
                       return (
                         <>
                           {onLeaveToday > 0 && (
-                            <span className="px-2.5 py-1 bg-amber-50 text-amber-700 border border-amber-200/50 rounded-full text-xs font-semibold flex items-center gap-1 shrink-0" title={`${onLeaveToday} employee${onLeaveToday > 1 ? 's' : ''} on approved leave today`}>
-                              <span className="w-1.5 h-1.5 rounded-full bg-amber-500 animate-pulse" />
-                              <span>{onLeaveToday} Leave</span>
+                            <span className="px-2.5 py-1 bg-amber-50 text-amber-700 border border-amber-200/50 rounded-full text-xs font-semibold flex items-center gap-1 shrink-0 whitespace-nowrap" title={`${onLeaveToday} employee${onLeaveToday > 1 ? 's' : ''} on approved leave today`}>
+                              <span className="w-1.5 h-1.5 rounded-full bg-amber-500 animate-pulse shrink-0" />
+                              <span className="whitespace-nowrap">+{onLeaveToday} Leave</span>
                             </span>
                           )}
                           <AllocationPopover
@@ -453,9 +453,9 @@ const AllocationsPage = () => {
                             allocations={projectAllocs}
                             employees={employees}
                             badgeContent={(
-                              <span className={`text-xs font-semibold px-2.5 py-1 rounded-lg border transition-all flex items-center gap-1.5 cursor-pointer select-none ${assignedCount >= requiredManpower ? 'bg-emerald-50/40 text-emerald-700 border-emerald-100/70 hover:bg-emerald-100/40' : 'bg-amber-50/40 text-amber-700 border-amber-100/70 hover:bg-amber-100/40'}`}>
-                                <span className={`w-1.5 h-1.5 rounded-full ${assignedCount >= requiredManpower ? 'bg-emerald-500' : 'bg-amber-500'}`} />
-                                <span>{assignedCount} / {requiredManpower}</span>
+                              <span className={`text-xs font-semibold px-2.5 py-1 rounded-lg border transition-all flex items-center gap-1.5 cursor-pointer select-none shrink-0 whitespace-nowrap ${assignedCount >= requiredManpower ? 'bg-emerald-50/40 text-emerald-700 border-emerald-100/70 hover:bg-emerald-100/40' : 'bg-amber-50/40 text-amber-700 border-amber-100/70 hover:bg-amber-100/40'}`}>
+                                <span className={`w-1.5 h-1.5 rounded-full shrink-0 ${assignedCount >= requiredManpower ? 'bg-emerald-500' : 'bg-amber-500'}`} />
+                                <span className="whitespace-nowrap">{assignedCount}&nbsp;/&nbsp;{requiredManpower}</span>
                               </span>
                             )}
                             onOpenAllocations={() => { setSelectedProject(project); setIsModalOpen(true); }}

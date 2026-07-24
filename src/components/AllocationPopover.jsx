@@ -316,7 +316,7 @@ const AllocationPopover = ({
         onClick={() => onOpenAllocations && onOpenAllocations()}
         onMouseEnter={() => { cancelClose(); setOpen(true); }}
         onMouseLeave={scheduleClose}
-        className={triggerClassName || "inline-flex items-center gap-1.5 px-3 py-1.5 bg-emerald-50 hover:bg-emerald-100 text-emerald-700 rounded-lg font-medium text-sm transition-colors border border-emerald-200 shadow-sm"}
+        className={triggerClassName ? `${triggerClassName} shrink-0 whitespace-nowrap` : "inline-flex items-center gap-1.5 px-3 py-1.5 bg-emerald-50 hover:bg-emerald-100 text-emerald-700 rounded-lg font-medium text-sm transition-colors border border-emerald-200 shadow-sm shrink-0 whitespace-nowrap"}
         aria-expanded={open}
       >
         {badgeContent || (
