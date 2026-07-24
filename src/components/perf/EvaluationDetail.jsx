@@ -6,8 +6,11 @@ import { CheckCircle2, XCircle, Gift } from 'lucide-react';
 // Read-only rendering of a monthly performance evaluation (new star-rating shape).
 // Shows the employee's self-rating per parameter and, once the PM has reviewed,
 // the PM's rating, an approved/rejected badge, and per-parameter feedback.
-const EvaluationDetail = ({ evaluation }) => {
+const EvaluationDetail = ({ evaluation, showBonus }) => {
     if (!evaluation) return null;
+    const role = localStorage.getItem('role') || 'employee';
+    const isAdmin = role === 'admin';
+    const canSeeBonus = showBonus !== undefined ? showBonus : isAdmin;
     const params = normalizeParamValues(evaluation.parameter_values);
     const reviewed = evaluation.status === 'reviewed';
     const empAvg = evaluation.employee_overall_rating ?? averageOf(params.map((p) => p.employee_rating));
@@ -68,7 +71,7 @@ const EvaluationDetail = ({ evaluation }) => {
                 <p className="mt-1 whitespace-pre-wrap text-sm text-slate-700">{evaluation.overall_comment || <span className="text-slate-300">—</span>}</p>
             </div>
 
-            {reviewed && evaluation.bonus_suggested && (
+            {canSeeBonus && reviewed && evaluation.bonus_suggested && (
                 <div className="flex items-start gap-2 rounded-xl border border-amber-200 bg-amber-50 px-3 py-2.5">
                     <Gift className="mt-0.5 h-4 w-4 shrink-0 text-amber-600" />
                     <div>

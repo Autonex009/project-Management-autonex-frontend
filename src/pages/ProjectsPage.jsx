@@ -6,7 +6,7 @@ import Spinner from '../components/ui/LoadingSpinner';
 import { subProjectApi, parentProjectApi, employeeApi, allocationApi, skillApi, leaveApi, guidelineApi, vendorApi } from '../services/api';
 import { Plus, Edit, Trash2, X, UserCheck, Users, ChevronDown, ArrowRight, Copy, Settings, UploadCloud, FileText, BarChart3, SlidersHorizontal } from 'lucide-react';
 import { Link } from 'react-router-dom';
-import { format } from 'date-fns';
+import { format, parseISO } from 'date-fns';
 import toast from 'react-hot-toast';
 import SearchBar from '../components/ui/SearchBar';
 import { getPmEmployeeId, getPmProjects, getPmSubProjects } from '../utils/pmScope';
@@ -17,6 +17,35 @@ import Dropdown from '../components/ui/Dropdown';
 import ConfirmDialog from '../components/ui/ConfirmDialog';
 import Modal from '../components/ui/Modal';
 import StatCard from '../components/dashboard/StatCard';
+
+const STATUS_CONFIG = {
+  poc: { label: 'POC', style: 'bg-purple-50 text-purple-700 border border-purple-200' },
+  active: { label: 'In Progress', style: 'bg-emerald-50 text-emerald-700 border border-emerald-200' },
+  'in-progress': { label: 'In Progress', style: 'bg-emerald-50 text-emerald-700 border border-emerald-200' },
+  'in progress': { label: 'In Progress', style: 'bg-emerald-50 text-emerald-700 border border-emerald-200' },
+  completed: { label: 'Completed', style: 'bg-blue-50 text-blue-700 border border-blue-200' },
+  'on-hold': { label: 'On Hold', style: 'bg-amber-50 text-amber-700 border border-amber-200' },
+  cancelled: { label: 'Cancelled', style: 'bg-red-50 text-red-700 border border-red-200' },
+};
+
+const getStatusBadgeConfig = (statusRaw) => {
+  const key = (statusRaw || 'active').toLowerCase().trim();
+  return STATUS_CONFIG[key] || {
+    label: statusRaw || 'In Progress',
+    style: 'bg-slate-100 text-slate-600 border border-slate-200',
+  };
+};
+
+const formatCreatedDate = (dateStr) => {
+  if (!dateStr) return null;
+  try {
+    const parsed = typeof dateStr === 'string' ? parseISO(dateStr) : dateStr;
+    if (!parsed || isNaN(parsed.getTime())) return null;
+    return format(parsed, 'MMM dd, yyyy');
+  } catch {
+    return null;
+  }
+};
 
 // Project type classification: category → available subtypes. One subtype may be
 // selected per category (stored as { category: subtype }).
@@ -324,6 +353,8 @@ const ProjectsPage = () => {
   const [formProjectStatus, setFormProjectStatus] = useState('active');
   const [selectedOrganization, setSelectedOrganization] = useState("all");
   const [selectedPm, setSelectedPm] = useState("all");
+  const [selectedStatus, setSelectedStatus] = useState("all");
+  const [selectedPmIds, setSelectedPmIds] = useState([]);
   const [filtersOpen, setFiltersOpen] = useState(false);
   const filtersRef = useRef(null);
 
@@ -542,11 +573,9 @@ const ProjectsPage = () => {
       autonex_annotators: num('autonex_annotators'),
       autonex_reviewers: num('autonex_reviewers'),
       qc_count: num('qc_count'),
-      // Preserve existing assignments when editing. On create, if a PM makes the
-      // project, attach them so it lands in their scope.
-      assigned_employee_ids: editingProject
-        ? (editingProject.assigned_employee_ids || [])
-        : (isPm && pmEmployeeId ? [pmEmployeeId] : []),
+      // Assigned PMs / Employees
+      assigned_employee_ids: selectedPmIds,
+      pm_id: selectedPmIds[0] || null,
       required_manpower: num('autonex_annotators') + num('autonex_reviewers') + num('qc_count'),
       project_duration_weeks: durationWeeks,
       project_duration_days: durationDays,
@@ -765,6 +794,17 @@ toast.success(wasEditing ? 'Project updated successfully' : 'Project created suc
     const parentProject = visibleMainProjects.find(p => p.id === project.main_project_id);
     return pmIdsOf(parentProject).includes(Number(selectedPm));
   })
+  .filter(project => {
+    if (selectedStatus === 'all') return true;
+    const status = (project.project_status || 'active').toLowerCase().trim();
+    if (selectedStatus === 'active') {
+      return status === 'active' || status === 'in-progress' || status === 'in progress';
+    }
+    if (selectedStatus === 'poc') {
+      return status === 'poc';
+    }
+    return status === selectedStatus.toLowerCase();
+  })
   .filter(p => {
     if (statusParam && p.project_status !== statusParam) return false;
 
@@ -785,38 +825,41 @@ toast.success(wasEditing ? 'Project updated successfully' : 'Project created suc
   // Reset to page 1 when filters change
   useEffect(() => {
     setCurrentPage(1);
-  }, [subProjectSearch, filterMainProjectId, statusParam, recommendationParam, selectedOrganization, selectedPm]);
+  }, [subProjectSearch, filterMainProjectId, statusParam, recommendationParam, selectedOrganization, selectedPm, selectedStatus]);
 
 
   const currentMainProject = visibleMainProjects.find(p => p.id === parseInt(filterMainProjectId));
 
   const projectMetrics = useMemo(() => {
-  const totalProjects = filteredProjects.length;
+    const totalProjects = filteredProjects.length;
 
-  const activeProjects = filteredProjects.filter(
-    p => p.project_status === "active"
-  ).length;
+    const activeProjects = filteredProjects.filter(
+      p => p.project_status === "active"
+    ).length;
 
-  const overburdenedProjects = filteredProjects.filter(
-    p => getSystemRecommendation(p).label === "Overburdened"
-  ).length;
+    const overburdenedProjects = filteredProjects.filter(
+      p => {
+        const required = p.required_manpower || 0;
+        const allocated = getAllocatedManpower(p);
+        return required > 0 ? allocated < required : false;
+      }
+    ).length;
 
-  const unstaffedProjects = filteredProjects.filter(
-    p => getAllocatedManpower(p) === 0
-  ).length;
+    const balancedProjects = filteredProjects.filter(
+      p => {
+        const required = p.required_manpower || 0;
+        const allocated = getAllocatedManpower(p);
+        return required > 0 ? allocated >= required : allocated > 0;
+      }
+    ).length;
 
-  const balancedProjects = filteredProjects.filter(
-    p => getSystemRecommendation(p).label === "Balanced"
-  ).length;
-
-  return {
-    totalProjects,
-    activeProjects,
-    overburdenedProjects,
-    unstaffedProjects,
-    balancedProjects,
-  };
-}, [filteredProjects, allocations, employees, leaves]);
+    return {
+      totalProjects,
+      activeProjects,
+      overburdenedProjects,
+      balancedProjects,
+    };
+  }, [filteredProjects, allocations, employees, leaves]);
 
   return (
     <div className="space-y-4">
@@ -833,11 +876,10 @@ toast.success(wasEditing ? 'Project updated successfully' : 'Project created suc
         </div>
       </div>
 
-      <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-5 gap-3">
+      <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-3">
         <StatCard title="Total Projects" value={projectMetrics.totalProjects} icon={FileText} tone="indigo" hint="all projects" />
         <StatCard title="Active Projects" value={projectMetrics.activeProjects} icon={UserCheck} tone="emerald" hint="currently active" />
         <StatCard title="Overburdened" value={projectMetrics.overburdenedProjects} icon={BarChart3} tone="rose" hint="need staffing" />
-        <StatCard title="Unstaffed" value={projectMetrics.unstaffedProjects} icon={Users} tone="amber" hint="no one allocated" />
         <StatCard title="Balanced" value={projectMetrics.balancedProjects} icon={Settings} tone="sky" hint="well staffed" />
       </div>
 
@@ -858,7 +900,7 @@ toast.success(wasEditing ? 'Project updated successfully' : 'Project created suc
         )}
         <button
           type="button"
-          onClick={() => { setEditingProject(null); setSelectedSkills([]); setSelectedVendors([]); setProjectTypes({}); setActiveTypeTab(PROJECT_TYPE_CATEGORIES[0].key); setGuidelineFiles([]); setFormMainProjectId(filterMainProjectId || ''); setFormOrg(filterMainProjectId ? orgOfMainProject(filterMainProjectId) : ''); setFormPriority('medium'); setFormProjectStatus('active'); setIsModalOpen(true); }}
+          onClick={() => { setEditingProject(null); setSelectedSkills([]); setSelectedVendors([]); setProjectTypes({}); setActiveTypeTab(PROJECT_TYPE_CATEGORIES[0].key); setGuidelineFiles([]); setFormMainProjectId(filterMainProjectId || ''); setFormOrg(filterMainProjectId ? orgOfMainProject(filterMainProjectId) : ''); setFormPriority('medium'); setFormProjectStatus('active'); setSelectedPmIds(isPm && pmEmployeeId ? [pmEmployeeId] : []); setIsModalOpen(true); }}
           className="inline-flex items-center gap-1.5 rounded-lg bg-indigo-600 px-3.5 py-2 text-sm font-medium text-white shadow-sm hover:bg-indigo-700 transition-colors"
         >
           <Plus className="w-4 h-4" />
@@ -867,6 +909,12 @@ toast.success(wasEditing ? 'Project updated successfully' : 'Project created suc
 
         {/* Right side: active chips + Filters dropdown */}
         <div className="ml-auto flex flex-wrap items-center gap-2">
+          {selectedStatus !== 'all' && (
+            <span className="inline-flex items-center gap-1.5 rounded-lg border border-indigo-200 bg-indigo-50 px-2.5 py-1.5 text-xs font-medium text-indigo-700">
+              Status: {selectedStatus === 'active' ? 'In Progress' : selectedStatus === 'poc' ? 'POC' : selectedStatus}
+              <button type="button" onClick={() => setSelectedStatus('all')} className="hover:text-indigo-900"><X className="w-3 h-3" /></button>
+            </span>
+          )}
           {selectedOrganization !== 'all' && (
             <span className="inline-flex items-center gap-1.5 rounded-lg border border-indigo-200 bg-indigo-50 px-2.5 py-1.5 text-xs font-medium text-indigo-700">
               {selectedOrganization}
@@ -888,17 +936,33 @@ toast.success(wasEditing ? 'Project updated successfully' : 'Project created suc
             >
               <SlidersHorizontal className="w-4 h-4 text-slate-400" />
               Filters
-              {[selectedOrganization, selectedPm].some((v) => v !== 'all') && (
+              {[selectedOrganization, selectedPm, selectedStatus].some((v) => v !== 'all') && (
                 <span className="ml-0.5 inline-flex items-center justify-center rounded-full bg-indigo-100 px-1.5 text-[10px] font-semibold text-indigo-700">
-                  {[selectedOrganization, selectedPm].filter((v) => v !== 'all').length}
+                  {[selectedOrganization, selectedPm, selectedStatus].filter((v) => v !== 'all').length}
                 </span>
               )}
               <ChevronDown className={`w-4 h-4 text-slate-400 transition-transform ${filtersOpen ? 'rotate-180' : ''}`} />
             </button>
 
             {filtersOpen && (
-              <div className="absolute right-0 top-full z-50 mt-2 w-72 rounded-xl border border-slate-200 bg-white p-3 shadow-xl">
-                <div className="mb-3">
+              <div className="absolute right-0 top-full z-50 mt-2 w-72 rounded-xl border border-slate-200 bg-white p-3 shadow-xl space-y-3">
+                <div>
+                  <label className="mb-1 block text-xs font-medium text-slate-500">Status</label>
+                  <Dropdown
+                    value={selectedStatus}
+                    onChange={setSelectedStatus}
+                    options={[
+                      { value: 'all', label: 'All statuses' },
+                      { value: 'active', label: 'In Progress' },
+                      { value: 'poc', label: 'POC' },
+                      { value: 'completed', label: 'Completed' },
+                      { value: 'on-hold', label: 'On Hold' },
+                      { value: 'cancelled', label: 'Cancelled' },
+                    ]}
+                    className="w-full"
+                  />
+                </div>
+                <div>
                   <label className="mb-1 block text-xs font-medium text-slate-500">Organization</label>
                   <Dropdown
                     value={selectedOrganization}
@@ -916,10 +980,10 @@ toast.success(wasEditing ? 'Project updated successfully' : 'Project created suc
                     className="w-full"
                   />
                 </div>
-                {[selectedOrganization, selectedPm].some((v) => v !== 'all') && (
+                {[selectedOrganization, selectedPm, selectedStatus].some((v) => v !== 'all') && (
                   <button
-                    onClick={() => { setSelectedOrganization('all'); setSelectedPm('all'); }}
-                    className="mt-3 w-full rounded-lg border border-slate-200 py-1.5 text-xs font-medium text-slate-500 hover:bg-slate-50"
+                    onClick={() => { setSelectedOrganization('all'); setSelectedPm('all'); setSelectedStatus('all'); }}
+                    className="w-full rounded-lg border border-slate-200 py-1.5 text-xs font-medium text-slate-500 hover:bg-slate-50"
                   >
                     Clear filters
                   </button>
@@ -989,11 +1053,13 @@ toast.success(wasEditing ? 'Project updated successfully' : 'Project created suc
 
                 const mainProject = parentProject;
 
-                const pmIds = mainProject?.program_manager_ids?.length
-                  ? mainProject.program_manager_ids
-                  : mainProject?.program_manager_id
-                    ? [mainProject.program_manager_id]
-                    : [];
+                const pmIds = project?.assigned_employee_ids?.length
+                  ? project.assigned_employee_ids
+                  : (project?.pm_id
+                    ? [project.pm_id]
+                    : (mainProject?.program_manager_ids?.length
+                      ? mainProject.program_manager_ids
+                      : (mainProject?.program_manager_id ? [mainProject.program_manager_id] : [])));
 
                 const pmNames = pmIds
                   .map((id) => employees.find((e) => e.id === id)?.name)
@@ -1027,18 +1093,23 @@ toast.success(wasEditing ? 'Project updated successfully' : 'Project created suc
                         </div>
                       </div>
 
-                      {/* Status */}
-                      <span
-                        className={`shrink-0 rounded-full px-2.5 py-1 text-xs font-semibold ${
-                          project.project_status === 'active'
-                            ? 'bg-emerald-50 text-emerald-700 border border-emerald-200'
-                            : project.project_status === 'completed'
-                              ? 'bg-blue-50 text-blue-700 border border-blue-200'
-                              : 'bg-slate-100 text-slate-600 border border-slate-200'
-                        }`}
-                      >
-                        {project.project_status}
-                      </span>
+                      {/* Status & Creation Date */}
+                      <div className="flex flex-col items-end shrink-0 gap-1">
+                        {(() => {
+                          const { label, style } = getStatusBadgeConfig(project.project_status);
+                          return (
+                            <span className={`rounded-full px-2.5 py-1 text-xs font-semibold ${style}`}>
+                              {label}
+                            </span>
+                          );
+                        })()}
+
+                        {(project.created_at || project.start_date) && (
+                          <span className="text-[11px] font-medium text-slate-400">
+                            Created: {formatCreatedDate(project.created_at || project.start_date)}
+                          </span>
+                        )}
+                      </div>
                     </div>
 
                     {/* Project Type chips */}
@@ -1075,6 +1146,11 @@ toast.success(wasEditing ? 'Project updated successfully' : 'Project created suc
                           project={project}
                           allocations={allocations}
                           employees={employees}
+                          onOpenAllocations={() =>
+                            navigate(`${prefix}/allocations`, {
+                              state: { projectId: project.id },
+                            })
+                          }
                           triggerClassName="inline-flex text-sm font-semibold text-slate-800 hover:text-indigo-600 transition-colors cursor-pointer"
                           badgeContent={
                             <span>
@@ -1187,6 +1263,7 @@ toast.success(wasEditing ? 'Project updated successfully' : 'Project created suc
                             setFormOrg(orgOfMainProject(project.main_project_id));
                             setFormPriority(project.priority || 'medium');
                             setFormProjectStatus(project.project_status || 'active');
+                            setSelectedPmIds(project.assigned_employee_ids?.length ? project.assigned_employee_ids : (project.pm_id ? [project.pm_id] : (isPm && pmEmployeeId ? [pmEmployeeId] : [])));
                             setIsModalOpen(true);
                           }}
                           className="rounded-lg p-2 text-slate-500 hover:bg-indigo-50 hover:text-indigo-600"
@@ -1209,6 +1286,7 @@ toast.success(wasEditing ? 'Project updated successfully' : 'Project created suc
                             setFormOrg(orgOfMainProject(project.main_project_id));
                             setFormPriority(project.priority || 'medium');
                             setFormProjectStatus(project.project_status || 'active');
+                            setSelectedPmIds(project.assigned_employee_ids?.length ? project.assigned_employee_ids : (project.pm_id ? [project.pm_id] : (isPm && pmEmployeeId ? [pmEmployeeId] : [])));
                             setIsModalOpen(true);
                           }}
                           className="rounded-lg p-2 text-slate-500 hover:bg-emerald-50 hover:text-emerald-600"
@@ -1416,6 +1494,7 @@ toast.success(wasEditing ? 'Project updated successfully' : 'Project created suc
 
                 <Dropdown
                   options={[
+                    { value: 'poc', label: 'POC' },
                     { value: 'active', label: 'In Progress' },
                     { value: 'completed', label: 'Completed' },
                     { value: 'on-hold', label: 'On Hold' },
@@ -1507,6 +1586,63 @@ toast.success(wasEditing ? 'Project updated successfully' : 'Project created suc
                   required
                   defaultValue={(editingProject || copyingProject)?.start_date}
                   className="input"
+                />
+              </div>
+
+              {/* Program Manager(s) */}
+              <div>
+                <label className="block text-xs font-semibold text-slate-600 mb-1">
+                  Program Manager(s)
+                </label>
+
+                {/* Selected PM chips */}
+                {selectedPmIds.length > 0 && (
+                  <div className="flex flex-wrap gap-1.5 mb-1.5">
+                    {selectedPmIds.map((id) => {
+                      const emp = employees.find(e => e.id === id);
+                      if (!emp) return null;
+                      return (
+                        <span
+                          key={id}
+                          className="inline-flex items-center gap-1 pl-2.5 pr-1 py-0.5 bg-indigo-50 text-indigo-700 rounded-full text-xs font-medium"
+                        >
+                          {emp.name}
+                          {selectedPmIds[0] === id && (
+                            <span className="text-[9px] uppercase tracking-wide text-indigo-400 font-semibold">
+                              primary
+                            </span>
+                          )}
+                          {!(isPm && id === pmEmployeeId) && (
+                            <button
+                              type="button"
+                              onClick={() => setSelectedPmIds(prev => prev.filter(p => p !== id))}
+                              className="p-0.5 hover:bg-indigo-100 rounded-full transition-colors"
+                            >
+                              <X className="w-3 h-3" />
+                            </button>
+                          )}
+                        </span>
+                      );
+                    })}
+                  </div>
+                )}
+
+                <Dropdown
+                  editable={true}
+                  allowCreate={false}
+                  value=""
+                  placeholder="+ Add Program Manager"
+                  options={employees
+                    .filter(e => e.status === 'active' && !selectedPmIds.includes(e.id))
+                    .map((emp) => ({
+                      value: emp.id,
+                      label: emp.name
+                    }))}
+                  onChange={(id) => {
+                    if (id && !selectedPmIds.includes(id)) {
+                      setSelectedPmIds(prev => [...prev, id]);
+                    }
+                  }}
                 />
               </div>
 

@@ -2,7 +2,7 @@ import React, { useMemo } from 'react';
 import { useQuery } from '@tanstack/react-query';
 import { allocationApi, subProjectApi, leaveApi, authApi } from '../../services/api';
 import { FolderKanban, Clock, Calendar, CheckCircle2, AlertCircle, TrendingUp } from 'lucide-react';
-import { format, parseISO, isWithinInterval, isFuture } from 'date-fns';
+import { format, parseISO } from 'date-fns';
 import { getLeaveTypeLabel } from '../../utils/leaveTypes';
 
 const EmployeeDashboard = () => {
@@ -37,7 +37,7 @@ const EmployeeDashboard = () => {
         queryFn: () => leaveApi.getAll({ employee_id: employeeId, start_date: startStr, end_date: endStr }),
         enabled: !!employeeId,
     });
-    const today = new Date();
+    const todayStr = format(new Date(), 'yyyy-MM-dd');
 
     // Map allocations to project data
     const myProjects = allocations.map(alloc => {
@@ -49,13 +49,13 @@ const EmployeeDashboard = () => {
     const totalHours = activeProjects.reduce((sum, p) => sum + (p.total_daily_hours || 0), 0);
 
     const currentLeave = myLeaves.find(l => {
-        try {
-            return isWithinInterval(today, { start: parseISO(l.start_date), end: parseISO(l.end_date) });
-        } catch { return false; }
+        if (!l.start_date || !l.end_date || l.status === 'rejected') return false;
+        return l.start_date <= todayStr && l.end_date >= todayStr;
     });
 
     const upcomingLeaves = myLeaves.filter(l => {
-        try { return isFuture(parseISO(l.start_date)); } catch { return false; }
+        if (!l.start_date || l.status === 'rejected') return false;
+        return l.start_date > todayStr;
     });
 
     return (

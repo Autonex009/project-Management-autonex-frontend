@@ -2,7 +2,7 @@ import React, { useMemo } from 'react';
 import { useQuery } from '@tanstack/react-query';
 import { allocationApi, subProjectApi, leaveApi, employeeApi } from '../../services/api';
 import { FolderKanban, Users, Calendar, CheckCircle2, Clock, AlertTriangle, TrendingUp } from 'lucide-react';
-import { format, parseISO, isWithinInterval, isFuture } from 'date-fns';
+import { format, parseISO } from 'date-fns';
 import { parentProjectApi } from '../../services/api';
 import { getPmEmployeeId, getPmSubProjects } from '../../utils/pmScope';
 import Table from '../../components/ui/Table';
@@ -29,21 +29,20 @@ const PMDashboard = () => {
         queryKey: ['allocations'],
         queryFn: allocationApi.getAll,
     });
-    const { startStr, endStr } = useMemo(() => {
+    const { startStr } = useMemo(() => {
         const today = new Date();
         const y = today.getFullYear();
         const m = today.getMonth();
         const start = `${y}-${String(m + 1).padStart(2, '0')}-01`;
-        const end = `${y}-${String(m + 1).padStart(2, '0')}-${String(new Date(y, m + 1, 0).getDate()).padStart(2, '0')}`;
-        return { startStr: start, endStr: end };
+        return { startStr: start };
     }, []);
 
     const { data: allLeaves = [] } = useQuery({
-        queryKey: ['leaves', startStr, endStr],
-        queryFn: () => leaveApi.getAll({ start_date: startStr, end_date: endStr }),
+        queryKey: ['leaves', startStr],
+        queryFn: () => leaveApi.getAll({ start_date: startStr }),
     });
 
-    const today = new Date();
+    const todayStr = format(new Date(), 'yyyy-MM-dd');
 
     // Projects managed by this PM (by assigned_employee_ids or all if PM)
     const scopedProjects = getPmSubProjects(projects, parentProjects, pmEmployeeId, allocations);
@@ -51,22 +50,22 @@ const PMDashboard = () => {
     const completedProjects = scopedProjects.filter(p => p.project_status === 'completed');
 
     // Team members = employees who are allocated to any project
-    const allocatedEmployeeIds = [...new Set(
+    const allocatedEmployeeIdSet = new Set(
         allocations
             .filter(a => scopedProjects.some(project => project.id === a.sub_project_id))
-            .map(a => a.employee_id)
-    )];
-    const teamMembers = employees.filter(e => allocatedEmployeeIds.includes(e.id));
+            .map(a => Number(a.employee_id))
+    );
+    const teamMembers = employees.filter(e => allocatedEmployeeIdSet.has(Number(e.id)));
 
     // Leaves
     const pendingLeaves = allLeaves.filter(l => {
-        try { return isFuture(parseISO(l.start_date)); } catch { return false; }
-    }).filter(l => allocatedEmployeeIds.includes(l.employee_id));
+        if (!l.start_date || l.status === 'rejected') return false;
+        return l.start_date > todayStr && allocatedEmployeeIdSet.has(Number(l.employee_id));
+    });
     const currentLeaves = allLeaves.filter(l => {
-        try {
-            return isWithinInterval(today, { start: parseISO(l.start_date), end: parseISO(l.end_date) });
-        } catch { return false; }
-    }).filter(l => allocatedEmployeeIds.includes(l.employee_id));
+        if (!l.start_date || !l.end_date || l.status === 'rejected') return false;
+        return l.start_date <= todayStr && l.end_date >= todayStr && allocatedEmployeeIdSet.has(Number(l.employee_id));
+    });
 
     // At-risk projects (under-staffed)
     const atRiskProjects = activeProjects.filter(p => {
