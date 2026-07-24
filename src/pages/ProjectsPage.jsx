@@ -791,32 +791,35 @@ toast.success(wasEditing ? 'Project updated successfully' : 'Project created suc
   const currentMainProject = visibleMainProjects.find(p => p.id === parseInt(filterMainProjectId));
 
   const projectMetrics = useMemo(() => {
-  const totalProjects = filteredProjects.length;
+    const totalProjects = filteredProjects.length;
 
-  const activeProjects = filteredProjects.filter(
-    p => p.project_status === "active"
-  ).length;
+    const activeProjects = filteredProjects.filter(
+      p => p.project_status === "active"
+    ).length;
 
-  const overburdenedProjects = filteredProjects.filter(
-    p => getSystemRecommendation(p).label === "Overburdened"
-  ).length;
+    const overburdenedProjects = filteredProjects.filter(
+      p => {
+        const required = p.required_manpower || 0;
+        const allocated = getAllocatedManpower(p);
+        return required > 0 ? allocated < required : false;
+      }
+    ).length;
 
-  const unstaffedProjects = filteredProjects.filter(
-    p => getAllocatedManpower(p) === 0
-  ).length;
+    const balancedProjects = filteredProjects.filter(
+      p => {
+        const required = p.required_manpower || 0;
+        const allocated = getAllocatedManpower(p);
+        return required > 0 ? allocated >= required : allocated > 0;
+      }
+    ).length;
 
-  const balancedProjects = filteredProjects.filter(
-    p => getSystemRecommendation(p).label === "Balanced"
-  ).length;
-
-  return {
-    totalProjects,
-    activeProjects,
-    overburdenedProjects,
-    unstaffedProjects,
-    balancedProjects,
-  };
-}, [filteredProjects, allocations, employees, leaves]);
+    return {
+      totalProjects,
+      activeProjects,
+      overburdenedProjects,
+      balancedProjects,
+    };
+  }, [filteredProjects, allocations, employees, leaves]);
 
   return (
     <div className="space-y-4">
@@ -833,11 +836,10 @@ toast.success(wasEditing ? 'Project updated successfully' : 'Project created suc
         </div>
       </div>
 
-      <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-5 gap-3">
+      <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-3">
         <StatCard title="Total Projects" value={projectMetrics.totalProjects} icon={FileText} tone="indigo" hint="all projects" />
         <StatCard title="Active Projects" value={projectMetrics.activeProjects} icon={UserCheck} tone="emerald" hint="currently active" />
         <StatCard title="Overburdened" value={projectMetrics.overburdenedProjects} icon={BarChart3} tone="rose" hint="need staffing" />
-        <StatCard title="Unstaffed" value={projectMetrics.unstaffedProjects} icon={Users} tone="amber" hint="no one allocated" />
         <StatCard title="Balanced" value={projectMetrics.balancedProjects} icon={Settings} tone="sky" hint="well staffed" />
       </div>
 
