@@ -6,7 +6,7 @@ import { FolderKanban, Calendar, Users, AlertTriangle, ArrowUpRight, Activity, Z
 import Table from '../components/ui/Table';
 import Button from '../components/ui/Button';
 import StatCard from '../components/dashboard/StatCard';
-import { isWithinInterval, parseISO } from 'date-fns'; 
+import { parseISO, format } from 'date-fns'; 
 import { getWorkingDays } from '../utils/dateCalculations';
 
 // ===============================================
@@ -66,12 +66,10 @@ const Dashboard = () => {
   const activeEmployees = employees.filter(e => e.status === 'active').length;
   const allocatedEmployeeIds = new Set(allocations.map(a => a.employee_id));
 
-  const today = new Date();
+  const todayStr = format(new Date(), 'yyyy-MM-dd');
   const employeesOnLeave = leaves.filter(leave => {
-    if (!leave.start_date || !leave.end_date) return false;
-    const start = parseISO(leave.start_date);
-    const end = parseISO(leave.end_date);
-    return isWithinInterval(today, { start, end });
+    if (!leave.start_date || !leave.end_date || leave.status === 'rejected') return false;
+    return leave.start_date <= todayStr && leave.end_date >= todayStr;
   });
 
   // Project analysis
