@@ -49,7 +49,7 @@ export const Table = ({
 
     const outerClass = isBorderless
         ? `${className}`
-        : `bg-white dark:bg-[#0f0f0f] rounded-2xl border border-slate-200/60 dark:border-neutral-800 shadow-[0_1px_3px_rgba(0,0,0,0.04)] ${airy ? 'overflow-hidden' : ''} ${className}`;
+        : `bg-white dark:bg-[#0f0f0f] rounded-2xl border border-slate-200/60 dark:border-neutral-800 shadow-[0_1px_3px_rgba(0,0,0,0.04)] ${className}`;
 
     return (
         <div className={outerClass}>
