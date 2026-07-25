@@ -59,11 +59,44 @@ const AnalyticsDashboard = () => {
             return analyticsApi.runSync({ date_from, date_to });
         },
         onSuccess: (res) => {
-            toast.success(`Encord sync: ${res.inserted + res.updated} rows from ${res.projects} project(s)`);
-            queryClient.invalidateQueries({ queryKey: ['analytics-summary'] });
+            // toast.success(`Encord sync: ${res.inserted + res.updated} rows from ${res.projects} project(s)`);
+            // queryClient.invalidateQueries({ queryKey: ['analytics-summary'] });
+            toast.success("Encord sync started in the background. This may take up to 15 minutes.");
+            localStorage.setItem('active_sync_job_id', res.job_id);
         },
-        onError: (e) => toast.error(e?.response?.data?.detail || 'Sync failed'),
+        onError: (e) => toast.error(e?.response?.data?.detail || 'Sync failed to start'),
     });
+
+    const handleSyncClick = async () => {
+        // 1. Check if we already have a job running
+        const existingJobId = localStorage.getItem('active_sync_job_id');
+
+        if (existingJobId) {
+            try {
+                // 2. Ask the backend for the status of this specific job
+                const statusRes = await analyticsApi.getSyncStatus(existingJobId);
+
+                if (statusRes.status === 'in_progress' || statusRes.status === 'queued' || statusRes.status === 'deferred') {
+                    // Job is still running. Stop here and tell the user.
+                    toast.info("A sync is currently running in the background. Please wait.");
+                    return; 
+                } 
+                
+                if (statusRes.status === 'complete') {
+                    // Job finished! Clear the memory, refresh the data, and start a new one.
+                    toast.success("Previous sync finished! Starting a fresh sync...");
+                    localStorage.removeItem('active_sync_job_id');
+                    queryClient.invalidateQueries({ queryKey: ['analytics-summary'] });
+                }
+            } catch (error) {
+                // If the job_id expired in Redis or wasn't found (404), clear it out
+                localStorage.removeItem('active_sync_job_id');
+            }
+        }
+
+        // 3. If no job was running (or the old one finished/expired), start a new one
+        syncMutation.mutate();
+    };
 
     const totals = useMemo(() => ({
         live: rows.filter((r) => r.status === 'active').length,
@@ -94,7 +127,7 @@ const AnalyticsDashboard = () => {
                     <h1 className="text-lg font-semibold text-slate-900">Project Analytics</h1>
                     <p className="text-slate-500 text-[13px] mt-0.5">Encord platform activity across all mapped projects (this month).</p>
                 </div>
-                <Button variant="secondary" onClick={() => syncMutation.mutate()} disabled={syncMutation.isPending}>
+                <Button variant="secondary" onClick={handleSyncClick} disabled={syncMutation.isPending}>
                     <RefreshCw className={`w-4 h-4 ${syncMutation.isPending ? 'animate-spin' : ''}`} />
                     {syncMutation.isPending ? 'Syncing…' : 'Sync now'}
                 </Button>
