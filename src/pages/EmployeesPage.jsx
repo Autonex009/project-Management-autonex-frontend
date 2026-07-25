@@ -619,7 +619,7 @@ function EmployeeActionMenu({
 
       {isOpen && (
         <div
-          className={`absolute right-0 ${positionClass} z-40 w-44 bg-white dark:bg-neutral-900 rounded-xl shadow-xl border border-slate-200/80 dark:border-neutral-800 py-1 text-xs font-medium focus:outline-none`}
+          className={`absolute right-0 ${positionClass} z-50 w-44 bg-white dark:bg-neutral-900 rounded-xl shadow-xl border border-slate-200/80 dark:border-neutral-800 py-1 text-xs font-medium focus:outline-none`}
           onClick={(e) => e.stopPropagation()}
         >
           {statusParam === 'archived' ? (
@@ -733,7 +733,7 @@ const EmployeesPage = () => {
   // Fetch all employees for organization KPI calculations
   const { data: allEmployeesData = [] } = useQuery({
     queryKey: ['all-employees-kpis'],
-    queryFn: () => employeeApi.getAll(),
+    queryFn: () => employeeApi.getAll({ include_archived: true }),
   });
 
   const allStaff = allEmployeesData.length > 0 ? allEmployeesData : employees;
@@ -995,7 +995,7 @@ const EmployeesPage = () => {
   };
 
   const designationOptions = Array.from(
-    new Set(employees.map((employee) => employee.designation).filter(Boolean))
+    new Set(allStaff.map((employee) => employee.designation).filter(Boolean))
   ).sort();
 
   const filteredEmployees = employees.filter((employee) => {
