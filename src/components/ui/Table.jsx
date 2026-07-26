@@ -25,6 +25,7 @@ export const Table = ({
     expandedRowId,
     getRowId = (row) => row.id,
     renderExpandedRow,
+    allowOverflow = false, // let row popovers/menus escape the card instead of being clipped
 }) => {
     const totalPages = Math.ceil((data?.length || 0) / pageSize);
     const startIndex = (currentPage - 1) * pageSize;
@@ -66,7 +67,7 @@ export const Table = ({
             )}
             <div className="overflow-visible">
                 <table className="w-full table-fixed border-separate border-spacing-0">
-                    <thead className={`${theadBg} border-b border-slate-100 dark:border-neutral-800`}>
+                    <thead className={`${theadBg} ${allowOverflow && !title ? 'rounded-t-2xl' : ''} border-b border-slate-100 dark:border-neutral-800`}>
                         <tr>
                             {columns.map((col, cIdx) => (
                                 <th
@@ -154,8 +155,8 @@ export const Table = ({
             </div>
 
             {!loading && totalPages > 1 && onPageChange && (
-                <div className="flex items-center justify-between px-5 py-3 border-t border-slate-100 dark:border-neutral-800">
-                    <p className="text-sm text-slate-500 dark:text-zinc-400">
+                <div className="flex items-center justify-between px-4 py-2.5 border-t border-slate-100 dark:border-neutral-800 rounded-b-2xl">
+                    <p className="text-[13px] text-slate-500 dark:text-zinc-400">
                         Showing {paginatedData.length === 0 ? 0 : startIndex + 1}–
                         {Math.min(startIndex + pageSize, data.length)} of {data.length} items
                     </p>
@@ -163,7 +164,7 @@ export const Table = ({
                         <button
                             onClick={() => onPageChange(Math.max(1, currentPage - 1))}
                             disabled={currentPage === 1}
-                            className="px-3 py-1.5 text-sm rounded-lg border border-slate-200 text-slate-600 hover:bg-slate-50 dark:border-neutral-800 dark:text-zinc-300 dark:hover:bg-white/[0.05] disabled:opacity-40 disabled:cursor-not-allowed transition-colors"
+                            className="h-8 px-2.5 text-[13px] rounded-md border border-slate-200 text-slate-600 hover:bg-slate-50 dark:border-neutral-800 dark:text-zinc-300 dark:hover:bg-white/[0.05] disabled:opacity-40 disabled:cursor-not-allowed transition-colors"
                         >
                             Previous
                         </button>
@@ -176,13 +177,13 @@ export const Table = ({
                             }, [])
                             .map((p, idx) =>
                                 p === '...' ? (
-                                    <span key={`ellipsis-${idx}`} className="px-2 text-slate-400 text-sm">...</span>
+                                    <span key={`ellipsis-${idx}`} className="px-1.5 text-slate-400 text-[13px]">...</span>
                                 ) : (
                                     <button
                                         key={p}
                                         onClick={() => onPageChange(p)}
-                                        className={`px-3 py-1.5 text-sm rounded-lg border transition-colors ${currentPage === p
-                                            ? 'bg-blue-600 border-blue-600 text-white font-medium'
+                                        className={`h-8 min-w-8 px-2 text-[13px] rounded-md border transition-colors ${currentPage === p
+                                            ? 'bg-indigo-600 border-indigo-600 text-white font-medium'
                                             : 'border-slate-200 text-slate-600 hover:bg-slate-50 dark:border-neutral-800 dark:text-zinc-300 dark:hover:bg-white/[0.05]'
                                             }`}
                                     >
@@ -193,7 +194,7 @@ export const Table = ({
                         <button
                             onClick={() => onPageChange(Math.min(totalPages, currentPage + 1))}
                             disabled={currentPage === totalPages}
-                            className="px-3 py-1.5 text-sm rounded-lg border border-slate-200 text-slate-600 hover:bg-slate-50 dark:border-neutral-800 dark:text-zinc-300 dark:hover:bg-white/[0.05] disabled:opacity-40 disabled:cursor-not-allowed transition-colors"
+                            className="h-8 px-2.5 text-[13px] rounded-md border border-slate-200 text-slate-600 hover:bg-slate-50 dark:border-neutral-800 dark:text-zinc-300 dark:hover:bg-white/[0.05] disabled:opacity-40 disabled:cursor-not-allowed transition-colors"
                         >
                             Next
                         </button>

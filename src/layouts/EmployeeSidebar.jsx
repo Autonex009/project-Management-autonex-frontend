@@ -1,20 +1,22 @@
 import { NavLink, useLocation, useNavigate } from 'react-router-dom';
 import { LayoutDashboard, FolderKanban, Calendar, CalendarCheck, Rocket, LogOut, FileText, Layers, UserCog, UserRound, Users, Users2, TrendingUp, GraduationCap, Info, ClipboardList } from 'lucide-react';
 
-const rowBase = 'flex items-center gap-2.5 w-full px-2.5 py-[7px] rounded-md text-[13px] font-medium transition-colors duration-150 group relative';
+const rowBase = 'flex items-center gap-2.5 w-full px-2.5 py-[9px] rounded-lg text-[13.5px] transition-all duration-150 group relative outline-none focus-visible:ring-2 focus-visible:ring-blue-500/40';
 
 const accentTheme = {
     pm: {
-        active: 'bg-white text-blue-700 shadow-sm dark:bg-white/[0.08] dark:text-zinc-100 dark:shadow-none',
-        inactive: 'text-slate-600 hover:text-slate-900 hover:bg-slate-200/60 dark:text-zinc-400 dark:hover:text-zinc-100 dark:hover:bg-white/[0.05]',
+        active: 'bg-white text-slate-900 font-semibold ring-1 ring-slate-200/60 shadow-[0_1px_2px_rgba(16,24,40,0.04)] dark:bg-white/[0.08] dark:text-zinc-100 dark:ring-0 dark:shadow-none',
+        inactive: 'text-slate-600 font-medium hover:text-slate-900 hover:bg-white/70 dark:text-zinc-400 dark:hover:text-zinc-100 dark:hover:bg-white/[0.05]',
         iconActive: 'text-blue-600 dark:text-zinc-100',
-        iconInactive: 'text-slate-400 group-hover:text-slate-600 dark:text-zinc-500 dark:group-hover:text-zinc-200',
+        iconInactive: 'text-slate-500 group-hover:text-slate-800 dark:text-zinc-500 dark:group-hover:text-zinc-200',
+        bar: 'bg-blue-600 dark:bg-blue-400',
     },
     employee: {
-        active: 'bg-white text-emerald-700 shadow-sm dark:bg-white/[0.08] dark:text-zinc-100 dark:shadow-none',
-        inactive: 'text-slate-600 hover:text-slate-900 hover:bg-slate-200/60 dark:text-zinc-400 dark:hover:text-zinc-100 dark:hover:bg-white/[0.05]',
+        active: 'bg-white text-slate-900 font-semibold ring-1 ring-slate-200/60 shadow-[0_1px_2px_rgba(16,24,40,0.04)] dark:bg-white/[0.08] dark:text-zinc-100 dark:ring-0 dark:shadow-none',
+        inactive: 'text-slate-600 font-medium hover:text-slate-900 hover:bg-white/70 dark:text-zinc-400 dark:hover:text-zinc-100 dark:hover:bg-white/[0.05]',
         iconActive: 'text-emerald-600 dark:text-zinc-100',
-        iconInactive: 'text-slate-400 group-hover:text-slate-600 dark:text-zinc-500 dark:group-hover:text-zinc-200',
+        iconInactive: 'text-slate-500 group-hover:text-slate-800 dark:text-zinc-500 dark:group-hover:text-zinc-200',
+        bar: 'bg-emerald-600 dark:bg-emerald-400',
     },
 };
 
@@ -72,14 +74,15 @@ const EmployeeSidebar = ({ user = {}, account, role, isPm, onNavigate, onLogout 
                 onClick={handleNavigate}
                 className={`${rowBase} ${isActive ? theme.active : theme.inactive}`}
             >
-                <Icon className={`w-4 h-4 shrink-0 transition-colors ${isActive ? theme.iconActive : theme.iconInactive}`} />
+                <Icon className={`w-[18px] h-[18px] shrink-0 transition-colors ${isActive ? theme.iconActive : theme.iconInactive}`} strokeWidth={isActive ? 2.4 : 2} />
+                {isActive && <span className={`absolute left-0 top-1/2 -translate-y-1/2 h-4 w-[3px] rounded-full ${theme.bar}`} />}
                 <span className="truncate">{item.label}</span>
             </NavLink>
         );
     };
 
     return (
-        <div className="h-full flex flex-col overflow-visible bg-[#f4f5f7] dark:bg-[#070707]">
+        <div className="h-full flex flex-col overflow-visible bg-gradient-to-b from-[#f6f7f9] to-[#eef0f3] dark:bg-[#070707] dark:from-[#070707] dark:to-[#070707]">
             {/* Brand Header */}
             <div className="shrink-0 px-3 pt-5 pb-4">
                 <div className="flex items-center gap-2.5">

@@ -1,14 +1,14 @@
 import { useState, useEffect } from 'react';
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import { signupRequestApi } from '../services/api';
-import Spinner from '../components/ui/LoadingSpinner';
 import Button from '../components/ui/Button';
-import { CheckCircle, XCircle, Clock, User, Mail, Phone, Briefcase, AlertTriangle, RotateCcw } from 'lucide-react';
+import { CheckCircle, XCircle, Clock, AlertTriangle, RotateCcw } from 'lucide-react';
 import { format, parseISO } from 'date-fns';
 import toast from 'react-hot-toast';
 import Dropdown from '../components/ui/Dropdown';
 import Modal from '../components/ui/Modal';
 import SearchBar from '../components/ui/SearchBar';
+import Table from '../components/ui/Table';
 
 const EMPLOYEE_TYPES = ['Full-time', 'Part-time', 'Intern', 'Contractor'];
 
@@ -123,38 +123,41 @@ const SignupRequestsPage = () => {
     };
 
     return (
-        <div className="space-y-6">
+        <div className="space-y-4">
             {/* Header */}
             <div>
                 <div className="flex items-center gap-3">
-                    <h1 className="text-lg font-semibold text-slate-800">Signup Requests</h1>
+                    <h1 className="text-lg font-semibold text-slate-900">Signup Requests</h1>
                     {pendingCount > 0 && (
                         <span className="inline-flex items-center justify-center h-6 min-w-[24px] px-1.5 rounded-full text-xs font-bold bg-red-500 text-white">
                             {pendingCount}
                         </span>
                     )}
                 </div>
-                <p className="mt-1 text-sm text-slate-500">
+                <p className="mt-0.5 text-[13px] text-slate-500">
                     Review and approve employee signup requests. Approved accounts receive credentials via email.
                 </p>
             </div>
 
             {/* Tabs + Search */}
-            <div className="flex items-center justify-between gap-4">
-                <div className="flex gap-1 bg-slate-100 rounded-xl p-1 w-fit">
-                    {TABS.map(tab => (
-                        <button key={tab} onClick={() => handleTabChange(tab)}
-                            className={`px-4 py-2 rounded-lg text-sm font-medium transition-all ${
-                                activeTab === tab ? 'bg-white text-slate-800 shadow-sm' : 'text-slate-500 hover:text-slate-700'
-                            }`}>
-                            {tab}
-                            {tab === 'Pending' && pendingCount > 0 && (
-                                <span className="ml-1.5 inline-flex items-center justify-center h-4 min-w-[16px] px-1 rounded-full text-[10px] font-bold bg-amber-500 text-white">
-                                    {pendingCount}
-                                </span>
-                            )}
-                        </button>
-                    ))}
+            <div className="flex flex-wrap items-center justify-between gap-3">
+                <div className="inline-flex items-center rounded-lg border border-slate-200 bg-slate-50 p-0.5">
+                    {TABS.map(tab => {
+                        const isActive = activeTab === tab;
+                        return (
+                            <button key={tab} onClick={() => handleTabChange(tab)}
+                                className={`inline-flex items-center gap-1.5 px-3.5 py-1.5 text-[13px] font-semibold rounded-md transition-all ${
+                                    isActive ? 'bg-white text-slate-900 shadow-sm ring-1 ring-slate-200/70' : 'text-slate-500 hover:text-slate-800'
+                                }`}>
+                                {tab}
+                                {tab === 'Pending' && pendingCount > 0 && (
+                                    <span className="inline-flex items-center justify-center h-4 min-w-4 px-1 rounded-full text-[10px] font-bold bg-amber-500 text-white">
+                                        {pendingCount}
+                                    </span>
+                                )}
+                            </button>
+                        );
+                    })}
                 </div>
                 <SearchBar
                     value={search}
@@ -166,138 +169,140 @@ const SignupRequestsPage = () => {
             </div>
 
             {/* Table */}
-            <div className="bg-white rounded-2xl border border-slate-200/60 shadow-sm">
-                {isLoading ? (
-                    <div className="flex items-center justify-center py-16 text-slate-400">Loading...</div>
-                ) : requests.length === 0 ? (
-                    <div className="flex flex-col items-center justify-center py-16 text-slate-400">
-                        <User className="w-10 h-10 mb-3 text-slate-300" />
-                        <p className="font-medium">No {activeTab.toLowerCase()} requests</p>
-                        <p className="text-sm mt-1">
-                            Share <strong className="text-slate-600">autonex-frontend.vercel.app/employee-signup</strong> with employees to get started.
-                        </p>
+            <Table
+                variant="untitled"
+                loading={isLoading}
+                data={requests}
+                currentPage={1}
+                pageSize={PAGE_SIZE}
+                getRowId={(row) => row.id}
+                expandedRowId={expandedId}
+                emptyState={{ title: `No ${activeTab.toLowerCase()} requests`, description: 'Applicant signup requests will appear here.' }}
+                renderExpandedRow={(req) => (
+                    <div className="px-4 pb-4 border-t border-slate-100 bg-slate-50/60">
+                        <div className="pt-4 grid grid-cols-1 md:grid-cols-2 gap-4 text-sm">
+                            <div>
+                                <p className="text-[11px] font-semibold text-slate-400 uppercase tracking-wide mb-1">Employment Type</p>
+                                <Dropdown
+                                    options={EMPLOYEE_TYPES}
+                                    value={localEmployeeTypes[req.id] ?? req.employee_type ?? ''}
+                                    onChange={newType => {
+                                        setLocalEmployeeTypes(prev => ({ ...prev, [req.id]: newType }));
+                                        updateMutation.mutate({ id: req.id, data: { employee_type: newType } });
+                                    }}
+                                />
+                            </div>
+                            <div>
+                                <p className="text-[11px] font-semibold text-slate-400 uppercase tracking-wide mb-1">Skills</p>
+                                <div className="flex flex-wrap gap-1.5">
+                                    {(req.skills || []).length > 0
+                                        ? req.skills.map(s => (
+                                            <span key={s} className="px-2 py-0.5 rounded-md bg-indigo-50 text-indigo-700 border border-indigo-200 text-[12px] font-medium">{s}</span>
+                                          ))
+                                        : <span className="text-slate-400 text-[13px]">None provided</span>
+                                    }
+                                </div>
+                            </div>
+                            {req.reason && (
+                                <div className="md:col-span-2">
+                                    <p className="text-[11px] font-semibold text-slate-400 uppercase tracking-wide mb-1">Reason / Background</p>
+                                    <p className="text-[13px] text-slate-700">{req.reason}</p>
+                                </div>
+                            )}
+                            {req.rejection_reason && (
+                                <div className="md:col-span-2">
+                                    <p className="text-[11px] font-semibold text-red-400 uppercase tracking-wide mb-1">Rejection Reason</p>
+                                    <p className="text-[13px] text-red-700">{req.rejection_reason}</p>
+                                </div>
+                            )}
+                            {req.reviewed_at && (
+                                <div>
+                                    <p className="text-[11px] font-semibold text-slate-400 uppercase tracking-wide mb-1">Reviewed At</p>
+                                    <p className="text-[13px] text-slate-700">{format(parseISO(req.reviewed_at), 'MMM d, yyyy HH:mm')}</p>
+                                </div>
+                            )}
+                        </div>
                     </div>
-                ) : (
-                    <div className="divide-y divide-slate-100">
-                        {requests.map(req => {
+                )}
+                columns={[
+                    {
+                        key: 'name',
+                        label: 'Applicant',
+                        width: 'w-[26%]',
+                        render: (value, req) => (
+                            <div className="flex items-center gap-3">
+                                <div className="w-9 h-9 rounded-full bg-indigo-50 text-indigo-600 flex items-center justify-center text-[13px] font-semibold ring-1 ring-slate-200 shrink-0">
+                                    {req.name.charAt(0).toUpperCase()}
+                                </div>
+                                <div className="min-w-0">
+                                    <div className="text-[13.5px] font-semibold text-slate-900 truncate" title={req.name}>{req.name}</div>
+                                    <div className="text-[12px] text-slate-400 truncate" title={req.email}>{req.email}</div>
+                                </div>
+                            </div>
+                        ),
+                    },
+                    {
+                        key: 'designation',
+                        label: 'Designation',
+                        width: 'w-[15%]',
+                        render: (v) => <span className="text-[13px] font-medium text-slate-600">{v || '—'}</span>,
+                    },
+                    {
+                        key: 'phone',
+                        label: 'Phone',
+                        width: 'w-[13%]',
+                        render: (v) => <span className="text-[13px] text-slate-600 tabular-nums">{v || '—'}</span>,
+                    },
+                    {
+                        key: 'created_at',
+                        label: 'Requested',
+                        width: 'w-[12%]',
+                        render: (v) => <span className="text-[13px] text-slate-500">{v ? format(parseISO(v), 'MMM d, yyyy') : '—'}</span>,
+                    },
+                    {
+                        key: 'status',
+                        label: 'Status',
+                        width: 'w-[11%]',
+                        render: (v) => STATUS_BADGE[v] || STATUS_BADGE.pending,
+                    },
+                    {
+                        key: 'actions',
+                        label: 'Actions',
+                        align: 'right',
+                        width: 'w-[23%]',
+                        render: (_, req) => {
                             const isExpanded = expandedId === req.id;
                             return (
-                                <div key={req.id} className="hover:bg-slate-50/50 transition-colors">
-                                    <div className="px-6 py-4 flex items-center justify-between gap-4">
-                                        {/* Left — info */}
-                                        <div className="flex items-center gap-4 min-w-0 flex-1">
-                                            <div className="w-10 h-10 rounded-xl bg-gradient-to-br from-slate-100 to-slate-200 flex items-center justify-center shrink-0">
-                                                <span className="text-sm font-bold text-slate-600">
-                                                    {req.name.charAt(0).toUpperCase()}
-                                                </span>
-                                            </div>
-                                            <div className="min-w-0">
-                                                <div className="flex items-center gap-2 flex-wrap">
-                                                    <p className="font-semibold text-slate-800">{req.name}</p>
-                                                    {STATUS_BADGE[req.status] || STATUS_BADGE.pending}
-                                                </div>
-                                                <div className="flex items-center gap-3 mt-0.5 flex-wrap">
-                                                    <span className="flex items-center gap-1 text-xs text-slate-500">
-                                                        <Mail className="w-3 h-3"/>{req.email}
-                                                    </span>
-                                                    {req.designation && (
-                                                        <span className="flex items-center gap-1 text-xs text-slate-500">
-                                                            <Briefcase className="w-3 h-3"/>{req.designation}
-                                                        </span>
-                                                    )}
-                                                    {req.phone && (
-                                                        <span className="flex items-center gap-1 text-xs text-slate-500">
-                                                            <Phone className="w-3 h-3"/>{req.phone}
-                                                        </span>
-                                                    )}
-                                                    <span className="text-xs text-slate-400">
-                                                        {req.created_at ? format(parseISO(req.created_at), 'MMM d, yyyy') : ''}
-                                                    </span>
-                                                </div>
-                                            </div>
-                                        </div>
-
-                                        {/* Right — actions */}
-                                        <div className="flex items-center gap-2 shrink-0">
-                                            {req.status === 'rejected' && (
-                                                <Button variant="secondary" size="sm" onClick={() => undoRejectMutation.mutate(req.id)} disabled={undoRejectMutation.isPending}>
-                                                    <RotateCcw className="w-3.5 h-3.5"/>Undo
-                                                </Button>
-                                            )}
-                                            {req.status === 'approved' && (
-                                                <Button variant="secondary" size="sm" onClick={() => { setRejectModal({ requestId: req.id, name: req.name, mode: 'undoApprove' }); setRejectReason(''); }}>
-                                                    <RotateCcw className="w-3.5 h-3.5"/>Undo
-                                                </Button>
-                                            )}
-                                            <Button variant="secondary" size="sm" onClick={() => setExpandedId(isExpanded ? null : req.id)}>
-                                                {isExpanded ? 'Less' : 'Details'}
+                                <div className="flex items-center justify-end gap-2">
+                                    {req.status === 'rejected' && (
+                                        <Button variant="secondary" size="sm" onClick={() => undoRejectMutation.mutate(req.id)} disabled={undoRejectMutation.isPending}>
+                                            <RotateCcw className="w-3.5 h-3.5"/>Undo
+                                        </Button>
+                                    )}
+                                    {req.status === 'approved' && (
+                                        <Button variant="secondary" size="sm" onClick={() => { setRejectModal({ requestId: req.id, name: req.name, mode: 'undoApprove' }); setRejectReason(''); }}>
+                                            <RotateCcw className="w-3.5 h-3.5"/>Undo
+                                        </Button>
+                                    )}
+                                    <Button variant="secondary" size="sm" onClick={() => setExpandedId(isExpanded ? null : req.id)}>
+                                        {isExpanded ? 'Less' : 'Details'}
+                                    </Button>
+                                    {req.status === 'pending' && (
+                                        <>
+                                            <Button variant="success" size="sm" onClick={() => approveMutation.mutate(req.id)} disabled={approveMutation.isPending}>
+                                                <CheckCircle className="w-3.5 h-3.5"/>Approve
                                             </Button>
-                                            {req.status === 'pending' && (
-                                                <>
-                                                    <Button variant="success" size="sm" onClick={() => approveMutation.mutate(req.id)} disabled={approveMutation.isPending}>
-                                                        <CheckCircle className="w-3.5 h-3.5"/>Approve
-                                                    </Button>
-                                                    <Button variant="danger" size="sm" onClick={() => { setRejectModal({ requestId: req.id, name: req.name, mode: 'reject' }); setRejectReason(''); }}>
-                                                        <XCircle className="w-3.5 h-3.5"/>Reject
-                                                    </Button>
-                                                </>
-                                            )}
-                                        </div>
-                                    </div>
-
-                                    {/* Expanded details */}
-                                    {isExpanded && (
-                                        <div className="px-6 pb-4 border-t border-slate-100 bg-slate-50/60">
-                                            <div className="pt-4 grid grid-cols-1 md:grid-cols-2 gap-4 text-sm">
-                                                <div>
-                                                    <p className="text-xs font-semibold text-slate-400 uppercase mb-1">Employment Type</p>
-                                                    <Dropdown
-                                                        options={EMPLOYEE_TYPES}
-                                                        value={localEmployeeTypes[req.id] ?? req.employee_type ?? ''}
-                                                        onChange={newType => {
-                                                            setLocalEmployeeTypes(prev => ({ ...prev, [req.id]: newType }));
-                                                            updateMutation.mutate({ id: req.id, data: { employee_type: newType } });
-                                                        }}
-                                                    />
-                                                </div>
-                                                <div>
-                                                    <p className="text-xs font-semibold text-slate-400 uppercase mb-1">Skills</p>
-                                                    <div className="flex flex-wrap gap-1.5">
-                                                        {(req.skills || []).length > 0
-                                                            ? req.skills.map(s => (
-                                                                <span key={s} className="px-2 py-0.5 rounded-lg bg-blue-100 text-blue-800 text-xs">{s}</span>
-                                                              ))
-                                                            : <span className="text-slate-400">None provided</span>
-                                                        }
-                                                    </div>
-                                                </div>
-                                                {req.reason && (
-                                                    <div className="md:col-span-2">
-                                                        <p className="text-xs font-semibold text-slate-400 uppercase mb-1">Reason / Background</p>
-                                                        <p className="text-slate-700">{req.reason}</p>
-                                                    </div>
-                                                )}
-                                                {req.rejection_reason && (
-                                                    <div className="md:col-span-2">
-                                                        <p className="text-xs font-semibold text-red-400 uppercase mb-1">Rejection Reason</p>
-                                                        <p className="text-red-700">{req.rejection_reason}</p>
-                                                    </div>
-                                                )}
-                                                {req.reviewed_at && (
-                                                    <div>
-                                                        <p className="text-xs font-semibold text-slate-400 uppercase mb-1">Reviewed At</p>
-                                                        <p className="text-slate-700">{format(parseISO(req.reviewed_at), 'MMM d, yyyy HH:mm')}</p>
-                                                    </div>
-                                                )}
-                                            </div>
-                                        </div>
+                                            <Button variant="danger" size="sm" onClick={() => { setRejectModal({ requestId: req.id, name: req.name, mode: 'reject' }); setRejectReason(''); }}>
+                                                <XCircle className="w-3.5 h-3.5"/>Reject
+                                            </Button>
+                                        </>
                                     )}
                                 </div>
                             );
-                        })}
-                    </div>
-                )}
-            </div>
+                        },
+                    },
+                ]}
+            />
 
             {/* Pagination */}
             {totalPages > 1 && (
@@ -305,7 +310,7 @@ const SignupRequestsPage = () => {
                     <button
                         onClick={() => setCurrentPage(p => Math.max(1, p - 1))}
                         disabled={currentPage === 1}
-                        className="px-3 py-1.5 text-sm font-medium text-slate-600 bg-white border border-slate-200 rounded-lg hover:bg-slate-50 disabled:opacity-40 disabled:cursor-not-allowed transition-colors">
+                        className="h-8 px-2.5 text-[13px] font-medium text-slate-600 bg-white border border-slate-200 rounded-md hover:bg-slate-50 disabled:opacity-40 disabled:cursor-not-allowed transition-colors">
                         Previous
                     </button>
                     {Array.from({ length: totalPages }, (_, i) => i + 1)
@@ -317,10 +322,10 @@ const SignupRequestsPage = () => {
                         }, [])
                         .map((p, idx) =>
                             p === '...' ? (
-                                <span key={`ellipsis-${idx}`} className="px-2 text-slate-400">…</span>
+                                <span key={`ellipsis-${idx}`} className="px-1.5 text-[13px] text-slate-400">…</span>
                             ) : (
                                 <button key={p} onClick={() => setCurrentPage(p)}
-                                    className={`w-9 h-9 text-sm font-medium rounded-lg transition-colors ${
+                                    className={`h-8 min-w-8 px-2 text-[13px] font-medium rounded-md transition-colors ${
                                         currentPage === p
                                             ? 'bg-indigo-600 text-white'
                                             : 'text-slate-600 bg-white border border-slate-200 hover:bg-slate-50'
@@ -332,22 +337,11 @@ const SignupRequestsPage = () => {
                     <button
                         onClick={() => setCurrentPage(p => Math.min(totalPages, p + 1))}
                         disabled={currentPage === totalPages}
-                        className="px-3 py-1.5 text-sm font-medium text-slate-600 bg-white border border-slate-200 rounded-lg hover:bg-slate-50 disabled:opacity-40 disabled:cursor-not-allowed transition-colors">
+                        className="h-8 px-2.5 text-[13px] font-medium text-slate-600 bg-white border border-slate-200 rounded-md hover:bg-slate-50 disabled:opacity-40 disabled:cursor-not-allowed transition-colors">
                         Next
                     </button>
                 </div>
             )}
-
-            {/* Signup link callout */}
-            <div className="bg-indigo-50 border border-indigo-100 rounded-2xl px-5 py-4 flex items-center gap-3">
-                <User className="w-5 h-5 text-indigo-500 shrink-0"/>
-                <div>
-                    <p className="text-sm font-medium text-indigo-800">Share the signup link with new employees</p>
-                    <p className="text-xs text-indigo-600 mt-0.5 font-mono">
-                        autonex-frontend.vercel.app/employee-signup
-                    </p>
-                </div>
-            </div>
 
             {/* Reject modal */}
             {rejectModal && (

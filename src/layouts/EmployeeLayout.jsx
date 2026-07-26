@@ -66,6 +66,9 @@ const EmployeeLayout = () => {
     });
   };
 
+
+  // Drag the right panel's left border to resize the sidebar; a click without
+  // dragging collapses the sidebar.
   const startResize = (e) => {
     e.preventDefault();
     const startX = e.clientX;
@@ -165,15 +168,8 @@ const EmployeeLayout = () => {
     <div className="h-screen flex font-sans overflow-hidden bg-[#f4f5f7] text-slate-900 dark:bg-[#070707] dark:text-zinc-100">
       {/* Desktop sidebar */}
       {!collapsed && (
-        <div className="hidden lg:block shrink-0 relative" style={{ width }}>
+        <div className="hidden lg:block shrink-0" style={{ width }}>
           <EmployeeSidebar {...sidebarProps} />
-          <div
-            onMouseDown={startResize}
-            title="Drag to resize · Click to collapse"
-            className="group absolute inset-y-0 -right-1 w-2 cursor-col-resize z-50 flex justify-center"
-          >
-            <div className="w-px h-full bg-transparent group-hover:bg-blue-500/70 transition-colors duration-150" />
-          </div>
         </div>
       )}
 
@@ -206,7 +202,16 @@ const EmployeeLayout = () => {
       )}
 
       {/* Main Content */}
-      <div className="flex-1 flex flex-col min-w-0 overflow-hidden m-2 rounded-xl border bg-[#f8fafc] border-slate-200 dark:bg-[#0c0c0c] dark:border-neutral-800">
+      <div className="relative flex-1 flex flex-col min-w-0 overflow-hidden m-2 rounded-xl border border-slate-200 bg-[#f8fafc] dark:bg-[#0c0c0c] dark:border-neutral-800">
+        {/* Drag the left border to resize the sidebar · click to collapse.
+            The blue line only shows while hovering the strip. */}
+        {!collapsed && (
+          <div
+            onMouseDown={startResize}
+            title="Drag to resize · Click to collapse"
+            className="hidden lg:block absolute left-0 inset-y-0 w-2 cursor-col-resize z-30 border-l-2 border-transparent hover:border-blue-500/70 transition-colors duration-150"
+          />
+        )}
         {/* Top Header */}
         <header className="h-12 shrink-0 flex items-center justify-between px-4 sm:px-5 border-b border-slate-200/70 dark:border-neutral-800">
           <div className="flex items-center gap-2 min-w-0">
@@ -241,7 +246,7 @@ const EmployeeLayout = () => {
         </header>
 
         {/* Content */}
-        <main className="flex-1 overflow-auto p-4 sm:p-6 relative">
+        <main className="flex-1 overflow-auto px-4 pt-3 pb-4 sm:px-6 sm:pt-4 sm:pb-6 relative">
           <div className="max-w-[1600px] mx-auto space-y-5">
             <Outlet />
           </div>

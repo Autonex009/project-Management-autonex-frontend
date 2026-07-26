@@ -1,10 +1,9 @@
 import { useState, useRef, useEffect } from 'react';
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import { useSearchParams } from 'react-router-dom';
-import { employeeApi, skillApi, allocationApi } from '../services/api';
-import { Plus, Edit, Trash2, X, User, ChevronDown, CheckCircle, AlertCircle, Clock, ArrowUpCircle, RotateCcw, MoreVertical, Users, UserCheck, Briefcase, Award, ShieldCheck } from 'lucide-react';
+import { employeeApi, skillApi, allocationApi, subProjectApi, parentProjectApi } from '../services/api';
+import { Plus, Edit, Trash2, X, User, ChevronDown, CheckCircle, AlertCircle, Clock, ArrowUpCircle, RotateCcw, MoreVertical, Users, UserCheck, Briefcase, Award, ShieldCheck, Filter, ArrowUpDown, Search, Check } from 'lucide-react';
 import toast from 'react-hot-toast';
-import SearchBar from '../components/ui/SearchBar';
 import Table, { ColumnTemplates, formatDateDeterministic } from '../components/ui/Table';
 import Dropdown from '../components/ui/Dropdown';
 import Spinner from '../components/ui/LoadingSpinner';
@@ -566,6 +565,122 @@ const DesignationMultiSelect = ({ options, value, onChange }) => {
   );
 };
 
+const SORT_OPTIONS = [
+  { value: '', label: 'Default' },
+  { value: 'name-asc', label: 'Name (A–Z)' },
+  { value: 'name-desc', label: 'Name (Z–A)' },
+  { value: 'designation', label: 'Designation' },
+  { value: 'type', label: 'Type' },
+];
+
+// Toolbar "Filter" button — collapses Skills + Designation filters into a popover (Untitled-UI style).
+const FilterButton = ({ predefinedSkills, skillFilter, setSkillFilter, designationOptions, designationFilter, setDesignationFilter, onChange }) => {
+  const [open, setOpen] = useState(false);
+  const ref = useRef(null);
+
+  useEffect(() => {
+    const handler = (e) => { if (ref.current && !ref.current.contains(e.target)) setOpen(false); };
+    document.addEventListener('mousedown', handler);
+    return () => document.removeEventListener('mousedown', handler);
+  }, []);
+
+  const activeCount = (skillFilter ? 1 : 0) + (designationFilter.length > 0 ? 1 : 0);
+
+  return (
+    <div ref={ref} className="relative">
+      <button
+        type="button"
+        onClick={() => setOpen((o) => !o)}
+        className="inline-flex items-center gap-2 h-9 px-3 rounded-lg border border-slate-200 bg-white text-[13px] font-medium text-slate-700 hover:bg-slate-50 transition-colors"
+      >
+        <Filter className="w-4 h-4 text-slate-500" />
+        Filters
+        {activeCount > 0 && (
+          <span className="inline-flex items-center justify-center h-4 min-w-4 px-1 rounded-full bg-indigo-600 text-white text-[10px] font-semibold">
+            {activeCount}
+          </span>
+        )}
+      </button>
+
+      {open && (
+        <div className="absolute right-0 mt-1.5 z-40 w-72 bg-white rounded-xl shadow-xl border border-slate-200 p-3 space-y-3">
+          <div className="space-y-1.5">
+            <label className="text-[11px] font-semibold uppercase tracking-wide text-slate-400">Skills</label>
+            <Dropdown
+              options={[{ value: '', label: 'All Skills' }, ...predefinedSkills.map((s) => ({ value: s, label: s }))]}
+              value={skillFilter}
+              onChange={(val) => { setSkillFilter(val); onChange?.(); }}
+              placeholder="All Skills"
+              optionsClassName="w-full"
+            />
+          </div>
+          <div className="space-y-1.5">
+            <label className="text-[11px] font-semibold uppercase tracking-wide text-slate-400">Designation</label>
+            <DesignationMultiSelect
+              options={designationOptions}
+              value={designationFilter}
+              onChange={(val) => { setDesignationFilter(val); onChange?.(); }}
+            />
+          </div>
+          {activeCount > 0 && (
+            <button
+              type="button"
+              onClick={() => { setSkillFilter(''); setDesignationFilter([]); onChange?.(); }}
+              className="w-full text-center py-1.5 text-xs font-medium text-slate-500 hover:text-slate-700 border-t border-slate-100 pt-2.5"
+            >
+              Clear all filters
+            </button>
+          )}
+        </div>
+      )}
+    </div>
+  );
+};
+
+// Toolbar "Sort by" menu (Untitled-UI style).
+const SortMenu = ({ sortBy, setSortBy }) => {
+  const [open, setOpen] = useState(false);
+  const ref = useRef(null);
+
+  useEffect(() => {
+    const handler = (e) => { if (ref.current && !ref.current.contains(e.target)) setOpen(false); };
+    document.addEventListener('mousedown', handler);
+    return () => document.removeEventListener('mousedown', handler);
+  }, []);
+
+  const current = SORT_OPTIONS.find((o) => o.value === sortBy);
+
+  return (
+    <div ref={ref} className="relative">
+      <button
+        type="button"
+        onClick={() => setOpen((o) => !o)}
+        className="inline-flex items-center gap-2 h-9 px-3 rounded-lg border border-slate-200 bg-white text-[13px] font-medium text-slate-700 hover:bg-slate-50 transition-colors"
+      >
+        <ArrowUpDown className="w-4 h-4 text-slate-500" />
+        <span className="hidden sm:inline">Sort by{current?.value ? `: ${current.label}` : ''}</span>
+        <ChevronDown className={`w-3.5 h-3.5 text-slate-400 transition-transform ${open ? 'rotate-180' : ''}`} />
+      </button>
+
+      {open && (
+        <div className="absolute right-0 mt-1.5 z-40 w-48 bg-white rounded-xl shadow-xl border border-slate-200 py-1">
+          {SORT_OPTIONS.map((opt) => (
+            <button
+              key={opt.value || 'default'}
+              type="button"
+              onClick={() => { setSortBy(opt.value); setOpen(false); }}
+              className="w-full flex items-center justify-between gap-2 px-3 py-2 text-[13px] text-slate-700 hover:bg-slate-50 transition-colors"
+            >
+              {opt.label}
+              {sortBy === opt.value && <Check className="w-4 h-4 text-indigo-600" />}
+            </button>
+          ))}
+        </div>
+      )}
+    </div>
+  );
+};
+
 function EmployeeActionMenu({
   row,
   statusParam,
@@ -603,7 +718,7 @@ function EmployeeActionMenu({
   const positionClass = isNearBottom ? 'bottom-full mb-1.5' : 'top-full mt-1.5';
 
   return (
-    <div className="relative inline-block text-left" ref={menuRef}>
+    <div className={`relative inline-block text-left ${isOpen ? 'z-[100]' : ''}`} ref={menuRef}>
       <button
         type="button"
         onClick={(e) => {
@@ -701,6 +816,7 @@ const EmployeesPage = () => {
   const [searchQuery, setSearchQuery] = useState('');
   const [skillFilter, setSkillFilter] = useState('');
   const [designationFilter, setDesignationFilter] = useState([]);
+  const [sortBy, setSortBy] = useState('');
   const [currentPage, setCurrentPage] = useState(1);
   const [formDesignation, setFormDesignation] = useState('Annotator/ Reviewer');
   const [formEmployeeType, setFormEmployeeType] = useState('Full-time');
@@ -730,6 +846,19 @@ const EmployeesPage = () => {
     queryFn: allocationApi.getAll,
   });
 
+  // Sub-projects + main projects are needed to resolve each employee's reporting
+  // manager: allocation.sub_project_id → subProject.main_project_id → mainProject PM.
+  const { data: subProjects = [] } = useQuery({
+    queryKey: ['sub-projects'],
+    queryFn: subProjectApi.getAll,
+    staleTime: 5 * 60 * 1000,
+  });
+  const { data: mainProjects = [] } = useQuery({
+    queryKey: ['parent-projects'],
+    queryFn: parentProjectApi.getAll,
+    staleTime: 5 * 60 * 1000,
+  });
+
   // Fetch all employees for organization KPI calculations
   const { data: allEmployeesData = [] } = useQuery({
     queryKey: ['all-employees-kpis'],
@@ -748,6 +877,35 @@ const EmployeesPage = () => {
     if (!projectName) return map;
     if (!map[alloc.employee_id]) map[alloc.employee_id] = new Set();
     map[alloc.employee_id].add(projectName);
+    return map;
+  }, {});
+
+  // Resolve reporting manager(s) per employee = PM(s) of the main project(s) they're
+  // allocated to. Join path: allocation.sub_project_id → subProject.main_project_id → mainProject PM.
+  const subProjectById = new Map(subProjects.map((sp) => [String(sp.id), sp]));
+  const mainProjectById = new Map(mainProjects.map((mp) => [String(mp.id), mp]));
+  const employeeIdToName = new Map(allStaff.map((e) => [String(e.id), e.name]));
+
+  const pmNamesOfMainProject = (mp) => {
+    if (!mp) return [];
+    if (Array.isArray(mp.program_manager_names) && mp.program_manager_names.length > 0) {
+      return mp.program_manager_names;
+    }
+    if (mp.program_manager_name) return [mp.program_manager_name];
+    const ids = mp.program_manager_ids?.length
+      ? mp.program_manager_ids
+      : (mp.program_manager_id ? [mp.program_manager_id] : []);
+    return ids.map((id) => employeeIdToName.get(String(id))).filter(Boolean);
+  };
+
+  const employeeManagersMap = allocations.reduce((map, alloc) => {
+    const sp = subProjectById.get(String(alloc.sub_project_id));
+    if (!sp) return map;
+    const mp = mainProjectById.get(String(sp.main_project_id));
+    const names = pmNamesOfMainProject(mp);
+    if (names.length === 0) return map;
+    if (!map[alloc.employee_id]) map[alloc.employee_id] = new Set();
+    names.forEach((n) => map[alloc.employee_id].add(n));
     return map;
   }, {});
 
@@ -1027,16 +1185,31 @@ const EmployeesPage = () => {
     return matchesSearch && matchesSkill && matchesDesignation && matchesIdle && matchesStatus;
   });
 
+  // Apply client-side sort (Sort by menu). Empty sortBy keeps API order.
+  const sortedEmployees = (() => {
+    if (!sortBy) return filteredEmployees;
+    const cmp = (a, b, key) => String(a[key] || '').localeCompare(String(b[key] || ''));
+    const arr = [...filteredEmployees];
+    switch (sortBy) {
+      case 'name-asc': arr.sort((a, b) => cmp(a, b, 'name')); break;
+      case 'name-desc': arr.sort((a, b) => cmp(b, a, 'name')); break;
+      case 'designation': arr.sort((a, b) => cmp(a, b, 'designation')); break;
+      case 'type': arr.sort((a, b) => cmp(a, b, 'employee_type')); break;
+      default: break;
+    }
+    return arr;
+  })();
+
   useEffect(() => {
     setCurrentPage(1);
-  }, [searchQuery, skillFilter, designationFilter, idleOnly, statusParam]);
+  }, [searchQuery, skillFilter, designationFilter, idleOnly, statusParam, sortBy]);
 
 
 
   return (
-    <div className="space-y-4">
+    <div className="space-y-3">
       {/* Page Header */}
-      <div className="flex flex-col gap-3">
+      <div className="flex flex-col gap-2.5">
         <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-2">
           <div className="flex items-center gap-4">
             <div>
@@ -1047,7 +1220,7 @@ const EmployeesPage = () => {
         </div>
 
         {/* KPI Overview Cards Grid */}
-        <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-3.5 mt-1 mb-1">
+        <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-3.5">
           {/* KPI 1: Total Employees */}
           <div className="bg-white dark:bg-[#0f0f0f] border border-slate-200/60 dark:border-neutral-800 rounded-2xl p-3.5 shadow-[0_1px_3px_rgba(0,0,0,0.04)] flex flex-col justify-between hover:shadow-md transition-all duration-200">
             <div className="flex items-center justify-between gap-2 mb-2.5">
@@ -1189,7 +1362,7 @@ const EmployeesPage = () => {
           </div>
         </div>
         {/* Tabs for Active Team vs Archived */}
-        <div className="flex border-b border-slate-200 mt-2 mb-1">
+        <div className="flex border-b border-slate-200">
           <button
             onClick={() => {
               const params = new URLSearchParams(searchParams);
@@ -1217,24 +1390,11 @@ const EmployeesPage = () => {
             Archived / Former
           </button>
         </div>
-        {/* Filters + Search + Add button on one row */}
-        <div className="flex flex-wrap items-center gap-2">
-          <Dropdown
-            options={[{ value: '', label: 'All Skills' }, ...predefinedSkills.map(s => ({ value: s, label: s }))]}
-            value={skillFilter}
-            onChange={(val) => { setSkillFilter(val); setCurrentPage(1); }}
-            placeholder="All Skills"
-            optionsClassName='w-40'
-          />
-
-          <DesignationMultiSelect
-            options={designationOptions}
-            value={designationFilter}
-            onChange={(val) => { setDesignationFilter(val); setCurrentPage(1); }}
-          />
-
-          {statusParam !== 'archived' && (
-            <div className="flex bg-slate-100 p-1 rounded-xl gap-1 border border-slate-200/50">
+        {/* Toolbar — Untitled-UI style: status segment on the left · search / filter / sort on the right */}
+        <div className="flex flex-wrap items-center justify-between gap-2">
+          {/* Status segmented control */}
+          {statusParam !== 'archived' ? (
+            <div className="inline-flex items-center rounded-lg border border-slate-200 bg-slate-50 p-0.5">
               {['all', 'active', 'inactive', 'idle'].map((s) => {
                 const label = s.charAt(0).toUpperCase() + s.slice(1);
                 const isActive = (s === 'all' && !statusParam) || statusParam === s;
@@ -1251,9 +1411,9 @@ const EmployeesPage = () => {
                       }
                       setSearchParams(params);
                     }}
-                    className={`px-3 py-1.5 text-xs font-semibold rounded-lg transition-all ${isActive
-                      ? 'bg-white text-indigo-600 shadow-sm'
-                      : 'text-slate-500 hover:text-slate-800 hover:bg-white/50'
+                    className={`px-3.5 py-1.5 text-[13px] font-semibold rounded-md transition-all ${isActive
+                      ? 'bg-white text-slate-900 shadow-sm ring-1 ring-slate-200/70'
+                      : 'text-slate-500 hover:text-slate-800'
                       }`}
                   >
                     {label}
@@ -1261,54 +1421,102 @@ const EmployeesPage = () => {
                 );
               })}
             </div>
+          ) : (
+            <div />
           )}
 
-          <SearchBar responsive
-            value={searchQuery}
-            onChange={(val) => { setSearchQuery(val); setCurrentPage(1); }}
-            placeholder="Search employees..."
-          />
+          {/* Right cluster: chips · search · filter · sort · add */}
+          <div className="flex flex-wrap items-center gap-2">
+            {idleOnly && (
+              <span className="inline-flex items-center gap-1.5 px-2.5 py-1.5 rounded-lg text-xs font-medium bg-amber-50 text-amber-700 border border-amber-200">
+                Idle Only
+                <button type="button" onClick={() => { const params = new URLSearchParams(searchParams); params.delete('idleOnly'); setSearchParams(params); }} className="hover:text-amber-900">
+                  <X className="w-3 h-3" />
+                </button>
+              </span>
+            )}
+            {statusParam === 'archived' && (
+              <span className="inline-flex items-center gap-1.5 px-2.5 py-1.5 rounded-lg text-xs font-medium bg-indigo-50 text-indigo-700 border border-indigo-200">
+                Status: Archived
+                <button type="button" onClick={() => { const params = new URLSearchParams(searchParams); params.delete('status'); setSearchParams(params); }} className="hover:text-indigo-900">
+                  <X className="w-3 h-3" />
+                </button>
+              </span>
+            )}
 
-          {/* Active filter chips — inline, just before the Add button */}
-          {idleOnly && (
-            <span className="inline-flex items-center gap-1.5 px-2.5 py-1.5 rounded-lg text-xs font-medium bg-amber-50 text-amber-700 border border-amber-200">
-              Idle Only
-              <button type="button" onClick={() => { const params = new URLSearchParams(searchParams); params.delete('idleOnly'); setSearchParams(params); }} className="hover:text-amber-900">
-                <X className="w-3 h-3" />
-              </button>
-            </span>
-          )}
-          {statusParam === 'archived' && (
-            <span className="inline-flex items-center gap-1.5 px-2.5 py-1.5 rounded-lg text-xs font-medium bg-indigo-50 text-indigo-700 border border-indigo-200">
-              Status: Archived
-              <button type="button" onClick={() => { const params = new URLSearchParams(searchParams); params.delete('status'); setSearchParams(params); }} className="hover:text-indigo-900">
-                <X className="w-3 h-3" />
-              </button>
-            </span>
-          )}
+            {/* Search */}
+            <div className="relative">
+              <Search className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-slate-400 pointer-events-none" />
+              <input
+                type="text"
+                value={searchQuery}
+                onChange={(e) => { setSearchQuery(e.target.value); setCurrentPage(1); }}
+                placeholder="Search employees..."
+                className="h-9 w-52 sm:w-64 pl-9 pr-9 rounded-lg border border-slate-200 bg-white text-[13px] text-slate-700 placeholder:text-slate-400 focus:outline-none focus:ring-2 focus:ring-indigo-100 focus:border-indigo-300 transition-all"
+              />
+              {searchQuery ? (
+                <button
+                  type="button"
+                  onClick={() => { setSearchQuery(''); setCurrentPage(1); }}
+                  className="absolute right-2.5 top-1/2 -translate-y-1/2 text-slate-400 hover:text-slate-600"
+                >
+                  <X className="w-3.5 h-3.5" />
+                </button>
+              ) : (
+                <kbd className="absolute right-2.5 top-1/2 -translate-y-1/2 hidden sm:inline-flex items-center h-5 px-1.5 rounded border border-slate-200 bg-slate-50 text-[10px] font-medium text-slate-400 pointer-events-none">
+                  ⌘1
+                </kbd>
+              )}
+            </div>
 
-          <Button onClick={() => { setEditingEmployee(null); setFormDesignation('Annotator/ Reviewer'); setFormEmployeeType('Full-time'); setFormWorkModel('WFO'); setFormEmpStatus('active'); setIsModalOpen(true); }}>
-            <Plus className="w-4 h-4" />
-            Add Employee
-          </Button>
+            <FilterButton
+              predefinedSkills={predefinedSkills}
+              skillFilter={skillFilter}
+              setSkillFilter={setSkillFilter}
+              designationOptions={designationOptions}
+              designationFilter={designationFilter}
+              setDesignationFilter={setDesignationFilter}
+              onChange={() => setCurrentPage(1)}
+            />
+
+            <SortMenu sortBy={sortBy} setSortBy={setSortBy} />
+
+            <button
+              type="button"
+              onClick={() => { setEditingEmployee(null); setFormDesignation('Annotator/ Reviewer'); setFormEmployeeType('Full-time'); setFormWorkModel('WFO'); setFormEmpStatus('active'); setIsModalOpen(true); }}
+              className="inline-flex items-center gap-1.5 h-9 px-3.5 rounded-lg bg-indigo-600 text-white text-[13px] font-semibold hover:bg-indigo-700 shadow-sm transition-colors"
+            >
+              <Plus className="w-4 h-4" />
+              Add Employee
+            </button>
+          </div>
         </div>
       </div>
 
       <Table
         variant="untitled"
+        allowOverflow
         loading={isLoading || skillsLoading || allocationsLoading}
         columns={[
           {
             key: 'name',
             label: 'Employee',
-            width: 'w-[16%]',
+            width: 'w-[19%]',
             render: (value, row) => (
-              <div className="flex items-center gap-2.5">
-                <div className="w-8 h-8 rounded-lg flex items-center justify-center flex-shrink-0 text-white text-xs font-bold bg-gradient-to-br from-indigo-500 to-purple-600">
-                  {String(value || '?')[0].toUpperCase()}
-                </div>
-                <div className="min-w-0 max-w-[150px]">
-                  <div className="font-semibold text-slate-800 truncate" title={value}>
+              <div className="flex items-center gap-3">
+                {row.avatar_url ? (
+                  <img
+                    src={row.avatar_url}
+                    alt={value}
+                    className="w-9 h-9 rounded-full object-cover flex-shrink-0 ring-1 ring-slate-200"
+                  />
+                ) : (
+                  <div className="w-9 h-9 rounded-full flex items-center justify-center flex-shrink-0 bg-indigo-50 text-indigo-600 text-[13px] font-semibold ring-1 ring-slate-200">
+                    {String(value || '?')[0].toUpperCase()}
+                  </div>
+                )}
+                <div className="min-w-0">
+                  <div className="text-[13.5px] font-semibold text-slate-900 truncate leading-tight" title={value}>
                     {value}
                   </div>
                   <div
@@ -1319,7 +1527,7 @@ const EmployeesPage = () => {
                         toast.success('Email copied to clipboard');
                       }
                     }}
-                    className="text-xs text-slate-400 truncate cursor-pointer hover:text-indigo-600 transition-colors"
+                    className="text-[12px] text-slate-400 truncate cursor-pointer hover:text-indigo-600 transition-colors leading-tight mt-0.5"
                     title={`Click to copy: ${row.email}`}
                   >
                     {row.email}
@@ -1331,10 +1539,10 @@ const EmployeesPage = () => {
           {
             key: 'designation',
             label: 'Designation',
-            width: 'w-[11%]',
+            width: 'w-[14%]',
             render: (value) => (
               <span
-                className="text-xs font-medium text-slate-600 whitespace-nowrap truncate max-w-[130px] inline-block align-middle"
+                className="text-[13px] font-medium text-slate-600 whitespace-nowrap truncate max-w-[140px] inline-block align-middle"
                 title={value || '—'}
               >
                 {value || '—'}
@@ -1345,7 +1553,7 @@ const EmployeesPage = () => {
             key: 'employee_type',
             label: 'Type',
             align: 'left',
-            width: 'w-[8%]',
+            width: 'w-[7%]',
             render: (value, row) => {
               const valStr = String(value || '').toLowerCase().replace('-', ' ').trim();
               const isFulltime = valStr.includes('full time') || valStr === 'fulltime';
@@ -1367,7 +1575,7 @@ const EmployeesPage = () => {
                 if (hasPromotion) glowClass = 'drop-shadow-[0_0_6px_rgba(56,189,248,0.75)]';
               }
 
-              const visibleRows = filteredEmployees.slice((currentPage - 1) * PAGE_SIZE, currentPage * PAGE_SIZE);
+              const visibleRows = sortedEmployees.slice((currentPage - 1) * PAGE_SIZE, currentPage * PAGE_SIZE);
               const pageIndex = visibleRows.indexOf(row);
               const totalVisible = visibleRows.length;
               const isNearTop = totalVisible <= 2 ? pageIndex === 0 : pageIndex <= 1;
@@ -1375,7 +1583,7 @@ const EmployeesPage = () => {
 
               return (
                 <div className="group relative flex items-center gap-1.5 whitespace-nowrap cursor-pointer">
-                  <span className={`text-xs ${textColorClass} ${glowClass} transition-all duration-200`}>
+                  <span className={`text-[13px] ${textColorClass} ${glowClass} transition-all duration-200`}>
                     {value || '—'}
                   </span>
 
@@ -1387,12 +1595,12 @@ const EmployeesPage = () => {
                   )}
 
                   {hasPromotion && (
-                    <div className={`absolute left-0 ${positionClass} hidden group-hover:flex flex-col gap-1.5 z-30 p-2.5 bg-slate-900 text-white rounded-xl shadow-xl border border-slate-700 min-w-[190px] max-w-[250px] pointer-events-none whitespace-normal`}>
+                    <div className={`absolute left-0 ${positionClass} hidden group-hover:flex flex-col gap-1.5 z-30 p-2.5 bg-white text-slate-700 rounded-xl shadow-xl border border-slate-200 min-w-[190px] max-w-[250px] pointer-events-none whitespace-normal`}>
                       <div className="text-[11px] font-semibold text-slate-400 uppercase tracking-wider">
                         Promotion Details
                       </div>
-                      <div className="text-xs text-slate-200 leading-relaxed">
-                        Promoted from <span className="font-semibold text-emerald-400">{row.previous_employee_type || 'Intern'}</span> on <span className="font-semibold text-white">{formatDateDeterministic(row.converted_to_fulltime_at)}</span>
+                      <div className="text-xs text-slate-600 leading-relaxed">
+                        Promoted from <span className="font-semibold text-emerald-600">{row.previous_employee_type || 'Intern'}</span> on <span className="font-semibold text-slate-900">{formatDateDeterministic(row.converted_to_fulltime_at)}</span>
                       </div>
                     </div>
                   )}
@@ -1406,7 +1614,7 @@ const EmployeesPage = () => {
             align: 'left',
             width: 'w-[8%]',
             render: (value, row) => (
-              <span className="text-xs font-medium text-slate-600 whitespace-nowrap">
+              <span className="text-[13px] font-medium text-slate-600 whitespace-nowrap">
                 {row.work_model || value || 'WFO'}
               </span>
             ),
@@ -1415,46 +1623,66 @@ const EmployeesPage = () => {
             key: 'reporting_manager',
             label: 'Reporting Manager',
             align: 'left',
-            width: 'w-[14%]',
+            width: 'w-[13%]',
             render: (_, row) => {
-              const manager =
-                row.reporting_manager_name ||
-                row.reporting_manager ||
-                row.manager_name ||
-                row.manager ||
-                (Array.isArray(row.reporting_managers) && row.reporting_managers.length > 0
-                  ? row.reporting_managers.join(', ')
-                  : Array.isArray(row.reporting_manager_names) && row.reporting_manager_names.length > 0
-                    ? row.reporting_manager_names.join(', ')
-                    : null);
-
-              if (!manager) {
-                return <span className="text-xs text-slate-400 font-medium">-</span>;
+              const managers = employeeManagersMap[row.id] ? [...employeeManagersMap[row.id]] : [];
+              if (managers.length === 0) {
+                return <span className="text-[13px] text-slate-400 font-medium">—</span>;
               }
 
-              const managerText = typeof manager === 'object' ? (manager.name || manager.email) : String(manager);
+              const visibleRows = sortedEmployees.slice((currentPage - 1) * PAGE_SIZE, currentPage * PAGE_SIZE);
+              const pageIndex = visibleRows.indexOf(row);
+              const totalVisible = visibleRows.length;
+              const isNearTop = totalVisible <= 2 ? pageIndex === 0 : pageIndex <= 1;
+              const positionClass = isNearTop ? 'top-full mt-1.5' : 'bottom-full mb-1.5';
+              const extra = managers.length - 1;
 
               return (
-                <span
-                  className="text-xs font-medium text-slate-700 whitespace-nowrap truncate max-w-[150px] inline-block align-middle"
-                  title={managerText}
-                >
-                  {managerText}
-                </span>
+                <div className="group relative flex items-center gap-1 flex-nowrap whitespace-nowrap cursor-default">
+                  <span
+                    className="text-[13px] font-medium text-slate-700 truncate max-w-[150px]"
+                    title={managers.join(', ')}
+                  >
+                    {managers[0]}
+                  </span>
+                  {extra > 0 && (
+                    <span className="inline-flex items-center justify-center flex-shrink-0 h-4 min-w-4 rounded-full bg-slate-100 px-1 text-[10px] font-semibold text-slate-500">
+                      +{extra}
+                    </span>
+                  )}
+
+                  {managers.length > 1 && (
+                    <div className={`absolute left-0 ${positionClass} hidden group-hover:flex flex-col gap-1.5 z-30 p-2.5 bg-white text-slate-700 rounded-xl shadow-xl border border-slate-200 min-w-[180px] max-w-[260px] pointer-events-none`}>
+                      <div className="text-xs font-semibold text-slate-400 uppercase tracking-wider">
+                        Reporting Managers ({managers.length})
+                      </div>
+                      <div className="flex flex-wrap gap-1">
+                        {managers.map((name, idx) => (
+                          <span
+                            key={idx}
+                            className="inline-flex items-center px-2 py-0.5 rounded-md text-xs font-medium bg-indigo-50 text-indigo-700 border border-indigo-200"
+                          >
+                            {name}
+                          </span>
+                        ))}
+                      </div>
+                    </div>
+                  )}
+                </div>
               );
             },
           },
           {
             key: 'skills',
             label: 'Skills',
-            width: 'w-[14%]',
+            width: 'w-[16%]',
             render: (value, row) => {
               const skillsList = Array.isArray(value) ? value : [];
               if (skillsList.length === 0) {
                 return <span className="text-xs text-slate-400">—</span>;
               }
 
-              const visibleRows = filteredEmployees.slice((currentPage - 1) * PAGE_SIZE, currentPage * PAGE_SIZE);
+              const visibleRows = sortedEmployees.slice((currentPage - 1) * PAGE_SIZE, currentPage * PAGE_SIZE);
               const pageIndex = visibleRows.indexOf(row);
               const totalVisible = visibleRows.length;
               const isNearTop = totalVisible <= 2 ? pageIndex === 0 : pageIndex <= 1;
@@ -1463,11 +1691,14 @@ const EmployeesPage = () => {
 
               return (
                 <div className="group relative flex items-center gap-1 flex-nowrap whitespace-nowrap cursor-default">
-                  <span className="inline-flex max-w-[120px] items-center truncate rounded-md border border-indigo-200 bg-indigo-50 px-2 py-0.5 text-xs font-medium text-indigo-700">
+                  <span className="min-w-0 truncate rounded-md border border-indigo-200 bg-indigo-50 px-2 py-0.5 text-[12px] font-medium text-indigo-700">
                     {skillsList[0]}
                   </span>
                   {extra > 0 && (
-                    <span className="inline-flex items-center flex-shrink-0 rounded-md border border-slate-200 bg-slate-50 px-1.5 py-0.5 text-xs font-semibold text-slate-500">
+                    <span
+                      className="inline-flex items-center justify-center flex-shrink-0 h-5 min-w-5 rounded-full bg-slate-100 px-1 text-[10px] font-semibold text-slate-500"
+                      title={`${extra} more`}
+                    >
                       +{extra}
                     </span>
                   )}
@@ -1496,11 +1727,11 @@ const EmployeesPage = () => {
           {
             key: 'assigned_projects',
             label: 'Assigned Projects',
-            width: 'w-[15%]',
+            width: 'w-[17%]',
             render: (_, row) => {
               if ((row.status || '').toLowerCase() === 'inactive') {
                 return (
-                  <span className="text-xs text-slate-400 font-medium">
+                  <span className="text-[13px] text-slate-400 font-medium">
                     —
                   </span>
                 );
@@ -1508,13 +1739,14 @@ const EmployeesPage = () => {
               const projects = employeeProjectsMap[row.id];
               if (!projects || projects.size === 0) {
                 return (
-                  <span className="text-xs text-slate-600 font-medium">
+                  <span className="inline-flex items-center gap-1.5 rounded-md border border-amber-200 bg-amber-50 px-2 py-0.5 text-[12px] font-medium text-amber-700">
+                    <span className="w-1.5 h-1.5 rounded-full bg-amber-500" />
                     Idle
                   </span>
                 );
               }
               const list = [...projects];
-              const visibleRows = filteredEmployees.slice((currentPage - 1) * PAGE_SIZE, currentPage * PAGE_SIZE);
+              const visibleRows = sortedEmployees.slice((currentPage - 1) * PAGE_SIZE, currentPage * PAGE_SIZE);
               const pageIndex = visibleRows.indexOf(row);
               const totalVisible = visibleRows.length;
               const isNearTop = totalVisible <= 2 ? pageIndex === 0 : pageIndex <= 1;
@@ -1523,11 +1755,14 @@ const EmployeesPage = () => {
 
               return (
                 <div className="group relative flex items-center gap-1 flex-nowrap whitespace-nowrap cursor-default">
-                  <span className="inline-flex max-w-[130px] items-center truncate rounded-md border border-slate-200 bg-slate-50 px-2 py-0.5 text-xs font-medium text-slate-700">
+                  <span className="min-w-0 truncate rounded-md border border-slate-200 bg-slate-50 px-2 py-0.5 text-[12px] font-medium text-slate-700">
                     {list[0]}
                   </span>
                   {extra > 0 && (
-                    <span className="inline-flex items-center flex-shrink-0 rounded-md border border-slate-200 bg-slate-50 px-1.5 py-0.5 text-xs font-semibold text-slate-500">
+                    <span
+                      className="inline-flex items-center justify-center flex-shrink-0 h-5 min-w-5 rounded-full bg-slate-100 px-1 text-[10px] font-semibold text-slate-500"
+                      title={`${extra} more`}
+                    >
                       +{extra}
                     </span>
                   )}
@@ -1557,9 +1792,9 @@ const EmployeesPage = () => {
             key: 'actions',
             label: 'Actions',
             align: 'center',
-            width: 'w-[8%]',
+            width: 'w-[6%]',
             render: (_, row) => {
-              const visibleRows = filteredEmployees.slice((currentPage - 1) * PAGE_SIZE, currentPage * PAGE_SIZE);
+              const visibleRows = sortedEmployees.slice((currentPage - 1) * PAGE_SIZE, currentPage * PAGE_SIZE);
               const pageIndex = visibleRows.indexOf(row);
               const totalVisible = visibleRows.length;
               const isNearBottom = totalVisible <= 2 ? pageIndex === totalVisible - 1 : pageIndex >= totalVisible - 2;
@@ -1588,7 +1823,7 @@ const EmployeesPage = () => {
             },
           },
         ]}
-        data={filteredEmployees}
+        data={sortedEmployees}
         currentPage={currentPage}
         pageSize={PAGE_SIZE}
         onPageChange={setCurrentPage}

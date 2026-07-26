@@ -1,6 +1,6 @@
 import React, { useState } from 'react';
 import { useNavigate } from 'react-router-dom';
-import { Lock, Mail, ArrowRight, UserPlus, KeyRound, Briefcase, Shield } from 'lucide-react';
+import { Lock, Mail, ArrowRight, UserPlus, KeyRound, Briefcase, Shield, Eye, EyeOff } from 'lucide-react';
 import { useMutation } from '@tanstack/react-query';
 import Spinner from '../../components/ui/LoadingSpinner';
 import { authApi } from '../../services/api';
@@ -10,6 +10,7 @@ import AuthBrandPanel from '../../components/brand/AuthBrandPanel';
 const EmployeeLogin = () => {
     const navigate = useNavigate();
     const [formData, setFormData] = useState({ email: '', password: '' });
+    const [showPassword, setShowPassword] = useState(false);
     const [errors, setErrors] = useState({});
     const [serverError, setServerError] = useState('');
 
@@ -103,14 +104,23 @@ const EmployeeLogin = () => {
                             <div className="relative">
                                 <Lock className="absolute left-3 top-1/2 h-5 w-5 -translate-y-1/2 text-slate-400" />
                                 <input
-                                    type="password"
+                                    type={showPassword ? 'text' : 'password'}
                                     name="password"
                                     value={formData.password}
                                     onChange={handleChange}
                                     placeholder="••••••••"
-                                    className={`w-full rounded-2xl border py-3 pl-11 pr-4 text-sm outline-none transition-all ${errors.password ? 'border-red-300' : 'border-slate-200 focus:border-emerald-500 focus:ring-2 focus:ring-emerald-100'}`}
+                                    className={`w-full rounded-2xl border py-3 pl-11 pr-11 text-sm outline-none transition-all ${errors.password ? 'border-red-300' : 'border-slate-200 focus:border-emerald-500 focus:ring-2 focus:ring-emerald-100'}`}
                                     disabled={loginMutation.isPending}
                                 />
+                                <button
+                                    type="button"
+                                    onClick={() => setShowPassword((s) => !s)}
+                                    tabIndex={-1}
+                                    aria-label={showPassword ? 'Hide password' : 'Show password'}
+                                    className="absolute right-3 top-1/2 -translate-y-1/2 text-slate-400 transition-colors hover:text-slate-600"
+                                >
+                                    {showPassword ? <EyeOff className="h-5 w-5" /> : <Eye className="h-5 w-5" />}
+                                </button>
                             </div>
                             {errors.password && <p className="mt-1 text-sm text-red-500">{errors.password}</p>}
                         </div>

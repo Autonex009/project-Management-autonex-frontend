@@ -1,7 +1,7 @@
 import { useMemo, useState } from 'react';
 import { Link, useSearchParams } from 'react-router-dom';
 import { useMutation } from '@tanstack/react-query';
-import { ArrowLeft, CheckCircle2, KeyRound, Lock } from 'lucide-react';
+import { ArrowLeft, CheckCircle2, KeyRound, Lock, Eye, EyeOff } from 'lucide-react';
 import Spinner from '../../components/ui/LoadingSpinner';
 import toast from 'react-hot-toast';
 import AuthBrandPanel from '../../components/brand/AuthBrandPanel';
@@ -60,6 +60,8 @@ const ResetPassword = () => {
     const token = searchParams.get('token') || '';
     const [password, setPassword] = useState('');
     const [confirmPassword, setConfirmPassword] = useState('');
+    const [showPassword, setShowPassword] = useState(false);
+    const [showConfirm, setShowConfirm] = useState(false);
     const [isComplete, setIsComplete] = useState(false);
     const theme = useMemo(() => themeMap[searchParams.get('role')] || themeMap.employee, [searchParams]);
 
@@ -146,13 +148,22 @@ const ResetPassword = () => {
                                     <div className="relative">
                                         <Lock className="absolute left-3 top-1/2 h-5 w-5 -translate-y-1/2 text-slate-400" />
                                         <input
-                                            type="password"
+                                            type={showPassword ? 'text' : 'password'}
                                             value={password}
                                             onChange={(event) => setPassword(event.target.value)}
                                             placeholder="Enter a new password"
-                                            className={`w-full rounded-2xl border py-3 pl-11 pr-4 text-sm outline-none transition-all focus:ring-2 ${theme.input}`}
+                                            className={`w-full rounded-2xl border py-3 pl-11 pr-11 text-sm outline-none transition-all focus:ring-2 ${theme.input}`}
                                             disabled={resetPasswordMutation.isPending}
                                         />
+                                        <button
+                                            type="button"
+                                            onClick={() => setShowPassword((s) => !s)}
+                                            tabIndex={-1}
+                                            aria-label={showPassword ? 'Hide password' : 'Show password'}
+                                            className="absolute right-3 top-1/2 -translate-y-1/2 text-slate-400 transition-colors hover:text-slate-600"
+                                        >
+                                            {showPassword ? <EyeOff className="h-5 w-5" /> : <Eye className="h-5 w-5" />}
+                                        </button>
                                     </div>
                                 </div>
 
@@ -161,13 +172,22 @@ const ResetPassword = () => {
                                     <div className="relative">
                                         <KeyRound className="absolute left-3 top-1/2 h-5 w-5 -translate-y-1/2 text-slate-400" />
                                         <input
-                                            type="password"
+                                            type={showConfirm ? 'text' : 'password'}
                                             value={confirmPassword}
                                             onChange={(event) => setConfirmPassword(event.target.value)}
                                             placeholder="Re-enter your new password"
-                                            className={`w-full rounded-2xl border py-3 pl-11 pr-4 text-sm outline-none transition-all focus:ring-2 ${theme.input}`}
+                                            className={`w-full rounded-2xl border py-3 pl-11 pr-11 text-sm outline-none transition-all focus:ring-2 ${theme.input}`}
                                             disabled={resetPasswordMutation.isPending}
                                         />
+                                        <button
+                                            type="button"
+                                            onClick={() => setShowConfirm((s) => !s)}
+                                            tabIndex={-1}
+                                            aria-label={showConfirm ? 'Hide password' : 'Show password'}
+                                            className="absolute right-3 top-1/2 -translate-y-1/2 text-slate-400 transition-colors hover:text-slate-600"
+                                        >
+                                            {showConfirm ? <EyeOff className="h-5 w-5" /> : <Eye className="h-5 w-5" />}
+                                        </button>
                                     </div>
                                 </div>
 
