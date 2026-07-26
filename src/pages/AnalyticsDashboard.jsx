@@ -8,12 +8,22 @@ import { FolderKanban, Clock, Users, RefreshCw, BarChart3, Timer, ClipboardCheck
 import { ResponsiveContainer, BarChart, Bar, XAxis, YAxis, CartesianGrid, Tooltip } from 'recharts';
 import { format, parseISO } from 'date-fns';
 import toast from 'react-hot-toast';
+import { useState, useEffect } from 'react';
 
+// Inside your component:
+const [isBackgroundSyncing, setIsBackgroundSyncing] = useState(false);
 const AUTONEX_RANGES = [
     { key: '1', label: 'Last day' },
     { key: '7', label: 'Last 7 days' },
     { key: '30', label: 'Last 30 days' },
 ];
+
+// Check on page load if a sync was already running
+useEffect(() => {
+    if (localStorage.getItem('active_sync_job_id')) {
+        setIsBackgroundSyncing(true);
+    }
+}, []);
 
 const shortDate = (s) => { try { return format(parseISO(s), 'MMM d'); } catch { return s; } };
 
@@ -63,8 +73,12 @@ const AnalyticsDashboard = () => {
             // queryClient.invalidateQueries({ queryKey: ['analytics-summary'] });
             toast.success("Encord sync started in the background. This may take up to 15 minutes.");
             localStorage.setItem('active_sync_job_id', res.job_id);
+            setIsBackgroundSyncing(true); // Keep the button spinning!
         },
-        onError: (e) => toast.error(e?.response?.data?.detail || 'Sync failed to start'),
+        onError: (e) => {
+            toast.error(e?.response?.data?.detail || 'Sync failed to start');
+            setIsBackgroundSyncing(false);
+        }
     });
 
     const handleSyncClick = async () => {
@@ -72,30 +86,31 @@ const AnalyticsDashboard = () => {
         const existingJobId = localStorage.getItem('active_sync_job_id');
 
         if (existingJobId) {
+            setIsBackgroundSyncing(true);
             try {
-                // 2. Ask the backend for the status of this specific job
                 const statusRes = await analyticsApi.getSyncStatus(existingJobId);
 
-                if (statusRes.status === 'in_progress' || statusRes.status === 'queued' || statusRes.status === 'deferred') {
-                    // Job is still running. Stop here and tell the user.
+                if (['in_progress', 'queued', 'deferred'].includes(statusRes.status)) {
                     toast.info("A sync is currently running in the background. Please wait.");
                     return; 
                 } 
                 
                 if (statusRes.status === 'complete') {
-                    // Job finished! Clear the memory, refresh the data, and start a new one.
                     toast.success("Previous sync finished! Starting a fresh sync...");
                     localStorage.removeItem('active_sync_job_id');
                     queryClient.invalidateQueries({ queryKey: ['analytics-summary'] });
+                    setIsBackgroundSyncing(false);
                 }
             } catch (error) {
-                // If the job_id expired in Redis or wasn't found (404), clear it out
                 localStorage.removeItem('active_sync_job_id');
+                setIsBackgroundSyncing(false);
             }
         }
 
-        // 3. If no job was running (or the old one finished/expired), start a new one
-        syncMutation.mutate();
+        // Only mutate if we cleared the old job or didn't have one
+        if (!localStorage.getItem('active_sync_job_id')) {
+            syncMutation.mutate();
+        }
     };
 
     const totals = useMemo(() => ({
@@ -127,9 +142,15 @@ const AnalyticsDashboard = () => {
                     <h1 className="text-lg font-semibold text-slate-900">Project Analytics</h1>
                     <p className="text-slate-500 text-[13px] mt-0.5">Encord platform activity across all mapped projects (this month).</p>
                 </div>
-                <Button variant="secondary" onClick={handleSyncClick} disabled={syncMutation.isPending}>
-                    <RefreshCw className={`w-4 h-4 ${syncMutation.isPending ? 'animate-spin' : ''}`} />
-                    {syncMutation.isPending ? 'Syncing…' : 'Sync now'}
+                
+                {/* Use isBackgroundSyncing here instead! */}
+                <Button 
+                    variant="secondary" 
+                    onClick={handleSyncClick} 
+                    disabled={isBackgroundSyncing || syncMutation.isPending}
+                >
+                    <RefreshCw className={`w-4 h-4 ${isBackgroundSyncing || syncMutation.isPending ? 'animate-spin' : ''}`} />
+                    {isBackgroundSyncing || syncMutation.isPending ? 'Syncing…' : 'Sync now'}
                 </Button>
             </div>
 
