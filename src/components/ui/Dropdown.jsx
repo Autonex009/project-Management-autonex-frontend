@@ -1,8 +1,8 @@
 import { useState, useRef, useEffect } from 'react';
 import { ChevronDown, X } from 'lucide-react';
 
-const Dropdown = ({ options = [], value, onChange, placeholder = 'Select', disabled = false, className = '', editable = false, allowCreate = true, optionsClassName = 'w-full' }) => {
-    const [open, setOpen] = useState(false);
+const Dropdown = ({ options = [], value, onChange, placeholder = 'Select', disabled = false, className = '', editable = false, allowCreate = true, optionsClassName = 'w-full', defaultOpen = false }) => {
+    const [open, setOpen] = useState(defaultOpen);
     const [searchText, setSearchText] = useState('');
     const ref = useRef(null);
     const inputRef = useRef(null);
@@ -11,6 +11,15 @@ const Dropdown = ({ options = [], value, onChange, placeholder = 'Select', disab
         const handler = (e) => { if (ref.current && !ref.current.contains(e.target)) setOpen(false); };
         document.addEventListener('mousedown', handler);
         return () => document.removeEventListener('mousedown', handler);
+    }, []);
+
+    // When mounted already-open (e.g. auto-opened on a tab switch), scroll it
+    // into view so the options are visible inside the scrollable modal body.
+    useEffect(() => {
+        if (defaultOpen && ref.current) {
+            ref.current.scrollIntoView({ behavior: 'smooth', block: 'center' });
+        }
+        // eslint-disable-next-line react-hooks/exhaustive-deps
     }, []);
 
     useEffect(() => {

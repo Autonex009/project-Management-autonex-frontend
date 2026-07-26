@@ -52,6 +52,7 @@ const AllocationPopover = ({
   onOpenAllocations,
   badgeContent,
   triggerClassName,
+  onLeaveEmployeeIds = new Set(),
 }) => {
   const [open, setOpen] = useState(false);
   const [position, setPosition] = useState({ top: 0, left: 0, placement: 'bottom', arrowLeft: 0 });
@@ -235,6 +236,7 @@ const AllocationPopover = ({
                     const name = emp?.name || 'Unknown';
                     const role = emp?.designation || emp?.role || emp?.job_title;
                     const tags = Array.isArray(alloc?.role_tags) ? alloc.role_tags : [];
+                    const isOnLeave = emp && onLeaveEmployeeIds?.has?.(emp.id);
                     return (
                       <li
                         key={alloc.id}
@@ -242,8 +244,16 @@ const AllocationPopover = ({
                       >
                         <Avatar name={name} />
                         <div className="flex-1 min-w-0">
-                          <div className="text-sm font-medium text-slate-800 truncate">
-                            {name}
+                          <div className="flex items-center gap-1.5 min-w-0">
+                            <span className="text-sm font-medium text-slate-800 truncate">
+                              {name}
+                            </span>
+                            {isOnLeave && (
+                              <span className="inline-flex items-center gap-1 rounded-full bg-amber-50 px-1.5 py-0.5 text-[10px] font-semibold text-amber-700 shrink-0" title="On approved leave today">
+                                <span className="w-1.5 h-1.5 rounded-full bg-amber-500" />
+                                On leave
+                              </span>
+                            )}
                           </div>
                           <div className="text-xs text-slate-400 truncate flex items-center gap-1">
                             {role ? (

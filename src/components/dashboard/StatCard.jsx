@@ -3,14 +3,15 @@ import React from 'react';
 // Clean metric KPI card (reference design): a small icon tile + title on top,
 // a big tabular number (with optional unit), and a delta / hint line below
 // e.g. "+5% vs last month".
+// Solid gradient icon tiles (white glyph) — one gradient per tone.
 const ICON_TONES = {
-    slate: 'bg-slate-100 text-slate-700',
-    emerald: 'bg-emerald-50 text-emerald-600',
-    rose: 'bg-rose-50 text-rose-600',
-    violet: 'bg-violet-50 text-violet-600',
-    sky: 'bg-sky-50 text-sky-600',
-    amber: 'bg-amber-50 text-amber-600',
-    indigo: 'bg-indigo-50 text-indigo-600',
+    slate: 'from-slate-500 to-slate-600',
+    emerald: 'from-emerald-500 to-green-600',
+    rose: 'from-rose-500 to-pink-600',
+    violet: 'from-violet-500 to-purple-600',
+    sky: 'from-sky-500 to-blue-600',
+    amber: 'from-amber-500 to-orange-500',
+    indigo: 'from-indigo-500 to-indigo-600',
 };
 
 const StatCard = ({ title, value, unit, icon: Icon, tone = 'slate', delta, hint, breakdown, onClick }) => {
@@ -18,24 +19,24 @@ const StatCard = ({ title, value, unit, icon: Icon, tone = 'slate', delta, hint,
     return (
         <div
             onClick={onClick}
-            className={`group relative rounded-xl border border-slate-200 bg-white p-4 shadow-[0_1px_2px_rgba(0,0,0,0.03)] transition-colors hover:border-slate-300 ${onClick ? 'cursor-pointer' : ''}`}
+            className={`group relative rounded-xl border border-slate-200 bg-white p-3 shadow-[0_1px_2px_rgba(0,0,0,0.03)] transition-colors hover:border-slate-300 ${onClick ? 'cursor-pointer' : ''}`}
         >
             <div className="flex items-center gap-2.5">
                 {Icon && (
-                    <span className={`flex h-8 w-8 shrink-0 items-center justify-center rounded-lg ${iconTone}`}>
+                    <span className={`flex h-9 w-9 shrink-0 items-center justify-center rounded-xl bg-gradient-to-br ${iconTone} text-white shadow-sm`}>
                         <Icon className="h-[18px] w-[18px]" />
                     </span>
                 )}
                 <span className="truncate text-[13px] font-medium text-slate-600">{title}</span>
             </div>
 
-            <div className="mt-3 flex items-baseline gap-1">
-                <span className="text-[26px] font-bold leading-none tracking-tight text-slate-900 tabular-nums">{value}</span>
+            <div className="mt-2 flex items-baseline gap-1">
+                <span className="text-2xl font-bold leading-none tracking-tight text-slate-900 tabular-nums">{value}</span>
                 {unit && <span className="text-sm font-medium text-slate-400">{unit}</span>}
             </div>
 
             {(delta || hint) && (
-                <div className="mt-2 flex items-center gap-1.5 text-xs">
+                <div className="mt-1.5 flex items-center gap-1.5 text-xs">
                     {delta && (
                         <span className={`font-semibold tabular-nums ${delta.positive ? 'text-emerald-600' : 'text-red-500'}`}>
                             {delta.positive ? '+' : ''}{delta.value}

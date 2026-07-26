@@ -1,7 +1,7 @@
 import { useState } from 'react';
 import { useNavigate, useLocation } from 'react-router-dom';
 import { useMutation } from '@tanstack/react-query';
-import { Lock, Mail, AlertCircle, Briefcase, User } from 'lucide-react';
+import { Lock, Mail, AlertCircle, Briefcase, User, Eye, EyeOff } from 'lucide-react';
 import { authApi } from '../../services/api';
 import Spinner from '../../components/ui/LoadingSpinner';
 import toast from 'react-hot-toast';
@@ -17,6 +17,7 @@ const AdminLogin = () => {
         password: ''
     });
     const [error, setError] = useState(null);
+    const [showPassword, setShowPassword] = useState(false);
 
     const loginMutation = useMutation({
         mutationFn: (credentials) => authApi.login({ ...credentials, portal: 'admin' }),
@@ -110,12 +111,21 @@ const AdminLogin = () => {
                             <div className="group relative">
                                 <Lock className="absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-slate-500 transition-colors group-focus-within:text-blue-400" />
                                 <input
-                                    type="password"
-                                    className="w-full rounded-2xl border border-slate-800 bg-slate-900/70 py-3 pl-10 pr-4 text-sm text-slate-100 outline-none transition-all placeholder:text-slate-600 focus:border-blue-500 focus:ring-2 focus:ring-blue-500/20"
+                                    type={showPassword ? 'text' : 'password'}
+                                    className="w-full rounded-2xl border border-slate-800 bg-slate-900/70 py-3 pl-10 pr-10 text-sm text-slate-100 outline-none transition-all placeholder:text-slate-600 focus:border-blue-500 focus:ring-2 focus:ring-blue-500/20"
                                     placeholder="••••••••"
                                     value={formData.password}
                                     onChange={(e) => setFormData({ ...formData, password: e.target.value })}
                                 />
+                                <button
+                                    type="button"
+                                    onClick={() => setShowPassword((s) => !s)}
+                                    tabIndex={-1}
+                                    aria-label={showPassword ? 'Hide password' : 'Show password'}
+                                    className="absolute right-3 top-1/2 -translate-y-1/2 text-slate-500 transition-colors hover:text-slate-300"
+                                >
+                                    {showPassword ? <EyeOff className="h-4 w-4" /> : <Eye className="h-4 w-4" />}
+                                </button>
                             </div>
                             <div className="flex justify-end pt-1">
                                 <button
