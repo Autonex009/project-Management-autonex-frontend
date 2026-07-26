@@ -55,7 +55,8 @@ const Dashboard = () => {
   const { data: autonexOverview } = useQuery({
     queryKey: ['autonex-overview'],
     queryFn: analyticsApi.getAutonexOverview,
-    refetchInterval: 10 * 60 * 1000,
+    // Encord data refreshes once a day; no need to poll in the background.
+    refetchOnWindowFocus: true,
   });
   const topUsers = autonexOverview?.top_users || [];
   const topActiveProjects = autonexOverview?.top_projects || [];

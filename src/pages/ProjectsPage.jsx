@@ -28,6 +28,12 @@ const STATUS_CONFIG = {
   cancelled: { label: 'Cancelled', style: 'bg-red-50 text-red-700 border border-red-200' },
 };
 
+// Projects with these statuses live under the "Archived" tab; everything else
+// (active, in-progress, poc, blank) is treated as an active project.
+const ARCHIVED_STATUSES = ['completed', 'on-hold', 'cancelled'];
+const isArchivedStatus = (statusRaw) =>
+  ARCHIVED_STATUSES.includes((statusRaw || 'active').toLowerCase().trim());
+
 const getStatusBadgeConfig = (statusRaw) => {
   const key = (statusRaw || 'active').toLowerCase().trim();
   return STATUS_CONFIG[key] || {
@@ -70,7 +76,19 @@ const PROJECT_TYPE_CATEGORIES = [
     key: 'Object Segmentation Types',
     subtypes: ['2D Bounding Box'],
   },
+  {
+    key: 'Developer',
+    subtypes: ['Coding'],
+  },
 ];
+
+// The project-type category that marks a project as a development/coding project.
+// Such projects are surfaced under the dedicated "Development" tab.
+const DEVELOPER_TYPE_KEY = 'Developer';
+const isDeveloperProject = (project) => {
+  const t = project?.project_types;
+  return !!(t && typeof t === 'object' && t[DEVELOPER_TYPE_KEY]);
+};
 
 const SkillMultiSelect = ({ options, value, onChange }) => {
   const [isOpen, setIsOpen] = useState(false);
@@ -731,6 +749,7 @@ const ProjectsPage = () => {
   const user = JSON.parse(localStorage.getItem('user') || '{}');
   const role = localStorage.getItem('role') || 'admin';
   const isPm = role === 'pm';
+  const isAdmin = role === 'admin';
   const prefix = isPm ? '/pm' : '/admin';
   const pmEmployeeId = getPmEmployeeId(user);
   const [isModalOpen, setIsModalOpen] = useState(false);
@@ -754,6 +773,7 @@ const ProjectsPage = () => {
   const [selectedOrganization, setSelectedOrganization] = useState("all");
   const [selectedPm, setSelectedPm] = useState("all");
   const [selectedStatus, setSelectedStatus] = useState("all");
+  const [projectView, setProjectView] = useState("active"); // 'active' | 'archived'
   const [selectedPmIds, setSelectedPmIds] = useState([]);
   const [filtersOpen, setFiltersOpen] = useState(false);
   const filtersRef = useRef(null);
@@ -1199,6 +1219,18 @@ toast.success(wasEditing ? 'Project updated successfully' : 'Project created suc
       : visibleProjects
   )
   .filter(project => {
+    // Tabs are admin-only. PMs have no tabs and see every project together.
+    if (!isAdmin) return true;
+    // Top-level tabs. Development is a separate bucket (by project type); Active vs
+    // Archived split the rest by status (Completed / On Hold / Cancelled = archived).
+    const dev = isDeveloperProject(project);
+    if (projectView === 'development') return dev;
+    if (dev) return false; // developer projects live only under the Development tab
+    return projectView === 'archived'
+      ? isArchivedStatus(project.project_status)
+      : !isArchivedStatus(project.project_status);
+  })
+  .filter(project => {
     if (selectedOrganization === "all") return true;
 
     const parentProject = visibleMainProjects.find(
@@ -1243,7 +1275,7 @@ toast.success(wasEditing ? 'Project updated successfully' : 'Project created suc
   // Reset to page 1 when filters change
   useEffect(() => {
     setCurrentPage(1);
-  }, [subProjectSearch, filterMainProjectId, statusParam, recommendationParam, selectedOrganization, selectedPm, selectedStatus]);
+  }, [subProjectSearch, filterMainProjectId, statusParam, recommendationParam, selectedOrganization, selectedPm, selectedStatus, projectView]);
 
 
   const currentMainProject = visibleMainProjects.find(p => p.id === parseInt(filterMainProjectId));
@@ -1363,6 +1395,29 @@ toast.success(wasEditing ? 'Project updated successfully' : 'Project created suc
         </div>
       </div>
 
+      {/* Active / Archived / Development tabs — admin only. Archived = Completed /
+          On Hold / Cancelled; Development = projects with the Developer type. */}
+      {isAdmin && (
+        <div className="flex border-b border-slate-200">
+          {[
+            { key: 'active', label: 'Active Projects' },
+            { key: 'archived', label: 'Archived' },
+            { key: 'development', label: 'Development' },
+          ].map((t) => (
+            <button
+              key={t.key}
+              onClick={() => { setProjectView(t.key); setSelectedStatus('all'); }}
+              className={`px-4 py-2 text-sm font-semibold border-b-2 -mb-px transition-colors ${projectView === t.key
+                ? 'border-indigo-600 text-indigo-600'
+                : 'border-transparent text-slate-500 hover:text-slate-700'
+                }`}
+            >
+              {t.label}
+            </button>
+          ))}
+        </div>
+      )}
+
       <div className="rounded-2xl border border-slate-200/70 bg-slate-50/70 p-2.5">
         <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-2.5">
           <StatCard title="Total Projects" value={projectMetrics.totalProjects} icon={FileText} tone="indigo" hint="all projects" />
@@ -1440,14 +1495,27 @@ toast.success(wasEditing ? 'Project updated successfully' : 'Project created suc
                   <Dropdown
                     value={selectedStatus}
                     onChange={setSelectedStatus}
-                    options={[
-                      { value: 'all', label: 'All statuses' },
-                      { value: 'active', label: 'In Progress' },
-                      { value: 'poc', label: 'POC' },
-                      { value: 'completed', label: 'Completed' },
-                      { value: 'on-hold', label: 'On Hold' },
-                      { value: 'cancelled', label: 'Cancelled' },
-                    ]}
+                    options={!isAdmin
+                      ? [
+                        { value: 'all', label: 'All statuses' },
+                        { value: 'active', label: 'In Progress' },
+                        { value: 'poc', label: 'POC' },
+                        { value: 'completed', label: 'Completed' },
+                        { value: 'on-hold', label: 'On Hold' },
+                        { value: 'cancelled', label: 'Cancelled' },
+                      ]
+                      : projectView === 'archived'
+                        ? [
+                          { value: 'all', label: 'All statuses' },
+                          { value: 'completed', label: 'Completed' },
+                          { value: 'on-hold', label: 'On Hold' },
+                          { value: 'cancelled', label: 'Cancelled' },
+                        ]
+                        : [
+                          { value: 'all', label: 'All statuses' },
+                          { value: 'active', label: 'In Progress' },
+                          { value: 'poc', label: 'POC' },
+                        ]}
                     className="w-full"
                   />
                 </div>

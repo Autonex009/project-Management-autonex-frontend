@@ -4,7 +4,7 @@ import { useNavigate } from 'react-router-dom';
 import { analyticsApi } from '../services/api';
 import Table from '../components/ui/Table';
 import Button from '../components/ui/Button';
-import { FolderKanban, Clock, Users, RefreshCw, BarChart3, Timer, ClipboardCheck } from 'lucide-react';
+import { FolderKanban, Clock, Users, UserCheck, PenLine, ClipboardCheck, RefreshCw, BarChart3 } from 'lucide-react';
 import { ResponsiveContainer, BarChart, Bar, XAxis, YAxis, CartesianGrid, Tooltip } from 'recharts';
 import { format, parseISO } from 'date-fns';
 import toast from 'react-hot-toast';
@@ -42,12 +42,24 @@ const AnalyticsDashboard = () => {
     const navigate = useNavigate();
     const queryClient = useQueryClient();
 
+    // One range control drives every Autonex KPI + the chart.
+    const [range, setRange] = useState('30');
+    const rangeLabel = AUTONEX_RANGES.find((r) => r.key === range)?.label ?? '';
+
     const { data: rows = [], isLoading } = useQuery({
         queryKey: ['analytics-summary'],
         queryFn: analyticsApi.getSummary,
-        refetchInterval: 10 * 60 * 1000,   // auto-refresh every 10 min
+        // Encord data is refreshed once a day by the scheduler, so there is nothing
+        // to gain from background polling — refetch on mount/focus is enough.
         refetchOnWindowFocus: true,
     });
+
+    const { data: autonex } = useQuery({
+        queryKey: ['autonex-kpis', range],
+        queryFn: () => analyticsApi.getAutonexKpis(range),
+        refetchOnWindowFocus: true,
+    });
+    const k = autonex?.kpis;
 
     const syncMutation = useMutation({
         // Manual sync backfills the current month so freshly-mapped projects populate
@@ -61,93 +73,94 @@ const AnalyticsDashboard = () => {
         onSuccess: (res) => {
             toast.success(`Encord sync: ${res.inserted + res.updated} rows from ${res.projects} project(s)`);
             queryClient.invalidateQueries({ queryKey: ['analytics-summary'] });
+            queryClient.invalidateQueries({ queryKey: ['autonex-kpis'] });
         },
         onError: (e) => toast.error(e?.response?.data?.detail || 'Sync failed'),
     });
 
-    const totals = useMemo(() => ({
-        live: rows.filter((r) => r.status === 'active').length,
-        hours: rows.reduce((a, r) => a + (r.month_platform_hours || 0), 0),
-        annotators: rows.reduce((a, r) => a + (r.active_annotators || 0), 0),
-    }), [rows]);
-
-    // Autonex-only KPIs across all mapped projects, with its own range filter.
-    const [autonexRange, setAutonexRange] = useState('7');
-    const { data: autonex } = useQuery({
-        queryKey: ['autonex-kpis', autonexRange],
-        queryFn: () => analyticsApi.getAutonexKpis(autonexRange),
-        refetchInterval: 10 * 60 * 1000,
-    });
-    const k = autonex?.kpis;
-
-    // Autonex total hours this month (for the top summary row).
-    const { data: autonexOverview } = useQuery({
-        queryKey: ['autonex-overview'],
-        queryFn: analyticsApi.getAutonexOverview,
-        refetchInterval: 10 * 60 * 1000,
-    });
+    const liveProjects = useMemo(() => rows.filter((r) => r.status === 'active').length, [rows]);
+    const chartData = autonex?.daily || [];
 
     return (
-        <div className="space-y-4">
-            <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3">
+        <div className="space-y-5">
+            {/* Header + single range control */}
+            <div className="flex flex-col gap-3 sm:flex-row sm:items-start sm:justify-between">
                 <div>
                     <h1 className="text-lg font-semibold text-slate-900">Project Analytics</h1>
-                    <p className="text-slate-500 text-[13px] mt-0.5">Encord platform activity across all mapped projects (this month).</p>
-                </div>
-                <Button variant="secondary" onClick={() => syncMutation.mutate()} disabled={syncMutation.isPending}>
-                    <RefreshCw className={`w-4 h-4 ${syncMutation.isPending ? 'animate-spin' : ''}`} />
-                    {syncMutation.isPending ? 'Syncing…' : 'Sync now'}
-                </Button>
-            </div>
-
-            {/* Overview KPIs (this month) */}
-            <div className="grid grid-cols-2 gap-3 sm:grid-cols-4">
-                <AutonexKpiCard icon={FolderKanban} label="Live Projects" value={totals.live} tone="indigo" />
-                <AutonexKpiCard icon={Clock} label="Platform Hours (month)" value={`${Math.round(totals.hours)}h`} tone="emerald" />
-                <AutonexKpiCard icon={Users} label="Active Annotators" value={totals.annotators} tone="sky" />
-                <AutonexKpiCard icon={Timer} label="Autonex Hours (month)" value={`${autonexOverview?.autonex_total_hours ?? 0}h`} tone="violet" />
-            </div>
-
-            {/* Autonex-employee KPIs (range-filtered) — same card style, no boxed section */}
-            <div className="flex items-center justify-between">
-                <div>
-                    <h2 className="text-base font-semibold text-slate-800">Autonex Employees</h2>
-                    <p className="text-xs text-slate-500">Metrics for Autonex team members only, across all projects</p>
+                    <p className="mt-0.5 text-[13px] text-slate-500">Autonex team activity across all mapped projects — figures used for billing.</p>
                 </div>
                 <div className="flex items-center gap-2">
-                    {AUTONEX_RANGES.map((r) => (
-                        <button
-                            key={r.key}
-                            onClick={() => setAutonexRange(r.key)}
-                            className={`rounded-lg px-3 py-1.5 text-sm font-medium transition-colors ${autonexRange === r.key ? 'bg-indigo-600 text-white' : 'bg-white border border-slate-200 text-slate-600 hover:bg-slate-50'}`}
-                        >
-                            {r.label}
-                        </button>
-                    ))}
+                    <div className="inline-flex items-center rounded-xl border border-slate-200 bg-white p-0.5 shadow-sm">
+                        {AUTONEX_RANGES.map((r) => (
+                            <button
+                                key={r.key}
+                                onClick={() => setRange(r.key)}
+                                className={`rounded-lg px-3 py-1.5 text-sm font-medium transition-colors ${range === r.key ? 'bg-indigo-600 text-white shadow-sm' : 'text-slate-600 hover:bg-slate-50'}`}
+                            >
+                                {r.label}
+                            </button>
+                        ))}
+                    </div>
+                    <Button variant="secondary" onClick={() => syncMutation.mutate()} disabled={syncMutation.isPending}>
+                        <RefreshCw className={`w-4 h-4 ${syncMutation.isPending ? 'animate-spin' : ''}`} />
+                        {syncMutation.isPending ? 'Syncing…' : 'Sync now'}
+                    </Button>
                 </div>
             </div>
 
-            <div className="grid grid-cols-2 gap-3 sm:grid-cols-4">
-                <AutonexKpiCard icon={Clock} label="Time Spent" value={`${k?.total_hours ?? 0}h`} tone="emerald" />
-                <AutonexKpiCard icon={Timer} label="Annotation Time" value={`${k?.annotation_hours ?? 0}h`} tone="sky" />
+            {/* Unified Autonex KPIs — all driven by the selected range */}
+            <div className="grid grid-cols-2 gap-3 sm:grid-cols-3 lg:grid-cols-6">
+                <AutonexKpiCard icon={FolderKanban} label="Live Projects" value={liveProjects} tone="indigo" />
+                <AutonexKpiCard icon={Clock} label="Platform Hours" value={`${k?.total_hours ?? 0}h`} tone="emerald" />
+                <AutonexKpiCard icon={Users} label="Active Annotators" value={k?.active_annotators ?? 0} tone="sky" />
+                <AutonexKpiCard icon={UserCheck} label="Active Reviewers" value={k?.active_reviewers ?? 0} tone="violet" />
+                <AutonexKpiCard icon={PenLine} label="Annotation Time" value={`${k?.annotation_hours ?? 0}h`} tone="amber" />
                 <AutonexKpiCard icon={ClipboardCheck} label="Review Time" value={`${k?.review_hours ?? 0}h`} tone="rose" />
             </div>
 
-            <div className="rounded-2xl border border-slate-200 bg-white p-4">
-                <p className="mb-2 text-sm font-semibold text-slate-700">Daily platform hours (Autonex)</p>
-                <div className="h-56">
+            {/* Daily platform hours — gradient area chart */}
+            <div className="rounded-2xl border border-slate-200/80 bg-white p-5 shadow-sm">
+                <div className="mb-4 flex items-center justify-between">
+                    <div>
+                        <p className="text-sm font-semibold text-slate-800">Daily platform hours</p>
+                        <p className="text-xs text-slate-400">Autonex team · {rangeLabel.toLowerCase()}</p>
+                    </div>
+                    <span className="rounded-lg bg-indigo-50 px-2.5 py-1 text-xs font-semibold text-indigo-600 tabular-nums">{k?.total_hours ?? 0}h total</span>
+                </div>
+                <div className="h-64">
                     <ResponsiveContainer width="100%" height="100%">
-                        <BarChart data={autonex?.daily || []} margin={{ top: 8, right: 16, bottom: 4, left: -8 }}>
-                            <CartesianGrid stroke="#e1e0d9" vertical={false} />
-                            <XAxis dataKey="date" tickFormatter={shortDate} tick={{ fill: '#898781', fontSize: 12 }} axisLine={{ stroke: '#e1e0d9' }} tickLine={false} minTickGap={24} />
-                            <YAxis tick={{ fill: '#898781', fontSize: 12 }} axisLine={false} tickLine={false} width={40} unit="h" />
-                            <Tooltip labelFormatter={shortDate} formatter={(v) => [`${v}h`, 'Hours']} />
-                            <Bar dataKey="hours" name="Hours" fill="#2a78d6" radius={[4, 4, 0, 0]} />
+                        <BarChart data={chartData} margin={{ top: 8, right: 8, bottom: 0, left: 0 }}>
+                            <CartesianGrid strokeDasharray="4 4" stroke="#eef0f4" vertical={false} />
+                            <XAxis
+                                dataKey="date"
+                                tickFormatter={shortDate}
+                                tick={{ fill: '#94a3b8', fontSize: 12 }}
+                                axisLine={false}
+                                tickLine={false}
+                                minTickGap={24}
+                                padding={{ left: 8, right: 8 }}
+                            />
+                            <YAxis
+                                tick={{ fill: '#94a3b8', fontSize: 12 }}
+                                axisLine={false}
+                                tickLine={false}
+                                width={52}
+                                tickFormatter={(v) => `${v}h`}
+                                allowDecimals={false}
+                            />
+                            <Tooltip
+                                labelFormatter={shortDate}
+                                formatter={(v) => [`${v}h`, 'Platform hours']}
+                                contentStyle={{ borderRadius: 12, border: '1px solid #e2e8f0', boxShadow: '0 8px 24px rgba(15,23,42,0.08)', fontSize: 13 }}
+                                cursor={{ fill: '#eef2ff' }}
+                            />
+                            <Bar dataKey="hours" name="Hours" fill="#2a78d6" radius={[4, 4, 0, 0]} maxBarSize={48} />
                         </BarChart>
                     </ResponsiveContainer>
                 </div>
             </div>
 
+            {/* Per-project breakdown */}
             <Table
                 variant="untitled"
                 loading={isLoading}
@@ -166,9 +179,35 @@ const AnalyticsDashboard = () => {
                             </div>
                         ),
                     },
-                    { key: 'month_platform_hours', label: 'Platform Hours', align: 'center', render: (v) => <span className="font-mono text-slate-700">{v ?? 0}h</span> },
-                    { key: 'active_annotators', label: 'Active Annotators', align: 'center', render: (v) => <span className="text-slate-700">{v ?? 0}</span> },
-                    { key: 'people_involved', label: 'People Involved', align: 'center', render: (v) => <span className="text-slate-700">{v ?? 0}</span> },
+                    { key: 'autonex_platform_hours', label: 'Autonex Hours', align: 'center', render: (v) => <span className="font-mono text-slate-700">{v ?? 0}h</span> },
+                    {
+                        key: 'autonex_annotator_only', label: 'Annotator only', align: 'center',
+                        render: (v, row) => (
+                            <span
+                                title={(row.autonex_annotator_only_names || []).join('\n') || 'None'}
+                                className={`text-slate-700 ${v ? 'cursor-help underline decoration-dotted decoration-slate-300 underline-offset-2' : ''}`}
+                            >{v ?? 0}</span>
+                        ),
+                    },
+                    {
+                        key: 'autonex_reviewer_only', label: 'Reviewer only', align: 'center',
+                        render: (v, row) => (
+                            <span
+                                title={(row.autonex_reviewer_only_names || []).join('\n') || 'None'}
+                                className={`text-slate-700 ${v ? 'cursor-help underline decoration-dotted decoration-slate-300 underline-offset-2' : ''}`}
+                            >{v ?? 0}</span>
+                        ),
+                    },
+                    {
+                        key: 'autonex_both', label: 'Both', align: 'center',
+                        render: (v, row) => (
+                            <span
+                                title={(row.autonex_both_names || []).join('\n') || 'None'}
+                                className={`text-slate-700 ${v ? 'cursor-help underline decoration-dotted decoration-slate-300 underline-offset-2' : ''}`}
+                            >{v ?? 0}</span>
+                        ),
+                    },
+                    { key: 'autonex_people', label: 'People', align: 'center', render: (v) => <span className="text-slate-700">{v ?? 0}</span> },
                     {
                         key: 'sentiment',
                         label: 'Sentiment',
