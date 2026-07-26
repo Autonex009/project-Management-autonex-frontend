@@ -10,8 +10,10 @@ import { format, parseISO } from 'date-fns';
 import toast from 'react-hot-toast';
 import { useState, useEffect } from 'react';
 
-// Inside your component:
-const [isBackgroundSyncing, setIsBackgroundSyncing] = useState(false);
+// Track if we have an active job ID
+const [activeJobId, setActiveJobId] = useState(null);
+// Track the brief moment when we are actively checking the status API
+const [isCheckingStatus, setIsCheckingStatus] = useState(false);
 const AUTONEX_RANGES = [
     { key: '1', label: 'Last day' },
     { key: '7', label: 'Last 7 days' },
@@ -20,8 +22,9 @@ const AUTONEX_RANGES = [
 
 // Check on page load if a sync was already running
 useEffect(() => {
-    if (localStorage.getItem('active_sync_job_id')) {
-        setIsBackgroundSyncing(true);
+    const jobId = localStorage.getItem('active_sync_job_id');
+    if (jobId) {
+        setActiveJobId(jobId);
     }
 }, []);
 
@@ -69,49 +72,49 @@ const AnalyticsDashboard = () => {
             return analyticsApi.runSync({ date_from, date_to });
         },
         onSuccess: (res) => {
-            // toast.success(`Encord sync: ${res.inserted + res.updated} rows from ${res.projects} project(s)`);
-            // queryClient.invalidateQueries({ queryKey: ['analytics-summary'] });
-            toast.success("Encord sync started in the background. This may take up to 15 minutes.");
+            toast.info("Sync started! Click the button again later to check the status.");
             localStorage.setItem('active_sync_job_id', res.job_id);
-            setIsBackgroundSyncing(true); // Keep the button spinning!
+            setActiveJobId(res.job_id);
         },
         onError: (e) => {
             toast.error(e?.response?.data?.detail || 'Sync failed to start');
-            setIsBackgroundSyncing(false);
         }
     });
 
     const handleSyncClick = async () => {
-        // 1. Check if we already have a job running
-        const existingJobId = localStorage.getItem('active_sync_job_id');
-
-        if (existingJobId) {
-            setIsBackgroundSyncing(true);
+        // SCENARIO 1: A job is already running. Check its status.
+        if (activeJobId) {
+            setIsCheckingStatus(true); // Spin the button briefly
             try {
-                const statusRes = await analyticsApi.getSyncStatus(existingJobId);
+                const statusRes = await analyticsApi.getSyncStatus(activeJobId);
 
                 if (['in_progress', 'queued', 'deferred'].includes(statusRes.status)) {
-                    toast.info("A sync is currently running in the background. Please wait.");
-                    return; 
+                    toast.info("The sync is still running in the background. Check back soon!");
                 } 
-                
-                if (statusRes.status === 'complete') {
-                    toast.success("Previous sync finished! Starting a fresh sync...");
+                else if (statusRes.status === 'complete') {
+                    toast.success("Sync finished! Fetching latest data...");
                     localStorage.removeItem('active_sync_job_id');
+                    setActiveJobId(null);
+                    // Refresh the data!
                     queryClient.invalidateQueries({ queryKey: ['analytics-summary'] });
-                    setIsBackgroundSyncing(false);
+                } 
+                else if (statusRes.status === 'failed') {
+                    toast.error("The background sync failed. You can try starting a new one.");
+                    localStorage.removeItem('active_sync_job_id');
+                    setActiveJobId(null);
                 }
             } catch (error) {
-                localStorage.removeItem('active_sync_job_id');
-                setIsBackgroundSyncing(false);
+                toast.error("Failed to check status. Please try again.");
+            } finally {
+                setIsCheckingStatus(false); // Stop the button from spinning
             }
+            return; // Exit early so we don't start a new job
         }
 
-        // Only mutate if we cleared the old job or didn't have one
-        if (!localStorage.getItem('active_sync_job_id')) {
-            syncMutation.mutate();
-        }
+        // SCENARIO 2: No active job exists. Start a new one.
+        syncMutation.mutate();
     };
+    const isLoading = syncMutation.isPending || isCheckingStatus;
 
     const totals = useMemo(() => ({
         live: rows.filter((r) => r.status === 'active').length,
@@ -143,14 +146,19 @@ const AnalyticsDashboard = () => {
                     <p className="text-slate-500 text-[13px] mt-0.5">Encord platform activity across all mapped projects (this month).</p>
                 </div>
                 
-                {/* Use isBackgroundSyncing here instead! */}
                 <Button 
                     variant="secondary" 
                     onClick={handleSyncClick} 
-                    disabled={isBackgroundSyncing || syncMutation.isPending}
+                    disabled={isLoading}
                 >
-                    <RefreshCw className={`w-4 h-4 ${isBackgroundSyncing || syncMutation.isPending ? 'animate-spin' : ''}`} />
-                    {isBackgroundSyncing || syncMutation.isPending ? 'Syncing…' : 'Sync now'}
+                    <RefreshCw className={`w-4 h-4 ${isLoading ? 'animate-spin' : ''}`} />
+                    
+                    {/* Dynamic button text based on what is happening */}
+                    {isLoading 
+                        ? 'Processing…' 
+                        : activeJobId 
+                            ? 'Check Sync Status' 
+                            : 'Sync now'}
                 </Button>
             </div>
 
