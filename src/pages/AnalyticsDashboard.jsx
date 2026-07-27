@@ -8,25 +8,11 @@ import { FolderKanban, Clock, Users, UserCheck, PenLine, ClipboardCheck, Refresh
 import { ResponsiveContainer, BarChart, Bar, XAxis, YAxis, CartesianGrid, Tooltip } from 'recharts';
 import { format, parseISO } from 'date-fns';
 import toast from 'react-hot-toast';
-import { useState, useEffect } from 'react';
-
-// Track if we have an active job ID
-const [activeJobId, setActiveJobId] = useState(null);
-// Track the brief moment when we are actively checking the status API
-const [isCheckingStatus, setIsCheckingStatus] = useState(false);
 const AUTONEX_RANGES = [
     { key: '1', label: 'Last day' },
     { key: '7', label: 'Last 7 days' },
     { key: '30', label: 'Last 30 days' },
 ];
-
-// Check on page load if a sync was already running
-useEffect(() => {
-    const jobId = localStorage.getItem('active_sync_job_id');
-    if (jobId) {
-        setActiveJobId(jobId);
-    }
-}, []);
 
 const shortDate = (s) => { try { return format(parseISO(s), 'MMM d'); } catch { return s; } };
 
