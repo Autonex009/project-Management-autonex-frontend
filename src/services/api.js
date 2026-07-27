@@ -100,6 +100,7 @@ export const analyticsApi = {
     getAutonexOverview: () => api.get('/analytics/autonex/overview').then(res => res.data),
     // Manual Encord pull (admin) — optional { date_from, date_to }
     runSync: (body) => api.post('/encord/sync', body || {}).then(res => res.data),
+    getSyncStatus: (jobId) => api.get(`/encord/sync/status/${jobId}`).then(res => res.data),
     previewSync: () => api.get('/encord/preview').then(res => res.data),
 };
 

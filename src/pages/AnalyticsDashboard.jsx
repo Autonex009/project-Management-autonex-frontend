@@ -1,4 +1,4 @@
-import { useMemo, useState } from 'react';
+import { useMemo, useState, useEffect } from 'react';
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import { useNavigate } from 'react-router-dom';
 import { analyticsApi } from '../services/api';
@@ -46,6 +46,15 @@ const AnalyticsDashboard = () => {
     const [range, setRange] = useState('30');
     const rangeLabel = AUTONEX_RANGES.find((r) => r.key === range)?.label ?? '';
 
+    // The sync runs as a background job: the button starts it (returns a job id we
+    // persist), and a later click polls that job's status instead of starting a new one.
+    const [activeJobId, setActiveJobId] = useState(null);
+    const [isCheckingStatus, setIsCheckingStatus] = useState(false);
+    useEffect(() => {
+        const jobId = localStorage.getItem('active_sync_job_id');
+        if (jobId) setActiveJobId(jobId);
+    }, []);
+
     const { data: rows = [], isLoading } = useQuery({
         queryKey: ['analytics-summary'],
         queryFn: analyticsApi.getSummary,
@@ -71,12 +80,44 @@ const AnalyticsDashboard = () => {
             return analyticsApi.runSync({ date_from, date_to });
         },
         onSuccess: (res) => {
-            toast.success(`Encord sync: ${res.inserted + res.updated} rows from ${res.projects} project(s)`);
-            queryClient.invalidateQueries({ queryKey: ['analytics-summary'] });
-            queryClient.invalidateQueries({ queryKey: ['autonex-kpis'] });
+            toast.success('Sync started — it runs in the background. Click again later to check status.');
+            if (res?.job_id) {
+                localStorage.setItem('active_sync_job_id', res.job_id);
+                setActiveJobId(res.job_id);
+            }
         },
-        onError: (e) => toast.error(e?.response?.data?.detail || 'Sync failed'),
+        onError: (e) => toast.error(e?.response?.data?.detail || 'Sync failed to start'),
     });
+
+    // Sync button: if a job is already running, poll its status; otherwise start one.
+    const syncBusy = syncMutation.isPending || isCheckingStatus;
+    const handleSyncClick = async () => {
+        if (activeJobId) {
+            setIsCheckingStatus(true);
+            try {
+                const { status } = await analyticsApi.getSyncStatus(activeJobId);
+                if (['queued', 'deferred', 'in_progress', 'started'].includes(status)) {
+                    toast('Sync is still running in the background — check back soon.');
+                } else if (status === 'complete' || status === 'finished') {
+                    toast.success('Sync finished — refreshing data.');
+                    localStorage.removeItem('active_sync_job_id');
+                    setActiveJobId(null);
+                    queryClient.invalidateQueries({ queryKey: ['analytics-summary'] });
+                    queryClient.invalidateQueries({ queryKey: ['autonex-kpis'] });
+                } else if (status === 'failed') {
+                    toast.error('The background sync failed — you can start a new one.');
+                    localStorage.removeItem('active_sync_job_id');
+                    setActiveJobId(null);
+                }
+            } catch {
+                toast.error('Could not check sync status — please try again.');
+            } finally {
+                setIsCheckingStatus(false);
+            }
+            return;
+        }
+        syncMutation.mutate();
+    };
 
     const liveProjects = useMemo(() => rows.filter((r) => r.status === 'active').length, [rows]);
     const chartData = autonex?.daily || [];
@@ -101,9 +142,9 @@ const AnalyticsDashboard = () => {
                             </button>
                         ))}
                     </div>
-                    <Button variant="secondary" onClick={() => syncMutation.mutate()} disabled={syncMutation.isPending}>
-                        <RefreshCw className={`w-4 h-4 ${syncMutation.isPending ? 'animate-spin' : ''}`} />
-                        {syncMutation.isPending ? 'Syncing…' : 'Sync now'}
+                    <Button variant="secondary" onClick={handleSyncClick} disabled={syncBusy}>
+                        <RefreshCw className={`w-4 h-4 ${syncBusy ? 'animate-spin' : ''}`} />
+                        {syncBusy ? 'Processing…' : activeJobId ? 'Check sync status' : 'Sync now'}
                     </Button>
                 </div>
             </div>
@@ -118,7 +159,7 @@ const AnalyticsDashboard = () => {
                 <AutonexKpiCard icon={ClipboardCheck} label="Review Time" value={`${k?.review_hours ?? 0}h`} tone="rose" />
             </div>
 
-            {/* Daily platform hours — gradient area chart */}
+            {/* Daily platform hours */}
             <div className="rounded-2xl border border-slate-200/80 bg-white p-5 shadow-sm">
                 <div className="mb-4 flex items-center justify-between">
                     <div>
