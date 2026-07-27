@@ -254,42 +254,49 @@ const LeavesPage = () => {
   };
 
   return (
-    <div className="space-y-6">
+    <div className="space-y-4">
       {/* Header */}
-      <div className="flex flex-col sm:flex-row sm:justify-between sm:items-center gap-3">
-        <div>
-          <h1 className="text-lg font-semibold text-slate-800">Leave Management</h1>
-          <p className="mt-1 text-sm text-slate-500">Track employee leaves, WFH requests, and attendance</p>
-        </div>
-        {activeTab === 'Leave List' && (
-          <Button onClick={() => setIsModalOpen(true)} className="self-start sm:self-auto">
-            <Plus className="w-4 h-4" /> Add Leave
-          </Button>
-        )}
+      <div>
+        <h1 className="text-lg font-semibold text-slate-900">Leave Management</h1>
+        <p className="mt-0.5 text-[13px] text-slate-500">Track employee leaves, WFH requests, and attendance</p>
       </div>
 
-      {/* Tabs and Search Bar */}
-      <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4">
-        <div className="flex gap-1 bg-slate-100 rounded-xl p-1 w-fit">
-          {TABS.map(tab => (
-            <button key={tab} onClick={() => handleTabChange(tab)}
-              className={`px-4 py-2 rounded-lg text-sm font-medium transition-all ${
-                activeTab === tab ? 'bg-white text-slate-800 shadow-sm' : 'text-slate-500 hover:text-slate-700'
-              }`}>
-              {tab === 'WFH Requests' ? <span className="flex items-center gap-1.5"><Home className="w-3.5 h-3.5"/>{tab}</span> :
-               tab === 'Calendar' ? <span className="flex items-center gap-1.5"><Calendar className="w-3.5 h-3.5"/>{tab}</span> :
-               tab === 'Employee KPI' ? <span className="flex items-center gap-1.5"><BarChart2 className="w-3.5 h-3.5"/>{tab}</span> : tab}
-            </button>
-          ))}
+      {/* Tabs · Search · Add Leave */}
+      <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3">
+        <div className="inline-flex items-center rounded-lg border border-slate-200 bg-slate-50 p-0.5 w-fit">
+          {TABS.map(tab => {
+            const isActive = activeTab === tab;
+            return (
+              <button key={tab} onClick={() => handleTabChange(tab)}
+                className={`inline-flex items-center gap-1.5 px-3.5 py-1.5 text-[13px] font-semibold rounded-md transition-all whitespace-nowrap ${
+                  isActive ? 'bg-white text-slate-900 shadow-sm ring-1 ring-slate-200/70' : 'text-slate-500 hover:text-slate-800'
+                }`}>
+                {tab === 'WFH Requests' ? <><Home className="w-3.5 h-3.5"/>{tab}</> :
+                 tab === 'Calendar' ? <><Calendar className="w-3.5 h-3.5"/>{tab}</> :
+                 tab === 'Employee KPI' ? <><BarChart2 className="w-3.5 h-3.5"/>{tab}</> : tab}
+              </button>
+            );
+          })}
         </div>
 
-        {activeTab !== 'Calendar' && activeTab !== 'Employee KPI' && (
-          <SearchBar responsive
-            value={searchQuery}
-            onChange={handleSearchChange}
-            placeholder={activeTab === 'WFH Requests' ? "Search WFH requests..." : "Search leaves..."}
-          />
-        )}
+        <div className="flex items-center gap-2">
+          {activeTab !== 'Calendar' && activeTab !== 'Employee KPI' && (
+            <SearchBar responsive
+              value={searchQuery}
+              onChange={handleSearchChange}
+              placeholder={activeTab === 'WFH Requests' ? "Search WFH requests..." : "Search leaves..."}
+            />
+          )}
+          {activeTab === 'Leave List' && (
+            <button
+              type="button"
+              onClick={() => setIsModalOpen(true)}
+              className="inline-flex items-center gap-1.5 h-9 px-3.5 rounded-lg bg-indigo-600 text-white text-[13px] font-semibold hover:bg-indigo-700 shadow-sm transition-colors shrink-0"
+            >
+              <Plus className="w-4 h-4" /> Add Leave
+            </button>
+          )}
+        </div>
       </div>
 
       {/* ── Tab: Leave List ── */}
@@ -300,18 +307,22 @@ const LeavesPage = () => {
             {
               key: 'employee_id',
               label: 'Employee',
+              width: 'w-[22%]',
               render: (_, leave) => (
-                <div>
-                  <div className="flex items-center gap-2">
-                    <span className="font-semibold text-slate-800">{getEmployeeName(leave.employee_id)}</span>
+                <div className="min-w-0">
+                  <div className="flex items-center gap-2 min-w-0">
+                    <span className="font-semibold text-slate-800 truncate">{getEmployeeName(leave.employee_id)}</span>
                     {leave.flagged && (
-                      <span className="inline-flex items-center gap-1 px-2 py-0.5 rounded-full text-[10px] font-semibold bg-orange-100 text-orange-700 border border-orange-200">
-                        <AlertTriangle className="w-2.5 h-2.5"/>Over limit
+                      <span
+                        title="Over limit"
+                        className="inline-flex items-center justify-center h-5 w-5 shrink-0 rounded-full bg-orange-100 text-orange-600 border border-orange-200 cursor-help"
+                      >
+                        <AlertTriangle className="w-3 h-3" />
                       </span>
                     )}
                   </div>
                   {leave.approval_remark && (
-                    <p className="text-xs text-slate-400 mt-0.5">Remark: {leave.approval_remark}</p>
+                    <p className="text-xs text-slate-400 mt-0.5 truncate">Remark: {leave.approval_remark}</p>
                   )}
                 </div>
               ),
@@ -319,26 +330,32 @@ const LeavesPage = () => {
             {
               key: 'leave_type',
               label: 'Leave Type',
+              width: 'w-[14%]',
               render: (value) => (
-                <span className={`inline-flex px-2.5 py-1 rounded-full text-xs font-medium ${getLeaveTypeBadgeClass(value)}`}>
-                  {getLeaveTypeLabel(value)}
+                <span className={`inline-flex whitespace-nowrap px-2.5 py-1 rounded-full text-xs font-medium ${getLeaveTypeBadgeClass(value)}`}>
+                  {getLeaveTypeLabel(value)
+                    .replace('Second Half-day Leave', '2nd Half-day')
+                    .replace('First Half-day Leave', '1st Half-day')}
                 </span>
               ),
             },
             {
               key: 'start_date',
               label: 'Start Date',
-              render: (value) => <span className="text-sm text-slate-700">{format(new Date(value + 'T00:00:00'), 'MMM d, yyyy')}</span>,
+              width: 'w-[12%]',
+              render: (value) => <span className="text-[13px] text-slate-700 whitespace-nowrap">{format(new Date(value + 'T00:00:00'), 'MMM d, yyyy')}</span>,
             },
             {
               key: 'end_date',
               label: 'End Date',
-              render: (value) => <span className="text-sm text-slate-700">{format(new Date(value + 'T00:00:00'), 'MMM d, yyyy')}</span>,
+              width: 'w-[12%]',
+              render: (value) => <span className="text-[13px] text-slate-700 whitespace-nowrap">{format(new Date(value + 'T00:00:00'), 'MMM d, yyyy')}</span>,
             },
             {
               key: 'leave_id',
               label: 'Duration',
               align: 'center',
+              width: 'w-[13%]',
               render: (_, leave) => {
                 const duration = getWorkingDayCount(leave.start_date, leave.end_date, leave.is_half_day);
                 return (
@@ -359,26 +376,29 @@ const LeavesPage = () => {
               key: 'status',
               label: 'Status',
               align: 'center',
+              width: 'w-[12%]',
               render: (value) => STATUS_BADGE[value] || STATUS_BADGE.pending,
             },
             {
               key: '_actions',
               label: 'Actions',
               align: 'right',
+              width: 'w-[15%]',
               render: (_, leave) => {
                 const isPending = !leave.status || leave.status === 'pending';
                 const btn = 'inline-flex items-center gap-1 rounded-md border px-2 py-1 text-xs font-medium transition-colors disabled:opacity-50';
+                const iconBtn = 'inline-flex items-center justify-center h-8 w-8 rounded-md border transition-colors disabled:opacity-50';
                 return (
                   <div className="flex items-center justify-end gap-1.5">
                     {isPending && (
                       <>
-                        <button onClick={() => handleApprove(leave)} disabled={approveMutation.isPending}
-                          className={`${btn} border-emerald-200 bg-emerald-50 text-emerald-700 hover:bg-emerald-100`}>
-                          <CheckCircle className="w-3.5 h-3.5"/>Approve
+                        <button onClick={() => handleApprove(leave)} disabled={approveMutation.isPending} title="Approve"
+                          className={`${iconBtn} border-emerald-200 bg-emerald-50 text-emerald-700 hover:bg-emerald-100`}>
+                          <CheckCircle className="w-4 h-4"/>
                         </button>
-                        <button onClick={() => rejectMutation.mutate(leave.leave_id)} disabled={rejectMutation.isPending}
-                          className={`${btn} border-red-200 bg-red-50 text-red-700 hover:bg-red-100`}>
-                          <XCircle className="w-3.5 h-3.5"/>Reject
+                        <button onClick={() => rejectMutation.mutate(leave.leave_id)} disabled={rejectMutation.isPending} title="Reject"
+                          className={`${iconBtn} border-red-200 bg-red-50 text-red-700 hover:bg-red-100`}>
+                          <XCircle className="w-4 h-4"/>
                         </button>
                       </>
                     )}

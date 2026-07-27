@@ -11,19 +11,19 @@ const onboardingNavigation = [
 
 const COMPANY_SETTINGS_HREF = '/admin/company-settings';
 
-// Shared Linear-style row classes (light base + dark: variants). Kept in one
-// place so both nav sections stay identical and future tweaks touch one spot.
-const rowBase = 'flex items-center gap-2.5 w-full px-2.5 py-[7px] rounded-md text-[13px] font-medium transition-colors duration-150 group relative';
-const rowActive = 'bg-white text-blue-700 shadow-sm dark:bg-white/[0.08] dark:text-zinc-100 dark:shadow-none';
-const rowInactive = 'text-slate-600 hover:text-slate-900 hover:bg-slate-200/60 dark:text-zinc-400 dark:hover:text-zinc-100 dark:hover:bg-white/[0.05]';
+// Shared row classes (light base + dark: variants). Kept in one place so both
+// nav sections stay identical and future tweaks touch one spot.
+const rowBase = 'flex items-center gap-2.5 w-full px-2.5 py-[9px] rounded-lg text-[13.5px] transition-all duration-150 group relative outline-none focus-visible:ring-2 focus-visible:ring-blue-500/40';
+const rowActive = 'bg-white text-slate-900 font-semibold ring-1 ring-slate-200/60 shadow-[0_1px_2px_rgba(16,24,40,0.04)] dark:bg-white/[0.08] dark:text-zinc-100 dark:ring-0 dark:shadow-none';
+const rowInactive = 'text-slate-600 font-medium hover:text-slate-900 hover:bg-white/70 dark:text-zinc-400 dark:hover:text-zinc-100 dark:hover:bg-white/[0.05]';
 
 // Compact icon button used in the bottom bar.
 const iconBtn = 'w-9 h-9 flex items-center justify-center rounded-md border border-slate-200 text-slate-500 hover:text-slate-900 hover:bg-slate-100 dark:border-neutral-800 dark:text-zinc-400 dark:hover:text-white dark:hover:bg-white/[0.06] transition-colors';
 
 const iconClass = (isActive) =>
-  `w-4 h-4 shrink-0 transition-colors ${isActive
+  `w-[18px] h-[18px] shrink-0 transition-colors ${isActive
     ? 'text-blue-600 dark:text-zinc-100'
-    : 'text-slate-400 group-hover:text-slate-600 dark:text-zinc-500 dark:group-hover:text-zinc-200'}`;
+    : 'text-slate-500 group-hover:text-slate-800 dark:text-zinc-500 dark:group-hover:text-zinc-200'}`;
 
 const AdminSidebar = ({ user = {}, pendingSignupCount = 0, onNavigate, onLogout }) => {
   const location = useLocation();
@@ -47,7 +47,8 @@ const AdminSidebar = ({ user = {}, pendingSignupCount = 0, onNavigate, onLogout 
         onClick={handleNavigate}
         className={`${rowBase} ${isActive ? rowActive : rowInactive}`}
       >
-        <Icon className={iconClass(isActive)} />
+        <Icon className={iconClass(isActive)} strokeWidth={isActive ? 2.4 : 2} />
+        {isActive && <span className="absolute left-0 top-1/2 -translate-y-1/2 h-4 w-[3px] rounded-full bg-blue-600 dark:bg-blue-400" />}
         <span className="truncate">{item.name}</span>
         {item.href === '/admin/signup-requests' && pendingSignupCount > 0 && (
           <span className="ml-auto inline-flex items-center justify-center h-[18px] min-w-[18px] px-1 rounded-full text-[10px] font-semibold shrink-0 bg-blue-50 text-blue-600 dark:bg-blue-500/15 dark:text-blue-300">
@@ -63,19 +64,19 @@ const AdminSidebar = ({ user = {}, pendingSignupCount = 0, onNavigate, onLogout 
       <button
         type="button"
         onClick={() => toggleSection(id)}
-        className="w-full flex items-center justify-between gap-2 px-2.5 h-6 rounded-md text-slate-500 hover:text-slate-700 hover:bg-slate-200/50 dark:text-zinc-500 dark:hover:text-zinc-300 dark:hover:bg-white/[0.04] transition-colors group"
+        className="w-full flex items-center justify-between gap-2 px-2.5 h-6 mb-1 rounded-md text-slate-400 hover:text-slate-600 dark:text-zinc-500 dark:hover:text-zinc-300 transition-colors group"
       >
-        <span className="text-[12px] font-semibold truncate">{label}</span>
+        <span className="text-[11px] font-semibold uppercase tracking-[0.07em] truncate">{label}</span>
         <ChevronDown className={`w-3.5 h-3.5 shrink-0 opacity-0 group-hover:opacity-100 transition-all duration-200 ${openSections[id] ? '' : '-rotate-90'}`} />
       </button>
-      {openSections[id] && <div className="mt-0.5 space-y-0.5">{items.map(renderItem)}</div>}
+      {openSections[id] && <div className="space-y-0.5">{items.map(renderItem)}</div>}
     </div>
   );
 
   const companySettingsActive = isRowActive(COMPANY_SETTINGS_HREF);
 
   return (
-    <div className="h-full flex flex-col overflow-visible bg-[#f4f5f7] dark:bg-[#070707]">
+    <div className="h-full flex flex-col overflow-visible">
       {/* Brand Header — compact workspace-style row (Linear) */}
       <div className="shrink-0 px-3 pt-5 pb-4">
         <div className="flex items-center gap-2.5">
@@ -89,7 +90,7 @@ const AdminSidebar = ({ user = {}, pendingSignupCount = 0, onNavigate, onLogout 
 
       {/* Navigation */}
       <nav
-        className="flex-1 px-2.5 py-2 space-y-3 overflow-y-auto"
+        className="flex-1 px-2.5  space-y-3 overflow-y-auto"
         style={{ scrollbarWidth: 'none', msOverflowStyle: 'none' }}
       >
         <div className="space-y-0.5">{platformItems.map(renderItem)}</div>

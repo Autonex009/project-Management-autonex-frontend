@@ -4,7 +4,7 @@ import { useNavigate, useSearchParams } from 'react-router-dom';
 import Button from '../components/ui/Button';
 import Spinner from '../components/ui/LoadingSpinner';
 import { subProjectApi, parentProjectApi, employeeApi, allocationApi, skillApi, leaveApi, guidelineApi, vendorApi } from '../services/api';
-import { Plus, Edit, Trash2, X, UserCheck, Users, ChevronDown, ArrowRight, Copy, Settings, UploadCloud, FileText, BarChart3, SlidersHorizontal } from 'lucide-react';
+import { Plus, Minus, Trash2, X, UserCheck, Users, ChevronDown, ArrowRight, Edit, Settings, UploadCloud, FileText, BarChart3, SlidersHorizontal, Check, Download, Clock, Smile } from 'lucide-react';
 import { Link } from 'react-router-dom';
 import { format, parseISO } from 'date-fns';
 import toast from 'react-hot-toast';
@@ -27,6 +27,12 @@ const STATUS_CONFIG = {
   'on-hold': { label: 'On Hold', style: 'bg-amber-50 text-amber-700 border border-amber-200' },
   cancelled: { label: 'Cancelled', style: 'bg-red-50 text-red-700 border border-red-200' },
 };
+
+// Projects with these statuses live under the "Archived" tab; everything else
+// (active, in-progress, poc, blank) is treated as an active project.
+const ARCHIVED_STATUSES = ['completed', 'on-hold', 'cancelled'];
+const isArchivedStatus = (statusRaw) =>
+  ARCHIVED_STATUSES.includes((statusRaw || 'active').toLowerCase().trim());
 
 const getStatusBadgeConfig = (statusRaw) => {
   const key = (statusRaw || 'active').toLowerCase().trim();
@@ -70,7 +76,19 @@ const PROJECT_TYPE_CATEGORIES = [
     key: 'Object Segmentation Types',
     subtypes: ['2D Bounding Box'],
   },
+  {
+    key: 'Developer',
+    subtypes: ['Coding'],
+  },
 ];
+
+// The project-type category that marks a project as a development/coding project.
+// Such projects are surfaced under the dedicated "Development" tab.
+const DEVELOPER_TYPE_KEY = 'Developer';
+const isDeveloperProject = (project) => {
+  const t = project?.project_types;
+  return !!(t && typeof t === 'object' && t[DEVELOPER_TYPE_KEY]);
+};
 
 const SkillMultiSelect = ({ options, value, onChange }) => {
   const [isOpen, setIsOpen] = useState(false);
@@ -329,12 +347,409 @@ const EmployeeMultiSelect = ({ name, defaultValue = [], employees, requiredSkill
   );
 };
 
+// Field label above a value/input inside the card (small uppercase caption).
+const CardField = ({ label, children, className = '' }) => (
+  <div className={`min-w-0 ${className}`}>
+    <span className="mb-1 block text-[10px] font-semibold uppercase tracking-wider text-slate-400">{label}</span>
+    {children}
+  </div>
+);
+
+const cardInputClass =
+  'w-full rounded-md border border-slate-200 px-2 py-1 text-[13px] text-slate-800 focus:border-indigo-400 focus:outline-none focus:ring-2 focus:ring-indigo-100';
+
+// Status: label + a colored dot rendered inside a soft pill.
+const STATUS_STYLE = {
+  active: { label: 'In Progress', dot: 'bg-indigo-500', pill: 'bg-indigo-50 text-indigo-700' },
+  completed: { label: 'Completed', dot: 'bg-emerald-500', pill: 'bg-emerald-50 text-emerald-700' },
+  'on-hold': { label: 'On Hold', dot: 'bg-amber-500', pill: 'bg-amber-50 text-amber-700' },
+  cancelled: { label: 'Cancelled', dot: 'bg-rose-500', pill: 'bg-rose-50 text-rose-700' },
+};
+
+// Client sentiment: friendly label + dot + pill colors.
+const SENTIMENT_STYLE = {
+  GOOD: { label: 'Good', dot: 'bg-emerald-500', pill: 'bg-emerald-50 text-emerald-700' },
+  AVG: { label: 'Avg', dot: 'bg-amber-500', pill: 'bg-amber-50 text-amber-700' },
+  Poor: { label: 'Poor', dot: 'bg-red-500', pill: 'bg-red-50 text-red-600' },
+};
+
+// Small title accent bar — a different gradient per project (picked by id).
+const CARD_ACCENTS = [
+  'from-indigo-500 to-violet-500',
+  'from-emerald-500 to-teal-500',
+  'from-amber-500 to-orange-500',
+  'from-rose-500 to-pink-500',
+  'from-sky-500 to-blue-500',
+  'from-fuchsia-500 to-purple-500',
+  'from-lime-500 to-green-500',
+  'from-cyan-500 to-sky-500',
+];
+
+// Truncated text that reveals its full value in a light (white) tooltip on hover.
+const TruncTip = ({ text, className = '' }) => (
+  <div className="group/tip relative min-w-0">
+    <div className={`truncate ${className}`}>{text}</div>
+    <span className="pointer-events-none absolute left-0 top-full z-30 mt-1 hidden w-max max-w-[240px] whitespace-normal break-words rounded-lg border border-slate-200 bg-white px-2.5 py-1.5 text-[11px] font-medium text-slate-600 shadow-lg group-hover/tip:block">
+      {text}
+    </span>
+  </div>
+);
+
+// A single project card. In "view" mode it shows the project at a glance; a
+// double-click flips it into inline "edit" mode where the common fields become
+// editable and Save / Cancel replace Copy / Delete.
+const ProjectCard = ({
+  project, parentProject, pmNames, allocatedManpower, allocations, employees,
+  prefix, navigate, docs, isEditing, draft, onStartEdit, onCancelEdit, onSaveEdit,
+  onDraftChange, saving, docsOpen, onToggleDocs, onCloseDocs, onAdvanced, onDelete,
+}) => {
+  const typeText = project.project_types && Object.keys(project.project_types).length
+    ? Object.values(project.project_types).join(', ')
+    : '—';
+  const vendorText = (project.workforce_vendors || []).join(', ');
+  const hasEncord = !!project.encord_project_hash?.trim();
+  const stop = (e) => e.stopPropagation();
+
+  const status = STATUS_STYLE[project.project_status]
+    || { label: project.project_status, dot: 'bg-slate-400', pill: 'bg-slate-100 text-slate-600' };
+  const sentiment = SENTIMENT_STYLE[project.sentiment];
+  const accent = CARD_ACCENTS[(project.id || 0) % CARD_ACCENTS.length];
+  const goToAllocations = (e) => { stop(e); navigate(`${prefix}/allocations`, { state: { projectId: project.id } }); };
+
+  return (
+    <div
+      onDoubleClick={() => !isEditing && onStartEdit()}
+      className={`group flex flex-col rounded-2xl border bg-white p-5 shadow-sm transition-all duration-200 ${
+        isEditing ? 'border-indigo-300 ring-2 ring-indigo-100' : 'border-slate-200 hover:shadow-md'
+      }`}
+    >
+      {/* Header */}
+      <div className="flex items-start justify-between gap-3">
+        <div className="flex min-w-0 flex-1 items-start gap-2.5">
+          {/* Small title accent — gradient varies per project */}
+          <span className={`mt-0.5 h-9 w-1.5 shrink-0 rounded-full bg-gradient-to-b ${accent}`} />
+          <div className="min-w-0 flex-1">
+            {isEditing ? (
+              <input
+                value={draft.name}
+                onChange={(e) => onDraftChange('name', e.target.value)}
+                onClick={stop}
+                className="w-full rounded-md border border-slate-200 px-2 py-1 text-[15px] font-bold text-slate-900 focus:border-indigo-400 focus:outline-none focus:ring-2 focus:ring-indigo-100"
+              />
+            ) : (
+              <div className="group/tip relative">
+                <h3 className="line-clamp-2 text-[15px] font-bold leading-snug text-slate-900">{project.name}</h3>
+                <span className="pointer-events-none absolute left-0 top-full z-30 mt-1 hidden w-max max-w-[240px] whitespace-normal break-words rounded-lg border border-slate-200 bg-white px-2.5 py-1.5 text-[11px] font-medium text-slate-600 shadow-lg group-hover/tip:block">
+                  {project.name}
+                </span>
+              </div>
+            )}
+            <p className="mt-1 truncate text-xs text-slate-500">{parentProject?.client || '—'}</p>
+          </div>
+        </div>
+
+        <div className="flex shrink-0 flex-col items-end gap-1.5">
+          {isEditing ? (
+            <select
+              value={draft.project_status}
+              onChange={(e) => onDraftChange('project_status', e.target.value)}
+              onClick={stop}
+              className="rounded-md border border-slate-200 px-1.5 py-0.5 text-[11px] font-semibold text-slate-700 focus:border-indigo-400 focus:outline-none"
+            >
+              <option value="active">In Progress</option>
+              <option value="completed">Completed</option>
+              <option value="on-hold">On Hold</option>
+              <option value="cancelled">Cancelled</option>
+            </select>
+          ) : (
+            <span className={`inline-flex items-center gap-1.5 rounded-full px-2.5 py-1 text-xs font-medium ${status.pill}`}>
+              <span className={`h-1.5 w-1.5 rounded-full ${status.dot}`} />
+              {status.label}
+            </span>
+          )}
+          {project.created_at && (
+            <span className="text-right text-[11px] text-slate-400">
+              Created {format(new Date(project.created_at), 'MMM d, yyyy')}
+            </span>
+          )}
+        </div>
+      </div>
+
+      <div className="my-4 border-t border-slate-100" />
+
+      {/* PM / Sentiment / Type / Vendor */}
+      <div className="grid grid-cols-2 gap-x-4 gap-y-3">
+        <CardField label="PM">
+          <TruncTip text={pmNames.length ? pmNames.join(', ') : '—'} className="text-sm font-semibold text-slate-800" />
+        </CardField>
+
+        <CardField label="Client sentiment">
+          {isEditing ? (
+            <div className="flex gap-1" onClick={stop}>
+              {[['GOOD', 'Good'], ['AVG', 'Avg'], ['Poor', 'Poor']].map(([val, label]) => {
+                const on = draft.sentiment === val;
+                const active = val === 'GOOD' ? 'bg-emerald-500 ring-emerald-500' : val === 'AVG' ? 'bg-amber-500 ring-amber-500' : 'bg-red-500 ring-red-500';
+                return (
+                  <button
+                    key={val}
+                    type="button"
+                    onClick={() => onDraftChange('sentiment', on ? '' : val)}
+                    className={`rounded px-1.5 py-0.5 text-[11px] font-semibold ring-1 ring-inset ${
+                      on ? `${active} text-white` : 'bg-slate-50 text-slate-500 ring-slate-200 hover:bg-slate-100'
+                    }`}
+                  >
+                    {label}
+                  </button>
+                );
+              })}
+            </div>
+          ) : sentiment ? (
+            <span className={`inline-flex items-center gap-1.5 rounded-full px-2.5 py-1 text-xs font-semibold ${sentiment.pill}`}>
+              <span className={`h-1.5 w-1.5 rounded-full ${sentiment.dot}`} />
+              {sentiment.label}
+            </span>
+          ) : (
+            <span className="text-sm font-medium text-slate-400">Not set</span>
+          )}
+        </CardField>
+
+        <CardField label="Type">
+          <TruncTip text={typeText} className="text-sm font-semibold text-slate-800" />
+        </CardField>
+
+        <CardField label="Vendor">
+          {isEditing ? (
+            <input
+              value={draft.vendorsText}
+              onChange={(e) => onDraftChange('vendorsText', e.target.value)}
+              onClick={stop}
+              placeholder="Comma separated"
+              className={cardInputClass}
+            />
+          ) : (
+            <TruncTip text={vendorText || '—'} className="text-sm font-semibold text-slate-800" />
+          )}
+        </CardField>
+      </div>
+
+      {/* Manpower — boxed stepper; the count keeps the hover popover (req 3) */}
+      <div className="mt-4 flex items-center justify-between rounded-xl bg-slate-50 px-3 py-2.5">
+        <span className="text-[10px] font-semibold uppercase tracking-wider text-slate-400">Manpower</span>
+        <div className="flex items-center rounded-lg border border-slate-200 bg-white">
+          <button type="button" title="Manage allocations" aria-label="Manage allocations" onClick={goToAllocations} className="rounded-l-lg px-2.5 py-1.5 text-slate-500 hover:bg-slate-50">
+            <Minus className="h-3.5 w-3.5" />
+          </button>
+          <span className="h-5 w-px bg-slate-200" />
+          <AllocationPopover
+            project={project}
+            allocations={allocations}
+            employees={employees}
+            onOpenAllocations={() => navigate(`${prefix}/allocations`, { state: { projectId: project.id } })}
+            triggerClassName="px-3 py-1.5 text-sm font-bold text-slate-800 tabular-nums hover:text-indigo-600 transition-colors cursor-pointer"
+            badgeContent={<span>{allocatedManpower} / {project.required_manpower || 0}</span>}
+          />
+          <span className="h-5 w-px bg-slate-200" />
+          <button type="button" title="Allocate employees" aria-label="Allocate employees" onClick={goToAllocations} className="rounded-r-lg px-2.5 py-1.5 text-indigo-600 hover:bg-indigo-50">
+            <Plus className="h-3.5 w-3.5" />
+          </button>
+        </div>
+      </div>
+
+      {/* Team counts + annotation time */}
+      <div className="mt-4 grid grid-cols-2 gap-x-4 gap-y-3">
+        {[['Annotators', 'autonex_annotators'], ['Quality checker', 'qc_count'], ['Reviewers', 'autonex_reviewers']].map(([label, field]) => (
+          <CardField key={field} label={label}>
+            {isEditing ? (
+              <input type="number" min="0" value={draft[field]} onChange={(e) => onDraftChange(field, e.target.value)} onClick={stop} className={cardInputClass} />
+            ) : (
+              <p className="text-sm font-bold text-slate-800 tabular-nums">{project[field] ?? 0}</p>
+            )}
+          </CardField>
+        ))}
+
+        <CardField label="Annotation time / task">
+          {isEditing ? (
+            <div className="flex items-center gap-1" onClick={stop}>
+              <input type="number" min="0" step="0.1" value={draft.annotation_minutes} onChange={(e) => onDraftChange('annotation_minutes', e.target.value)} className={cardInputClass} />
+              <span className="text-[11px] text-slate-400">min</span>
+            </div>
+          ) : (
+            <p className="text-sm font-bold text-slate-800">
+              {project.estimated_time_per_task
+                ? <>{Math.round(project.estimated_time_per_task * 60)} <span className="text-[11px] font-medium text-slate-400">min</span></>
+                : '—'}
+            </p>
+          )}
+        </CardField>
+      </div>
+
+      {/* Footer */}
+      <div className="mt-5 flex items-center justify-between border-t border-slate-100 pt-4">
+        <div className="flex items-center gap-2">
+          {/* Analytics */}
+          <div className="group/an relative inline-block">
+            <button
+              type="button"
+              disabled={!hasEncord}
+              onClick={(e) => { stop(e); navigate(`/admin/analytics/${project.id}`); }}
+              className={`inline-flex items-center gap-1.5 rounded-lg border px-3 py-1.5 text-xs font-medium transition-colors ${
+                hasEncord ? 'border-slate-200 bg-white text-slate-700 hover:bg-slate-50' : 'cursor-not-allowed border-slate-100 bg-slate-50 text-slate-400'
+              }`}
+            >
+              <BarChart3 className="h-4 w-4" /> Analytics
+            </button>
+            {!hasEncord && (
+              <div className="pointer-events-none absolute bottom-full left-1/2 z-20 mb-2 -translate-x-1/2 whitespace-nowrap rounded-lg border border-slate-200 bg-white px-3 py-2 text-xs font-medium text-slate-600 opacity-0 shadow-lg transition-opacity duration-200 group-hover/an:opacity-100">
+                Encord Project ID is not configured.
+              </div>
+            )}
+          </div>
+
+          {/* Docs — project guideline documents (req 4) */}
+          <div className="relative inline-block">
+            <button
+              type="button"
+              onClick={(e) => { stop(e); onToggleDocs(); }}
+              className="inline-flex items-center gap-1.5 rounded-lg border border-slate-200 bg-white px-3 py-1.5 text-xs font-medium text-slate-700 hover:bg-slate-50"
+            >
+              <FileText className="h-4 w-4" /> Docs
+              {docs.length > 0 && (
+                <span className="rounded-full bg-indigo-100 px-1.5 text-[10px] font-bold text-indigo-700">{docs.length}</span>
+              )}
+            </button>
+            {docsOpen && (
+              <>
+                <div className="fixed inset-0 z-30" onClick={(e) => { stop(e); onCloseDocs(); }} />
+                <div className="absolute bottom-full left-0 z-40 mb-2 w-64 rounded-xl border border-slate-200 bg-white p-2 shadow-xl" onClick={stop}>
+                  <p className="px-2 py-1 text-[11px] font-semibold uppercase tracking-wide text-slate-400">Project guidelines</p>
+                  {docs.length === 0 ? (
+                    <p className="px-2 py-3 text-center text-xs text-slate-400">No documents uploaded</p>
+                  ) : (
+                    <ul className="max-h-48 overflow-y-auto">
+                      {docs.map((g) => (
+                        <li key={g.id}>
+                          <a
+                            href={g.file_url || undefined}
+                            target="_blank"
+                            rel="noreferrer"
+                            className={`flex items-center gap-2 rounded-lg px-2 py-1.5 text-xs ${g.file_url ? 'text-slate-700 hover:bg-slate-50' : 'cursor-default text-slate-400'}`}
+                          >
+                            <FileText className="h-3.5 w-3.5 shrink-0 text-indigo-500" />
+                            <span className="truncate">{g.title || g.file_name || 'Document'}</span>
+                            {g.file_url && <Download className="ml-auto h-3.5 w-3.5 shrink-0 text-slate-400" />}
+                          </a>
+                        </li>
+                      ))}
+                    </ul>
+                  )}
+                </div>
+              </>
+            )}
+          </div>
+        </div>
+
+        {/* Right: tick / cross while editing, else edit / delete (req 5) */}
+        <div className="flex items-center gap-0.5" onClick={stop}>
+          {isEditing ? (
+            <>
+              <button type="button" onClick={onCancelEdit} title="Cancel" aria-label="Cancel" className="rounded-lg p-1.5 text-slate-400 hover:bg-slate-100 hover:text-slate-600">
+                <X className="h-4 w-4" />
+              </button>
+              <button type="button" onClick={onSaveEdit} disabled={saving} title="Save" aria-label="Save" className="rounded-lg p-1.5 text-emerald-600 hover:bg-emerald-50 disabled:opacity-50">
+                <Check className="h-4 w-4" />
+              </button>
+            </>
+          ) : (
+            <>
+              <button type="button" onClick={onAdvanced} title="Edit" aria-label="Edit" className="rounded-lg p-1.5 text-slate-400 hover:bg-indigo-50 hover:text-indigo-600">
+                <Edit className="h-4 w-4" />
+              </button>
+              <button type="button" onClick={onDelete} title="Delete" aria-label="Delete" className="rounded-lg p-1.5 text-slate-400 hover:bg-red-50 hover:text-red-600">
+                <Trash2 className="h-4 w-4" />
+              </button>
+            </>
+          )}
+        </div>
+      </div>
+    </div>
+  );
+};
+
+// Program-manager multi-select styled like Dropdown. Selected managers stay in
+// the list with a tick (and "primary" on the first); clicking one toggles it.
+const PmMultiSelect = ({ employees, value, onChange, isPm, pmEmployeeId }) => {
+  const [open, setOpen] = useState(false);
+  const [search, setSearch] = useState('');
+  const ref = useRef(null);
+
+  useEffect(() => {
+    const handler = (e) => { if (ref.current && !ref.current.contains(e.target)) setOpen(false); };
+    document.addEventListener('mousedown', handler);
+    return () => document.removeEventListener('mousedown', handler);
+  }, []);
+
+  const q = search.trim().toLowerCase();
+  const list = employees
+    .filter((e) => e.status === 'active')
+    .filter((e) => !q || (e.name || '').toLowerCase().includes(q));
+
+  const toggle = (id) => {
+    if (value.includes(id)) {
+      if (isPm && id === pmEmployeeId) return; // a PM can't remove themselves
+      onChange(value.filter((v) => v !== id));
+    } else {
+      onChange([...value, id]);
+    }
+  };
+
+  return (
+    <div ref={ref} className="relative">
+      <div className="flex w-full items-center gap-1.5 rounded-lg border border-slate-200 bg-white px-3 py-1.5 text-sm transition-colors hover:border-slate-300">
+        <input
+          type="text"
+          value={search}
+          placeholder={value.length ? 'Add another' : 'Add manager'}
+          onChange={(e) => { setSearch(e.target.value); setOpen(true); }}
+          onFocus={() => setOpen(true)}
+          className="min-w-0 flex-1 bg-transparent text-slate-700 outline-none placeholder:text-slate-400"
+        />
+        <ChevronDown className={`h-3.5 w-3.5 shrink-0 text-slate-400 transition-transform ${open ? 'rotate-180' : ''}`} />
+      </div>
+      {open && (
+        <div className="absolute left-0 top-full z-[9999] mt-1 max-h-64 w-full overflow-y-auto rounded-xl border border-slate-200 bg-white py-1 shadow-lg">
+          {list.length ? list.map((emp) => {
+            const selected = value.includes(emp.id);
+            const isPrimary = value[0] === emp.id;
+            return (
+              <button
+                key={emp.id}
+                type="button"
+                onClick={() => toggle(emp.id)}
+                className={`flex w-full items-center gap-2 px-3 py-1.5 text-left text-sm transition-colors ${selected ? 'bg-indigo-50 text-indigo-700 font-medium' : 'text-slate-700 hover:bg-slate-50'}`}
+              >
+                <span className="flex w-4 shrink-0 justify-center">
+                  {selected && <Check className="h-3.5 w-3.5 text-indigo-600" />}
+                </span>
+                <span className="flex-1 truncate">{emp.name}</span>
+                {isPrimary && <span className="text-[9px] font-semibold uppercase tracking-wide text-indigo-400">primary</span>}
+              </button>
+            );
+          }) : (
+            <div className="px-3 py-2 text-sm text-slate-400">No matches found</div>
+          )}
+        </div>
+      )}
+    </div>
+  );
+};
+
 const ProjectsPage = () => {
   const queryClient = useQueryClient();
   const navigate = useNavigate();
   const user = JSON.parse(localStorage.getItem('user') || '{}');
   const role = localStorage.getItem('role') || 'admin';
   const isPm = role === 'pm';
+  const isAdmin = role === 'admin';
   const prefix = isPm ? '/pm' : '/admin';
   const pmEmployeeId = getPmEmployeeId(user);
   const [isModalOpen, setIsModalOpen] = useState(false);
@@ -344,6 +759,7 @@ const ProjectsPage = () => {
   const [selectedVendors, setSelectedVendors] = useState([]);
   const [projectTypes, setProjectTypes] = useState({});        // { category: subtype }
   const [activeTypeTab, setActiveTypeTab] = useState(PROJECT_TYPE_CATEGORIES[0].key);
+  const [typeTabTouched, setTypeTabTouched] = useState(false);  // has the user clicked a type tab? (drives subtype auto-open)
   const [guidelineFiles, setGuidelineFiles] = useState([]);
   const [isDragActive, setIsDragActive] = useState(false);
   const fileInputRef = useRef(null);
@@ -351,12 +767,20 @@ const ProjectsPage = () => {
   const [formOrg, setFormOrg] = useState('');
   const [formPriority, setFormPriority] = useState('medium');
   const [formProjectStatus, setFormProjectStatus] = useState('active');
+  const [formSentiment, setFormSentiment] = useState('');
+  const [modalInfoTab, setModalInfoTab] = useState('status');   // Status | Client Sentiment
+  const [modalBuildTab, setModalBuildTab] = useState('types');  // Project Types | Team Composition
   const [selectedOrganization, setSelectedOrganization] = useState("all");
   const [selectedPm, setSelectedPm] = useState("all");
   const [selectedStatus, setSelectedStatus] = useState("all");
+  const [projectView, setProjectView] = useState("active"); // 'active' | 'archived'
   const [selectedPmIds, setSelectedPmIds] = useState([]);
   const [filtersOpen, setFiltersOpen] = useState(false);
   const filtersRef = useRef(null);
+  // Inline (double-click) card editing + per-card docs popover
+  const [editingCardId, setEditingCardId] = useState(null);
+  const [cardDraft, setCardDraft] = useState(null);
+  const [docsOpenId, setDocsOpenId] = useState(null);
 
   const { data: projects = [], isLoading } = useQuery({
     queryKey: ['sub-projects'],
@@ -391,6 +815,12 @@ const ProjectsPage = () => {
   const { data: allocations = [] } = useQuery({
     queryKey: ['allocations'],
     queryFn: allocationApi.getAll,
+  });
+
+  // Guideline docs, filtered per-card by sub_project_id for the card "Docs" popover.
+  const { data: guidelinesData = [] } = useQuery({
+    queryKey: ['guidelines', 'cards'],
+    queryFn: () => guidelineApi.getAll(),
   });
 
   const { startStr, endStr } = useMemo(() => {
@@ -432,14 +862,18 @@ const ProjectsPage = () => {
     mutationFn: ({ id, data }) => subProjectApi.update(id, data),
   });
 
-  // Inline PM/admin update of a project's sentiment directly from the card.
-  const sentimentMutation = useMutation({
-    mutationFn: ({ id, sentiment }) => subProjectApi.update(id, { sentiment: sentiment || null }),
+  // Inline (double-click) card edit — persists the commonly-changed sub-project
+  // fields shown on the card (name, status, team counts, annotation time,
+  // vendor, sentiment). Advanced fields are edited via the full modal.
+  const cardUpdateMutation = useMutation({
+    mutationFn: ({ id, data }) => subProjectApi.update(id, data),
     onSuccess: () => {
       queryClient.invalidateQueries(['sub-projects']);
-      toast.success('Sentiment updated');
+      toast.success('Project updated');
+      setEditingCardId(null);
+      setCardDraft(null);
     },
-    onError: (err) => toast.error(err.response?.data?.detail || 'Failed to update sentiment'),
+    onError: (err) => toast.error(err.response?.data?.detail || 'Failed to update project'),
   });
 
   const deleteMutation = useMutation({
@@ -459,12 +893,16 @@ const ProjectsPage = () => {
     setSelectedVendors([]);
     setProjectTypes({});
     setActiveTypeTab(PROJECT_TYPE_CATEGORIES[0].key);
+    setTypeTabTouched(false);
     setGuidelineFiles([]);
     setIsDragActive(false);
     setFormMainProjectId('');
     setFormOrg('');
     setFormPriority('medium');
     setFormProjectStatus('active');
+    setFormSentiment('');
+    setModalInfoTab('status');
+    setModalBuildTab('types');
   };
 
   const addGuidelineFiles = (files) => {
@@ -739,7 +1177,7 @@ toast.success(wasEditing ? 'Project updated successfully' : 'Project created suc
   const [subProjectSearch, setSubProjectSearch] = useState('');
   const [deleteConfirm, setDeleteConfirm] = useState(null);
   const [currentPage, setCurrentPage] = useState(1);
-  const PAGE_SIZE = 10;
+  const PAGE_SIZE = 12;
 
   // Program managers present across the visible parent projects (for the PM filter)
   const projectManagers = useMemo(() => {
@@ -780,6 +1218,18 @@ toast.success(wasEditing ? 'Project updated successfully' : 'Project created suc
         )
       : visibleProjects
   )
+  .filter(project => {
+    // Tabs are admin-only. PMs have no tabs and see every project together.
+    if (!isAdmin) return true;
+    // Top-level tabs. Development is a separate bucket (by project type); Active vs
+    // Archived split the rest by status (Completed / On Hold / Cancelled = archived).
+    const dev = isDeveloperProject(project);
+    if (projectView === 'development') return dev;
+    if (dev) return false; // developer projects live only under the Development tab
+    return projectView === 'archived'
+      ? isArchivedStatus(project.project_status)
+      : !isArchivedStatus(project.project_status);
+  })
   .filter(project => {
     if (selectedOrganization === "all") return true;
 
@@ -825,7 +1275,7 @@ toast.success(wasEditing ? 'Project updated successfully' : 'Project created suc
   // Reset to page 1 when filters change
   useEffect(() => {
     setCurrentPage(1);
-  }, [subProjectSearch, filterMainProjectId, statusParam, recommendationParam, selectedOrganization, selectedPm, selectedStatus]);
+  }, [subProjectSearch, filterMainProjectId, statusParam, recommendationParam, selectedOrganization, selectedPm, selectedStatus, projectView]);
 
 
   const currentMainProject = visibleMainProjects.find(p => p.id === parseInt(filterMainProjectId));
@@ -861,6 +1311,75 @@ toast.success(wasEditing ? 'Project updated successfully' : 'Project created suc
     };
   }, [filteredProjects, allocations, employees, leaves]);
 
+  // Open the full create/edit modal, prefilled from a project. `copy` clones it.
+  const openProjectModal = (project, { copy = false } = {}) => {
+    setEditingCardId(null);
+    setCardDraft(null);
+    if (copy) {
+      setEditingProject(null);
+      setCopyingProject({ ...project, name: `${project.name} (Copy)` });
+    } else {
+      setCopyingProject(null);
+      setEditingProject(project);
+    }
+    setSelectedSkills(project.required_expertise || []);
+    setSelectedVendors(project.workforce_vendors || []);
+    setProjectTypes(project.project_types || {});
+    setActiveTypeTab(PROJECT_TYPE_CATEGORIES[0].key);
+    setTypeTabTouched(false);
+    setGuidelineFiles([]);
+    setFormMainProjectId(String(project.main_project_id || ''));
+    setFormOrg(orgOfMainProject(project.main_project_id));
+    setFormPriority(project.priority || 'medium');
+    setFormProjectStatus(project.project_status || 'active');
+    setFormSentiment(project.sentiment || '');
+    setModalInfoTab('status');
+    setModalBuildTab('types');
+    setIsModalOpen(true);
+  };
+
+  // Inline card editing (double-click to enter, Save/Cancel to exit)
+  const startCardEdit = (project) => {
+    setDocsOpenId(null);
+    setEditingCardId(project.id);
+    setCardDraft({
+      name: project.name || '',
+      project_status: project.project_status || 'active',
+      autonex_annotators: String(project.autonex_annotators ?? 0),
+      qc_count: String(project.qc_count ?? 0),
+      autonex_reviewers: String(project.autonex_reviewers ?? 0),
+      annotation_minutes: project.estimated_time_per_task
+        ? String(Math.round(project.estimated_time_per_task * 60))
+        : '',
+      sentiment: project.sentiment || '',
+      vendorsText: (project.workforce_vendors || []).join(', '),
+    });
+  };
+  const cancelCardEdit = () => { setEditingCardId(null); setCardDraft(null); };
+  const updateDraft = (field, value) => setCardDraft((d) => ({ ...d, [field]: value }));
+  const saveCardEdit = (project) => {
+    if (!cardDraft || cardUpdateMutation.isPending) return;
+    const ann = parseInt(cardDraft.autonex_annotators) || 0;
+    const rev = parseInt(cardDraft.autonex_reviewers) || 0;
+    const qc = parseInt(cardDraft.qc_count) || 0;
+    cardUpdateMutation.mutate({
+      id: project.id,
+      data: {
+        name: (cardDraft.name || '').trim() || project.name,
+        project_status: cardDraft.project_status,
+        autonex_annotators: ann,
+        autonex_reviewers: rev,
+        qc_count: qc,
+        required_manpower: ann + rev + qc,
+        estimated_time_per_task: cardDraft.annotation_minutes !== ''
+          ? parseFloat(cardDraft.annotation_minutes) / 60
+          : (project.estimated_time_per_task ?? null),
+        sentiment: cardDraft.sentiment || null,
+        workforce_vendors: cardDraft.vendorsText.split(',').map((s) => s.trim()).filter(Boolean),
+      },
+    });
+  };
+
   return (
     <div className="space-y-4">
       <div className="flex flex-col md:flex-row md:items-center justify-between gap-4">
@@ -876,11 +1395,36 @@ toast.success(wasEditing ? 'Project updated successfully' : 'Project created suc
         </div>
       </div>
 
-      <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-3">
-        <StatCard title="Total Projects" value={projectMetrics.totalProjects} icon={FileText} tone="indigo" hint="all projects" />
-        <StatCard title="Active Projects" value={projectMetrics.activeProjects} icon={UserCheck} tone="emerald" hint="currently active" />
-        <StatCard title="Overburdened" value={projectMetrics.overburdenedProjects} icon={BarChart3} tone="rose" hint="need staffing" />
-        <StatCard title="Balanced" value={projectMetrics.balancedProjects} icon={Settings} tone="sky" hint="well staffed" />
+      {/* Active / Archived / Development tabs — admin only. Archived = Completed /
+          On Hold / Cancelled; Development = projects with the Developer type. */}
+      {isAdmin && (
+        <div className="flex border-b border-slate-200">
+          {[
+            { key: 'active', label: 'Active Projects' },
+            { key: 'archived', label: 'Archived' },
+            { key: 'development', label: 'Development' },
+          ].map((t) => (
+            <button
+              key={t.key}
+              onClick={() => { setProjectView(t.key); setSelectedStatus('all'); }}
+              className={`px-4 py-2 text-sm font-semibold border-b-2 -mb-px transition-colors ${projectView === t.key
+                ? 'border-indigo-600 text-indigo-600'
+                : 'border-transparent text-slate-500 hover:text-slate-700'
+                }`}
+            >
+              {t.label}
+            </button>
+          ))}
+        </div>
+      )}
+
+      <div className="rounded-2xl border border-slate-200/70 bg-slate-50/70 p-2.5">
+        <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-2.5">
+          <StatCard title="Total Projects" value={projectMetrics.totalProjects} icon={FileText} tone="indigo" hint="all projects" />
+          <StatCard title="Active Projects" value={projectMetrics.activeProjects} icon={UserCheck} tone="emerald" hint="currently active" />
+          <StatCard title="Overburdened" value={projectMetrics.overburdenedProjects} icon={BarChart3} tone="rose" hint="need staffing" />
+          <StatCard title="Balanced" value={projectMetrics.balancedProjects} icon={Settings} tone="sky" hint="well staffed" />
+        </div>
       </div>
 
       <div className="flex flex-wrap items-center gap-2">
@@ -900,7 +1444,7 @@ toast.success(wasEditing ? 'Project updated successfully' : 'Project created suc
         )}
         <button
           type="button"
-          onClick={() => { setEditingProject(null); setSelectedSkills([]); setSelectedVendors([]); setProjectTypes({}); setActiveTypeTab(PROJECT_TYPE_CATEGORIES[0].key); setGuidelineFiles([]); setFormMainProjectId(filterMainProjectId || ''); setFormOrg(filterMainProjectId ? orgOfMainProject(filterMainProjectId) : ''); setFormPriority('medium'); setFormProjectStatus('active'); setSelectedPmIds(isPm && pmEmployeeId ? [pmEmployeeId] : []); setIsModalOpen(true); }}
+          onClick={() => { setEditingProject(null); setSelectedSkills([]); setSelectedVendors([]); setProjectTypes({}); setActiveTypeTab(PROJECT_TYPE_CATEGORIES[0].key); setTypeTabTouched(false); setGuidelineFiles([]); setFormMainProjectId(filterMainProjectId || ''); setFormOrg(filterMainProjectId ? orgOfMainProject(filterMainProjectId) : ''); setFormPriority('medium'); setFormProjectStatus('active'); setFormSentiment(''); setModalInfoTab('status'); setModalBuildTab('types'); setSelectedPmIds(isPm && pmEmployeeId ? [pmEmployeeId] : []); setIsModalOpen(true); }}
           className="inline-flex items-center gap-1.5 rounded-lg bg-indigo-600 px-3.5 py-2 text-sm font-medium text-white shadow-sm hover:bg-indigo-700 transition-colors"
         >
           <Plus className="w-4 h-4" />
@@ -951,14 +1495,27 @@ toast.success(wasEditing ? 'Project updated successfully' : 'Project created suc
                   <Dropdown
                     value={selectedStatus}
                     onChange={setSelectedStatus}
-                    options={[
-                      { value: 'all', label: 'All statuses' },
-                      { value: 'active', label: 'In Progress' },
-                      { value: 'poc', label: 'POC' },
-                      { value: 'completed', label: 'Completed' },
-                      { value: 'on-hold', label: 'On Hold' },
-                      { value: 'cancelled', label: 'Cancelled' },
-                    ]}
+                    options={!isAdmin
+                      ? [
+                        { value: 'all', label: 'All statuses' },
+                        { value: 'active', label: 'In Progress' },
+                        { value: 'poc', label: 'POC' },
+                        { value: 'completed', label: 'Completed' },
+                        { value: 'on-hold', label: 'On Hold' },
+                        { value: 'cancelled', label: 'Cancelled' },
+                      ]
+                      : projectView === 'archived'
+                        ? [
+                          { value: 'all', label: 'All statuses' },
+                          { value: 'completed', label: 'Completed' },
+                          { value: 'on-hold', label: 'On Hold' },
+                          { value: 'cancelled', label: 'Cancelled' },
+                        ]
+                        : [
+                          { value: 'all', label: 'All statuses' },
+                          { value: 'active', label: 'In Progress' },
+                          { value: 'poc', label: 'POC' },
+                        ]}
                     className="w-full"
                   />
                 </div>
@@ -1021,11 +1578,11 @@ toast.success(wasEditing ? 'Project updated successfully' : 'Project created suc
       )}
 
       {isLoading ? (
-        <div className="grid grid-cols-1 md:grid-cols-2 xl:grid-cols-3 gap-5">
+        <div className="grid grid-cols-1 md:grid-cols-2 xl:grid-cols-3 gap-4">
           {[...Array(6)].map((_, index) => (
             <div
               key={index}
-              className="h-96 rounded-2xl border border-slate-200 bg-white animate-pulse"
+              className="h-72 rounded-2xl border border-slate-200 bg-white animate-pulse"
             />
           ))}
         </div>
@@ -1043,7 +1600,7 @@ toast.success(wasEditing ? 'Project updated successfully' : 'Project created suc
         </div>
       ) : (
         <>
-          <div className="grid grid-cols-1 md:grid-cols-2 xl:grid-cols-3 gap-5">
+          <div className="grid grid-cols-1 md:grid-cols-2 xl:grid-cols-3 gap-4">
             {filteredProjects
               .slice((currentPage - 1) * PAGE_SIZE, currentPage * PAGE_SIZE)
               .map((project) => {
@@ -1066,257 +1623,39 @@ toast.success(wasEditing ? 'Project updated successfully' : 'Project created suc
                   .filter(Boolean);
 
                 const allocatedManpower = getAllocatedManpower(project);
-                const matchingEmployees = getMatchingEmployees(project).length;
 
                 return (
-                  <div
+                  <ProjectCard
                     key={project.id}
-                    className="group rounded-2xl border border-slate-200 bg-white p-5 shadow-sm hover:shadow-lg hover:-translate-y-0.5 transition-all duration-200"
-                  >
-                    {/* Header */}
-                    <div className="flex items-start justify-between gap-3">
-                      <div className="flex items-start gap-3 min-w-0">
-                        <div className="flex h-11 w-11 shrink-0 items-center justify-center rounded-xl bg-indigo-600 text-white shadow-sm">
-                          <FileText className="h-5 w-5" />
-                        </div>
-
-                        <div className="min-w-0">
-                          <h3 className="text-base font-bold text-slate-900 truncate">
-                            {project.name}
-                          </h3>
-
-                          <p className="mt-1 text-xs text-slate-500 truncate">
-                            {parentProject?.client || '—'}
-                            {' • '}
-                            {parentProject?.project_type || '—'}
-                          </p>
-                        </div>
-                      </div>
-
-                      {/* Status & Creation Date */}
-                      <div className="flex flex-col items-end shrink-0 gap-1">
-                        {(() => {
-                          const { label, style } = getStatusBadgeConfig(project.project_status);
-                          return (
-                            <span className={`rounded-full px-2.5 py-1 text-xs font-semibold ${style}`}>
-                              {label}
-                            </span>
-                          );
-                        })()}
-
-                        {(project.created_at || project.start_date) && (
-                          <span className="text-[11px] font-medium text-slate-400">
-                            Created: {formatCreatedDate(project.created_at || project.start_date)}
-                          </span>
-                        )}
-                      </div>
-                    </div>
-
-                    {/* Project Type chips */}
-                    <div className="mt-4">
-                      {project.project_types && Object.keys(project.project_types).length > 0 ? (
-                        <div className="flex flex-wrap gap-1.5">
-                          {Object.entries(project.project_types).map(([cat, sub]) => (
-                            <span
-                              key={cat}
-                              title={`${cat}: ${sub}`}
-                              className="cursor-default inline-flex items-center rounded-full bg-indigo-50 px-2.5 py-1 text-[11px] font-medium text-indigo-700 ring-1 ring-inset ring-indigo-100"
-                            >
-                              {sub}
-                            </span>
-                          ))}
-                        </div>
-                      ) : (
-                        <span className="text-[11px] text-slate-400">No project type set</span>
-                      )}
-                    </div>
-
-                    {/* Key metrics */}
-                    <div className="mt-4 grid grid-cols-2 gap-2.5">
-                      <div className="rounded-xl bg-slate-50 p-3">
-                        <p className="text-[11px] font-medium text-slate-500">Project Manager</p>
-                        <p className="mt-1 text-sm font-semibold text-slate-800 truncate">
-                          {pmNames.length ? pmNames.join(', ') : '—'}
-                        </p>
-                      </div>
-
-                      <div className="rounded-xl bg-slate-50 p-3">
-                        <p className="text-[11px] font-medium text-slate-500 mb-1">Manpower</p>
-                        <AllocationPopover
-                          project={project}
-                          allocations={allocations}
-                          employees={employees}
-                          onOpenAllocations={() =>
-                            navigate(`${prefix}/allocations`, {
-                              state: { projectId: project.id },
-                            })
-                          }
-                          triggerClassName="inline-flex text-sm font-semibold text-slate-800 hover:text-indigo-600 transition-colors cursor-pointer"
-                          badgeContent={
-                            <span>
-                              {allocatedManpower} / {project.required_manpower || 0}
-                            </span>
-                          }
-                        />
-                      </div>
-
-                      <div className="rounded-xl bg-slate-50 p-3">
-                        <p className="text-[11px] font-medium text-slate-500">Autonex Annotators</p>
-                        <p className="mt-1 text-sm font-semibold text-slate-800">
-                          {project.autonex_annotators ?? 0}
-                        </p>
-                      </div>
-
-                      <div className="rounded-xl bg-slate-50 p-3">
-                        <p className="text-[11px] font-medium text-slate-500">Autonex Reviewers</p>
-                        <p className="mt-1 text-sm font-semibold text-slate-800">
-                          {project.autonex_reviewers ?? 0}
-                        </p>
-                      </div>
-                    </div>
-
-                    {/* Client Sentiment (PM/admin can update inline) */}
-                    <div className="mt-4">
-                      <p className="mb-1.5 text-[11px] font-medium text-slate-500">Client Sentiment</p>
-                      <div className="grid grid-cols-3 gap-1.5">
-                        {[
-                          { value: 'GOOD', label: 'Good', active: 'bg-emerald-500 text-white shadow-sm ring-emerald-500', idle: 'bg-emerald-50 text-emerald-700 ring-emerald-100 hover:bg-emerald-100' },
-                          { value: 'AVG', label: 'Avg', active: 'bg-amber-500 text-white shadow-sm ring-amber-500', idle: 'bg-amber-50 text-amber-700 ring-amber-100 hover:bg-amber-100' },
-                          { value: 'Poor', label: 'Poor', active: 'bg-red-500 text-white shadow-sm ring-red-500', idle: 'bg-red-50 text-red-600 ring-red-100 hover:bg-red-100' },
-                        ].map((opt) => {
-                          const selected = project.sentiment === opt.value;
-                          return (
-                            <button
-                              key={opt.value}
-                              type="button"
-                              disabled={sentimentMutation.isPending}
-                              onClick={() =>
-                                sentimentMutation.mutate({ id: project.id, sentiment: selected ? '' : opt.value })
-                              }
-                              className={`rounded-lg px-2 py-1.5 text-xs font-semibold ring-1 ring-inset transition-colors disabled:opacity-60 ${
-                                selected ? opt.active : opt.idle
-                              }`}
-                            >
-                              {opt.label}
-                            </button>
-                          );
-                        })}
-                      </div>
-                    </div>
-
-                    {/* Actions */}
-                    <div className="mt-5 flex items-center justify-between border-t border-slate-100 pt-4">
-                      <button
-                        onClick={() =>
-                          navigate(`${prefix}/allocations`, {
-                            state: { projectId: project.id },
-                          })
-                        }
-                        className="inline-flex items-center gap-1.5 rounded-lg bg-indigo-50 px-3 py-2 text-xs font-semibold text-indigo-700 hover:bg-indigo-100"
-                      >
-                        <Users className="h-4 w-4" />
-                        Allocations
-                      </button>
-
-                      <div className="relative inline-block group">
-                        <button
-                          disabled={!project.encord_project_hash?.trim()}
-                          onClick={() => navigate(`/admin/analytics/${project.id}`)}
-                          className={`inline-flex items-center gap-1.5 rounded-lg px-3 py-2 text-xs font-semibold transition-colors ${
-                            project.encord_project_hash?.trim()
-                              ? "bg-slate-50 text-slate-700 hover:bg-slate-100"
-                              : "bg-slate-100 text-slate-400 cursor-not-allowed"
-                          }`}
-                        >
-                          <BarChart3 className="h-4 w-4" />
-                          Analytics
-                        </button>
-
-                        {!project.encord_project_hash?.trim() && (
-                          <div
-                            className="
-                              pointer-events-none
-                              absolute left-1/2 top-full z-20
-                              mt-2 -translate-x-1/2
-                              whitespace-nowrap
-                              rounded-md bg-slate-900 px-3 py-2
-                              text-xs text-white
-                              opacity-0 shadow-lg
-                              transition-opacity duration-200
-                              group-hover:opacity-100
-                            "
-                          >
-                            Encord Project ID is not configured.
-                          </div>
-                        )}
-                      </div>
-
-                      <div className="flex items-center gap-1">
-                        <button
-                          onClick={() => {
-                            setEditingProject(project);
-                            setSelectedSkills(project.required_expertise || []);
-                            setSelectedVendors(project.workforce_vendors || []);
-                            setProjectTypes(project.project_types || {});
-                            setGuidelineFiles([]);
-                            setFormMainProjectId(String(project.main_project_id || ''));
-                            setFormOrg(orgOfMainProject(project.main_project_id));
-                            setFormPriority(project.priority || 'medium');
-                            setFormProjectStatus(project.project_status || 'active');
-                            setSelectedPmIds(project.assigned_employee_ids?.length ? project.assigned_employee_ids : (project.pm_id ? [project.pm_id] : (isPm && pmEmployeeId ? [pmEmployeeId] : [])));
-                            setIsModalOpen(true);
-                          }}
-                          className="rounded-lg p-2 text-slate-500 hover:bg-indigo-50 hover:text-indigo-600"
-                          title="Edit"
-                        >
-                          <Edit className="h-4 w-4" />
-                        </button>
-
-                        <button
-                          onClick={() => {
-                            setCopyingProject({
-                              ...project,
-                              name: `${project.name} (Copy)`,
-                            });
-                            setSelectedSkills(project.required_expertise || []);
-                            setSelectedVendors(project.workforce_vendors || []);
-                            setProjectTypes(project.project_types || {});
-                            setGuidelineFiles([]);
-                            setFormMainProjectId(String(project.main_project_id || ''));
-                            setFormOrg(orgOfMainProject(project.main_project_id));
-                            setFormPriority(project.priority || 'medium');
-                            setFormProjectStatus(project.project_status || 'active');
-                            setSelectedPmIds(project.assigned_employee_ids?.length ? project.assigned_employee_ids : (project.pm_id ? [project.pm_id] : (isPm && pmEmployeeId ? [pmEmployeeId] : [])));
-                            setIsModalOpen(true);
-                          }}
-                          className="rounded-lg p-2 text-slate-500 hover:bg-emerald-50 hover:text-emerald-600"
-                          title="Copy"
-                        >
-                          <Copy className="h-4 w-4" />
-                        </button>
-
-                        <button
-                          onClick={() =>
-                            setDeleteConfirm({
-                              id: project.id,
-                              name: project.name,
-                            })
-                          }
-                          className="rounded-lg p-2 text-slate-500 hover:bg-red-50 hover:text-red-600"
-                          title="Delete"
-                        >
-                          <Trash2 className="h-4 w-4" />
-                        </button>
-                      </div>
-                    </div>
-                  </div>
+                    project={project}
+                    parentProject={parentProject}
+                    pmNames={pmNames}
+                    allocatedManpower={allocatedManpower}
+                    allocations={allocations}
+                    employees={employees}
+                    prefix={prefix}
+                    navigate={navigate}
+                    docs={guidelinesData.filter((g) => g.sub_project_id === project.id)}
+                    isEditing={editingCardId === project.id}
+                    draft={cardDraft}
+                    onStartEdit={() => startCardEdit(project)}
+                    onCancelEdit={cancelCardEdit}
+                    onSaveEdit={() => saveCardEdit(project)}
+                    onDraftChange={updateDraft}
+                    saving={cardUpdateMutation.isPending}
+                    docsOpen={docsOpenId === project.id}
+                    onToggleDocs={() => setDocsOpenId(docsOpenId === project.id ? null : project.id)}
+                    onCloseDocs={() => setDocsOpenId(null)}
+                    onAdvanced={() => openProjectModal(project)}
+                    onDelete={() => setDeleteConfirm({ id: project.id, name: project.name })}
+                  />
                 );
               })}
           </div>
 
           {/* Pagination */}
           {filteredProjects.length > 0 && (
-            <div className="flex items-center justify-between px-5 py-3 border-t border-slate-100 mt-6">
+            <div className="flex items-center justify-between px-5 py-3 border-t border-slate-100 mt-4">
 
               <p className="text-sm text-slate-500">
                 Showing{" "}
@@ -1407,537 +1746,355 @@ toast.success(wasEditing ? 'Project updated successfully' : 'Project created suc
 
       <Modal.Compact isOpen={isModalOpen} onClose={resetModalState} size="4xl" maxHeight="92vh">
         <Modal.Compact.Header onClose={resetModalState}>
-          <h2 className="text-xl font-semibold text-gray-900">
-            {editingProject ? 'Edit Project' : copyingProject ? 'Copy Project' : 'Create New Project'}
-          </h2>
+          <div className="flex items-center gap-3">
+            <div className="flex h-9 w-9 shrink-0 items-center justify-center rounded-xl bg-indigo-50 text-indigo-600">
+              <FileText className="h-5 w-5" />
+            </div>
+            <div>
+              <h2 className="text-base font-bold text-slate-900">
+                {editingProject ? 'Edit Project' : copyingProject ? 'Copy Project' : 'Create New Project'}
+              </h2>
+              <p className="text-xs text-slate-500">Update project details and team allocation.</p>
+            </div>
+          </div>
         </Modal.Compact.Header>
         <form onSubmit={handleSubmit} className="flex-1 flex flex-col min-h-0" id="project-form">
           <Modal.Compact.Body className="space-y-4">
 
-            {/* Project Information */}
+            {/* Row 1: Project Name / Organisation Name / Program Manager */}
             <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-3">
-
-              {/* Project Name */}
-              <div className="lg:col-span-2">
+              <div>
                 <label className="block text-xs font-semibold text-slate-600 mb-1">
                   Project Name <span className="text-red-500">*</span>
                 </label>
-
-                <input
-                  type="text"
-                  name="name"
-                  required
-                  defaultValue={(editingProject || copyingProject)?.name}
-                  className="input"
-                  placeholder="Enter project name"
-                />
+                <input type="text" name="name" required defaultValue={(editingProject || copyingProject)?.name} className="w-full rounded-lg border border-slate-200 bg-white px-3 py-1.5 text-sm text-slate-700 placeholder:text-slate-400 transition-colors hover:border-slate-300 focus:border-indigo-400 focus:outline-none focus:ring-2 focus:ring-indigo-100" placeholder="Enter project name" />
               </div>
 
-              {/* Organization */}
               <div>
                 <label className="block text-xs font-semibold text-slate-600 mb-1">
-                  Organization <span className="text-red-500">*</span>
+                  Organisation Name <span className="text-red-500">*</span>
                 </label>
-
                 <input
                   type="hidden"
                   name="main_project_id"
-                  value={
-                    filterMainProjectId &&
-                    !editingProject &&
-                    !copyingProject
-                      ? filterMainProjectId
-                      : formMainProjectId
-                  }
+                  value={filterMainProjectId && !editingProject && !copyingProject ? filterMainProjectId : formMainProjectId}
                 />
-
                 <Dropdown
                   editable={true}
-                  options={organizations.map(org => ({
-                    value: org,
-                    label: org,
-                  }))}
+                  options={organizations.map(org => ({ value: org, label: org }))}
                   value={formOrg}
                   onChange={(val) => {
                     setFormOrg(val);
-
-                    const projs = visibleMainProjects.filter(
-                      p => clientOf(p) === val
-                    );
-
-                    setFormMainProjectId(
-                      projs.length
-                        ? String(projs[projs.length - 1].id)
-                        : ''
-                    );
+                    const projs = visibleMainProjects.filter(p => clientOf(p) === val);
+                    setFormMainProjectId(projs.length ? String(projs[projs.length - 1].id) : '');
                   }}
                   placeholder="Select or type an organization"
-                  disabled={
-                    !!filterMainProjectId &&
-                    !editingProject &&
-                    !copyingProject
-                  }
+                  disabled={!!filterMainProjectId && !editingProject && !copyingProject}
                 />
               </div>
 
-              {/* Status */}
               <div>
-                <label className="block text-xs font-semibold text-slate-600 mb-1">
-                  Status <span className="text-red-500">*</span>
-                </label>
-
-                <input
-                  type="hidden"
-                  name="project_status"
-                  value={formProjectStatus}
-                />
-
-                <Dropdown
-                  options={[
-                    { value: 'poc', label: 'POC' },
-                    { value: 'active', label: 'In Progress' },
-                    { value: 'completed', label: 'Completed' },
-                    { value: 'on-hold', label: 'On Hold' },
-                    { value: 'cancelled', label: 'Cancelled' },
-                  ]}
-                  value={formProjectStatus}
-                  onChange={setFormProjectStatus}
-                  placeholder="Select status"
-                />
-              </div>
-
-              {/* Annotation Time per Task */}
-              <div>
-                <label className="block text-xs font-semibold text-slate-600 mb-1">
-                  Annotation Time per Task (Minutes) <span className="text-red-500">*</span>
-                </label>
-
-                <input
-                  type="number"
-                  name="estimated_time_per_task"
-                  required
-                  min="0.1"
-                  step="0.1"
-                  defaultValue={
-                    (editingProject || copyingProject)
-                      ?.estimated_time_per_task
-                      ? parseFloat(
-                          (
-                            (editingProject || copyingProject)
-                              .estimated_time_per_task * 60
-                          ).toFixed(1)
-                        )
-                      : ''
-                  }
-                  className="input"
-                  placeholder="30"
-                />
-              </div>
-
-              {/* Reviewer Time per Task */}
-              <div>
-                <label className="block text-xs font-semibold text-slate-600 mb-1">
-                  Reviewer Time per Task (Minutes)
-                </label>
-
-                <input
-                  type="number"
-                  name="review_time_per_task"
-                  min="0.1"
-                  step="0.1"
-                  defaultValue={
-                    (editingProject || copyingProject)?.review_time_per_task
-                      ? parseFloat(
-                          ((editingProject || copyingProject).review_time_per_task * 60).toFixed(1)
-                        )
-                      : ''
-                  }
-                  className="input"
-                  placeholder="15"
-                />
-              </div>
-
-              {/* Gearing Ratio */}
-              <div>
-                <label className="block text-xs font-semibold text-slate-600 mb-1">
-                  Gearing Ratio
-                </label>
-
-                <input
-                  type="number"
-                  name="gearing_ratio"
-                  min="0"
-                  step="0.1"
-                  defaultValue={(editingProject || copyingProject)?.gearing_ratio ?? ''}
-                  className="input"
-                  placeholder="e.g. 3 or 3.1"
-                />
-              </div>
-
-              {/* Start Date */}
-              <div>
-                <label className="block text-xs font-semibold text-slate-600 mb-1">
-                  Start Date <span className="text-red-500">*</span>
-                </label>
-
-                <input
-                  type="date"
-                  name="start_date"
-                  required
-                  defaultValue={(editingProject || copyingProject)?.start_date}
-                  className="input"
-                />
-              </div>
-
-              {/* Program Manager(s) */}
-              <div>
-                <label className="block text-xs font-semibold text-slate-600 mb-1">
-                  Program Manager(s)
-                </label>
-
-                {/* Selected PM chips */}
-                {selectedPmIds.length > 0 && (
-                  <div className="flex flex-wrap gap-1.5 mb-1.5">
-                    {selectedPmIds.map((id) => {
-                      const emp = employees.find(e => e.id === id);
-                      if (!emp) return null;
-                      return (
-                        <span
-                          key={id}
-                          className="inline-flex items-center gap-1 pl-2.5 pr-1 py-0.5 bg-indigo-50 text-indigo-700 rounded-full text-xs font-medium"
-                        >
-                          {emp.name}
-                          {selectedPmIds[0] === id && (
-                            <span className="text-[9px] uppercase tracking-wide text-indigo-400 font-semibold">
-                              primary
+                <div className="mb-1 flex items-center gap-1.5">
+                  <label className="block text-xs font-semibold text-slate-600">Program Manager</label>
+                  {selectedPmIds.length > 0 && (
+                    <span className="group relative inline-flex">
+                      <span className="inline-flex h-4 min-w-[16px] cursor-default items-center justify-center rounded-full bg-indigo-100 px-1 text-[10px] font-bold text-indigo-700">
+                        {selectedPmIds.length}
+                      </span>
+                      <span className="pointer-events-none absolute left-0 top-full z-30 mt-1 hidden w-max max-w-[220px] rounded-lg border border-slate-200 bg-white px-2.5 py-1.5 text-[11px] font-medium text-slate-600 shadow-lg group-hover:block">
+                        {selectedPmIds.map((id, i) => {
+                          const emp = employees.find(e => e.id === id);
+                          return (
+                            <span key={id} className="flex items-center gap-1.5 whitespace-nowrap py-0.5">
+                              {emp?.name || 'Unknown'}
+                              {i === 0 && <span className="text-[9px] font-semibold uppercase tracking-wide text-indigo-400">primary</span>}
                             </span>
-                          )}
-                          {!(isPm && id === pmEmployeeId) && (
-                            <button
-                              type="button"
-                              onClick={() => setSelectedPmIds(prev => prev.filter(p => p !== id))}
-                              className="p-0.5 hover:bg-indigo-100 rounded-full transition-colors"
-                            >
-                              <X className="w-3 h-3" />
-                            </button>
-                          )}
-                        </span>
+                          );
+                        })}
+                      </span>
+                    </span>
+                  )}
+                </div>
+                <PmMultiSelect
+                  employees={employees}
+                  value={selectedPmIds}
+                  onChange={setSelectedPmIds}
+                  isPm={isPm}
+                  pmEmployeeId={pmEmployeeId}
+                />
+              </div>
+            </div>
+
+            {/* Status / Client Sentiment tabs  +  timings / gearing / date / guidelines */}
+            <div className="grid grid-cols-1 lg:grid-cols-2 gap-4">
+              {/* Left: tabbed Status | Client Sentiment card */}
+              <div className="rounded-xl border border-slate-200 p-3">
+                <div className="mb-3 flex items-center gap-4 border-b border-slate-200">
+                  <button
+                    type="button"
+                    onClick={() => setModalInfoTab('status')}
+                    className={`-mb-px flex items-center gap-1.5 border-b-2 pb-2 text-[13px] font-semibold transition-colors ${modalInfoTab === 'status' ? 'border-indigo-600 text-slate-900' : 'border-transparent text-slate-400 hover:text-slate-600'}`}
+                  >
+                    <Clock className="h-3.5 w-3.5" /> Status
+                  </button>
+                  <button
+                    type="button"
+                    onClick={() => setModalInfoTab('sentiment')}
+                    className={`-mb-px flex items-center gap-1.5 border-b-2 pb-2 text-[13px] font-semibold transition-colors ${modalInfoTab === 'sentiment' ? 'border-indigo-600 text-slate-900' : 'border-transparent text-slate-400 hover:text-slate-600'}`}
+                  >
+                    <Smile className="h-3.5 w-3.5" /> Client Sentiment
+                  </button>
+                </div>
+
+                {/* Values are submitted via these hidden inputs regardless of the active tab */}
+                <input type="hidden" name="project_status" value={formProjectStatus} />
+                <input type="hidden" name="sentiment" value={formSentiment} />
+
+                {modalInfoTab === 'status' ? (
+                  <div className="grid grid-cols-2 gap-1.5">
+                    {[
+                      { value: 'poc', label: 'POC' },
+                      { value: 'on-hold', label: 'On Hold' },
+                      { value: 'active', label: 'In Progress' },
+                      { value: 'completed', label: 'Completed' },
+                      { value: 'cancelled', label: 'Cancelled' },
+                    ].map((opt) => {
+                      const on = formProjectStatus === opt.value;
+                      return (
+                        <button
+                          key={opt.value}
+                          type="button"
+                          onClick={() => setFormProjectStatus(opt.value)}
+                          className={`flex w-full items-center gap-2 rounded-lg border px-3 py-2 text-sm transition-colors ${on ? 'border-indigo-300 bg-indigo-50 font-medium text-indigo-700' : 'border-slate-200 bg-white text-slate-600 hover:bg-slate-50'}`}
+                        >
+                          <span className={`h-1.5 w-1.5 rounded-full ${on ? 'bg-indigo-500' : 'bg-slate-300'}`} />
+                          {opt.label}
+                        </button>
+                      );
+                    })}
+                  </div>
+                ) : (
+                  <div className="grid grid-cols-2 gap-1.5">
+                    {[
+                      { value: '', label: 'Not set', dot: 'bg-slate-300' },
+                      { value: 'GOOD', label: 'Good', dot: 'bg-emerald-500' },
+                      { value: 'AVG', label: 'Avg', dot: 'bg-amber-500' },
+                      { value: 'Poor', label: 'Poor', dot: 'bg-red-500' },
+                    ].map((opt) => {
+                      const on = formSentiment === opt.value;
+                      return (
+                        <button
+                          key={opt.value || 'none'}
+                          type="button"
+                          onClick={() => setFormSentiment(opt.value)}
+                          className={`flex w-full items-center gap-2 rounded-lg border px-3 py-2 text-sm transition-colors ${on ? 'border-indigo-300 bg-indigo-50 font-medium text-indigo-700' : 'border-slate-200 bg-white text-slate-600 hover:bg-slate-50'}`}
+                        >
+                          <span className={`h-1.5 w-1.5 rounded-full ${opt.dot}`} />
+                          {opt.label}
+                        </button>
                       );
                     })}
                   </div>
                 )}
-
-                <Dropdown
-                  editable={true}
-                  allowCreate={false}
-                  value=""
-                  placeholder="+ Add Program Manager"
-                  options={employees
-                    .filter(e => e.status === 'active' && !selectedPmIds.includes(e.id))
-                    .map((emp) => ({
-                      value: emp.id,
-                      label: emp.name
-                    }))}
-                  onChange={(id) => {
-                    if (id && !selectedPmIds.includes(id)) {
-                      setSelectedPmIds(prev => [...prev, id]);
-                    }
-                  }}
-                />
               </div>
 
-              {/* Encord Project ID */}
-              <div className="sm:col-span-2 lg:col-span-2">
-                <label className="block text-xs font-semibold text-slate-600 mb-1">
-                  Encord Project ID
-                </label>
-
-                <input
-                  type="text"
-                  name="encord_project_hash"
-                  defaultValue={
-                    (editingProject || copyingProject)?.encord_project_hash || ''
-                  }
-                  className="input font-mono text-sm"
-                  placeholder="Encord project hash (enables analytics for this project)"
-                />
-              </div>
-
-              {/* Client Sentiment */}
-              <div>
-                <label className="block text-xs font-semibold text-slate-600 mb-1">
-                  Client Sentiment
-                </label>
-
-                <select
-                  name="sentiment"
-                  defaultValue={
-                    (editingProject || copyingProject)?.sentiment || ''
-                  }
-                  className="input"
-                >
-                  <option value="">Not set</option>
-                  <option value="GOOD">GOOD</option>
-                  <option value="AVG">AVG</option>
-                  <option value="Poor">Poor</option>
-                </select>
-              </div>
-
-            </div>
-
-
-            {/* Project Types */}
-            <div className="rounded-xl border border-slate-200 bg-slate-50/40 p-3">
-              <div className="mb-2 flex items-center justify-between">
-                <label className="text-xs font-semibold text-slate-700">Project Types</label>
-                <span className="text-[11px] text-slate-400">Pick one subtype per category</span>
-              </div>
-
-              {/* Category tabs */}
-              <div className="flex flex-wrap gap-2">
-                {PROJECT_TYPE_CATEGORIES.map((cat) => {
-                  const isActive = activeTypeTab === cat.key;
-                  const chosen = projectTypes[cat.key];
-                  return (
-                    <button
-                      key={cat.key}
-                      type="button"
-                      onClick={() => setActiveTypeTab(cat.key)}
-                      className={`inline-flex items-center gap-1.5 rounded-lg px-3 py-1.5 text-xs font-medium transition-colors ${
-                        isActive
-                          ? 'bg-indigo-600 text-white'
-                          : 'border border-slate-200 bg-white text-slate-600 hover:bg-slate-50'
-                      }`}
-                    >
-                      {cat.key}
-                      {chosen && (
-                        <span className={`rounded-full px-1.5 py-0.5 text-[10px] ${isActive ? 'bg-white/20 text-white' : 'bg-indigo-50 text-indigo-600'}`}>1</span>
-                      )}
-                    </button>
-                  );
-                })}
-              </div>
-
-              {/* Subtype dropdown for the active category */}
-              {PROJECT_TYPE_CATEGORIES.filter((c) => c.key === activeTypeTab).map((cat) => (
-                <div key={cat.key} className="mt-3">
-                  <label className="mb-1 block text-[11px] font-medium text-slate-500">{cat.key} — Subtype</label>
-                  <Dropdown
-                    options={[{ value: '', label: 'Not set' }, ...cat.subtypes.map((s) => ({ value: s, label: s }))]}
-                    value={projectTypes[cat.key] || ''}
-                    onChange={(val) =>
-                      setProjectTypes((prev) => {
-                        const next = { ...prev };
-                        if (val) next[cat.key] = val; else delete next[cat.key];
-                        return next;
-                      })
-                    }
-                    placeholder="Select a subtype"
-                  />
-                </div>
-              ))}
-
-              {/* Selected summary across all categories */}
-              {Object.keys(projectTypes).length > 0 && (
-                <div className="mt-3 flex flex-wrap gap-1.5">
-                  {Object.entries(projectTypes).map(([cat, sub]) => (
-                    <span key={cat} className="inline-flex items-center gap-1 rounded-full bg-indigo-50 px-2.5 py-1 text-xs font-medium text-indigo-700">
-                      <span className="text-indigo-400">{cat}:</span> {sub}
-                      <button type="button" onClick={() => setProjectTypes((prev) => { const n = { ...prev }; delete n[cat]; return n; })} className="text-indigo-400 hover:text-indigo-700">
-                        <X className="h-3 w-3" />
-                      </button>
-                    </span>
-                  ))}
-                </div>
-              )}
-            </div>
-
-
-            {/* Team Composition */}
-            <div className="rounded-xl border border-slate-200 bg-slate-50/40 p-3">
-
-              <div className="flex items-center justify-between mb-2">
-                <label className="text-xs font-semibold text-slate-700">
-                  Team Composition
-                </label>
-
-                <span className="text-[11px] text-slate-400">
-                  Required headcount is calculated automatically
-                </span>
-              </div>
-
-              {/* Workforce vendors (multi-select with inline create) */}
-              <div className="mb-3">
-                <label className="block text-[11px] font-medium text-slate-500 mb-1">Workforce Vendors</label>
-                <Dropdown
-                  editable={true}
-                  allowCreate={true}
-                  placeholder="Select or create a vendor"
-                  value=""
-                  options={vendorsData
-                    .filter((v) => !selectedVendors.includes(v.name))
-                    .map((v) => ({ value: v.name, label: v.name }))}
-                  onChange={(val) => {
-                    const name = (val || '').trim();
-                    if (!name || selectedVendors.includes(name)) return;
-                    setSelectedVendors((prev) => [...prev, name]);
-                    // Persist a brand-new vendor so it's reusable next time.
-                    if (!vendorsData.some((v) => v.name.toLowerCase() === name.toLowerCase())) {
-                      createVendorMutation.mutate(name);
-                    }
-                  }}
-                />
-                {selectedVendors.length > 0 && (
-                  <div className="mt-2 flex flex-wrap gap-1.5">
-                    {selectedVendors.map((name) => (
-                      <span key={name} className="inline-flex items-center gap-1 rounded-full bg-indigo-50 px-2.5 py-1 text-xs font-medium text-indigo-700">
-                        {name}
-                        <button type="button" onClick={() => setSelectedVendors((prev) => prev.filter((v) => v !== name))} className="text-indigo-400 hover:text-indigo-700">
-                          <X className="h-3 w-3" />
-                        </button>
-                      </span>
-                    ))}
-                  </div>
-                )}
-              </div>
-
-              <div className="grid grid-cols-2 sm:grid-cols-4 gap-2">
-
-                {[
-                  ['annotators_total', 'Total Annotators'],
-                  ['autonex_annotators', 'Autonex Annotators'],
-                  ['autonex_reviewers', 'Autonex Reviewers'],
-                  ['qc_count', 'QC'],
-                ].map(([field, label]) => (
-                  <div key={field}>
-                    <label className="block text-[11px] font-medium text-slate-500 mb-1 truncate">
-                      {label}
-                    </label>
-
+              {/* Right: timings, gearing / date, guidelines */}
+              <div className="space-y-3">
+                <div className="grid grid-cols-2 gap-3">
+                  <div>
+                    <label className="block text-xs font-semibold text-slate-600 mb-1">Annotation Time / Task (min) <span className="text-red-500">*</span></label>
                     <input
-                      type="number"
-                      name={field}
-                      min="0"
-                      defaultValue={
-                        (editingProject || copyingProject)?.[field] ?? ''
-                      }
-                      className="input"
-                      placeholder="0"
+                      type="number" name="estimated_time_per_task" required min="0.1" step="0.1"
+                      defaultValue={(editingProject || copyingProject)?.estimated_time_per_task ? parseFloat(((editingProject || copyingProject).estimated_time_per_task * 60).toFixed(1)) : ''}
+                      className="input [appearance:textfield] [&::-webkit-outer-spin-button]:appearance-none [&::-webkit-inner-spin-button]:appearance-none" placeholder="30"
                     />
                   </div>
-                ))}
+                  <div>
+                    <label className="block text-xs font-semibold text-slate-600 mb-1">Reviewer Time / Task (min)</label>
+                    <input
+                      type="number" name="review_time_per_task" min="0.1" step="0.1"
+                      defaultValue={(editingProject || copyingProject)?.review_time_per_task ? parseFloat(((editingProject || copyingProject).review_time_per_task * 60).toFixed(1)) : ''}
+                      className="input [appearance:textfield] [&::-webkit-outer-spin-button]:appearance-none [&::-webkit-inner-spin-button]:appearance-none" placeholder="15"
+                    />
+                  </div>
+                </div>
 
+                <div className="grid grid-cols-2 gap-3">
+                  <div className="flex items-center gap-2">
+                    <label className="whitespace-nowrap text-xs font-semibold text-slate-600">Gearing Ratio:</label>
+                    <input type="number" name="gearing_ratio" min="0" step="0.1" defaultValue={(editingProject || copyingProject)?.gearing_ratio ?? ''} className="input flex-1 [appearance:textfield] [&::-webkit-outer-spin-button]:appearance-none [&::-webkit-inner-spin-button]:appearance-none" placeholder="e.g. 3.1" />
+                  </div>
+                  <div className="flex items-center gap-2">
+                    <label className="whitespace-nowrap text-xs font-semibold text-slate-600">Date:</label>
+                    <input type="date" name="start_date" required defaultValue={(editingProject || copyingProject)?.start_date} className="input flex-1" />
+                  </div>
+                </div>
+
+                <div>
+                  <label className="block text-xs font-semibold text-slate-600 mb-1">Project Guidelines</label>
+                  <div
+                    onDragOver={(e) => { e.preventDefault(); setIsDragActive(true); }}
+                    onDragLeave={(e) => { e.preventDefault(); setIsDragActive(false); }}
+                    onDrop={(e) => { e.preventDefault(); setIsDragActive(false); addGuidelineFiles(e.dataTransfer.files); }}
+                    onClick={() => fileInputRef.current?.click()}
+                    className={`flex items-center justify-center gap-2 rounded-lg border border-dashed px-3 py-2.5 text-center cursor-pointer transition-colors ${isDragActive ? 'border-indigo-500 bg-indigo-50' : 'border-slate-300 bg-slate-50 hover:border-indigo-400 hover:bg-indigo-50/60'}`}
+                  >
+                    <input ref={fileInputRef} type="file" multiple className="hidden" onChange={(e) => { addGuidelineFiles(e.target.files); e.target.value = ''; }} />
+                    <UploadCloud className="h-4 w-4 text-indigo-500" />
+                    <p className="text-xs font-medium text-slate-600">Drag documents here or click to browse</p>
+                  </div>
+                  {guidelineFiles.length > 0 && (
+                    <div className="mt-2 space-y-1.5">
+                      {guidelineFiles.map((file) => (
+                        <div key={`${file.name}-${file.size}-${file.lastModified}`} className="flex items-center justify-between rounded-lg border border-slate-200 bg-white px-3 py-1.5">
+                          <div className="flex items-center gap-2 min-w-0">
+                            <FileText className="h-4 w-4 shrink-0 text-indigo-500" />
+                            <p className="truncate text-xs font-medium text-slate-700">{file.name}</p>
+                          </div>
+                          <button type="button" onClick={(e) => { e.stopPropagation(); removeGuidelineFile(file); }} className="text-xs text-red-500 hover:text-red-600">Remove</button>
+                        </div>
+                      ))}
+                    </div>
+                  )}
+                </div>
               </div>
+            </div>
 
-              <p className="mt-2 text-[11px] text-slate-400">
-                Required headcount = Autonex Annotators + Autonex Reviewers + QC.
-              </p>
-
+            {/* Encord Project ID (full width) */}
+            <div>
+              <label className="block text-xs font-semibold text-slate-600 mb-1">Encord Project ID</label>
+              <input
+                type="text" name="encord_project_hash"
+                defaultValue={(editingProject || copyingProject)?.encord_project_hash || ''}
+                className="input font-mono text-sm"
+                placeholder="Encord project hash (enables analytics for this project)"
+              />
             </div>
 
 
-            {/* Project Guidelines */}
-            <div>
-
-              <label className="block text-xs font-semibold text-slate-700 mb-2">
-                Project Guidelines
-              </label>
-
-              <div
-                onDragOver={(e) => {
-                  e.preventDefault();
-                  setIsDragActive(true);
-                }}
-                onDragLeave={(e) => {
-                  e.preventDefault();
-                  setIsDragActive(false);
-                }}
-                onDrop={(e) => {
-                  e.preventDefault();
-                  setIsDragActive(false);
-                  addGuidelineFiles(e.dataTransfer.files);
-                }}
-                onClick={() => fileInputRef.current?.click()}
-                className={`
-                  border border-dashed rounded-lg
-                  px-4 py-3
-                  text-center cursor-pointer
-                  transition-colors
-                  ${
-                    isDragActive
-                      ? 'border-indigo-500 bg-indigo-50'
-                      : 'border-slate-300 bg-slate-50 hover:border-indigo-400 hover:bg-indigo-50/60'
-                  }
-                `}
-              >
-
-                <input
-                  ref={fileInputRef}
-                  type="file"
-                  multiple
-                  className="hidden"
-                  onChange={(e) => {
-                    addGuidelineFiles(e.target.files);
-                    e.target.value = '';
-                  }}
-                />
-
-                <div className="flex items-center justify-center gap-2">
-                  <UploadCloud className="w-5 h-5 text-indigo-500" />
-
-                  <p className="text-xs font-medium text-slate-700">
-                    Drag documents here or click to browse
-                  </p>
-                </div>
-
-                <p className="text-[11px] text-slate-500 mt-1">
-                  Uploaded files will appear in the Guidelines tab after saving.
-                </p>
-
+            {/* Project Types | Team Composition tabbed card. Both panels stay
+                mounted (inactive one hidden via CSS) so the team-count inputs are
+                always present in the submitted FormData. */}
+            <div className="rounded-xl border border-slate-200">
+              <div className="flex items-center gap-4 border-b border-slate-200 px-3 pt-2">
+                <button
+                  type="button"
+                  onClick={() => setModalBuildTab('types')}
+                  className={`-mb-px border-b-2 pb-2 text-[13px] font-semibold transition-colors ${modalBuildTab === 'types' ? 'border-indigo-600 text-slate-900' : 'border-transparent text-slate-400 hover:text-slate-600'}`}
+                >
+                  Project Types
+                </button>
+                <button
+                  type="button"
+                  onClick={() => setModalBuildTab('team')}
+                  className={`-mb-px border-b-2 pb-2 text-[13px] font-semibold transition-colors ${modalBuildTab === 'team' ? 'border-indigo-600 text-slate-900' : 'border-transparent text-slate-400 hover:text-slate-600'}`}
+                >
+                  Team Composition
+                </button>
               </div>
 
-              {guidelineFiles.length > 0 && (
-                <div className="mt-2 space-y-1.5">
+              <div className="p-3">
+                {/* Project Types */}
+                <div className={modalBuildTab === 'types' ? '' : 'hidden'}>
+                  <div className="flex flex-wrap gap-2">
+                    {PROJECT_TYPE_CATEGORIES.map((cat) => {
+                      const isActive = activeTypeTab === cat.key;
+                      const chosen = projectTypes[cat.key];
+                      return (
+                        <button
+                          key={cat.key}
+                          type="button"
+                          onClick={() => { setActiveTypeTab(cat.key); setTypeTabTouched(true); }}
+                          className={`inline-flex items-center gap-1.5 rounded-lg px-3 py-1.5 text-xs font-medium transition-colors ${isActive ? 'bg-indigo-600 text-white' : 'border border-slate-200 bg-white text-slate-600 hover:bg-slate-50'}`}
+                        >
+                          {cat.key}
+                          {chosen && (
+                            <span className={`rounded-full px-1.5 py-0.5 text-[10px] ${isActive ? 'bg-white/20 text-white' : 'bg-indigo-50 text-indigo-600'}`}>1</span>
+                          )}
+                        </button>
+                      );
+                    })}
+                  </div>
 
-                  {guidelineFiles.map((file) => (
-                    <div
-                      key={`${file.name}-${file.size}-${file.lastModified}`}
-                      className="flex items-center justify-between rounded-lg border border-slate-200 bg-white px-3 py-1.5"
-                    >
-                      <div className="flex items-center gap-2 min-w-0">
-
-                        <FileText className="w-4 h-4 text-indigo-500 flex-shrink-0" />
-
-                        <div className="min-w-0">
-                          <p className="text-xs font-medium text-slate-700 truncate">
-                            {file.name}
-                          </p>
-
-                          <p className="text-[10px] text-slate-400">
-                            {Math.max(1, Math.round(file.size / 1024))} KB
-                          </p>
-                        </div>
-
-                      </div>
-
-                      <button
-                        type="button"
-                        onClick={(e) => {
-                          e.stopPropagation();
-                          removeGuidelineFile(file);
-                        }}
-                        className="text-xs text-red-500 hover:text-red-600"
-                      >
-                        Remove
-                      </button>
-
+                  {PROJECT_TYPE_CATEGORIES.filter((c) => c.key === activeTypeTab).map((cat) => (
+                    <div key={cat.key} className="mt-3">
+                      <label className="mb-1 block text-[11px] font-medium text-slate-500">{cat.key} — Subtype</label>
+                      <Dropdown
+                        defaultOpen={typeTabTouched}
+                        options={[{ value: '', label: 'Not set' }, ...cat.subtypes.map((s) => ({ value: s, label: s }))]}
+                        value={projectTypes[cat.key] || ''}
+                        onChange={(val) => setProjectTypes((prev) => { const next = { ...prev }; if (val) next[cat.key] = val; else delete next[cat.key]; return next; })}
+                        placeholder="Select a subtype"
+                      />
                     </div>
                   ))}
 
+                  {Object.keys(projectTypes).length > 0 && (
+                    <div className="mt-3 flex flex-wrap gap-1.5">
+                      {Object.entries(projectTypes).map(([cat, sub]) => (
+                        <span key={cat} className="inline-flex items-center gap-1 rounded-full bg-indigo-50 px-2.5 py-1 text-xs font-medium text-indigo-700">
+                          <span className="text-indigo-400">{cat}:</span> {sub}
+                          <button type="button" onClick={() => setProjectTypes((prev) => { const n = { ...prev }; delete n[cat]; return n; })} className="text-indigo-400 hover:text-indigo-700">
+                            <X className="h-3 w-3" />
+                          </button>
+                        </span>
+                      ))}
+                    </div>
+                  )}
                 </div>
-              )}
 
+                {/* Team Composition */}
+                <div className={modalBuildTab === 'team' ? '' : 'hidden'}>
+                  <div className="mb-3">
+                    <label className="block text-[11px] font-medium text-slate-500 mb-1">Workforce Vendors</label>
+                    <Dropdown
+                      editable={true}
+                      allowCreate={true}
+                      placeholder="Select or create a vendor"
+                      value=""
+                      options={vendorsData.filter((v) => !selectedVendors.includes(v.name)).map((v) => ({ value: v.name, label: v.name }))}
+                      onChange={(val) => {
+                        const name = (val || '').trim();
+                        if (!name || selectedVendors.includes(name)) return;
+                        setSelectedVendors((prev) => [...prev, name]);
+                        if (!vendorsData.some((v) => v.name.toLowerCase() === name.toLowerCase())) {
+                          createVendorMutation.mutate(name);
+                        }
+                      }}
+                    />
+                    {selectedVendors.length > 0 && (
+                      <div className="mt-2 flex flex-wrap gap-1.5">
+                        {selectedVendors.map((name) => (
+                          <span key={name} className="inline-flex items-center gap-1 rounded-full bg-indigo-50 px-2.5 py-1 text-xs font-medium text-indigo-700">
+                            {name}
+                            <button type="button" onClick={() => setSelectedVendors((prev) => prev.filter((v) => v !== name))} className="text-indigo-400 hover:text-indigo-700">
+                              <X className="h-3 w-3" />
+                            </button>
+                          </span>
+                        ))}
+                      </div>
+                    )}
+                  </div>
+
+                  <div className="grid grid-cols-2 sm:grid-cols-4 gap-2">
+                    {[
+                      ['annotators_total', 'Total Annotators'],
+                      ['autonex_annotators', 'Autonex Annotators'],
+                      ['autonex_reviewers', 'Autonex Reviewers'],
+                      ['qc_count', 'QC'],
+                    ].map(([field, label]) => (
+                      <div key={field}>
+                        <label className="block text-[11px] font-medium text-slate-500 mb-1 truncate">{label}</label>
+                        <input type="number" name={field} min="0" defaultValue={(editingProject || copyingProject)?.[field] ?? ''} className="input" placeholder="0" />
+                      </div>
+                    ))}
+                  </div>
+
+                  <p className="mt-2 text-[11px] text-slate-400">Required headcount = Autonex Annotators + Autonex Reviewers + QC.</p>
+                </div>
+              </div>
             </div>
+
 
           </Modal.Compact.Body>
           <Modal.Compact.Footer>

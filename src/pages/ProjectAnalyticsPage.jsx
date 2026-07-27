@@ -112,7 +112,7 @@ const ProjectAnalyticsPage = () => {
         queryKey: ['project-analytics', mainProjectId, params.date_from, params.date_to],
         queryFn: () => analyticsApi.getProjectAnalytics(mainProjectId, params),
         enabled: !!mainProjectId,
-        refetchInterval: 10 * 60 * 1000,   // auto-refresh every 10 min
+        // Encord data refreshes once a day; refetch on mount/focus rather than polling.
         refetchOnWindowFocus: true,
     });
 

@@ -2,7 +2,7 @@ import { useState, useEffect, useRef, useMemo } from 'react';
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import { useLocation } from 'react-router-dom';
 import { allocationApi, subProjectApi, employeeApi, leaveApi, parentProjectApi } from '../services/api';
-import { Plus, Edit, Trash2, X, UserPlus, UserMinus, CheckSquare, AlertTriangle, Users } from 'lucide-react';
+import { Plus, Edit, Trash2, X, UserPlus, UserMinus, CheckSquare, AlertTriangle, Users, Search, Filter } from 'lucide-react';
 import toast from 'react-hot-toast';
 import ConfirmDialog from '../components/ui/ConfirmDialog';
 import { getPmEmployeeId, getPmSubProjects } from '../utils/pmScope';
@@ -63,6 +63,7 @@ const AllocationsPage = () => {
   const [filterTab, setFilterTab] = useState('all');
   const [editingAllocation, setEditingAllocation] = useState(null);
   const [confirmState, setConfirmState] = useState(null);
+  const [showAllAllocated, setShowAllAllocated] = useState(false);
 
   // Time division state
   const [selectedRoleTags, setSelectedRoleTags] = useState([]);
@@ -102,6 +103,22 @@ const AllocationsPage = () => {
     queryKey: ['parent-projects'],
     queryFn: parentProjectApi.getAll,
   });
+
+  // Employees on approved leave today — shared by the Fill column and the allocation popover.
+  const leaveEmployeeIds = useMemo(() => {
+    const todayStr = new Date().toISOString().slice(0, 10);
+    const ids = new Set();
+    leaves.forEach((l) => {
+      if (
+        l.status === 'approved' &&
+        String(l.start_date).slice(0, 10) <= todayStr &&
+        String(l.end_date).slice(0, 10) >= todayStr
+      ) {
+        ids.add(l.employee_id);
+      }
+    });
+    return ids;
+  }, [leaves]);
 
   const isDataLoading = projectsLoading || employeesLoading || allocationsLoading;
   const visibleProjects = isPm ? getPmSubProjects(projects, parentProjects, pmEmployeeId, allocations) : projects;
@@ -348,120 +365,138 @@ const AllocationsPage = () => {
 
 
   return (
-    <div className="space-y-6">
+    <div className="space-y-4">
       {/* Page Header */}
-      <div className="flex flex-col sm:flex-row sm:justify-between sm:items-center gap-3">
-        <div>
-          <h1 className="text-lg font-semibold text-slate-800">Allocations</h1>
-          <p className="mt-1 text-sm text-slate-500">Assign employees to projects</p>
-        </div>
-        <Button onClick={() => { setSelectedProject(null); setSelectedEmployees([]); setIsModalOpen(true); }}>
-          <Plus className="w-4 h-4" />
-          Create Allocation
-        </Button>
+      <div>
+        <h1 className="text-lg font-semibold text-slate-900">Allocations</h1>
+        <p className="mt-0.5 text-[13px] text-slate-500">Assign employees to projects</p>
       </div>
 
-
-
-      {/* Search Filter */}
-      <div className="flex justify-between items-center mb-4">
+      {/* Toolbar — search (left) · create allocation (right) */}
+      <div className="flex flex-wrap items-center justify-between gap-2">
         <SearchBar responsive
           value={searchQuery}
           onChange={(val) => { setSearchQuery(val); setCurrentPage(1); }}
           placeholder="Search projects or employees..."
         />
+        <button
+          type="button"
+          onClick={() => { setSelectedProject(null); setSelectedEmployees([]); setIsModalOpen(true); }}
+          className="inline-flex items-center gap-1.5 h-9 px-3.5 rounded-lg bg-indigo-600 text-white text-[13px] font-semibold hover:bg-indigo-700 shadow-sm transition-colors"
+        >
+          <Plus className="w-4 h-4" />
+          Create Allocation
+        </button>
       </div>
 
       <Table
+        variant="untitled"
         loading={isDataLoading}
         columns={[
           {
             key: 'project',
-            label: 'Project Name',
+            label: 'Project',
+            width: 'w-[28%]',
             render: (project) => (
-              <div>
-                <div className="font-semibold text-slate-800">{project.name}</div>
-                <div className="text-xs text-slate-400">{project.project_type}</div>
+              <div className="flex items-center gap-3">
+                <div className="w-9 h-9 rounded-lg bg-indigo-50 text-indigo-600 flex items-center justify-center text-[13px] font-semibold ring-1 ring-slate-200 shrink-0">
+                  {(project.name || '?').charAt(0).toUpperCase()}
+                </div>
+                <div className="min-w-0">
+                  <div className="text-[13.5px] font-semibold text-slate-900 truncate" title={project.name}>{project.name}</div>
+                  <div className="text-[12px] text-slate-400 truncate">{project.project_type || '—'}</div>
+                </div>
               </div>
             ),
           },
           {
             key: 'requiredManpower',
             label: 'Required',
-            align: 'center',
+            align: 'left',
+            width: 'w-[10%]',
             render: (value) => (
-              <span className="inline-flex items-center px-2.5 py-1 bg-slate-100 text-slate-700 rounded-lg font-semibold text-sm">
-                {value}
-              </span>
+              <span className="text-[13px] font-medium text-slate-700 tabular-nums">{value}</span>
             ),
           },
           {
             key: 'allocations',
             label: 'Allocated Employees',
+            width: 'w-[22%]',
             render: (projectAllocs, row) => {
               const project = row.project;
-              const requiredManpower = row.requiredManpower;
               return (
-                <div className="flex items-center justify-between gap-4">
-                  <div className="flex items-center gap-2">
-                    <div className="flex -space-x-1.5 overflow-hidden">
-                      {projectAllocs.slice(0, 3).map(alloc => {
-                        const emp = employees.find(e => e.id === alloc.employee_id);
-                        const name = emp?.name || 'Unknown';
-                        const initials = name.split(/\s+/).slice(0, 2).map(p => p[0]).join('').toUpperCase();
-                        const gradient = getAvatarGradient(name);
-                        return (
-                          <div key={alloc.id} className={`w-8 h-8 rounded-full bg-gradient-to-br ${gradient} text-white flex items-center justify-center text-[10px] font-bold border-2 border-white shadow-sm ring-1 ring-slate-100/50 shrink-0`} title={name}>
-                            {initials}
-                          </div>
-                        );
-                      })}
-                      {projectAllocs.length > 3 && (
-                        <div className="w-8 h-8 rounded-full bg-slate-100 border-2 border-white text-[10px] font-bold text-slate-500 flex items-center justify-center shadow-sm ring-1 ring-slate-100/50 shrink-0">
-                          +{projectAllocs.length - 3}
+                <div className="flex items-center gap-2">
+                  <div className="flex -space-x-1.5 overflow-hidden">
+                    {projectAllocs.slice(0, 4).map(alloc => {
+                      const emp = employees.find(e => e.id === alloc.employee_id);
+                      const name = emp?.name || 'Unknown';
+                      const initials = name.split(/\s+/).slice(0, 2).map(p => p[0]).join('').toUpperCase();
+                      const gradient = getAvatarGradient(name);
+                      return emp?.avatar_url ? (
+                        <img key={alloc.id} src={emp.avatar_url} alt={name} title={name} className="w-8 h-8 rounded-full object-cover border-2 border-white shadow-sm shrink-0" />
+                      ) : (
+                        <div key={alloc.id} className={`w-8 h-8 rounded-full bg-gradient-to-br ${gradient} text-white flex items-center justify-center text-[10px] font-bold border-2 border-white shadow-sm shrink-0`} title={name}>
+                          {initials}
                         </div>
-                      )}
-                    </div>
-                    <button onClick={() => { setSelectedProject(project); setIsModalOpen(true); }} className="w-8 h-8 rounded-full border border-dashed border-slate-300 text-slate-400 hover:text-indigo-600 hover:border-indigo-500 hover:bg-indigo-50/50 flex items-center justify-center transition-all shrink-0" title="Add employees">
-                      <UserPlus className="w-3.5 h-3.5" />
-                    </button>
+                      )
+                    })}
+                    {projectAllocs.length > 4 && (
+                      <div className="w-8 h-8 rounded-full bg-slate-100 border-2 border-white text-[10px] font-bold text-slate-500 flex items-center justify-center shadow-sm shrink-0">
+                        +{projectAllocs.length - 4}
+                      </div>
+                    )}
                   </div>
-                  <div className="flex items-center gap-2 shrink-0 whitespace-nowrap">
-                    {(() => {
-                      const assignedCount = projectAllocs.length;
-                      const todayStr = new Date().toISOString().slice(0, 10);
-                      const onLeaveToday = projectAllocs.filter(a =>
-                        leaves.some(l =>
-                          l.employee_id === a.employee_id &&
-                          l.status === 'approved' &&
-                          String(l.start_date).slice(0, 10) <= todayStr &&
-                          String(l.end_date).slice(0, 10) >= todayStr
-                        )
-                      ).length;
-                      return (
-                        <>
-                          {onLeaveToday > 0 && (
-                            <span className="px-2.5 py-1 bg-amber-50 text-amber-700 border border-amber-200/50 rounded-full text-xs font-semibold flex items-center gap-1 shrink-0 whitespace-nowrap" title={`${onLeaveToday} employee${onLeaveToday > 1 ? 's' : ''} on approved leave today`}>
-                              <span className="w-1.5 h-1.5 rounded-full bg-amber-500 animate-pulse shrink-0" />
-                              <span className="whitespace-nowrap">+{onLeaveToday} Leave</span>
-                            </span>
-                          )}
-                          <AllocationPopover
-                            project={project}
-                            allocations={projectAllocs}
-                            employees={employees}
-                            badgeContent={(
-                              <span className={`text-xs font-semibold px-2.5 py-1 rounded-lg border transition-all flex items-center gap-1.5 cursor-pointer select-none shrink-0 whitespace-nowrap ${assignedCount >= requiredManpower ? 'bg-emerald-50/40 text-emerald-700 border-emerald-100/70 hover:bg-emerald-100/40' : 'bg-amber-50/40 text-amber-700 border-amber-100/70 hover:bg-amber-100/40'}`}>
-                                <span className={`w-1.5 h-1.5 rounded-full shrink-0 ${assignedCount >= requiredManpower ? 'bg-emerald-500' : 'bg-amber-500'}`} />
-                                <span className="whitespace-nowrap">{assignedCount}&nbsp;/&nbsp;{requiredManpower}</span>
-                              </span>
-                            )}
-                            onOpenAllocations={() => { setSelectedProject(project); setIsModalOpen(true); }}
-                          />
-                        </>
-                      );
-                    })()}
-                  </div>
+
+                  <button onClick={() => { setSelectedProject(project); setIsModalOpen(true); }} className="w-8 h-8 rounded-full border border-dashed border-slate-300 text-slate-400 hover:text-indigo-600 hover:border-indigo-500 hover:bg-indigo-50/50 flex items-center justify-center transition-all shrink-0" title="Add employees">
+                    <UserPlus className="w-3.5 h-3.5" />
+                  </button>
+                </div>
+              );
+            },
+          },
+          {
+            key: '_fill',
+            label: 'Fill',
+            width: 'w-[26%]',
+            render: (_, row) => {
+              const project = row.project;
+              const assigned = row.allocations.length;
+              const required = row.requiredManpower || 0;
+              const pct = required > 0 ? Math.min(100, Math.round((assigned / required) * 100)) : (assigned > 0 ? 100 : 0);
+              const full = assigned >= required && required > 0;
+              const todayStr = new Date().toISOString().slice(0, 10);
+              const onLeaveToday = row.allocations.filter(a =>
+                leaves.some(l =>
+                  l.employee_id === a.employee_id &&
+                  l.status === 'approved' &&
+                  String(l.start_date).slice(0, 10) <= todayStr &&
+                  String(l.end_date).slice(0, 10) >= todayStr
+                )
+              ).length;
+              return (
+                <div className="flex items-center gap-3">
+                  <AllocationPopover
+                    project={project}
+                    allocations={row.allocations}
+                    employees={employees}
+                    onLeaveEmployeeIds={leaveEmployeeIds}
+                    triggerClassName="inline-flex items-center rounded-md focus:outline-none"
+                    badgeContent={(
+                      <div className="flex items-center gap-2.5 cursor-pointer select-none">
+                        <div className="h-2 w-[120px] rounded-full bg-slate-100 overflow-hidden">
+                          <div className={`h-full rounded-full transition-all ${full ? 'bg-emerald-500' : 'bg-indigo-500'}`} style={{ width: `${pct}%` }} />
+                        </div>
+                        <span className="w-12 text-[13px] font-medium text-slate-600 tabular-nums shrink-0">{assigned}/{required}</span>
+                      </div>
+                    )}
+                    onOpenAllocations={() => { setSelectedProject(project); setIsModalOpen(true); }}
+                  />
+                  {onLeaveToday > 0 && (
+                    <span className="inline-flex items-center gap-1.5 text-[12px] font-medium text-amber-600 shrink-0" title={`${onLeaveToday} on approved leave today`}>
+                      <span className="w-1.5 h-1.5 rounded-full bg-amber-500" />
+                      {onLeaveToday} on leave
+                    </span>
+                  )}
                 </div>
               );
             },
@@ -470,6 +505,7 @@ const AllocationsPage = () => {
             key: '_edit',
             label: 'Actions',
             align: 'right',
+            width: 'w-[14%]',
             render: (_, row) => (
               <button
                 onClick={() => setEditingAllocation({ project: row.project, allocations: row.allocations })}
@@ -493,94 +529,87 @@ const AllocationsPage = () => {
 
       {/* Create Allocation Modal */}
       <Modal isOpen={isModalOpen} onClose={closeCreateModal} size="3xl" maxHeight="95vh">
-        <Modal.Header onClose={closeCreateModal}>
-          <h2 className="text-xl font-semibold text-gray-900">
+        <Modal.Header onClose={closeCreateModal} className="!py-4">
+          <h2 className="text-base font-semibold text-slate-900">
             Create Allocation
           </h2>
         </Modal.Header>
 
         <form onSubmit={handleSubmit} className="flex-1 flex flex-col min-h-0">
-          <Modal.Body className="space-y-5">
-              {/* Project Selection */}
-              <div>
-                <label className="block text-sm font-medium text-gray-700 mb-1">
-                  Select Project <span className="text-red-500">*</span>
-                </label>
-                <Dropdown
-                  options={visibleProjects.map(project => ({
-                    value: project.id.toString(),
-                    label: `${project.name} - Required: ${project.required_manpower || 0}`
-                  }))}
-                  value={selectedProject?.id.toString() || ''}
-                  onChange={(val) => {
-                    const project = visibleProjects.find(p => p.id === parseInt(val));
-                    setSelectedProject(project);
-                    setSelectedEmployees([]);
-                  }}
-                  placeholder="Choose a project..."
-                />
+          <Modal.Body className="space-y-3.5 !pt-3">
+              {/* Project select + inline stats (one row) */}
+              <div className="flex flex-wrap items-end gap-x-4 gap-y-2">
+                <div className="flex-1 min-w-[240px]">
+                  <label className="block text-[13px] font-medium text-slate-700 mb-1">
+                    Select Project <span className="text-red-500">*</span>
+                  </label>
+                  <Dropdown
+                    options={visibleProjects.map(project => ({
+                      value: project.id.toString(),
+                      label: `${project.name} - Required: ${project.required_manpower || 0}`
+                    }))}
+                    value={selectedProject?.id.toString() || ''}
+                    onChange={(val) => {
+                      const project = visibleProjects.find(p => p.id === parseInt(val));
+                      setSelectedProject(project);
+                      setSelectedEmployees([]);
+                    }}
+                    placeholder="Choose a project..."
+                  />
+                </div>
+                {selectedProject && (() => {
+                  const projectAllocs = allocations.filter(a => a.sub_project_id === selectedProject.id);
+                  const required = selectedProject.required_manpower || 0;
+                  const filled = projectAllocs.length;
+                  const skills = selectedProject.required_expertise || [];
+                  return (
+                    <div className="flex items-center gap-3 flex-wrap pb-0.5">
+                      <div className="flex items-center gap-1.5">
+                        <span className="text-[11px] font-medium text-slate-400 uppercase tracking-wide">Required</span>
+                        <span className="text-[13px] font-bold text-blue-700">{required}</span>
+                      </div>
+                      <div className="flex items-center gap-1.5">
+                        <span className="text-[11px] font-medium text-slate-400 uppercase tracking-wide">Allocated</span>
+                        <span className={`text-[13px] font-bold ${filled >= required ? 'text-emerald-600' : 'text-amber-600'}`}>{filled}/{required}</span>
+                      </div>
+                      {skills.length > 0 && (
+                        <div className="flex items-center gap-1.5 min-w-0">
+                          <span className="text-[11px] font-medium text-slate-400 uppercase tracking-wide shrink-0">Skills</span>
+                          <div className="flex flex-wrap gap-1">
+                            {skills.slice(0, 3).map((skill, idx) => (
+                              <span key={idx} className="px-1.5 py-0.5 text-[11px] font-medium bg-slate-100 text-slate-600 rounded">{skill}</span>
+                            ))}
+                            {skills.length > 3 && (<span className="text-[11px] text-slate-400">+{skills.length - 3}</span>)}
+                          </div>
+                        </div>
+                      )}
+                    </div>
+                  );
+                })()}
               </div>
 
               {selectedProject && (
                 <>
-                  {/* Compact project summary */}
+                  {/* On this project — single row + see more */}
                   {(() => {
                     const projectAllocs = allocations.filter(a => a.sub_project_id === selectedProject.id);
                     const allocatedEmps = projectAllocs
                       .map(a => ({ alloc: a, emp: employees.find(e => e.id === a.employee_id) }))
                       .filter(x => x.emp);
-                    const required = selectedProject.required_manpower || 0;
-                    const filled = projectAllocs.length;
-                    const skills = selectedProject.required_expertise || [];
 
                     return (
-                      <div className="bg-blue-50/60 border border-blue-100 rounded-lg p-3 space-y-3">
-                        {/* Compact stats row */}
-                        <div className="flex items-center justify-between gap-3 flex-wrap">
-                          <div className="flex items-center gap-4">
-                            <div className="flex items-center gap-2">
-                              <span className="text-xs font-medium text-blue-900/70 uppercase tracking-wide">Required</span>
-                              <span className="text-sm font-bold text-blue-700 bg-white border border-blue-200 rounded-md px-2 py-0.5">{required}</span>
-                            </div>
-                            <div className="flex items-center gap-2">
-                              <span className="text-xs font-medium text-blue-900/70 uppercase tracking-wide">Allocated</span>
-                              <span className={`text-sm font-bold rounded-md px-2 py-0.5 border ${
-                                filled >= required
-                                  ? 'bg-emerald-50 text-emerald-700 border-emerald-200'
-                                  : 'bg-amber-50 text-amber-700 border-amber-200'
-                              }`}>{filled}/{required}</span>
-                            </div>
-                          </div>
-                          {skills.length > 0 && (
-                            <div className="flex items-center gap-2 min-w-0">
-                              <span className="text-xs font-medium text-blue-900/70 uppercase tracking-wide shrink-0">Skills</span>
-                              <div className="flex flex-wrap gap-1">
-                                {skills.slice(0, 4).map((skill, idx) => (
-                                  <span key={idx} className="px-1.5 py-0.5 text-[11px] font-medium bg-white text-blue-700 border border-blue-200 rounded">
-                                    {skill}
-                                  </span>
-                                ))}
-                                {skills.length > 4 && (
-                                  <span className="text-[11px] text-blue-700/70">+{skills.length - 4}</span>
-                                )}
-                              </div>
-                            </div>
-                          )}
+                      <div className="bg-blue-50/60 border border-blue-100 rounded-lg p-3">
+                        <div className="flex items-center justify-between mb-2">
+                          <span className="text-[11px] font-semibold text-blue-900/80 uppercase tracking-wide">
+                            On this project
+                          </span>
+                          <span className="text-[11px] text-blue-900/60">{allocatedEmps.length} employee{allocatedEmps.length === 1 ? '' : 's'}</span>
                         </div>
-
-                        {/* Employees on this project */}
-                        <div className="pt-2 border-t border-blue-100">
-                          <div className="flex items-center justify-between mb-2">
-                            <span className="text-xs font-semibold text-blue-900/80 uppercase tracking-wide">
-                              On this project
-                            </span>
-                            <span className="text-[11px] text-blue-900/60">{allocatedEmps.length} employee{allocatedEmps.length === 1 ? '' : 's'}</span>
-                          </div>
-                          {allocatedEmps.length === 0 ? (
-                            <p className="text-xs text-slate-500 italic">No one allocated yet</p>
-                          ) : (
+                        {allocatedEmps.length === 0 ? (
+                          <p className="text-xs text-slate-500 italic">No one allocated yet</p>
+                        ) : (
                             <div className="flex flex-wrap gap-1.5">
-                              {allocatedEmps.map(({ alloc, emp }) => {
+                              {(showAllAllocated ? allocatedEmps : allocatedEmps.slice(0, 3)).map(({ alloc, emp }) => {
                                 const initials = (emp.name || '')
                                   .trim()
                                   .split(/\s+/)
@@ -591,7 +620,7 @@ const AllocationsPage = () => {
                                 return (
                                   <div
                                     key={alloc.id}
-                                    title={`${emp.name}${alloc.total_daily_hours ? ` Â· ${alloc.total_daily_hours}h/day` : ''}`}
+                                    title={`${emp.name}${alloc.total_daily_hours ? ` · ${alloc.total_daily_hours}h/day` : ''}`}
                                     className={`group inline-flex items-center gap-1.5 pl-1 pr-1 py-0.5 bg-white border border-slate-200 rounded-full shadow-sm transition-opacity ${isRemoving ? 'opacity-50' : ''}`}
                                   >
                                     <span className="w-5 h-5 rounded-full bg-indigo-500 text-white text-[10px] font-semibold flex items-center justify-center">
@@ -623,63 +652,75 @@ const AllocationsPage = () => {
                                   </div>
                                 );
                               })}
+                              {allocatedEmps.length > 3 && (
+                                <button
+                                  type="button"
+                                  onClick={() => setShowAllAllocated(v => !v)}
+                                  className="inline-flex items-center px-2.5 py-1 rounded-full border border-blue-200 bg-white text-[11px] font-semibold text-blue-600 hover:bg-blue-50 transition-colors shrink-0"
+                                >
+                                  {showAllAllocated ? 'Show less' : `+${allocatedEmps.length - 3}`}
+                                </button>
+                              )}
                             </div>
                           )}
-                        </div>
                       </div>
                     );
                   })()}
 
                   {/* Employee Selection */}
                   <div>
-                    <div className="flex items-center justify-between mb-3">
-                      <label className="block text-sm font-medium text-gray-700">
+                    <div className="flex items-center justify-between mb-2.5">
+                      <label className="block text-[13px] font-medium text-slate-700">
                         Allocate Employees <span className="text-red-500">*</span>
                       </label>
                       <button
                         type="button"
                         onClick={handleSelectAll}
-                        className="flex items-center gap-1 text-sm text-blue-600 hover:text-blue-800"
+                        className="flex items-center gap-1 text-[13px] font-medium text-blue-600 hover:text-blue-800"
                       >
-                        <CheckSquare className="w-4 h-4" />
-                        {selectedEmployees.length === (filterTab === 'unallocated' ? availableEmployees : [...availableEmployees, ...allocatedEmployeesOther]).length ? 'Deselect All' : 'Select All'}
+                        <CheckSquare className="w-3.5 h-3.5" />
+                        {selectedEmployees.length === (filterTab === 'unallocated' ? availableEmployees : filterTab === 'allocated' ? allocatedEmployeesOther : [...availableEmployees, ...allocatedEmployeesOther]).length ? 'Deselect All' : 'Select All'}
                       </button>
                     </div>
-                    {/* Filter Tabs */}
-                    <div className="flex gap-1 mb-3 p-1 bg-gray-100 rounded-lg">
+
+                    {/* Tabs · search · filter — one row */}
+                    <div className="flex items-center gap-2 mb-2.5">
+                      <div className="inline-flex items-center rounded-lg border border-slate-200 bg-slate-50 p-0.5 shrink-0">
+                        {[
+                          { key: 'all', label: `All (${availableEmployees.length + allocatedEmployeesOther.length})` },
+                          { key: 'unallocated', label: `Available (${availableEmployees.length})` },
+                        ].map(t => (
+                          <button
+                            key={t.key}
+                            type="button"
+                            onClick={() => setFilterTab(t.key)}
+                            className={`px-3 py-1.5 text-[13px] font-semibold rounded-md transition-all whitespace-nowrap ${filterTab === t.key
+                              ? 'bg-white text-slate-900 shadow-sm ring-1 ring-slate-200/70'
+                              : 'text-slate-500 hover:text-slate-800'
+                              }`}
+                          >
+                            {t.label}
+                          </button>
+                        ))}
+                      </div>
+                      <div className="relative flex-1 min-w-0">
+                        <Search className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-slate-400 pointer-events-none" />
+                        <input
+                          type="text"
+                          value={employeeSearch}
+                          onChange={(e) => setEmployeeSearch(e.target.value)}
+                          placeholder="Search employees by name or email..."
+                          className="h-9 w-full pl-9 pr-3 rounded-lg border border-slate-200 bg-white text-[13px] text-slate-700 placeholder:text-slate-400 focus:outline-none focus:ring-2 focus:ring-indigo-100 focus:border-indigo-300 transition-all"
+                        />
+                      </div>
                       <button
                         type="button"
-                        onClick={() => setFilterTab('all')}
-                        className={`flex-1 px-3 py-2 text-sm font-medium rounded-md transition-colors ${filterTab === 'all'
-                          ? 'bg-white text-indigo-700 shadow-sm'
-                          : 'text-gray-600 hover:text-gray-900'
-                          }`}
+                        title="Filters (coming soon)"
+                        className="h-9 w-9 shrink-0 inline-flex items-center justify-center rounded-lg border border-slate-200 bg-white text-slate-500 hover:bg-slate-50 transition-colors"
                       >
-                        All ({availableEmployees.length + allocatedEmployeesOther.length})
-                      </button>
-                      <button
-                        type="button"
-                        onClick={() => setFilterTab('unallocated')}
-                        className={`flex-1 px-3 py-2 text-sm font-medium rounded-md transition-colors ${filterTab === 'unallocated'
-                          ? 'bg-white text-indigo-700 shadow-sm'
-                          : 'text-gray-600 hover:text-gray-900'
-                          }`}
-                      >
-                        Available ({availableEmployees.length})
+                        <Filter className="w-4 h-4" />
                       </button>
                     </div>
-
-                    {/* Employee Search */}
-                    <div className="mb-3">
-                      <SearchBar
-                        placeholder="Search employees by name or email..."
-                        value={employeeSearch}
-                        onChange={setEmployeeSearch}
-                        className="w-full"
-                      />
-                    </div>
-
-
 
                     {/* Employee List */}
                     {(() => {
@@ -707,79 +748,52 @@ const AllocationsPage = () => {
                       }
 
                       return (
-                        <div className="border border-gray-200 rounded-md max-h-64 overflow-y-auto">
-                          {displayEmployees.map(employee => (
+                        <div className="border border-slate-200 rounded-lg max-h-72 overflow-y-auto divide-y divide-slate-100">
+                          {displayEmployees.map(employee => {
+                            const isSelected = !!selectedEmployees.find(e => e.id === employee.id);
+                            return (
                             <div
                               key={employee.id}
                               onClick={() => !employee.alreadyInProject && handleEmployeeToggle(employee)}
-                              className={`p-3 border-b border-gray-100 last:border-b-0 ${employee.alreadyInProject ? 'opacity-50 cursor-not-allowed bg-gray-50' : 'cursor-pointer hover:bg-gray-50'} ${selectedEmployees.find(e => e.id === employee.id) ? 'bg-blue-50' : ''
-                                }`}
+                              className={`px-3 py-2.5 ${employee.alreadyInProject ? 'opacity-50 cursor-not-allowed bg-slate-50' : 'cursor-pointer hover:bg-slate-50'} ${isSelected ? 'bg-blue-50/70' : ''}`}
                             >
-                              <div className="flex items-center gap-3">
+                              <div className="flex items-center gap-2.5 min-w-0">
                                 <input
                                   type="checkbox"
-                                  checked={!!selectedEmployees.find(e => e.id === employee.id)}
+                                  checked={isSelected}
                                   disabled={employee.alreadyInProject}
                                   onChange={() => { }}
-                                  className="rounded border-gray-300 text-blue-600 focus:ring-blue-500 disabled:opacity-40"
+                                  className="rounded border-slate-300 text-blue-600 focus:ring-blue-500 disabled:opacity-40 shrink-0"
                                 />
-                                <div className="flex-1">
-                                  <div className="flex items-center gap-2">
-                                    <p className="font-medium text-gray-900">{employee.name}</p>
-                                    {employee.skillMatch && (
-                                      <span className="px-2 py-0.5 text-xs bg-green-100 text-green-700 rounded-full font-medium">
-                                        Skill Match
-                                      </span>
-                                    )}
-                                    {employee.alreadyInProject && (
-                                      <span className="px-2 py-0.5 text-xs bg-blue-100 text-blue-700 rounded-full font-medium">
-                                        In This Project
-                                      </span>
-                                    )}
-                                    {employee.currentProjects && !employee.alreadyInProject && (
-                                      <span className="px-2 py-0.5 text-xs bg-orange-100 text-orange-700 rounded-full font-medium">
-                                        Other Project
-                                      </span>
-                                    )}
-                                  </div>
-                                  <div className="flex items-center gap-2 mt-1">
-                                    <span className="text-xs text-gray-500">{employee.email}</span>
-                                    <span className="text-xs text-gray-400">â€¢</span>
-                                    <span className="text-xs text-gray-500">{employee.weekly_availability}h/week</span>
-                                  </div>
-                                  {/* Show current projects if allocated */}
-                                  {employee.currentProjects && (
-                                    <div className="flex flex-wrap gap-1 mt-1">
-                                      {employee.currentProjects.map((proj, idx) => (
-                                        <span key={idx} className="px-2 py-0.5 text-xs bg-slate-200 text-slate-700 rounded">
-                                          {proj.projectName} ({proj.hours}h/day)
-                                        </span>
-                                      ))}
-                                    </div>
+                                <span className="text-[13px] font-semibold text-slate-900 shrink-0">{employee.name}</span>
+                                {employee.skillMatch && (
+                                  <span className="px-1.5 py-0.5 text-[10px] bg-green-100 text-green-700 rounded-full font-semibold shrink-0">Skill Match</span>
+                                )}
+                                {employee.alreadyInProject && (
+                                  <span className="px-1.5 py-0.5 text-[10px] bg-blue-100 text-blue-700 rounded-full font-semibold shrink-0">In This Project</span>
+                                )}
+                                {employee.currentProjects && !employee.alreadyInProject && (
+                                  <span className="px-1.5 py-0.5 text-[10px] bg-orange-100 text-orange-700 rounded-full font-semibold shrink-0">Other Project</span>
+                                )}
+                                <div className="ml-auto flex items-center gap-1.5 shrink-0">
+                                  {employee.skills?.slice(0, 3).map((skill, idx) => (
+                                    <span key={idx} className="px-1.5 py-0.5 text-[10px] bg-slate-100 text-slate-600 rounded">
+                                      {skill}
+                                    </span>
+                                  ))}
+                                  {employee.skills?.length > 3 && (
+                                    <span className="text-[10px] text-slate-400">+{employee.skills.length - 3}</span>
                                   )}
-                                  <div className="flex flex-wrap gap-1 mt-1">
-                                    {employee.skills?.slice(0, 3).map((skill, idx) => (
-                                      <span key={idx} className="px-2 py-0.5 text-xs bg-gray-100 text-gray-600 rounded">
-                                        {skill}
-                                      </span>
-                                    ))}
-                                    {employee.skills?.length > 3 && (
-                                      <span className="px-2 py-0.5 text-xs bg-gray-200 text-gray-500 rounded">
-                                        +{employee.skills.length - 3}
-                                      </span>
-                                    )}
-                                  </div>
-                                </div>
-                                {selectedEmployees.find(e => e.id === employee.id) && (
-                                  <div className="text-green-600">
-                                    <svg className="w-5 h-5" fill="currentColor" viewBox="0 0 20 20">
+                                  {isSelected && (
+                                    <svg className="w-5 h-5 text-blue-600" fill="currentColor" viewBox="0 0 20 20">
                                       <path fillRule="evenodd" d="M10 18a8 8 0 100-16 8 8 0 000 16zm3.707-9.293a1 1 0 00-1.414-1.414L9 10.586 7.707 9.293a1 1 0 00-1.414 1.414l2 2a1 1 0 001.414 0l4-4z" clipRule="evenodd" />
                                     </svg>
-                                  </div>
-                                )}
+                                  )}
+                                </div>
                               </div>
                             </div>
-                          ))}
+                            );
+                          })}
                         </div>
                       );
                     })()}
@@ -923,9 +937,10 @@ const AllocationsPage = () => {
 
           </Modal.Body>
           <Modal.Footer>
-            <Button type="button" variant="cancel" onClick={closeCreateModal}>Cancel</Button>
+            <Button type="button" variant="cancel" size="sm" onClick={closeCreateModal}>Cancel</Button>
             <Button
               type="submit"
+              size="sm"
               disabled={!selectedProject || selectedEmployees.length === 0 || createMutation.isPending}
               isLoading={createMutation.isPending}
             >

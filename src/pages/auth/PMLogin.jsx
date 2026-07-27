@@ -1,7 +1,7 @@
 import React, { useState } from 'react';
 import { useNavigate, useLocation } from 'react-router-dom';
 import { useMutation } from '@tanstack/react-query';
-import { Lock, Mail, User, Shield } from 'lucide-react';
+import { Lock, Mail, User, Shield, Eye, EyeOff } from 'lucide-react';
 import { authApi } from '../../services/api';
 import Spinner from '../../components/ui/LoadingSpinner';
 import toast from 'react-hot-toast';
@@ -13,6 +13,7 @@ const PMLogin = () => {
     const from = location.state?.from?.pathname || '/pm/dashboard';
 
     const [formData, setFormData] = useState({ email: '', password: '' });
+    const [showPassword, setShowPassword] = useState(false);
     const [error, setError] = useState(null);
 
     const loginMutation = useMutation({
@@ -90,13 +91,22 @@ const PMLogin = () => {
                             <div className="relative">
                                 <Lock className="absolute left-3 top-1/2 h-5 w-5 -translate-y-1/2 text-slate-400" />
                                 <input
-                                    type="password"
+                                    type={showPassword ? 'text' : 'password'}
                                     value={formData.password}
                                     onChange={(e) => setFormData({ ...formData, password: e.target.value })}
                                     placeholder="••••••••"
-                                    className="w-full rounded-2xl border border-slate-200 py-3 pl-11 pr-4 text-sm outline-none transition-all focus:border-blue-500 focus:ring-2 focus:ring-blue-100"
+                                    className="w-full rounded-2xl border border-slate-200 py-3 pl-11 pr-11 text-sm outline-none transition-all focus:border-blue-500 focus:ring-2 focus:ring-blue-100"
                                     disabled={loginMutation.isPending}
                                 />
+                                <button
+                                    type="button"
+                                    onClick={() => setShowPassword((s) => !s)}
+                                    tabIndex={-1}
+                                    aria-label={showPassword ? 'Hide password' : 'Show password'}
+                                    className="absolute right-3 top-1/2 -translate-y-1/2 text-slate-400 transition-colors hover:text-slate-600"
+                                >
+                                    {showPassword ? <EyeOff className="h-5 w-5" /> : <Eye className="h-5 w-5" />}
+                                </button>
                             </div>
                             <div className="mt-2 flex justify-end">
                                 <button

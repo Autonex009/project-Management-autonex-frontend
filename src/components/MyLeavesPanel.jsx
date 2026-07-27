@@ -502,10 +502,10 @@ const MyLeavesPanel = ({
 
     return (
         <div className="space-y-6">
-            <div className="flex items-center justify-between">
+            <div className="flex flex-col sm:flex-row items-start sm:items-center justify-between mb-8 gap-4">
                 <div>
-                    <h1 className="text-2xl font-bold text-slate-900">{title}</h1>
-                    <p className="text-slate-500 text-sm mt-1">{subtitle}</p>
+                    <h1 className="text-2xl sm:text-3xl font-extrabold text-slate-900">{title}</h1>
+                    <p className="text-sm text-slate-500">{subtitle}</p>
                 </div>
                 <div className="flex gap-2">
                     {activeTab === 'My Leaves' && (
