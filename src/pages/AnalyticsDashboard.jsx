@@ -8,25 +8,12 @@ import { FolderKanban, Clock, Users, UserCheck, PenLine, ClipboardCheck, Refresh
 import { ResponsiveContainer, BarChart, Bar, XAxis, YAxis, CartesianGrid, Tooltip } from 'recharts';
 import { format, parseISO } from 'date-fns';
 import toast from 'react-hot-toast';
-import { useState, useEffect } from 'react';
 
-// Track if we have an active job ID
-const [activeJobId, setActiveJobId] = useState(null);
-// Track the brief moment when we are actively checking the status API
-const [isCheckingStatus, setIsCheckingStatus] = useState(false);
 const AUTONEX_RANGES = [
     { key: '1', label: 'Last day' },
     { key: '7', label: 'Last 7 days' },
     { key: '30', label: 'Last 30 days' },
 ];
-
-// Check on page load if a sync was already running
-useEffect(() => {
-    const jobId = localStorage.getItem('active_sync_job_id');
-    if (jobId) {
-        setActiveJobId(jobId);
-    }
-}, []);
 
 const shortDate = (s) => { try { return format(parseISO(s), 'MMM d'); } catch { return s; } };
 
@@ -108,15 +95,21 @@ const AnalyticsDashboard = () => {
         if (activeJobId) {
             setIsCheckingStatus(true);
             try {
-                const { status } = await analyticsApi.getSyncStatus(activeJobId);
+                const res = await analyticsApi.getSyncStatus(activeJobId);
+                const status = res?.status;
                 if (['queued', 'deferred', 'in_progress', 'started'].includes(status)) {
                     toast('Sync is still running in the background — check back soon.');
                 } else if (status === 'complete' || status === 'finished') {
-                    toast.success('Sync finished — refreshing data.');
+                    // arq marks a crashed job "complete" with success=false — treat that as a failure.
                     localStorage.removeItem('active_sync_job_id');
                     setActiveJobId(null);
-                    queryClient.invalidateQueries({ queryKey: ['analytics-summary'] });
-                    queryClient.invalidateQueries({ queryKey: ['autonex-kpis'] });
+                    if (res?.success === false) {
+                        toast.error('The background sync failed — you can start a new one.');
+                    } else {
+                        toast.success('Sync finished — refreshing data.');
+                        queryClient.invalidateQueries({ queryKey: ['analytics-summary'] });
+                        queryClient.invalidateQueries({ queryKey: ['autonex-kpis'] });
+                    }
                 } else if (status === 'failed') {
                     toast.error('The background sync failed — you can start a new one.');
                     localStorage.removeItem('active_sync_job_id');
