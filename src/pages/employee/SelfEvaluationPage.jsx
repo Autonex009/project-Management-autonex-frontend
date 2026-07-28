@@ -208,7 +208,7 @@ const SelfEvaluationPage = () => {
             <div className="space-y-6">
                 <section className="overflow-hidden rounded-[28px] border border-blue-100 bg-[linear-gradient(135deg,rgba(37,99,235,0.12),rgba(255,255,255,0.94)_42%,rgba(239,246,255,1))] p-6 shadow-sm">
                     <p className="text-sm font-medium uppercase tracking-[0.18em] text-blue-700">Self Evaluation</p>
-                    <h1 className="mt-1 text-2xl font-bold tracking-tight text-slate-900">Monthly Self-Evaluation</h1>
+                    <h1 className="mt-1 text-lg font-semibold tracking-tight text-slate-900">Monthly Self-Evaluation</h1>
                     <p className="mt-2 max-w-2xl text-sm text-slate-500">
                         Rate yourself on each parameter once a month. Your submission is locked and reviewed by the Admin.
                     </p>

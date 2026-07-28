@@ -1,9 +1,11 @@
 import { useLocation, Outlet, useNavigate } from 'react-router-dom';
-import { Menu, ChevronRight, PanelLeft } from 'lucide-react';
+import { Menu, PanelLeft } from 'lucide-react';
 import { authApi } from '../services/api';
 import { useState, useEffect, useRef } from 'react';
 import { useQuery, useQueryClient } from '@tanstack/react-query';
 import NotificationBell from '../components/NotificationBell';
+import Breadcrumbs from '../components/ui/Breadcrumbs';
+import { useBreadcrumbTrail } from '../hooks/useBreadcrumbTrail';
 import EmployeeSidebar from './EmployeeSidebar';
 import ChatWidget from '../components/chat/ChatWidget';
 import { LayoutDashboard, FolderKanban, Calendar, CalendarCheck, Rocket, FileText, Layers, UserCog, Users, Users2, TrendingUp, GraduationCap, Info, ClipboardList } from 'lucide-react';
@@ -153,7 +155,15 @@ const EmployeeLayout = () => {
           { to: `${prefix}/onboarding`, label: 'Onboarding' },
       ];
 
-  const currentNav = navItems.find(n => n.to === location.pathname) || { label: 'Dashboard' };
+  // Resolve the current route to a breadcrumb crumb (labels come from navItems,
+  // which already differ for PM vs employee).
+  const resolveCrumb = (pathname) => {
+    const item = navItems.find((n) => n.to === pathname);
+    if (item) return { name: item.label, key: pathname };
+    if (/\/onboarding\/[^/]+$/.test(pathname)) return { name: 'Module', key: 'onboarding-module', isDetail: true };
+    return { name: 'Dashboard', key: `${prefix}/dashboard` };
+  };
+  const breadcrumbTrail = useBreadcrumbTrail(resolveCrumb);
 
   const sidebarProps = {
     user,
@@ -228,16 +238,12 @@ const EmployeeLayout = () => {
             >
               <PanelLeft className="w-4 h-4" />
             </button>
-            <nav className="flex items-center gap-1.5 text-[13px] min-w-0">
-              <span className="flex items-center gap-1.5 text-slate-500 dark:text-zinc-400 shrink-0">
-                <img src="/favicon.png" alt="" className="h-[18px] w-[18px] rounded-[5px] border border-slate-200 bg-white dark:border-white/10 dark:bg-white/5 p-0.5" />
-                <span className="hidden sm:inline">Autonex</span>
-              </span>
-              <ChevronRight className="w-3.5 h-3.5 text-slate-300 dark:text-zinc-600 shrink-0" />
-              <span className="font-medium text-slate-900 dark:text-zinc-100 truncate">
-                {currentNav.label}
-              </span>
-            </nav>
+            <Breadcrumbs
+              items={breadcrumbTrail}
+              homeHref={`${prefix}/dashboard`}
+              homeLabel="Autonex"
+              homeIcon={<img src="/favicon.png" alt="" className="h-[18px] w-[18px] rounded-[5px] border border-slate-200 bg-white dark:border-white/10 dark:bg-white/5 p-0.5" />}
+            />
           </div>
 
           <div className="flex items-center gap-2">

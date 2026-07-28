@@ -34,8 +34,18 @@ const getInitials = (name = '') => {
   return (parts[0].charAt(0) + parts[parts.length - 1].charAt(0)).toUpperCase();
 };
 
-const Avatar = ({ name }) => {
+const Avatar = ({ name, src }) => {
   const gradient = AVATAR_PALETTE[hashString(name || '') % AVATAR_PALETTE.length];
+  if (src) {
+    return (
+      <img
+        src={src}
+        alt={name}
+        title={name}
+        className="w-9 h-9 rounded-full object-cover shadow-sm ring-2 ring-white shrink-0"
+      />
+    );
+  }
   return (
     <div
       className={`w-9 h-9 rounded-full bg-gradient-to-br ${gradient} text-white flex items-center justify-center text-xs font-semibold shadow-sm ring-2 ring-white shrink-0`}
@@ -242,7 +252,7 @@ const AllocationPopover = ({
                         key={alloc.id}
                         className="flex items-center gap-3 px-3 py-2 hover:bg-slate-50 transition-colors"
                       >
-                        <Avatar name={name} />
+                        <Avatar name={name} src={emp?.avatar_url} />
                         <div className="flex-1 min-w-0">
                           <div className="flex items-center gap-1.5 min-w-0">
                             <span className="text-sm font-medium text-slate-800 truncate">

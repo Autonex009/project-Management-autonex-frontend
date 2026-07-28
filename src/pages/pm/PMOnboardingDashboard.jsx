@@ -67,7 +67,7 @@ const PMOnboardingDashboard = ({ embedded = false }) => {
                 <div className="flex flex-col md:flex-row justify-between items-start md:items-end gap-6">
                     <div>
                         <span className="text-xs font-bold uppercase tracking-widest text-blue-600">PM Portal</span>
-                        <h1 className="text-3xl font-extrabold text-slate-900 mt-1">
+                        <h1 className="text-lg font-semibold text-slate-900 mt-1">
                             Mentorship & Onboarding
                         </h1>
                         <p className="text-slate-500 text-sm mt-1">Monitor training progression and quiz outcomes for your team.</p>

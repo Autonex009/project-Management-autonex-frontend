@@ -1,6 +1,6 @@
 import { useState, useEffect, useRef, useMemo } from 'react';
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
-import { useLocation } from 'react-router-dom';
+import { useLocation, useNavigate } from 'react-router-dom';
 import { allocationApi, subProjectApi, employeeApi, leaveApi, parentProjectApi } from '../services/api';
 import { Plus, Edit, Trash2, X, UserPlus, UserMinus, CheckSquare, AlertTriangle, Users, Search, Filter } from 'lucide-react';
 import toast from 'react-hot-toast';
@@ -47,11 +47,13 @@ const ROLE_TAGS = [
 
 const AllocationsPage = () => {
   const location = useLocation();
+  const navigate = useNavigate();
   const queryClient = useQueryClient();
   const hasHandledLocationProject = useRef(false);
   const user = JSON.parse(localStorage.getItem('user') || '{}');
   const role = localStorage.getItem('role') || 'admin';
   const isPm = role === 'pm';
+  const prefix = isPm ? '/pm' : '/admin';
   const pmEmployeeId = getPmEmployeeId(user);
   const [isModalOpen, setIsModalOpen] = useState(false);
   const [currentPage, setCurrentPage] = useState(1);
@@ -398,15 +400,20 @@ const AllocationsPage = () => {
             label: 'Project',
             width: 'w-[28%]',
             render: (project) => (
-              <div className="flex items-center gap-3">
+              <button
+                type="button"
+                onClick={() => navigate(`${prefix}/sub-projects?focus=${project.id}`)}
+                title={`Open ${project.name} in Projects`}
+                className="group/proj -mx-1 flex items-center gap-3 rounded-md px-1 py-0.5 text-left transition-colors hover:bg-slate-50"
+              >
                 <div className="w-9 h-9 rounded-lg bg-indigo-50 text-indigo-600 flex items-center justify-center text-[13px] font-semibold ring-1 ring-slate-200 shrink-0">
                   {(project.name || '?').charAt(0).toUpperCase()}
                 </div>
                 <div className="min-w-0">
-                  <div className="text-[13.5px] font-semibold text-slate-900 truncate" title={project.name}>{project.name}</div>
+                  <div className="text-[13.5px] font-semibold text-slate-900 truncate transition-colors group-hover/proj:text-indigo-600" title={project.name}>{project.name}</div>
                   <div className="text-[12px] text-slate-400 truncate">{project.project_type || '—'}</div>
                 </div>
-              </div>
+              </button>
             ),
           },
           {
@@ -424,15 +431,28 @@ const AllocationsPage = () => {
             width: 'w-[22%]',
             render: (projectAllocs, row) => {
               const project = row.project;
+              // Order the avatar stack so real profile photos fill the first 4
+              // slots: employees with a profile image come first. But once there
+              // are plenty of images (all of them, or more than 4), just show A→Z.
+              const withEmp = projectAllocs.map(a => {
+                const emp = employees.find(e => e.id === a.employee_id);
+                return { alloc: a, emp, name: emp?.name || 'Unknown', hasImg: !!emp?.avatar_url };
+              });
+              const byName = (a, b) => a.name.localeCompare(b.name);
+              // Profile photos ALWAYS come first so the visible avatars are real
+              // images, never initials. Only when there are many photos (more
+              // than 5) do we order those photos A→Z.
+              const withImg = withEmp.filter(x => x.hasImg);
+              const withoutImg = withEmp.filter(x => !x.hasImg);
+              const orderedImg = withImg.length > 5 ? [...withImg].sort(byName) : withImg;
+              const ordered = [...orderedImg, ...withoutImg];
               return (
                 <div className="flex items-center gap-2">
                   <div className="flex -space-x-1.5 overflow-hidden">
-                    {projectAllocs.slice(0, 4).map(alloc => {
-                      const emp = employees.find(e => e.id === alloc.employee_id);
-                      const name = emp?.name || 'Unknown';
+                    {ordered.slice(0, 4).map(({ alloc, emp, name, hasImg }) => {
                       const initials = name.split(/\s+/).slice(0, 2).map(p => p[0]).join('').toUpperCase();
                       const gradient = getAvatarGradient(name);
-                      return emp?.avatar_url ? (
+                      return hasImg ? (
                         <img key={alloc.id} src={emp.avatar_url} alt={name} title={name} className="w-8 h-8 rounded-full object-cover border-2 border-white shadow-sm shrink-0" />
                       ) : (
                         <div key={alloc.id} className={`w-8 h-8 rounded-full bg-gradient-to-br ${gradient} text-white flex items-center justify-center text-[10px] font-bold border-2 border-white shadow-sm shrink-0`} title={name}>
@@ -440,9 +460,9 @@ const AllocationsPage = () => {
                         </div>
                       )
                     })}
-                    {projectAllocs.length > 4 && (
+                    {ordered.length > 4 && (
                       <div className="w-8 h-8 rounded-full bg-slate-100 border-2 border-white text-[10px] font-bold text-slate-500 flex items-center justify-center shadow-sm shrink-0">
-                        +{projectAllocs.length - 4}
+                        +{ordered.length - 4}
                       </div>
                     )}
                   </div>

@@ -71,7 +71,7 @@ const EvalReviewCard = ({ evaluation, personName, reviewerId }) => {
     };
 
     return (
-        <div className="rounded-2xl border border-slate-200 bg-white p-4">
+        <div className="rounded-xl border border-slate-200 bg-white p-3.5">
             <div className="mb-3 flex flex-wrap items-center justify-between gap-2">
                 <div className="flex flex-wrap items-center gap-2">
                     <span className="font-medium text-slate-800">{personName}</span>
@@ -96,23 +96,22 @@ const EvalReviewCard = ({ evaluation, personName, reviewerId }) => {
             </div>
 
             {editing ? (
-                <div className="space-y-3">
+                <div className="space-y-2">
                     {rows.map((r) => (
-                        <div key={r.name} className="rounded-xl border border-slate-200 bg-slate-50/60 p-3">
-                            <div className="flex flex-wrap items-center justify-between gap-3">
-                                <div className="min-w-0">
-                                    <p className="font-medium text-slate-800">{r.name}</p>
-                                    <div className="mt-1 flex items-center gap-1.5">
+                        <div key={r.name} className="rounded-lg border border-slate-200 bg-slate-50/60 px-3 py-2">
+                            <div className="flex flex-wrap items-center justify-between gap-x-4 gap-y-1.5">
+                                <div className="flex min-w-0 items-center gap-2">
+                                    <span className="truncate text-sm font-medium text-slate-800">{r.name}</span>
+                                    <span className="hidden items-center gap-1 sm:inline-flex">
                                         <span className="text-[10px] uppercase tracking-wide text-slate-400">Self</span>
-                                        <StarRating value={r.employee_rating || 0} readOnly showLabel={false} size="text-sm" />
-                                    </div>
+                                        <StarRating value={r.employee_rating || 0} readOnly showLabel={false} size="text-xs" />
+                                    </span>
                                 </div>
-                                <div className="flex flex-col items-end gap-2">
-                                    <div className="flex items-center gap-2">
-                                        <span className="text-[10px] uppercase tracking-wide text-amber-500">Your rating</span>
-                                        <StarRating value={r.pm_rating || null} onChange={(v) => setRow(r.name, { pm_rating: v })} showLabel={false} size="text-lg" />
-                                    </div>
-                                    <div className="flex items-center gap-4 text-xs">
+                                <div className="flex items-center gap-2.5">
+                                    <span className="text-[10px] uppercase tracking-wide text-amber-500">Your</span>
+                                    <StarRating value={r.pm_rating || null} onChange={(v) => setRow(r.name, { pm_rating: v })} showLabel={false} size="text-base" />
+                                    <span className="mx-0.5 h-4 w-px bg-slate-200" />
+                                    <div className="flex items-center gap-3 text-xs">
                                         <label className="inline-flex cursor-pointer items-center gap-1.5">
                                             <input type="radio" name={`decision-${evaluation.id}-${r.name}`} checked={r.approved} onChange={() => setRow(r.name, { approved: true })} className="accent-emerald-600" />
                                             <span className={r.approved ? 'font-medium text-emerald-700' : 'text-slate-500'}>Approve</span>
@@ -130,20 +129,20 @@ const EvalReviewCard = ({ evaluation, personName, reviewerId }) => {
                                     value={r.feedback}
                                     onChange={(e) => setRow(r.name, { feedback: e.target.value })}
                                     placeholder="Feedback (required)…"
-                                    className="mt-2 w-full resize-none rounded-lg border border-rose-200 bg-white px-3 py-2 text-sm text-slate-800 placeholder:text-slate-300 focus:border-rose-400 focus:outline-none focus:ring-2 focus:ring-rose-100"
+                                    className="mt-1.5 w-full resize-none rounded-lg border border-rose-200 bg-white px-3 py-1.5 text-sm text-slate-800 placeholder:text-slate-300 focus:border-rose-400 focus:outline-none focus:ring-2 focus:ring-rose-100"
                                 />
                             )}
                         </div>
                     ))}
 
                     {evaluation.overall_comment && (
-                        <div className="rounded-xl bg-slate-50 px-3 py-2.5">
-                            <p className="text-xs font-semibold uppercase tracking-wide text-slate-400">Overall comment</p>
-                            <p className="mt-1 whitespace-pre-wrap text-sm text-slate-700">{evaluation.overall_comment}</p>
+                        <div className="rounded-lg bg-slate-50 px-3 py-2">
+                            <p className="text-[10px] font-semibold uppercase tracking-wide text-slate-400">Overall comment</p>
+                            <p className="mt-0.5 whitespace-pre-wrap text-sm text-slate-700">{evaluation.overall_comment}</p>
                         </div>
                     )}
 
-                    <div className="rounded-xl border border-amber-200 bg-amber-50/60 p-3">
+                    <div className="rounded-lg border border-amber-200 bg-amber-50/60 px-3 py-2.5">
                         <label className="flex items-center justify-between gap-3">
                             <span className="inline-flex items-center gap-2 text-sm font-medium text-amber-800"><Gift className="h-4 w-4" /> Suggest for a bonus</span>
                             <button

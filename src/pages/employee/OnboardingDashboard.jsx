@@ -64,7 +64,7 @@ const OnboardingDashboard = () => {
             <div className="flex flex-col md:flex-row justify-between items-start md:items-end gap-6">
                 <div>
                     <span className="text-xs font-bold uppercase tracking-widest text-emerald-600">Onboarding & Training</span>
-                    <h1 className="text-3xl font-extrabold text-slate-900 mt-1">
+                    <h1 className="text-lg font-semibold text-slate-900 mt-1">
                         Welcome, {user.name ? user.name.split(' ')[0] : 'Employee'}
                     </h1>
                     <p className="text-slate-500 text-sm mt-1">Complete your required courses to get certified.</p>

@@ -1,4 +1,4 @@
-import React, { useRef, useState } from 'react';
+import React, { useRef, useState, useEffect } from 'react';
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import Button from '../../components/ui/Button';
 import { guidelineApi, projectApi, subProjectApi } from '../../services/api';
@@ -8,7 +8,19 @@ import { getPmEmployeeId, getPmProjects, getPmSubProjects } from '../../utils/pm
 import SearchBar from '../../components/ui/SearchBar';
 import Dropdown from '../../components/ui/Dropdown';
 import Modal from '../../components/ui/Modal';
+import Table from '../../components/ui/Table';
 import ConfirmDialog from '../../components/ui/ConfirmDialog';
+
+// Truncated text that reveals its full value in a light (white) tooltip on hover
+// (replaces the browser's dark native title tooltip).
+const TruncTip = ({ text, className = '' }) => (
+    <span className="group/tip relative block min-w-0 flex-1">
+        <span className={`block truncate ${className}`}>{text}</span>
+        <span className="pointer-events-none absolute left-0 top-full z-30 mt-1 hidden w-max max-w-[280px] whitespace-normal break-words rounded-lg border border-slate-200 bg-white px-2.5 py-1.5 text-[11px] font-medium text-slate-600 shadow-lg group-hover/tip:block">
+            {text}
+        </span>
+    </span>
+);
 
 const GuidelinesPage = () => {
     const queryClient = useQueryClient();
@@ -27,6 +39,8 @@ const GuidelinesPage = () => {
     const fileInputRef = useRef(null);
     const [searchQuery, setSearchQuery] = useState('');
     const [deleteTarget, setDeleteTarget] = useState(null);
+    const [page, setPage] = useState(1);
+    const PAGE_SIZE = 12;
 
     // Fetch guidelines
     const params = {};
@@ -60,6 +74,8 @@ const GuidelinesPage = () => {
         const q = searchQuery.toLowerCase();
         return title.includes(q) || content.includes(q) || fileName.includes(q);
     });
+
+    useEffect(() => { setPage(1); }, [searchQuery, filterProject]);
 
     // Mutations
     const createMutation = useMutation({
@@ -144,6 +160,71 @@ const GuidelinesPage = () => {
         ? visibleSubProjectsForRole.filter((project) => String(project.main_project_id) === String(form.main_project_id))
         : visibleSubProjectsForRole;
 
+    const columns = [
+        {
+            key: 'title', label: 'Guideline', width: 'w-[27%]',
+            render: (_, g) => (
+                <div className="flex min-w-0 items-center gap-2.5">
+                    <span className="flex h-8 w-8 shrink-0 items-center justify-center rounded-lg bg-blue-50 text-blue-600"><FileText className="h-4 w-4" /></span>
+                    <TruncTip text={g.title} className="font-medium text-slate-800" />
+                </div>
+            ),
+        },
+        {
+            key: 'organization', label: 'Organization', width: 'w-[20%]',
+            render: (_, g) => {
+                const mp = mainProjects.find((p) => p.id === g.main_project_id);
+                return mp
+                    ? <span className="inline-flex max-w-full truncate rounded-full bg-indigo-50 px-2 py-0.5 text-[11px] font-medium text-indigo-600" title={undefined}>{mp.name}</span>
+                    : <span className="text-slate-300">—</span>;
+            },
+        },
+        {
+            key: 'project', label: 'Project', width: 'w-[26%]',
+            render: (_, g) => {
+                const sp = subProjects.find((p) => p.id === g.sub_project_id);
+                return sp
+                    ? (
+                        <div className="flex min-w-0 items-center gap-1 text-slate-600">
+                            <FolderOpen className="h-3.5 w-3.5 shrink-0 text-slate-400" />
+                            <TruncTip text={sp.name} />
+                        </div>
+                    )
+                    : <span className="text-slate-300">—</span>;
+            },
+        },
+        {
+            key: 'created', label: 'Created', width: 'w-[16%]',
+            render: (_, g) => <span className="whitespace-nowrap text-slate-500 tabular-nums">{g.created_at ? new Date(g.created_at).toLocaleDateString('en-US', { month: 'short', day: 'numeric', year: 'numeric' }) : '—'}</span>,
+        },
+        {
+            key: 'actions', label: 'Actions', align: 'right', width: 'w-[10%]',
+            render: (_, g) => (
+                <div className="flex items-center justify-end gap-1">
+                    {g.file_url && (
+                        <a
+                            href={g.file_url}
+                            target="_blank"
+                            rel="noreferrer"
+                            download
+                            title={`Download ${g.file_name || 'file'}`}
+                            onClick={(e) => e.stopPropagation()}
+                            className="rounded-lg p-1.5 text-slate-400 transition-colors hover:bg-indigo-50 hover:text-indigo-600"
+                        >
+                            <Download className="h-4 w-4" />
+                        </a>
+                    )}
+                    {canEdit && (
+                        <>
+                            <button type="button" onClick={() => startEdit(g)} title="Edit" className="rounded-lg p-1.5 text-slate-400 transition-colors hover:bg-blue-50 hover:text-blue-600"><Edit3 className="h-4 w-4" /></button>
+                            <button type="button" onClick={() => setDeleteTarget(g)} title="Delete" className="rounded-lg p-1.5 text-slate-400 transition-colors hover:bg-red-50 hover:text-red-600"><Trash2 className="h-4 w-4" /></button>
+                        </>
+                    )}
+                </div>
+            ),
+        },
+    ];
+
     return (
         <div className="space-y-6">
             {/* Header */}
@@ -163,10 +244,10 @@ const GuidelinesPage = () => {
             <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4">
                 <div className="flex items-center gap-3">
                     <Dropdown
-                        options={[{ value: '', label: 'All Projects' }, ...visibleMainProjects.map(p => ({ value: String(p.id), label: p.name }))]}
+                        options={[{ value: '', label: 'All Organizations' }, ...visibleMainProjects.map(p => ({ value: String(p.id), label: p.name }))]}
                         value={filterProject}
                         onChange={(val) => { setFilterProject(val); setSearchQuery(''); }}
-                        placeholder="All Projects"
+                        placeholder="All Organizations"
                     />
                     <span className="text-sm text-slate-400">{filteredGuidelines.length} guideline{filteredGuidelines.length !== 1 ? 's' : ''}</span>
                 </div>
@@ -199,7 +280,7 @@ const GuidelinesPage = () => {
                             </div>
                             {!editingId && (
                                 <div>
-                                    <label className="block text-sm font-medium text-slate-700 mb-1">Main Project</label>
+                                    <label className="block text-sm font-medium text-slate-700 mb-1">Organization</label>
                                     <Dropdown
                                         options={[{ value: '', label: 'None (General)' }, ...visibleMainProjects.map(p => ({ value: String(p.id), label: p.name }))]}
                                         value={form.main_project_id}
@@ -209,15 +290,27 @@ const GuidelinesPage = () => {
                                 </div>
                             )}
                         </div>
+
+                        {editingId && (() => {
+                            const mp = mainProjects.find((p) => String(p.id) === String(form.main_project_id));
+                            const sp = subProjects.find((p) => String(p.id) === String(form.sub_project_id));
+                            return (
+                                <div className="space-y-1 rounded-lg border border-slate-200 bg-slate-50 px-3 py-2.5 text-sm">
+                                    <div className="flex justify-between gap-3"><span className="text-slate-400">Organization</span><span className="truncate font-medium text-slate-700">{mp?.name || 'General'}</span></div>
+                                    {sp && <div className="flex justify-between gap-3"><span className="text-slate-400">Project</span><span className="truncate font-medium text-slate-700">{sp.name}</span></div>}
+                                </div>
+                            );
+                        })()}
+
                         {!editingId && (
                             <>
                                 <div>
-                                    <label className="block text-sm font-medium text-slate-700 mb-1">Sub-Project</label>
+                                    <label className="block text-sm font-medium text-slate-700 mb-1">Project</label>
                                     <Dropdown
-                                        options={[{ value: '', label: 'All Sub-Projects' }, ...visibleSubProjects.map(p => ({ value: String(p.id), label: p.name }))]}
+                                        options={[{ value: '', label: 'All Projects' }, ...visibleSubProjects.map(p => ({ value: String(p.id), label: p.name }))]}
                                         value={form.sub_project_id}
                                         onChange={(val) => setForm({ ...form, sub_project_id: val })}
-                                        placeholder="All Sub-Projects"
+                                        placeholder="All Projects"
                                     />
                                 </div>
                                 <div>
@@ -291,77 +384,20 @@ const GuidelinesPage = () => {
                 </form>
             </Modal>
 
-            {/* Guidelines List */}
-            {isLoading ? (
-                <div className="text-center py-12 text-slate-400 animate-pulse">Loading guidelines...</div>
-            ) : filteredGuidelines.length === 0 ? (
-                <div className="bg-white rounded-2xl border border-slate-200 p-12 text-center">
-                    <FileText className="w-12 h-12 text-slate-300 mx-auto mb-4" />
-                    <h3 className="font-medium text-slate-600 mb-1">No guidelines found</h3>
-                    <p className="text-sm text-slate-400">Try adjusting your search or filters.</p>
-                </div>
-            ) : (
-                <div className="space-y-4">
-                    {filteredGuidelines.map(g => {
-                        const project = mainProjects.find(p => p.id === g.main_project_id);
-                        const subProject = subProjects.find(p => p.id === g.sub_project_id);
-                        return (
-                            <div key={g.id} className="bg-white rounded-2xl border border-slate-200/60 shadow-sm hover:shadow-md transition-shadow">
-                                <div className="p-5">
-                                    <div className="flex items-start justify-between">
-                                        <div className="flex-1">
-                                            <div className="flex items-center gap-2 mb-1">
-                                                <FileText className="w-4 h-4 text-blue-500" />
-                                                <h3 className="font-semibold text-slate-800">{g.title}</h3>
-                                            </div>
-                                            {project && (
-                                                <span className="inline-block px-2 py-0.5 text-[11px] font-medium bg-indigo-50 text-indigo-600 rounded-full mb-2">
-                                                    {project.name}
-                                                </span>
-                                            )}
-                                            {subProject && (
-                                                <div className="flex items-center gap-1 text-xs text-slate-500 mb-2">
-                                                    <FolderOpen className="w-3.5 h-3.5" />
-                                                    <span>{subProject.name}</span>
-                                                </div>
-                                            )}
-                                        </div>
-                                        {canEdit && (
-                                            <div className="flex items-center gap-1">
-                                                <button onClick={() => startEdit(g)} className="p-1.5 text-slate-400 hover:text-blue-600 hover:bg-blue-50 rounded-lg transition-colors">
-                                                    <Edit3 className="w-4 h-4" />
-                                                </button>
-                                                <button onClick={() => setDeleteTarget(g)} className="p-1.5 text-slate-400 hover:text-red-600 hover:bg-red-50 rounded-lg transition-colors">
-                                                    <Trash2 className="w-4 h-4" />
-                                                </button>
-                                            </div>
-                                        )}
-                                    </div>
-                                    {g.content && (
-                                        <div className="mt-3 p-4 bg-slate-50 rounded-xl text-sm text-slate-700 whitespace-pre-wrap leading-relaxed font-mono max-h-64 overflow-y-auto">
-                                            {g.content}
-                                        </div>
-                                    )}
-                                    {g.file_url && (
-                                        <a
-                                            href={g.file_url}
-                                            target="_blank"
-                                            rel="noreferrer"
-                                            className="mt-3 inline-flex items-center gap-2 px-3 py-2 bg-blue-50 text-blue-700 rounded-lg text-sm font-medium hover:bg-blue-100 transition-colors"
-                                        >
-                                            <Download className="w-4 h-4" />
-                                            {g.file_name || 'Open guideline file'}
-                                        </a>
-                                    )}
-                                    <p className="text-xs text-slate-400 mt-3">
-                                        Created {new Date(g.created_at).toLocaleDateString('en-US', { month: 'short', day: 'numeric', year: 'numeric' })}
-                                    </p>
-                                </div>
-                            </div>
-                        );
-                    })}
-                </div>
-            )}
+            {/* Guidelines table */}
+            <Table
+                variant="untitled"
+                allowOverflow
+                columns={columns}
+                data={filteredGuidelines}
+                loading={isLoading}
+                skeletonRows={8}
+                currentPage={page}
+                pageSize={PAGE_SIZE}
+                onPageChange={setPage}
+                getRowId={(g) => g.id}
+                emptyState={{ title: 'No guidelines found', description: 'Try adjusting your search or filters.' }}
+            />
 
             <ConfirmDialog
                 isOpen={!!deleteTarget}

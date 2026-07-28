@@ -24,8 +24,8 @@ const EmployeeProjectsPage = () => {
         <div className="space-y-6">
             <div className="flex flex-col sm:flex-row items-start sm:items-center justify-between mb-8 gap-4">
                 <div>
-                    <h1 className="text-2xl sm:text-3xl font-extrabold text-slate-900">My Projects</h1>
-                    <p className="text-sm text-slate-500">Daily sheets you're allocated to</p>
+                    <h1 className="text-lg font-semibold text-slate-900">My Projects</h1>
+                    <p className="text-[13px] text-slate-500 mt-0.5">Daily sheets you're allocated to</p>
                 </div>
             </div>
 

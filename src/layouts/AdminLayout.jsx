@@ -1,19 +1,42 @@
-import { useLocation, Outlet } from 'react-router-dom';
-import { Menu, ChevronRight, PanelLeft } from 'lucide-react';
+import { Outlet } from 'react-router-dom';
+import { Menu, PanelLeft } from 'lucide-react';
 import { navigation } from '../config/navigation';
 import api, { signupRequestApi, employeeApi, subProjectApi } from '../services/api';
 import { useState, useEffect, useRef } from 'react';
 import { useQuery, useQueryClient } from '@tanstack/react-query';
 import NotificationBell from '../components/NotificationBell';
+import Breadcrumbs from '../components/ui/Breadcrumbs';
+import { useBreadcrumbTrail } from '../hooks/useBreadcrumbTrail';
 import AdminSidebar from './AdminSidebar';
 import ChatWidget from '../components/chat/ChatWidget';
+
+// Human labels for admin routes not in the sidebar `navigation` config.
+const ADMIN_ROUTE_LABELS = {
+  '/admin/modules': 'Training Modules',
+  '/admin/modules/new': 'New Module',
+  '/admin/onboarding-reports': 'Progress Reports',
+  '/admin/newly-onboarded': 'Newly Onboarded',
+  '/admin/company-settings': 'Company Settings',
+};
+
+// Resolve the current admin route to a breadcrumb crumb.
+const resolveAdminCrumb = (pathname) => {
+  // Project analytics is a drill-down detail route (e.g. from a project card).
+  if (pathname.startsWith('/admin/analytics/')) {
+    return { name: 'Analytics', key: 'admin-analytics-detail', isDetail: true };
+  }
+  const navItem = navigation.find((n) => n.href === pathname);
+  if (navItem) return { name: navItem.name, key: pathname };
+  if (ADMIN_ROUTE_LABELS[pathname]) return { name: ADMIN_ROUTE_LABELS[pathname], key: pathname };
+  return { name: 'Dashboard', key: '/admin/dashboard' };
+};
 
 const MIN_WIDTH = 208;
 const MAX_WIDTH = 400;
 const DEFAULT_WIDTH = 256;
 
 const AdminLayout = () => {
-  const location = useLocation();
+  const breadcrumbTrail = useBreadcrumbTrail(resolveAdminCrumb);
   const queryClient = useQueryClient();
   const [sidebarOpen, setSidebarOpen] = useState(false);   // mobile drawer
   const [collapsed, setCollapsed] = useState(false);        // desktop collapse
@@ -211,16 +234,12 @@ const AdminLayout = () => {
             >
               <PanelLeft className="w-4 h-4" />
             </button>
-            <nav className="flex items-center gap-1.5 text-[13px] min-w-0">
-              <span className="flex items-center gap-1.5 text-slate-500 dark:text-zinc-400 shrink-0">
-                <img src="/favicon.png" alt="" className="h-[18px] w-[18px] rounded-[5px] border border-slate-200 bg-white dark:border-white/10 dark:bg-white/5 p-0.5" />
-                <span className="hidden sm:inline">Autonex</span>
-              </span>
-              <ChevronRight className="w-3.5 h-3.5 text-slate-300 dark:text-zinc-600 shrink-0" />
-              <span className="font-medium text-slate-900 dark:text-zinc-100 truncate">
-                {navigation.find(n => n.href === location.pathname)?.name || 'Dashboard'}
-              </span>
-            </nav>
+            <Breadcrumbs
+              items={breadcrumbTrail}
+              homeHref="/admin/dashboard"
+              homeLabel="Autonex"
+              homeIcon={<img src="/favicon.png" alt="" className="h-[18px] w-[18px] rounded-[5px] border border-slate-200 bg-white dark:border-white/10 dark:bg-white/5 p-0.5" />}
+            />
           </div>
 
           <div className="flex items-center gap-2">

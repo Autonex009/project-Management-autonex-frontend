@@ -466,8 +466,8 @@ const CompanyInfoPage = () => {
         <div className="space-y-6">
             <div className="flex flex-col sm:flex-row items-start sm:items-center justify-between mb-8 gap-4">
                 <div>
-                    <h1 className="text-2xl sm:text-3xl font-extrabold text-slate-900">Company Information</h1>
-                    <p className="text-sm text-slate-500">General reference handbook, policies, and guidelines</p>
+                    <h1 className="text-lg font-semibold text-slate-900">Company Information</h1>
+                    <p className="text-[13px] text-slate-500 mt-0.5">General reference handbook, policies, and guidelines</p>
                 </div>
             </div>
 

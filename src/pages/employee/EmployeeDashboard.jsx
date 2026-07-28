@@ -63,7 +63,7 @@ const EmployeeDashboard = () => {
             {/* Welcome Header */}
             <div className="flex flex-col sm:flex-row items-start sm:items-center justify-between mb-8 gap-4">
                 <div>
-                    <h1 className="text-2xl sm:text-3xl font-extrabold text-slate-900">
+                    <h1 className="text-lg font-semibold text-slate-900">
                         Welcome back, <span className="text-emerald-600">{user.name?.split(' ')[0] || 'there'}</span> 👋
                     </h1>
                     <p className="text-sm text-slate-500">Here&apos;s your work overview for today.</p>

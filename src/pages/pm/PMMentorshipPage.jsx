@@ -16,8 +16,8 @@ const PMMentorshipPage = () => {
             {/* Section header */}
             <div>
                 <span className="text-xs font-bold uppercase tracking-widest text-blue-600">PM Portal</span>
-                <h1 className="text-3xl font-extrabold text-slate-900 mt-1 flex items-center gap-2">
-                    <GraduationCap className="w-7 h-7 text-blue-500" /> Mentorship
+                <h1 className="text-lg font-semibold text-slate-900 mt-1 flex items-center gap-2">
+                    <GraduationCap className="w-5 h-5 text-blue-500" /> Mentorship
                 </h1>
                 <p className="text-slate-500 text-sm mt-1">
                     Pick from newly onboarded annotators and track the onboarding progress of your team.

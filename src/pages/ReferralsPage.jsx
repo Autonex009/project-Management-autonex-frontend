@@ -7,10 +7,11 @@ import toast from 'react-hot-toast';
 import SearchBar from '../components/ui/SearchBar';
 import {
     Users2, Briefcase, Mail, Phone, Linkedin, ChevronDown, ChevronUp,
-    CheckCircle2, Clock, UserCheck, XCircle, TrendingUp
+    Clock, UserCheck, TrendingUp
 } from 'lucide-react';
 import Dropdown from '../components/ui/Dropdown';
 import Modal from '../components/ui/Modal';
+import StatCard from '../components/dashboard/StatCard';
 
 const STATUS_CONFIG = {
     pending:             { label: 'Pending Review',       color: 'bg-amber-50 text-amber-700 border-amber-200',   dot: 'bg-amber-400' },
@@ -35,9 +36,10 @@ const TAB_STATUS = {
 };
 
 const StatusBadge = ({ status }) => {
-    const cfg = STATUS_CONFIG[status] || { label: status, color: 'bg-slate-100 text-slate-600 border-slate-200' };
+    const cfg = STATUS_CONFIG[status] || { label: status, color: 'bg-slate-100 text-slate-600 border-slate-200', dot: 'bg-slate-400' };
     return (
-        <span className={`inline-flex items-center gap-1.5 px-2.5 py-0.5 rounded-full text-xs font-medium border ${cfg.color}`}>
+        <span className={`inline-flex items-center gap-1.5 px-2 py-0.5 rounded-full text-[11px] font-medium border ${cfg.color}`}>
+            <span className={`h-1.5 w-1.5 rounded-full ${cfg.dot || 'bg-slate-400'}`} />
             {cfg.label}
         </span>
     );
@@ -100,123 +102,46 @@ const ReferralsPage = () => {
     };
 
     return (
-        <div className="space-y-6">
+        <div className="space-y-4">
             {/* Header */}
             <div>
-                <div className="flex items-center gap-3">
-                    <h1 className="text-lg font-semibold text-slate-800">Employee Referrals</h1>
+                <div className="flex items-center gap-2">
+                    <h1 className="text-lg font-semibold text-slate-900">Employee Referrals</h1>
                     {stats.pending > 0 && (
-                        <span className="inline-flex items-center justify-center h-6 min-w-[24px] px-1.5 rounded-full text-xs font-bold bg-amber-500 text-white">
+                        <span className="inline-flex items-center justify-center h-5 min-w-[20px] px-1.5 rounded-full text-[11px] font-bold bg-amber-500 text-white">
                             {stats.pending}
                         </span>
                     )}
                 </div>
-                <p className="mt-1 text-sm text-slate-500">
+                <p className="text-slate-500 text-[13px] mt-0.5">
                     Review and track candidates referred by employees.
                 </p>
             </div>
 
-            {/* Stats */}
-            <div className="grid grid-cols-1 sm:grid-cols-2 xl:grid-cols-4 gap-5">
-                {[
-                    {
-                        label: 'Total',
-                        value: stats.total,
-                        icon: Users2,
-                        color: 'text-slate-700',
-                        bg: 'bg-slate-100',
-                        accent: 'bg-slate-500',
-                    },
-                    {
-                        label: 'Pending Review',
-                        value: stats.pending,
-                        icon: Clock,
-                        color: 'text-amber-600',
-                        bg: 'bg-amber-100',
-                        accent: 'bg-amber-500',
-                    },
-                    {
-                        label: 'In Progress',
-                        value: stats.active,
-                        icon: TrendingUp,
-                        color: 'text-blue-600',
-                        bg: 'bg-blue-100',
-                        accent: 'bg-blue-500',
-                    },
-                    {
-                        label: 'Hired',
-                        value: stats.hired,
-                        icon: UserCheck,
-                        color: 'text-emerald-600',
-                        bg: 'bg-emerald-100',
-                        accent: 'bg-emerald-500',
-                    },
-                ].map((s) => (
-                    <div
-                        key={s.label}
-                        className="relative overflow-hidden bg-white border border-slate-200 rounded-2xl p-5 transition-all duration-200 hover:-translate-y-1 hover:shadow-lg"
-                    >
-                        {/* Colored accent */}
-                        <div
-                            className={`absolute left-0 top-0 h-full w-1 ${s.accent}`}
-                        />
-
-                        <div className="flex items-center justify-between">
-                            <div>
-                                <p className="text-sm font-medium text-slate-500">
-                                    {s.label}
-                                </p>
-
-                                <h3
-                                    className={`text-3xl font-bold ${s.color} mt-2`}
-                                >
-                                    {s.value}
-                                </h3>
-
-                                <p className="text-xs text-slate-400 mt-1">
-                                    Candidates
-                                </p>
-                            </div>
-
-                            <div
-                                className={`h-12 w-12 rounded-xl ${s.bg} flex items-center justify-center`}
-                            >
-                                <s.icon className={`w-6 h-6 ${s.color}`} />
-                            </div>
-                        </div>
-                    </div>
-                ))}
+            {/* KPIs */}
+            <div className="grid grid-cols-2 lg:grid-cols-4 gap-3">
+                <StatCard title="Total" value={stats.total} icon={Users2} tone="indigo" hint="candidates" onClick={() => handleTabChange('All')} />
+                <StatCard title="Pending Review" value={stats.pending} icon={Clock} tone="amber" hint="awaiting review" onClick={() => handleTabChange('Pending')} />
+                <StatCard title="In Progress" value={stats.active} icon={TrendingUp} tone="sky" hint="reviewing / interview" onClick={() => handleTabChange('Reviewing')} />
+                <StatCard title="Hired" value={stats.hired} icon={UserCheck} tone="emerald" hint="candidates" onClick={() => handleTabChange('Hired')} />
             </div>
 
-            {/* External API info */}
-            <div className="bg-indigo-50 border border-indigo-100 rounded-2xl px-5 py-4">
-                <p className="text-sm font-semibold text-indigo-800 mb-1">ATS / Hiring Software Integration</p>
-                <p className="text-xs text-indigo-600 font-mono break-all">
-                    GET {import.meta.env.VITE_API_URL?.replace('/api', '') || 'https://your-backend.vercel.app'}/api/external/referrals
-                </p>
-                <p className="text-xs text-indigo-500 mt-1">
-                    Authenticate with <code className="bg-indigo-100 px-1 rounded">X-API-Key</code> header.
-                    Supports <code className="bg-indigo-100 px-1 rounded">?status=</code>,{' '}
-                    <code className="bg-indigo-100 px-1 rounded">?position=</code>, and{' '}
-                    <code className="bg-indigo-100 px-1 rounded">?since=YYYY-MM-DD</code> query params.
-                </p>
-            </div>
-
-            {/* Tabs and Search Bar */}
-            <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4">
-                <div className="flex gap-1 bg-slate-100 rounded-xl p-1 w-fit flex-wrap">
+            {/* Tabs + Search */}
+            <div className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
+                <div className="inline-flex items-center gap-0.5 overflow-x-auto rounded-lg border border-slate-200 bg-slate-50 p-0.5">
                     {TABS.map(tab => {
                         const count = TAB_STATUS[tab]
                             ? referrals.filter(r => r.status === TAB_STATUS[tab]).length
                             : referrals.length;
+                        const active = activeTab === tab;
                         return (
                             <button key={tab} onClick={() => handleTabChange(tab)}
-                                className={`px-4 py-2 rounded-lg text-sm font-medium transition-all ${
-                                    activeTab === tab ? 'bg-white text-slate-800 shadow-sm' : 'text-slate-500 hover:text-slate-700'
+                                className={`inline-flex items-center gap-1.5 whitespace-nowrap rounded-md px-3 py-1.5 text-[13px] font-semibold transition-all ${
+                                    active ? 'bg-white text-slate-900 shadow-sm ring-1 ring-slate-200/70' : 'text-slate-500 hover:text-slate-800'
                                 }`}>
                                 {tab}
                                 {count > 0 && tab !== 'All' && (
-                                    <span className="ml-1.5 inline-flex items-center justify-center h-4 min-w-[16px] px-1 rounded-full text-[10px] font-bold bg-slate-300 text-slate-700">
+                                    <span className={`inline-flex items-center justify-center h-4 min-w-[16px] rounded-full px-1 text-[10px] font-bold ${active ? 'bg-indigo-100 text-indigo-700' : 'bg-slate-200 text-slate-600'}`}>
                                         {count}
                                     </span>
                                 )}
@@ -247,9 +172,9 @@ const ReferralsPage = () => {
                             const isExpanded = expandedId === ref.id;
                             return (
                                 <div key={ref.id} className="hover:bg-slate-50/40 transition-colors">
-                                    <div className="px-6 py-4 flex items-center justify-between gap-4">
+                                    <div className="px-5 py-3.5 flex items-center justify-between gap-4">
                                         {/* Left */}
-                                        <div className="flex items-center gap-4 min-w-0 flex-1">
+                                        <div className="flex items-center gap-3 min-w-0 flex-1">
                                             <div className="w-10 h-10 rounded-xl bg-gradient-to-br from-indigo-100 to-slate-100 flex items-center justify-center shrink-0">
                                                 <span className="text-sm font-bold text-indigo-700">
                                                     {ref.candidate_name.charAt(0).toUpperCase()}
@@ -257,7 +182,7 @@ const ReferralsPage = () => {
                                             </div>
                                             <div className="min-w-0">
                                                 <div className="flex items-center gap-2 flex-wrap">
-                                                    <p className="font-semibold text-slate-800">{ref.candidate_name}</p>
+                                                    <p className="text-[14px] font-semibold text-slate-900">{ref.candidate_name}</p>
                                                     <StatusBadge status={ref.status} />
                                                 </div>
                                                 <div className="flex items-center gap-3 mt-0.5 flex-wrap">
@@ -294,7 +219,7 @@ const ReferralsPage = () => {
                                     </div>
 
                                     {isExpanded && (
-                                        <div className="px-6 pb-4 border-t border-slate-100 bg-slate-50/60">
+                                        <div className="px-5 pb-4 border-t border-slate-100 bg-slate-50/60">
                                             <div className="pt-4 grid grid-cols-1 md:grid-cols-2 gap-4 text-sm">
                                                 <div>
                                                     <p className="text-xs font-semibold text-slate-400 uppercase mb-1">Referred By</p>

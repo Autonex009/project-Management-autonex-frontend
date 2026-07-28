@@ -289,12 +289,14 @@ const SignupRequestsPage = () => {
                                     </Button>
                                     {req.status === 'pending' && (
                                         <>
-                                            <Button variant="success" size="sm" onClick={() => approveMutation.mutate(req.id)} disabled={approveMutation.isPending}>
-                                                <CheckCircle className="w-3.5 h-3.5"/>Approve
-                                            </Button>
-                                            <Button variant="danger" size="sm" onClick={() => { setRejectModal({ requestId: req.id, name: req.name, mode: 'reject' }); setRejectReason(''); }}>
-                                                <XCircle className="w-3.5 h-3.5"/>Reject
-                                            </Button>
+                                            <button onClick={() => approveMutation.mutate(req.id)} disabled={approveMutation.isPending} title="Approve"
+                                                className="inline-flex items-center justify-center h-8 w-8 rounded-md border border-emerald-200 bg-emerald-50 text-emerald-700 hover:bg-emerald-100 transition-colors disabled:opacity-50">
+                                                <CheckCircle className="w-4 h-4"/>
+                                            </button>
+                                            <button onClick={() => { setRejectModal({ requestId: req.id, name: req.name, mode: 'reject' }); setRejectReason(''); }} title="Reject"
+                                                className="inline-flex items-center justify-center h-8 w-8 rounded-md border border-red-200 bg-red-50 text-red-700 hover:bg-red-100 transition-colors disabled:opacity-50">
+                                                <XCircle className="w-4 h-4"/>
+                                            </button>
                                         </>
                                     )}
                                 </div>

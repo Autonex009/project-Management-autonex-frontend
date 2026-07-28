@@ -81,7 +81,7 @@ const PMLeavesPage = () => {
         <div className="space-y-4">
             {/* Header */}
             <div>
-                <h1 className="text-2xl sm:text-3xl font-extrabold text-slate-900">Team Leaves</h1>
+                <h1 className="text-lg font-semibold text-slate-900">Team Leaves</h1>
                 <p className="mt-0.5 text-[13px] text-slate-500">Manage leave and WFH requests from your team</p>
             </div>
 
