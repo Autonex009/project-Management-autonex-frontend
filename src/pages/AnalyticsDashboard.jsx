@@ -119,12 +119,18 @@ const AnalyticsDashboard = () => {
       return analyticsApi.runSync({ date_from, date_to });
     },
     onSuccess: (res) => {
-      toast.success(
-        "Sync started — it runs in the background. Click again later to check status.",
-      );
       if (res?.job_id) {
+        // Async (Redis/Railway): a background job was queued — poll it later.
+        toast.success(
+          "Sync started — it runs in the background. Click again later to check status.",
+        );
         localStorage.setItem("active_sync_job_id", res.job_id);
         setActiveJobId(res.job_id);
+      } else {
+        // Inline (serverless/no Redis): the sync already ran — refresh now.
+        toast.success("Sync complete — refreshing data.");
+        queryClient.invalidateQueries({ queryKey: ["analytics-summary"] });
+        queryClient.invalidateQueries({ queryKey: ["autonex-kpis"] });
       }
     },
     onError: (e) =>
