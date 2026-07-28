@@ -1,4 +1,4 @@
-import MyLeavesPanel from '../../components/MyLeavesPanel';
+import MyLeavesPanel from "../../components/MyLeavesPanel";
 
 const EmployeeLeavesPage = () => <MyLeavesPanel />;
 
