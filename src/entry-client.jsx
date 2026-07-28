@@ -10,10 +10,10 @@ import '@fontsource/plus-jakarta-sans';
 // scratch. BrowserRouter lives here (not in App) so the same App component
 // tree works under StaticRouter on the server.
 hydrateRoot(
-  document.getElementById('root'),
-  <React.StrictMode>
-    <BrowserRouter>
-      <App />
-    </BrowserRouter>
-  </React.StrictMode>
+ document.getElementById('root'),
+ <React.StrictMode>
+ <BrowserRouter>
+ <App />
+ </BrowserRouter>
+ </React.StrictMode>
 );
