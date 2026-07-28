@@ -19,21 +19,21 @@
 // suppresses the warning. This file is never imported on the client, so real
 // browser storage is untouched there.
 const makeNoopStorage = () => ({
-  getItem: () => null,
-  setItem: () => {},
-  removeItem: () => {},
-  clear: () => {},
-  key: () => null,
-  length: 0,
+ getItem: () => null,
+ setItem: () => {},
+ removeItem: () => {},
+ clear: () => {},
+ key: () => null,
+ length: 0,
 });
 
 Object.defineProperty(globalThis, 'localStorage', {
-  value: makeNoopStorage(),
-  configurable: true,
-  writable: true,
+ value: makeNoopStorage(),
+ configurable: true,
+ writable: true,
 });
 Object.defineProperty(globalThis, 'sessionStorage', {
-  value: makeNoopStorage(),
-  configurable: true,
-  writable: true,
+ value: makeNoopStorage(),
+ configurable: true,
+ writable: true,
 });
