@@ -10,41 +10,41 @@ import { format, parseISO } from 'date-fns';
 import toast from 'react-hot-toast';
 
 const AUTONEX_RANGES = [
-    { key: '1', label: 'Last day' },
-    { key: '7', label: 'Last 7 days' },
-    { key: '30', label: 'Last 30 days' },
+ { key: '1', label: 'Last day' },
+ { key: '7', label: 'Last 7 days' },
+ { key: '30', label: 'Last 30 days' },
 ];
 
 const shortDate = (s) => { try { return format(parseISO(s), 'MMM d'); } catch { return s; } };
 
 const AutonexKpiCard = ({ icon: Icon, label, value, tone = 'indigo' }) => {
-    const tones = { indigo: 'bg-indigo-500', emerald: 'bg-emerald-500', amber: 'bg-amber-500', sky: 'bg-sky-500', violet: 'bg-violet-500', rose: 'bg-rose-500' };
-    return (
-        <div className="rounded-xl border border-slate-200 bg-white p-3.5 shadow-sm">
-            <div className={`flex h-9 w-9 items-center justify-center rounded-lg text-white ${tones[tone]}`}>
-                {Icon && <Icon className="h-[18px] w-[18px]" />}
-            </div>
-            <p className="mt-3 text-[11px] font-semibold uppercase tracking-wide text-slate-400">{label}</p>
-            <p className="mt-0.5 text-2xl font-bold tracking-tight text-slate-900">{value}</p>
-        </div>
-    );
+ const tones = { indigo: 'bg-indigo-500', emerald: 'bg-emerald-500', amber: 'bg-amber-500', sky: 'bg-sky-500', violet: 'bg-violet-500', rose: 'bg-rose-500' };
+ return (
+ <div className="rounded-xl border border-slate-200 bg-white p-3.5 shadow-sm">
+ <div className={`flex h-9 w-9 items-center justify-center rounded-lg text-white ${tones[tone]}`}>
+ {Icon && <Icon className="h-[18px] w-[18px]" />}
+ </div>
+ <p className="mt-3 text-[11px] font-semibold uppercase tracking-wide text-slate-400">{label}</p>
+ <p className="mt-0.5 text-2xl font-bold tracking-tight text-slate-900">{value}</p>
+ </div>
+ );
 };
 
 const sentimentStyle = (s) => {
-    const v = (s || '').toLowerCase();
-    if (/(green|positive|good|on track)/.test(v)) return 'bg-emerald-50 text-emerald-700';
-    if (/(red|risk|at-risk|bad|blocked|critical|poor)/.test(v)) return 'bg-red-50 text-red-700';
-    if (/(amber|yellow|neutral|watch|avg|average)/.test(v)) return 'bg-amber-50 text-amber-700';
-    return 'bg-slate-100 text-slate-600';
+ const v = (s || '').toLowerCase();
+ if (/(green|positive|good|on track)/.test(v)) return 'bg-emerald-50 text-emerald-700';
+ if (/(red|risk|at-risk|bad|blocked|critical|poor)/.test(v)) return 'bg-red-50 text-red-700';
+ if (/(amber|yellow|neutral|watch|avg|average)/.test(v)) return 'bg-amber-50 text-amber-700';
+ return 'bg-slate-100 text-slate-600';
 };
 
 const AnalyticsDashboard = () => {
-    const navigate = useNavigate();
-    const queryClient = useQueryClient();
+ const navigate = useNavigate();
+ const queryClient = useQueryClient();
 
-    // One range control drives every Autonex KPI + the chart.
-    const [range, setRange] = useState('30');
-    const rangeLabel = AUTONEX_RANGES.find((r) => r.key === range)?.label ?? '';
+ // One range control drives every Autonex KPI + the chart.
+ const [range, setRange] = useState('30');
+ const rangeLabel = AUTONEX_RANGES.find((r) => r.key === range)?.label ?? '';
 
     // The sync runs as a background job: the button starts it (returns a job id we
     // persist), and a later click polls that job's status instead of starting a new one.
@@ -63,12 +63,13 @@ const AnalyticsDashboard = () => {
         refetchOnWindowFocus: true,
     });
 
-    const { data: autonex } = useQuery({
-        queryKey: ['autonex-kpis', range],
-        queryFn: () => analyticsApi.getAutonexKpis(range),
-        refetchOnWindowFocus: true,
-    });
-    const k = autonex?.kpis;
+
+ const { data: autonex } = useQuery({
+ queryKey: ['autonex-kpis', range],
+ queryFn: () => analyticsApi.getAutonexKpis(range),
+ refetchOnWindowFocus: true,
+ });
+ const k = autonex?.kpis;
 
     const syncMutation = useMutation({
         // Manual sync backfills the current month so freshly-mapped projects populate
@@ -155,15 +156,15 @@ const AnalyticsDashboard = () => {
                 </div>
             </div>
 
-            {/* Unified Autonex KPIs — all driven by the selected range */}
-            <div className="grid grid-cols-2 gap-3 sm:grid-cols-3 lg:grid-cols-6">
-                <AutonexKpiCard icon={FolderKanban} label="Live Projects" value={liveProjects} tone="indigo" />
-                <AutonexKpiCard icon={Clock} label="Platform Hours" value={`${k?.total_hours ?? 0}h`} tone="emerald" />
-                <AutonexKpiCard icon={Users} label="Active Annotators" value={k?.active_annotators ?? 0} tone="sky" />
-                <AutonexKpiCard icon={UserCheck} label="Active Reviewers" value={k?.active_reviewers ?? 0} tone="violet" />
-                <AutonexKpiCard icon={PenLine} label="Annotation Time" value={`${k?.annotation_hours ?? 0}h`} tone="amber" />
-                <AutonexKpiCard icon={ClipboardCheck} label="Review Time" value={`${k?.review_hours ?? 0}h`} tone="rose" />
-            </div>
+ {/* Unified Autonex KPIs — all driven by the selected range */}
+ <div className="grid grid-cols-2 gap-3 sm:grid-cols-3 lg:grid-cols-6">
+ <AutonexKpiCard icon={FolderKanban} label="Live Projects" value={liveProjects} tone="indigo" />
+ <AutonexKpiCard icon={Clock} label="Platform Hours" value={`${k?.total_hours ?? 0}h`} tone="emerald" />
+ <AutonexKpiCard icon={Users} label="Active Annotators" value={k?.active_annotators ?? 0} tone="sky" />
+ <AutonexKpiCard icon={UserCheck} label="Active Reviewers" value={k?.active_reviewers ?? 0} tone="violet" />
+ <AutonexKpiCard icon={PenLine} label="Annotation Time" value={`${k?.annotation_hours ?? 0}h`} tone="amber" />
+ <AutonexKpiCard icon={ClipboardCheck} label="Review Time" value={`${k?.review_hours ?? 0}h`} tone="rose" />
+ </div>
 
             {/* Daily platform hours */}
             <div className="rounded-2xl border border-slate-200/80 bg-white p-5 shadow-sm">
@@ -207,71 +208,72 @@ const AnalyticsDashboard = () => {
                 </div>
             </div>
 
-            {/* Per-project breakdown */}
-            <Table
-                variant="untitled"
-                loading={isLoading}
-                onRowClick={(row) => navigate(`/admin/analytics/${row.project_id}`)}
-                columns={[
-                    {
-                        key: 'name',
-                        label: 'Project',
-                        render: (value, row) => (
-                            <div className="flex items-center gap-2">
-                                <span className={`w-2 h-2 rounded-full ${row.status === 'active' ? 'bg-emerald-500' : 'bg-slate-400'}`}></span>
-                                <div>
-                                    <div className="font-medium text-slate-800">{value}</div>
-                                    {row.client && <div className="text-xs text-slate-400">{row.client}</div>}
-                                </div>
-                            </div>
-                        ),
-                    },
-                    { key: 'autonex_platform_hours', label: 'Autonex Hours', align: 'center', render: (v) => <span className="font-mono text-slate-700">{v ?? 0}h</span> },
-                    {
-                        key: 'autonex_annotator_only', label: 'Annotator only', align: 'center',
-                        render: (v, row) => (
-                            <span
-                                title={(row.autonex_annotator_only_names || []).join('\n') || 'None'}
-                                className={`text-slate-700 ${v ? 'cursor-help underline decoration-dotted decoration-slate-300 underline-offset-2' : ''}`}
-                            >{v ?? 0}</span>
-                        ),
-                    },
-                    {
-                        key: 'autonex_reviewer_only', label: 'Reviewer only', align: 'center',
-                        render: (v, row) => (
-                            <span
-                                title={(row.autonex_reviewer_only_names || []).join('\n') || 'None'}
-                                className={`text-slate-700 ${v ? 'cursor-help underline decoration-dotted decoration-slate-300 underline-offset-2' : ''}`}
-                            >{v ?? 0}</span>
-                        ),
-                    },
-                    {
-                        key: 'autonex_both', label: 'Both', align: 'center',
-                        render: (v, row) => (
-                            <span
-                                title={(row.autonex_both_names || []).join('\n') || 'None'}
-                                className={`text-slate-700 ${v ? 'cursor-help underline decoration-dotted decoration-slate-300 underline-offset-2' : ''}`}
-                            >{v ?? 0}</span>
-                        ),
-                    },
-                    { key: 'autonex_people', label: 'People', align: 'center', render: (v) => <span className="text-slate-700">{v ?? 0}</span> },
-                    {
-                        key: 'sentiment',
-                        label: 'Sentiment',
-                        render: (v) => v
-                            ? <span className={`inline-flex px-2.5 py-1 rounded-full text-xs font-medium ${sentimentStyle(v)}`}>{v.length > 40 ? v.slice(0, 40) + '…' : v}</span>
-                            : <span className="text-slate-300">—</span>,
-                    },
-                ]}
-                data={rows}
-                emptyState={{
-                    title: 'No Encord-mapped projects yet',
-                    description: 'Set an Encord Project ID on a project (Projects → Edit Project), then run a sync.',
-                    icon: BarChart3,
-                }}
-            />
-        </div>
-    );
+
+ {/* Per-project breakdown */}
+ <Table
+ variant="untitled"
+ loading={isLoading}
+ onRowClick={(row) => navigate(`/admin/analytics/${row.project_id}`)}
+ columns={[
+ {
+ key: 'name',
+ label: 'Project',
+ render: (value, row) => (
+ <div className="flex items-center gap-2">
+ <span className={`w-2 h-2 rounded-full ${row.status === 'active' ? 'bg-emerald-500' : 'bg-slate-400'}`}></span>
+ <div>
+ <div className="font-medium text-slate-800">{value}</div>
+ {row.client && <div className="text-xs text-slate-400">{row.client}</div>}
+ </div>
+ </div>
+ ),
+ },
+ { key: 'autonex_platform_hours', label: 'Autonex Hours', align: 'center', render: (v) => <span className="font-mono text-slate-700">{v ?? 0}h</span> },
+ {
+ key: 'autonex_annotator_only', label: 'Annotator only', align: 'center',
+ render: (v, row) => (
+ <span
+ title={(row.autonex_annotator_only_names || []).join('\n') || 'None'}
+ className={`text-slate-700 ${v ? 'cursor-help underline decoration-dotted decoration-slate-300 underline-offset-2' : ''}`}
+ >{v ?? 0}</span>
+ ),
+ },
+ {
+ key: 'autonex_reviewer_only', label: 'Reviewer only', align: 'center',
+ render: (v, row) => (
+ <span
+ title={(row.autonex_reviewer_only_names || []).join('\n') || 'None'}
+ className={`text-slate-700 ${v ? 'cursor-help underline decoration-dotted decoration-slate-300 underline-offset-2' : ''}`}
+ >{v ?? 0}</span>
+ ),
+ },
+ {
+ key: 'autonex_both', label: 'Both', align: 'center',
+ render: (v, row) => (
+ <span
+ title={(row.autonex_both_names || []).join('\n') || 'None'}
+ className={`text-slate-700 ${v ? 'cursor-help underline decoration-dotted decoration-slate-300 underline-offset-2' : ''}`}
+ >{v ?? 0}</span>
+ ),
+ },
+ { key: 'autonex_people', label: 'People', align: 'center', render: (v) => <span className="text-slate-700">{v ?? 0}</span> },
+ {
+ key: 'sentiment',
+ label: 'Sentiment',
+ render: (v) => v
+ ? <span className={`inline-flex px-2.5 py-1 rounded-full text-xs font-medium ${sentimentStyle(v)}`}>{v.length > 40 ? v.slice(0, 40) + '…' : v}</span>
+ : <span className="text-slate-300">—</span>,
+ },
+ ]}
+ data={rows}
+ emptyState={{
+ title: 'No Encord-mapped projects yet',
+ description: 'Set an Encord Project ID on a project (Projects → Edit Project), then run a sync.',
+ icon: BarChart3,
+ }}
+ />
+ </div>
+ );
 };
 
 export default AnalyticsDashboard;
