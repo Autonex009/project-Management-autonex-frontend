@@ -134,7 +134,7 @@ const AnalyticsDashboard = () => {
             <div className="flex flex-col gap-3 sm:flex-row sm:items-start sm:justify-between">
                 <div>
                     <h1 className="text-lg font-semibold text-slate-900">Project Analytics</h1>
-                    <p className="mt-0.5 text-[13px] text-slate-500">Autonex team activity across all mapped projects — figures used for billing.</p>
+                    <p className="mt-0.5 text-[13px] text-slate-500">Autonex team activity across all mapped projects.</p>
                 </div>
                 <div className="flex items-center gap-2">
                     <div className="inline-flex items-center rounded-xl border border-slate-200 bg-white p-0.5 shadow-sm">
