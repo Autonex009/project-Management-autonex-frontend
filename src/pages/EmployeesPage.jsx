@@ -44,6 +44,7 @@ import {
   hasAssignedProject,
   bucketWorkforce,
 } from "../utils/workforce";
+import { formatDisplayName, getNameInitials } from "../utils/displayName";
 import Table, {
   ColumnTemplates,
   formatDateDeterministic,
@@ -1181,7 +1182,8 @@ const EmployeesPage = () => {
   const todayStr = todayLocalISO();
   const { data: leavesToday = [] } = useQuery({
     queryKey: ["leaves", "today", todayStr],
-    queryFn: () => leaveApi.getAll({ start_date: todayStr, end_date: todayStr }),
+    queryFn: () =>
+      leaveApi.getAll({ start_date: todayStr, end_date: todayStr }),
   });
 
   const allStaff = allEmployeesData.length > 0 ? allEmployeesData : employees;
@@ -2058,22 +2060,26 @@ const EmployeesPage = () => {
               const positionClass = isNearTop
                 ? "top-full mt-1.5"
                 : "bottom-full mb-1.5";
+              // Display only: middle names dropped and CAPS-LOCK names cased, so
+              // the column reads evenly. The stored name is untouched — the hover
+              // card below still shows it in full, and search/sort use it.
+              const shortName = formatDisplayName(value) || value;
               return (
                 <div className="flex items-center gap-3">
                   {row.avatar_url ? (
                     <img
                       src={row.avatar_url}
-                      alt={value}
+                      alt={shortName}
                       className="w-9 h-9 rounded-full object-cover flex-shrink-0 ring-1 ring-slate-200"
                     />
                   ) : (
                     <div className="w-9 h-9 rounded-full flex items-center justify-center flex-shrink-0 bg-indigo-50 text-indigo-600 text-[13px] font-semibold ring-1 ring-slate-200">
-                      {String(value || "?")[0].toUpperCase()}
+                      {getNameInitials(value, 1)}
                     </div>
                   )}
                   <div className="group relative min-w-0">
                     <div className="text-[13.5px] font-semibold text-slate-900 truncate leading-tight">
-                      {value}
+                      {shortName}
                     </div>
                     <div
                       onClick={(e) => {
@@ -2087,7 +2093,8 @@ const EmployeesPage = () => {
                     >
                       {row.email}
                     </div>
-                    {/* Light hover card — full name + email */}
+                    {/* Light hover card — the FULL stored name (middle names and
+                        all) plus the email, so nothing shortened above is lost. */}
                     <div
                       className={`absolute left-0 ${positionClass} hidden group-hover:block z-40 p-2.5 bg-white rounded-xl shadow-xl border border-slate-200 min-w-[180px] max-w-[280px] pointer-events-none`}
                     >

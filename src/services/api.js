@@ -138,6 +138,12 @@ export const employeeApi = {
   create: (data) => api.post("/employees", data).then((res) => res.data),
   update: (id, data) =>
     api.put(`/employees/${id}`, data).then((res) => res.data),
+  // Self-service login-email change. Company domain only; the server emails a
+  // confirmation to the new address and leaves the password alone.
+  changeEmail: (id, newEmail) =>
+    api
+      .patch(`/employees/${id}/email`, { new_email: newEmail })
+      .then((res) => res.data),
   delete: (id) => api.delete(`/employees/${id}`).then((res) => res.data),
   getAvailability: (id) =>
     api.get(`/employees/${id}/availability`).then((res) => res.data),
@@ -223,6 +229,17 @@ export const leaveApi = {
 };
 
 export const signupRequestApi = {
+  // Step 1 — emails a link to the real signup form, proving the address works.
+  requestEmailVerification: (email) =>
+    api
+      .post("/signup-requests/verify-email", { email })
+      .then((res) => res.data),
+  // Validates the link's token and returns the verified address to pre-fill.
+  checkEmailVerification: (token) =>
+    api
+      .get("/signup-requests/verify-email/check", { params: { token } })
+      .then((res) => res.data),
+  // Step 2 — the backend reads the email from verification_token, not from `data`.
   submit: (data) => api.post("/signup-requests", data).then((res) => res.data),
   getAll: (params) =>
     api.get("/signup-requests", { params }).then((res) => res.data),

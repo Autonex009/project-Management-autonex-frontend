@@ -227,14 +227,35 @@ const NotificationBell = () => {
             return next;
           })
         }
-        className={`relative p-2 text-slate-500 hover:text-slate-700 hover:bg-slate-100/80 rounded-xl transition-all duration-200 ${open ? "bg-slate-100 text-slate-800 " : ""}`}
-        aria-label="Notifications"
+        // Fixed 36px hit area so the badge sits INSIDE the button: hung off the
+        // corner it could be clipped by any ancestor that scrolls or hides
+        // overflow, and it left the icon nothing to breathe against.
+        className={`relative grid h-9 w-9 place-items-center rounded-xl transition-colors duration-150 hover:bg-slate-100 hover:text-slate-800 ${
+          open
+            ? "bg-slate-100 text-slate-900 ring-1 ring-slate-200"
+            : unreadCount > 0
+              ? "text-slate-700"
+              : "text-slate-500"
+        }`}
+        aria-label={
+          unreadCount > 0
+            ? `Notifications, ${unreadCount} unread`
+            : "Notifications"
+        }
+        aria-expanded={open}
       >
-        <Bell className="w-5 h-5 transition-transform duration-300 hover:rotate-12" />
+        {/* No hover rotate: the badge stayed put while the glyph tilted under it. */}
+        <Bell className="h-[18px] w-[18px]" />
         {unreadCount > 0 && (
-          <span className="absolute -top-0.5 -right-0.5 flex h-4 w-4 items-center justify-center rounded-full bg-blue-600 text-[9px] font-bold text-white leading-none shadow-sm">
-            {unreadCount > 9 ? "9+" : unreadCount}
-          </span>
+          // A 6px dot centred ON the bell's outline, at the top-right shoulder —
+          // viewBox (18,8), which is exactly where lucide's own BellDot puts it,
+          // mapped through the 18px render inside this 36px button. A count here
+          // was a chip of text competing with the icon; the exact number lives in
+          // the panel, and in this button's aria-label.
+          <span
+            aria-hidden="true"
+            className="pointer-events-none absolute right-[10px] top-[9px] h-1.5 w-1.5 rounded-full bg-rose-500 ring-[1.5px] ring-white"
+          />
         )}
       </button>
 

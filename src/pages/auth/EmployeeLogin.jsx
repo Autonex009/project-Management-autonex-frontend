@@ -16,6 +16,7 @@ import Spinner from "../../components/ui/LoadingSpinner";
 import { authApi } from "../../services/api";
 import toast from "react-hot-toast";
 import AuthBrandPanel from "../../components/brand/AuthBrandPanel";
+import { parseAuthError } from "../../utils/authErrors";
 
 const EmployeeLogin = () => {
   const navigate = useNavigate();
@@ -23,12 +24,16 @@ const EmployeeLogin = () => {
   const [showPassword, setShowPassword] = useState(false);
   const [errors, setErrors] = useState({});
   const [serverError, setServerError] = useState("");
+  // Which input the server blamed. Drives the red border ONLY — the text lives in
+  // the banner, so the same sentence is never printed twice.
+  const [invalidField, setInvalidField] = useState(null);
 
   const handleChange = (e) => {
     const { name, value } = e.target;
     setFormData((prev) => ({ ...prev, [name]: value }));
     if (errors[name]) setErrors((prev) => ({ ...prev, [name]: "" }));
     if (serverError) setServerError("");
+    if (invalidField === name) setInvalidField(null);
   };
 
   const validate = () => {
@@ -38,9 +43,7 @@ const EmployeeLogin = () => {
       newErrors.email = "Invalid email format";
     if (!formData.password) newErrors.password = "Password is required";
     setErrors(newErrors);
-    if (Object.keys(newErrors).length > 0) {
-      toast.error(Object.values(newErrors)[0]);
-    }
+    // No toast: the message already sits under the field it belongs to.
     return Object.keys(newErrors).length === 0;
   };
 
@@ -54,9 +57,12 @@ const EmployeeLogin = () => {
       navigate("/employee/dashboard");
     },
     onError: (err) => {
-      const message = err.response?.data?.detail || "Invalid credentials.";
+      // ONE place for the sentence — the banner. The field the API blames only
+      // gets a red border, and there is no toast: the same message in a toast, a
+      // banner and under the input was three copies of one problem.
+      const { message, field } = parseAuthError(err);
       setServerError(message);
-      toast.error(message);
+      setInvalidField(field);
     },
   });
 
@@ -115,7 +121,7 @@ const EmployeeLogin = () => {
                   value={formData.email}
                   onChange={handleChange}
                   placeholder="you@company.com"
-                  className={`w-full rounded-2xl border py-3 pl-11 pr-4 text-sm outline-none transition-all ${errors.email ? "border-red-300" : "border-slate-200 focus:border-emerald-500 focus:ring-2 focus:ring-emerald-100"}`}
+                  className={`w-full rounded-2xl border py-3 pl-11 pr-4 text-sm outline-none transition-all ${errors.email || invalidField === "email" ? "border-red-300" : "border-slate-200 focus:border-emerald-500 focus:ring-2 focus:ring-emerald-100"}`}
                   disabled={loginMutation.isPending}
                 />
               </div>
@@ -136,7 +142,7 @@ const EmployeeLogin = () => {
                   value={formData.password}
                   onChange={handleChange}
                   placeholder="••••••••"
-                  className={`w-full rounded-2xl border py-3 pl-11 pr-11 text-sm outline-none transition-all ${errors.password ? "border-red-300" : "border-slate-200 focus:border-emerald-500 focus:ring-2 focus:ring-emerald-100"}`}
+                  className={`w-full rounded-2xl border py-3 pl-11 pr-11 text-sm outline-none transition-all ${errors.password || invalidField === "password" ? "border-red-300" : "border-slate-200 focus:border-emerald-500 focus:ring-2 focus:ring-emerald-100"}`}
                   disabled={loginMutation.isPending}
                 />
                 <button
