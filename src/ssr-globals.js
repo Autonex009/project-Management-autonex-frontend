@@ -27,12 +27,12 @@ const makeNoopStorage = () => ({
   length: 0,
 });
 
-Object.defineProperty(globalThis, 'localStorage', {
+Object.defineProperty(globalThis, "localStorage", {
   value: makeNoopStorage(),
   configurable: true,
   writable: true,
 });
-Object.defineProperty(globalThis, 'sessionStorage', {
+Object.defineProperty(globalThis, "sessionStorage", {
   value: makeNoopStorage(),
   configurable: true,
   writable: true,

@@ -10,24 +10,24 @@
  * @returns {number} Number of working days (Mon-Fri)
  */
 export const getWorkingDays = (startDate, endDate) => {
-    let count = 0;
-    let curDate = new Date(startDate);
-    const end = new Date(endDate);
+  let count = 0;
+  let curDate = new Date(startDate);
+  const end = new Date(endDate);
 
-    // Validate dates
-    if (isNaN(curDate.getTime()) || isNaN(end.getTime())) {
-        return 0;
-    }
+  // Validate dates
+  if (isNaN(curDate.getTime()) || isNaN(end.getTime())) {
+    return 0;
+  }
 
-    while (curDate <= end) {
-        const dayOfWeek = curDate.getDay();
-        // 0 = Sunday, 6 = Saturday. Only count 1-5 (Mon-Fri)
-        if (dayOfWeek !== 0 && dayOfWeek !== 6) {
-            count++;
-        }
-        curDate.setDate(curDate.getDate() + 1);
+  while (curDate <= end) {
+    const dayOfWeek = curDate.getDay();
+    // 0 = Sunday, 6 = Saturday. Only count 1-5 (Mon-Fri)
+    if (dayOfWeek !== 0 && dayOfWeek !== 6) {
+      count++;
     }
-    return count;
+    curDate.setDate(curDate.getDate() + 1);
+  }
+  return count;
 };
 
 /**
@@ -36,6 +36,6 @@ export const getWorkingDays = (startDate, endDate) => {
  * @returns {boolean} True if Saturday or Sunday
  */
 export const isWeekend = (date) => {
-    const day = new Date(date).getDay();
-    return day === 0 || day === 6;
+  const day = new Date(date).getDay();
+  return day === 0 || day === 6;
 };

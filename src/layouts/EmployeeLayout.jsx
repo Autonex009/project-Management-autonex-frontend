@@ -1,12 +1,29 @@
-import { useLocation, Outlet, useNavigate } from 'react-router-dom';
-import { Menu, ChevronRight, PanelLeft } from 'lucide-react';
-import { authApi } from '../services/api';
-import { useState, useEffect, useRef } from 'react';
-import { useQuery, useQueryClient } from '@tanstack/react-query';
-import NotificationBell from '../components/NotificationBell';
-import EmployeeSidebar from './EmployeeSidebar';
-import ChatWidget from '../components/chat/ChatWidget';
-import { LayoutDashboard, FolderKanban, Calendar, CalendarCheck, Rocket, FileText, Layers, UserCog, Users, Users2, TrendingUp, GraduationCap, Info, ClipboardList } from 'lucide-react';
+import { useLocation, Outlet, useNavigate } from "react-router-dom";
+import { Menu, PanelLeft } from "lucide-react";
+import { authApi } from "../services/api";
+import { useState, useEffect, useRef } from "react";
+import { useQuery, useQueryClient } from "@tanstack/react-query";
+import NotificationBell from "../components/NotificationBell";
+import Breadcrumbs from "../components/ui/Breadcrumbs";
+import { useBreadcrumbTrail } from "../hooks/useBreadcrumbTrail";
+import EmployeeSidebar from "./EmployeeSidebar";
+import ChatWidget from "../components/chat/ChatWidget";
+import {
+  LayoutDashboard,
+  FolderKanban,
+  Calendar,
+  CalendarCheck,
+  Rocket,
+  FileText,
+  Layers,
+  UserCog,
+  Users,
+  Users2,
+  TrendingUp,
+  GraduationCap,
+  Info,
+  ClipboardList,
+} from "lucide-react";
 
 const MIN_WIDTH = 208;
 const MAX_WIDTH = 400;
@@ -16,17 +33,17 @@ const EmployeeLayout = () => {
   const location = useLocation();
   const navigate = useNavigate();
   const queryClient = useQueryClient();
-  const [sidebarOpen, setSidebarOpen] = useState(false);   // mobile drawer
-  const [collapsed, setCollapsed] = useState(false);        // desktop collapse
-  const [peek, setPeek] = useState(false);                  // edge-peek when collapsed
-  const [width, setWidth] = useState(DEFAULT_WIDTH);        // desktop sidebar width
+  const [sidebarOpen, setSidebarOpen] = useState(false); // mobile drawer
+  const [collapsed, setCollapsed] = useState(false); // desktop collapse
+  const [peek, setPeek] = useState(false); // edge-peek when collapsed
+  const [width, setWidth] = useState(DEFAULT_WIDTH); // desktop sidebar width
   const widthRef = useRef(DEFAULT_WIDTH);
   const [user, setUser] = useState({});
-  const [role, setRole] = useState('employee');
+  const [role, setRole] = useState("employee");
 
   useEffect(() => {
     // Client-side initialization after hydration
-    const savedUser = localStorage.getItem('user');
+    const savedUser = localStorage.getItem("user");
     if (savedUser) {
       try {
         setUser(JSON.parse(savedUser));
@@ -35,15 +52,18 @@ const EmployeeLayout = () => {
       }
     }
 
-    const savedRole = localStorage.getItem('role');
+    const savedRole = localStorage.getItem("role");
     if (savedRole) {
       setRole(savedRole);
     }
 
-    const savedCollapsed = localStorage.getItem('employee-sidebar-collapsed');
-    if (savedCollapsed === 'true') setCollapsed(true);
+    const savedCollapsed = localStorage.getItem("employee-sidebar-collapsed");
+    if (savedCollapsed === "true") setCollapsed(true);
 
-    const savedWidth = parseInt(localStorage.getItem('employee-sidebar-width'), 10);
+    const savedWidth = parseInt(
+      localStorage.getItem("employee-sidebar-width"),
+      10,
+    );
     if (!Number.isNaN(savedWidth)) {
       const clamped = Math.min(MAX_WIDTH, Math.max(MIN_WIDTH, savedWidth));
       widthRef.current = clamped;
@@ -51,21 +71,14 @@ const EmployeeLayout = () => {
     }
   }, []);
 
-  // Light-only mode: ensure the document never carries the `dark` class so the
-  // dormant dark: styles never activate.
-  useEffect(() => {
-    document.documentElement.classList.remove('dark');
-  }, []);
-
   const toggleCollapsed = () => {
     setCollapsed((prev) => {
       const next = !prev;
-      localStorage.setItem('employee-sidebar-collapsed', String(next));
+      localStorage.setItem("employee-sidebar-collapsed", String(next));
       if (next) setPeek(false);
       return next;
     });
   };
-
 
   // Drag the right panel's left border to resize the sidebar; a click without
   // dragging collapses the sidebar.
@@ -83,21 +96,24 @@ const EmployeeLayout = () => {
       setWidth(w);
     };
     const onUp = () => {
-      document.removeEventListener('mousemove', onMove);
-      document.removeEventListener('mouseup', onUp);
-      document.body.style.cursor = '';
-      document.body.style.userSelect = '';
+      document.removeEventListener("mousemove", onMove);
+      document.removeEventListener("mouseup", onUp);
+      document.body.style.cursor = "";
+      document.body.style.userSelect = "";
       if (!moved) {
         toggleCollapsed();
       } else {
-        localStorage.setItem('employee-sidebar-width', String(widthRef.current));
+        localStorage.setItem(
+          "employee-sidebar-width",
+          String(widthRef.current),
+        );
       }
     };
 
-    document.body.style.cursor = 'col-resize';
-    document.body.style.userSelect = 'none';
-    document.addEventListener('mousemove', onMove);
-    document.addEventListener('mouseup', onUp);
+    document.body.style.cursor = "col-resize";
+    document.body.style.userSelect = "none";
+    document.addEventListener("mousemove", onMove);
+    document.addEventListener("mouseup", onUp);
   };
 
   const closeOverlays = () => {
@@ -105,55 +121,67 @@ const EmployeeLayout = () => {
     setPeek(false);
   };
 
-  const isPm = location.pathname.startsWith('/pm');
+  const isPm = location.pathname.startsWith("/pm");
 
   const { data: account } = useQuery({
-    queryKey: ['auth-me'],
+    queryKey: ["auth-me"],
     queryFn: authApi.me,
     staleTime: 5 * 60 * 1000,
   });
 
   const handleLogout = () => {
-    authApi.logout().catch(() => {}).finally(() => {
-      localStorage.removeItem('token');
-      localStorage.removeItem('user');
-      localStorage.removeItem('role');
-      queryClient.clear();
-      window.location.href = isPm ? '/login/pm' : '/login/employee';
-    });
+    authApi
+      .logout()
+      .catch(() => {})
+      .finally(() => {
+        localStorage.removeItem("token");
+        localStorage.removeItem("user");
+        localStorage.removeItem("role");
+        queryClient.clear();
+        window.location.href = isPm ? "/login/pm" : "/login/employee";
+      });
   };
 
-  const prefix = isPm ? '/pm' : '/employee';
+  const prefix = isPm ? "/pm" : "/employee";
 
   const navItems = isPm
-      ? [
-          { to: `${prefix}/dashboard`, label: 'Dashboard' },
-          { to: `${prefix}/projects`, label: 'Organizations' },
-          { to: `${prefix}/sub-projects`, label: 'Projects' },
-          { to: `${prefix}/allocations`, label: 'Allocations' },
-          { to: `${prefix}/my-team`, label: 'My Team' },
-          { to: `${prefix}/performance`, label: 'Performance' },
-          { to: `${prefix}/self-evaluation`, label: 'Self Evaluation' },
-          { to: `${prefix}/leaves`, label: 'Team Leaves' },
-          { to: `${prefix}/my-leaves`, label: 'My Leaves' },
-          { to: `${prefix}/side-projects`, label: 'Side Projects' },
-          { to: `${prefix}/guidelines`, label: 'Guidelines' },
-          { to: `${prefix}/onboarding`, label: 'My Onboarding' },
-          { to: `${prefix}/onboarding-mentor`, label: 'Mentorship' },
+    ? [
+        { to: `${prefix}/dashboard`, label: "Dashboard" },
+        { to: `${prefix}/projects`, label: "Organizations" },
+        { to: `${prefix}/sub-projects`, label: "Projects" },
+        { to: `${prefix}/allocations`, label: "Allocations" },
+        { to: `${prefix}/my-team`, label: "My Team" },
+        { to: `${prefix}/performance`, label: "Performance" },
+        { to: `${prefix}/self-evaluation`, label: "Self Evaluation" },
+        { to: `${prefix}/leaves`, label: "Team Leaves" },
+        { to: `${prefix}/my-leaves`, label: "My Leaves" },
+        { to: `${prefix}/side-projects`, label: "Side Projects" },
+        { to: `${prefix}/guidelines`, label: "Guidelines" },
+        { to: `${prefix}/onboarding`, label: "My Onboarding" },
+        { to: `${prefix}/onboarding-mentor`, label: "Mentorship" },
       ]
-      : [
-          { to: `${prefix}/dashboard`, label: 'Dashboard' },
-          { to: `${prefix}/projects`, label: 'My Projects' },
-          { to: `${prefix}/self-evaluation`, label: 'Self Evaluation' },
-          { to: `${prefix}/leaves`, label: 'Leaves' },
-          { to: `${prefix}/side-projects`, label: 'Side Projects' },
-          { to: `${prefix}/guidelines`, label: 'Guidelines' },
-          { to: `${prefix}/referrals`, label: 'Referrals' },
-          { to: `${prefix}/company-info`, label: 'Company Info' },
-          { to: `${prefix}/onboarding`, label: 'Onboarding' },
+    : [
+        { to: `${prefix}/dashboard`, label: "Dashboard" },
+        { to: `${prefix}/projects`, label: "My Projects" },
+        { to: `${prefix}/self-evaluation`, label: "Self Evaluation" },
+        { to: `${prefix}/leaves`, label: "Leaves" },
+        { to: `${prefix}/side-projects`, label: "Side Projects" },
+        { to: `${prefix}/guidelines`, label: "Guidelines" },
+        { to: `${prefix}/referrals`, label: "Referrals" },
+        { to: `${prefix}/company-info`, label: "Company Info" },
+        { to: `${prefix}/onboarding`, label: "Onboarding" },
       ];
 
-  const currentNav = navItems.find(n => n.to === location.pathname) || { label: 'Dashboard' };
+  // Resolve the current route to a breadcrumb crumb (labels come from navItems,
+  // which already differ for PM vs employee).
+  const resolveCrumb = (pathname) => {
+    const item = navItems.find((n) => n.to === pathname);
+    if (item) return { name: item.label, key: pathname };
+    if (/\/onboarding\/[^/]+$/.test(pathname))
+      return { name: "Module", key: "onboarding-module", isDetail: true };
+    return { name: "Dashboard", key: `${prefix}/dashboard` };
+  };
+  const breadcrumbTrail = useBreadcrumbTrail(resolveCrumb);
 
   const sidebarProps = {
     user,
@@ -165,7 +193,7 @@ const EmployeeLayout = () => {
   };
 
   return (
-    <div className="h-screen flex font-sans overflow-hidden bg-[#f4f5f7] text-slate-900 dark:bg-[#070707] dark:text-zinc-100">
+    <div className="h-screen flex font-sans overflow-hidden bg-[#f4f5f7] text-slate-900 ">
       {/* Desktop sidebar */}
       {!collapsed && (
         <div className="hidden lg:block shrink-0" style={{ width }}>
@@ -182,7 +210,7 @@ const EmployeeLayout = () => {
       )}
       {collapsed && peek && (
         <div
-          className="hidden lg:block fixed left-2 top-2 bottom-2 z-50 rounded-xl overflow-hidden border border-slate-200 dark:border-neutral-800 shadow-2xl"
+          className="hidden lg:block fixed left-2 top-2 bottom-2 z-50 rounded-xl overflow-hidden border border-slate-200 shadow-2xl"
           style={{ width }}
           onMouseLeave={() => setPeek(false)}
         >
@@ -191,7 +219,9 @@ const EmployeeLayout = () => {
       )}
 
       {/* Mobile drawer */}
-      <div className={`lg:hidden fixed inset-y-0 left-0 z-50 w-64 transition-transform duration-300 ease-in-out ${sidebarOpen ? 'translate-x-0' : '-translate-x-full'}`}>
+      <div
+        className={`lg:hidden fixed inset-y-0 left-0 z-50 w-64 transition-transform duration-300 ease-in-out ${sidebarOpen ? "translate-x-0" : "-translate-x-full"}`}
+      >
         <EmployeeSidebar {...sidebarProps} />
       </div>
       {sidebarOpen && (
@@ -202,9 +232,9 @@ const EmployeeLayout = () => {
       )}
 
       {/* Main Content */}
-      <div className="relative flex-1 flex flex-col min-w-0 overflow-hidden m-2 rounded-xl border border-slate-200 bg-[#f8fafc] dark:bg-[#0c0c0c] dark:border-neutral-800">
+      <div className="relative flex-1 flex flex-col min-w-0 overflow-hidden m-2 rounded-xl border border-slate-200 bg-[#f8fafc] ">
         {/* Drag the left border to resize the sidebar · click to collapse.
-            The blue line only shows while hovering the strip. */}
+ The blue line only shows while hovering the strip. */}
         {!collapsed && (
           <div
             onMouseDown={startResize}
@@ -213,31 +243,33 @@ const EmployeeLayout = () => {
           />
         )}
         {/* Top Header */}
-        <header className="h-12 shrink-0 flex items-center justify-between px-4 sm:px-5 border-b border-slate-200/70 dark:border-neutral-800">
+        <header className="h-12 shrink-0 flex items-center justify-between px-4 sm:px-5 border-b border-slate-200/70 ">
           <div className="flex items-center gap-2 min-w-0">
             <button
               onClick={() => setSidebarOpen(!sidebarOpen)}
-              className="p-1.5 -ml-1 text-slate-500 hover:bg-slate-100 rounded-md lg:hidden dark:text-zinc-400 dark:hover:bg-white/[0.06]"
+              className="p-1.5 -ml-1 text-slate-500 hover:bg-slate-100 rounded-md lg:hidden "
             >
               <Menu className="w-5 h-5" />
             </button>
             <button
               onClick={toggleCollapsed}
-              title={collapsed ? 'Expand sidebar' : 'Collapse sidebar'}
-              className="hidden lg:flex p-1.5 -ml-1 text-slate-500 hover:bg-slate-100 rounded-md dark:text-zinc-400 dark:hover:bg-white/[0.06] transition-colors"
+              title={collapsed ? "Expand sidebar" : "Collapse sidebar"}
+              className="hidden lg:flex p-1.5 -ml-1 text-slate-500 hover:bg-slate-100 rounded-md transition-colors"
             >
               <PanelLeft className="w-4 h-4" />
             </button>
-            <nav className="flex items-center gap-1.5 text-[13px] min-w-0">
-              <span className="flex items-center gap-1.5 text-slate-500 dark:text-zinc-400 shrink-0">
-                <img src="/favicon.png" alt="" className="h-[18px] w-[18px] rounded-[5px] border border-slate-200 bg-white dark:border-white/10 dark:bg-white/5 p-0.5" />
-                <span className="hidden sm:inline">Autonex</span>
-              </span>
-              <ChevronRight className="w-3.5 h-3.5 text-slate-300 dark:text-zinc-600 shrink-0" />
-              <span className="font-medium text-slate-900 dark:text-zinc-100 truncate">
-                {currentNav.label}
-              </span>
-            </nav>
+            <Breadcrumbs
+              items={breadcrumbTrail}
+              homeHref={`${prefix}/dashboard`}
+              homeLabel="Autonex"
+              homeIcon={
+                <img
+                  src="/favicon.png"
+                  alt=""
+                  className="h-[18px] w-[18px] rounded-[5px] border border-slate-200 bg-white p-0.5"
+                />
+              }
+            />
           </div>
 
           <div className="flex items-center gap-2">

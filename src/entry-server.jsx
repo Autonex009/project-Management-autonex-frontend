@@ -1,11 +1,11 @@
 // IMPORTANT: ssr-globals must be the first import so its browser-global stubs
 // are installed before App's module graph is evaluated (ES imports run in order).
-import './ssr-globals';
+import "./ssr-globals";
 
-import React from 'react';
-import { renderToString } from 'react-dom/server';
-import { StaticRouter } from 'react-router-dom/server';
-import App from './App';
+import React from "react";
+import { renderToString } from "react-dom/server";
+import { StaticRouter } from "react-router-dom/server";
+import App from "./App";
 
 // Called once per request by the server (server.js in dev, api/ssr.js on Vercel).
 // StaticRouter is the SSR counterpart to BrowserRouter — it takes the requested
@@ -22,7 +22,7 @@ export function render(url, cookieHeader) {
         <StaticRouter location={url}>
           <App />
         </StaticRouter>
-      </React.StrictMode>
+      </React.StrictMode>,
     );
     return { html };
   } finally {

@@ -1,29 +1,29 @@
 export const LEAVE_TYPE_OPTIONS = [
-  { value: 'paid', label: 'Paid Leave' },
-  { value: 'casual_sick', label: 'Casual/Sick Leave' },
-  { value: 'floater', label: 'Floater Leave' },
-  { value: 'first_half', label: 'First Half-day Leave' },
-  { value: 'second_half', label: 'Second Half-day Leave' },
+  { value: "paid", label: "Paid Leave" },
+  { value: "casual_sick", label: "Casual/Sick Leave" },
+  { value: "floater", label: "Floater Leave" },
+  { value: "first_half", label: "First Half-day Leave" },
+  { value: "second_half", label: "Second Half-day Leave" },
 ];
 
 const LEGACY_LEAVE_TYPE_ALIASES = {
-  vacation: 'paid',
-  casual: 'casual_sick',
-  sick: 'casual_sick',
-  personal: 'floater',
-  emergency: 'floater',
+  vacation: "paid",
+  casual: "casual_sick",
+  sick: "casual_sick",
+  personal: "floater",
+  emergency: "floater",
 };
 
 const LEAVE_TYPE_LABELS = Object.fromEntries(
-  LEAVE_TYPE_OPTIONS.map((option) => [option.value, option.label])
+  LEAVE_TYPE_OPTIONS.map((option) => [option.value, option.label]),
 );
 
 const LEAVE_TYPE_BADGES = {
-  paid: 'bg-blue-50 text-blue-700',
-  casual_sick: 'bg-emerald-50 text-emerald-700',
-  floater: 'bg-amber-50 text-amber-700',
-  first_half: 'bg-indigo-50 text-indigo-700',
-  second_half: 'bg-violet-50 text-violet-700',
+  paid: "bg-blue-50 text-blue-700",
+  casual_sick: "bg-emerald-50 text-emerald-700",
+  floater: "bg-amber-50 text-amber-700",
+  first_half: "bg-indigo-50 text-indigo-700",
+  second_half: "bg-violet-50 text-violet-700",
 };
 
 // Annual paid-leave entitlement (working days/year), mirrors the backend
@@ -40,30 +40,30 @@ export const ANNUAL_LEAVE_QUOTA = {
 export const INTERN_MONTHLY_PAID_QUOTA = 1;
 
 export function isIntern(employeeType) {
-  const type = (employeeType || '').trim().toLowerCase();
-  return type === 'intern' || type === 'contract' || type === 'contractor';
+  const type = (employeeType || "").trim().toLowerCase();
+  return type === "intern" || type === "contract" || type === "contractor";
 }
 
 export const FLOATER_DATES_2026 = [
-  { date: '2026-01-14', label: 'Pongal / Makar Sankranti' },
-  { date: '2026-01-23', label: 'Vasant Panchami' },
-  { date: '2026-02-15', label: 'Maha Shivratri' },
-  { date: '2026-02-19', label: 'Shivaji Jayanti' },
-  { date: '2026-03-19', label: 'Ugadi / Gudi Padwa' },
-  { date: '2026-03-21', label: 'Ramzan Eid' },
-  { date: '2026-03-31', label: 'Mahavir Jayanti' },
-  { date: '2026-04-03', label: 'Good Friday' },
-  { date: '2026-04-14', label: 'Ambedkar Jayanti' },
-  { date: '2026-05-27', label: 'Bakrid' },
-  { date: '2026-08-15', label: 'Independence Day' },
-  { date: '2026-08-26', label: 'Onam' },
-  { date: '2026-08-28', label: 'Raksha Bandhan' },
-  { date: '2026-09-04', label: 'Janmashtami' },
-  { date: '2026-10-20', label: 'Dussehra' },
-  { date: '2026-11-08', label: 'Diwali' },
-  { date: '2026-11-11', label: 'Bhai Duj' },
-  { date: '2026-11-24', label: 'Guru Nanak Jayanti' },
-  { date: '2026-12-23', label: "Hazarat Ali's Birthday" },
+  { date: "2026-01-14", label: "Pongal / Makar Sankranti" },
+  { date: "2026-01-23", label: "Vasant Panchami" },
+  { date: "2026-02-15", label: "Maha Shivratri" },
+  { date: "2026-02-19", label: "Shivaji Jayanti" },
+  { date: "2026-03-19", label: "Ugadi / Gudi Padwa" },
+  { date: "2026-03-21", label: "Ramzan Eid" },
+  { date: "2026-03-31", label: "Mahavir Jayanti" },
+  { date: "2026-04-03", label: "Good Friday" },
+  { date: "2026-04-14", label: "Ambedkar Jayanti" },
+  { date: "2026-05-27", label: "Bakrid" },
+  { date: "2026-08-15", label: "Independence Day" },
+  { date: "2026-08-26", label: "Onam" },
+  { date: "2026-08-28", label: "Raksha Bandhan" },
+  { date: "2026-09-04", label: "Janmashtami" },
+  { date: "2026-10-20", label: "Dussehra" },
+  { date: "2026-11-08", label: "Diwali" },
+  { date: "2026-11-11", label: "Bhai Duj" },
+  { date: "2026-11-24", label: "Guru Nanak Jayanti" },
+  { date: "2026-12-23", label: "Hazarat Ali's Birthday" },
 ];
 
 const FLOATER_DATE_SET = new Set(FLOATER_DATES_2026.map((d) => d.date));
@@ -78,15 +78,15 @@ export function getFloaterDateLabel(dateStr) {
 }
 
 export const FIXED_HOLIDAYS_2026 = [
-  { date: '2026-01-01', label: "New Year's Day" },
-  { date: '2026-01-26', label: 'Republic Day' },
-  { date: '2026-03-04', label: 'Holi' },
-  { date: '2026-05-01', label: 'Maharashtra Day' },
-  { date: '2026-06-26', label: 'Muharram' },
-  { date: '2026-09-14', label: 'Ganesh Chaturthi' },
-  { date: '2026-10-02', label: 'Mahatma Gandhi Jayanti' },
-  { date: '2026-11-09', label: 'Govardhan Puja' },
-  { date: '2026-12-25', label: 'Christmas' },
+  { date: "2026-01-01", label: "New Year's Day" },
+  { date: "2026-01-26", label: "Republic Day" },
+  { date: "2026-03-04", label: "Holi" },
+  { date: "2026-05-01", label: "Maharashtra Day" },
+  { date: "2026-06-26", label: "Muharram" },
+  { date: "2026-09-14", label: "Ganesh Chaturthi" },
+  { date: "2026-10-02", label: "Mahatma Gandhi Jayanti" },
+  { date: "2026-11-09", label: "Govardhan Puja" },
+  { date: "2026-12-25", label: "Christmas" },
 ];
 
 const FIXED_HOLIDAY_SET = new Set(FIXED_HOLIDAYS_2026.map((d) => d.date));
@@ -101,7 +101,7 @@ export function getFixedHolidayLabel(dateStr) {
 
 export function isWeekend(dateStr) {
   if (!dateStr) return false;
-  const day = new Date(dateStr + 'T00:00:00').getDay(); // 0=Sun, 6=Sat
+  const day = new Date(dateStr + "T00:00:00").getDay(); // 0=Sun, 6=Sat
   return day === 0 || day === 6;
 }
 
@@ -111,8 +111,8 @@ export function isNonWorkingDay(dateStr) {
 
 export function getNonWorkingDayLabel(dateStr) {
   if (isWeekend(dateStr)) {
-    const day = new Date(dateStr + 'T00:00:00').getDay();
-    return day === 6 ? 'Saturday' : 'Sunday';
+    const day = new Date(dateStr + "T00:00:00").getDay();
+    return day === 6 ? "Saturday" : "Sunday";
   }
   return getFixedHolidayLabel(dateStr) || null;
 }
@@ -127,8 +127,8 @@ export function getNonWorkingDayLabel(dateStr) {
  */
 export function toLocalISODate(d) {
   const year = d.getFullYear();
-  const month = String(d.getMonth() + 1).padStart(2, '0');
-  const day = String(d.getDate()).padStart(2, '0');
+  const month = String(d.getMonth() + 1).padStart(2, "0");
+  const day = String(d.getDate()).padStart(2, "0");
   return `${year}-${month}-${day}`;
 }
 
@@ -138,8 +138,8 @@ export function toLocalISODate(d) {
  */
 export function findNonWorkingDayInRange(startDateStr, endDateStr) {
   if (!startDateStr || !endDateStr) return null;
-  const start = new Date(startDateStr + 'T00:00:00');
-  const end = new Date(endDateStr + 'T00:00:00');
+  const start = new Date(startDateStr + "T00:00:00");
+  const end = new Date(endDateStr + "T00:00:00");
   const cur = new Date(start);
   while (cur <= end) {
     const ds = toLocalISODate(cur);
@@ -149,10 +149,14 @@ export function findNonWorkingDayInRange(startDateStr, endDateStr) {
   return null;
 }
 
-export function getWorkingDayCount(startDateStr, endDateStr, isHalfDay = false) {
+export function getWorkingDayCount(
+  startDateStr,
+  endDateStr,
+  isHalfDay = false,
+) {
   if (!startDateStr || !endDateStr) return 0;
-  const start = new Date(startDateStr + 'T00:00:00');
-  const end = new Date(endDateStr + 'T00:00:00');
+  const start = new Date(startDateStr + "T00:00:00");
+  const end = new Date(endDateStr + "T00:00:00");
   if (end < start) return 0;
   let count = 0;
   const cur = new Date(start);
@@ -165,8 +169,8 @@ export function getWorkingDayCount(startDateStr, endDateStr, isHalfDay = false) 
 
 export function countNonWorkingDaysInRange(startDateStr, endDateStr) {
   if (!startDateStr || !endDateStr) return 0;
-  const start = new Date(startDateStr + 'T00:00:00');
-  const end = new Date(endDateStr + 'T00:00:00');
+  const start = new Date(startDateStr + "T00:00:00");
+  const end = new Date(endDateStr + "T00:00:00");
   if (end < start) return 0;
   let count = 0;
   const cur = new Date(start);
@@ -178,29 +182,41 @@ export function countNonWorkingDaysInRange(startDateStr, endDateStr) {
 }
 
 export const RAZORPAY_NEGATIVE_BALANCE_NOTE =
-  'If your leave balance is exhausted, Razorpay may automatically convert this request to unpaid leave, which can affect payroll.';
+  "If your leave balance is exhausted, Razorpay may automatically convert this request to unpaid leave, which can affect payroll.";
 
 export function normalizeLeaveType(value) {
-  const normalized = (value || '').trim().toLowerCase().replace(/[- ]/g, '_');
+  const normalized = (value || "").trim().toLowerCase().replace(/[- ]/g, "_");
   return LEGACY_LEAVE_TYPE_ALIASES[normalized] || normalized;
 }
 
 export function getLeaveTypeLabel(value) {
   const normalized = normalizeLeaveType(value);
-  return LEAVE_TYPE_LABELS[normalized] || normalized.replace(/_/g, ' ').replace(/\b\w/g, (char) => char.toUpperCase());
+  return (
+    LEAVE_TYPE_LABELS[normalized] ||
+    normalized.replace(/_/g, " ").replace(/\b\w/g, (char) => char.toUpperCase())
+  );
 }
 
 export function getLeaveTypeBadgeClass(value) {
-  return LEAVE_TYPE_BADGES[normalizeLeaveType(value)] || 'bg-slate-100 text-slate-600';
+  return (
+    LEAVE_TYPE_BADGES[normalizeLeaveType(value)] ||
+    "bg-slate-100 text-slate-600"
+  );
 }
 
-export function validateConsecutiveLeaves(startDateStr, endDateStr, leavesList, excludeLeaveId = null, isHalfDay = false) {
+export function validateConsecutiveLeaves(
+  startDateStr,
+  endDateStr,
+  leavesList,
+  excludeLeaveId = null,
+  isHalfDay = false,
+) {
   if (isHalfDay) return true;
   if (!startDateStr || !endDateStr) return true;
-  
-  const start = new Date(startDateStr + 'T00:00:00');
-  const end = new Date(endDateStr + 'T00:00:00');
-  
+
+  const start = new Date(startDateStr + "T00:00:00");
+  const end = new Date(endDateStr + "T00:00:00");
+
   const windowStart = new Date(start);
   windowStart.setDate(windowStart.getDate() - 10);
   const windowEnd = new Date(end);
@@ -219,16 +235,21 @@ export function validateConsecutiveLeaves(startDateStr, endDateStr, leavesList, 
   }
 
   // Add existing non-rejected leaves' working days
-  leavesList.forEach(l => {
-    if (l.status === 'rejected' || l.leave_id === excludeLeaveId) return;
-    if (l.is_half_day || l.leave_type === 'first_half' || l.leave_type === 'second_half') return;
-    
-    let lStart = new Date(l.start_date + 'T00:00:00');
-    let lEnd = new Date(l.end_date + 'T00:00:00');
-    
+  leavesList.forEach((l) => {
+    if (l.status === "rejected" || l.leave_id === excludeLeaveId) return;
+    if (
+      l.is_half_day ||
+      l.leave_type === "first_half" ||
+      l.leave_type === "second_half"
+    )
+      return;
+
+    let lStart = new Date(l.start_date + "T00:00:00");
+    let lEnd = new Date(l.end_date + "T00:00:00");
+
     let c = new Date(lStart < windowStart ? windowStart : lStart);
     let actualEnd = lEnd > windowEnd ? windowEnd : lEnd;
-    
+
     while (c <= actualEnd) {
       const ds = toLocalISODate(c);
       if (!isNonWorkingDay(ds)) {

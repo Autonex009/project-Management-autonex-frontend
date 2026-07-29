@@ -12,9 +12,9 @@ export function getPmProjectIds(parentProjects = [], pmEmployeeId) {
         (project) =>
           project.program_manager_id === pmEmployeeId ||
           (Array.isArray(project.program_manager_ids) &&
-            project.program_manager_ids.includes(pmEmployeeId))
+            project.program_manager_ids.includes(pmEmployeeId)),
       )
-      .map((project) => project.id)
+      .map((project) => project.id),
   );
 }
 
@@ -27,14 +27,14 @@ export function getPmSubProjects(
   subProjects = [],
   parentProjects = [],
   pmEmployeeId,
-  allocations = []
+  allocations = [],
 ) {
   if (!pmEmployeeId) return [];
   const projectIds = getPmProjectIds(parentProjects, pmEmployeeId);
   const allocatedSubProjectIds = new Set(
     allocations
       .filter((allocation) => allocation.employee_id === pmEmployeeId)
-      .map((allocation) => allocation.sub_project_id)
+      .map((allocation) => allocation.sub_project_id),
   );
 
   return subProjects.filter((subProject) => {

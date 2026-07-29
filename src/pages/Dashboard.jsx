@@ -1,13 +1,180 @@
-import { useQuery } from '@tanstack/react-query';
-import { useMemo, useState } from 'react';
-import { useNavigate } from 'react-router-dom';
-import { subProjectApi, employeeApi, allocationApi, leaveApi, skillsApi, analyticsApi } from '../services/api'; 
-import { FolderKanban, Calendar, Users, AlertTriangle, ArrowUpRight, Activity, Zap, Target, TrendingUp, Plus, ChevronRight, UserCog, ClipboardCheck, Clock } from 'lucide-react';
-import Table from '../components/ui/Table';
-import Button from '../components/ui/Button';
-import StatCard from '../components/dashboard/StatCard';
-import { parseISO, format } from 'date-fns'; 
-import { getWorkingDays } from '../utils/dateCalculations';
+import { useQuery } from "@tanstack/react-query";
+import { useMemo, useState } from "react";
+import { useNavigate } from "react-router-dom";
+import {
+  subProjectApi,
+  employeeApi,
+  allocationApi,
+  leaveApi,
+  skillsApi,
+  analyticsApi,
+  parentProjectApi,
+  wfhApi,
+} from "../services/api";
+import {
+  todayLocalISO,
+  getOnLeaveTodayIds,
+  getWfhTodayIds,
+  buildAssignedProjectsMap,
+  bucketWorkforce,
+} from "../utils/workforce";
+import {
+  FolderKanban,
+  Users,
+  ChevronRight,
+  CalendarDays,
+  Home,
+} from "lucide-react";
+import Table from "../components/ui/Table";
+import Button from "../components/ui/Button";
+import StatCard from "../components/dashboard/StatCard";
+import SplitStatCard from "../components/dashboard/SplitStatCard";
+import MostActivePanel from "../components/dashboard/MostActivePanel";
+import MetricDots from "../components/ui/MetricDots";
+import { getWorkingDays } from "../utils/dateCalculations";
+
+// The three engagement buckets, colour-matched to the dots on the Employees page
+// so Active / Inactive / Idle mean the same colour wherever they appear.
+const BUCKET_TONES = [
+  { key: "active", label: "active", dot: "bg-emerald-500", text: "text-emerald-600" },
+  { key: "inactive", label: "inactive", dot: "bg-slate-400", text: "text-slate-500" },
+  { key: "idle", label: "idle", dot: "bg-amber-500", text: "text-amber-600" },
+];
+
+// Reads as three glanceable chips rather than one grey sentence.
+const WorkforceSplit = ({ workforce }) => (
+  <MetricDots
+    items={BUCKET_TONES.map(({ key, label, dot, text }) => ({
+      label,
+      value: workforce[key].length,
+      dot,
+      tone: text,
+    }))}
+  />
+);
+
+// A project is archived unless its status is active-ish — mirrors the same list
+// in ProjectsPage so "archived" means one thing across both screens.
+const ARCHIVED_PROJECT_STATUSES = ["completed", "on-hold", "cancelled"];
+const isArchivedProject = (project) =>
+  ARCHIVED_PROJECT_STATUSES.includes(
+    (project?.project_status || "active").toLowerCase().trim(),
+  );
+
+const NO_ORG = "— No Organization —";
+const NO_VENDOR = "— No Vendor —";
+
+/**
+ * Count projects per key, biggest first. `keysOf` returns an ARRAY because a
+ * project can carry several vendors (workforce_vendors is a list) — such a
+ * project counts once under each, so a vendor column can total more than the
+ * project count. The unassigned bucket always sorts last.
+ */
+const countProjectsBy = (projects, keysOf, emptyLabel) => {
+  const counts = new Map();
+  projects.forEach((project) => {
+    const keys = keysOf(project);
+    (keys.length ? keys : [emptyLabel]).forEach((key) => {
+      const label = String(key).trim() || emptyLabel;
+      counts.set(label, (counts.get(label) || 0) + 1);
+    });
+  });
+  return [...counts.entries()]
+    .map(([label, value]) => ({ label, value }))
+    .sort((a, b) => {
+      if (a.label === emptyLabel) return 1;
+      if (b.label === emptyLabel) return -1;
+      return b.value - a.value || a.label.localeCompare(b.label);
+    });
+};
+
+// Same treatment as the workforce split: colour-coded so active vs archived reads
+// at a glance instead of as grey prose.
+const ProjectSplit = ({ active, archived }) => (
+  <MetricDots
+    items={[
+      {
+        label: "active",
+        value: active,
+        dot: "bg-emerald-500",
+        tone: "text-emerald-600",
+      },
+      {
+        label: "archived",
+        value: archived,
+        dot: "bg-slate-400",
+        tone: "text-slate-500",
+      },
+    ]}
+  />
+);
+
+const MONTHS = [
+  "Jan", "Feb", "Mar", "Apr", "May", "Jun",
+  "Jul", "Aug", "Sep", "Oct", "Nov", "Dec",
+];
+// Formats a YYYY-MM-DD string without going through Date(), which would reparse
+// it as UTC midnight and can shift the day in IST.
+const shortDate = (iso) => {
+  const [, m, d] = String(iso || "").slice(0, 10).split("-");
+  if (!m || !d) return "";
+  return `${MONTHS[Number(m) - 1]} ${Number(d)}`;
+};
+const rangeLabel = (from, to) =>
+  !to || to === from ? shortDate(from) : `${shortDate(from)}–${shortDate(to)}`;
+
+/**
+ * Split pending requests into Past / Today / Future relative to today.
+ *
+ * This is what makes a large pending count readable: a queue of 46 is mostly
+ * stale requests for dates that have already gone by, and lumping them in with
+ * today's makes the number look wrong. Each request is a date RANGE, so "today"
+ * means the range covers today, not that it starts today.
+ */
+const splitPendingByTiming = (rows, { startKey, endKey, nameOf }, todayStr) => {
+  const past = [];
+  const today = [];
+  const future = [];
+
+  rows.forEach((row) => {
+    const from = String(row[startKey] || "").slice(0, 10);
+    if (!from) return;
+    const to = String(row[endKey] || row[startKey] || "").slice(0, 10);
+    const person = {
+      id: row.id ?? row.leave_id,
+      employeeId: row.employee_id,
+      name: nameOf(row),
+      meta: rangeLabel(from, to),
+      from,
+    };
+    if (from <= todayStr && to >= todayStr) today.push(person);
+    else if (from > todayStr) future.push(person);
+    else past.push(person);
+  });
+
+  // Soonest first for what's ahead; most recent first for what's behind.
+  today.sort((a, b) => a.from.localeCompare(b.from));
+  future.sort((a, b) => a.from.localeCompare(b.from));
+  past.sort((a, b) => b.from.localeCompare(a.from));
+
+  return { past, today, future };
+};
+
+// One popover tab: the same three buckets, composed by whichever cut is passed in.
+const workforceSections = (workforce, composeFn) => [
+  {
+    title: `Active (${workforce.active.length}) — working today`,
+    rows: composeFn(workforce.active),
+  },
+  {
+    title: `Inactive (${workforce.inactive.length}) — on leave today`,
+    rows: composeFn(workforce.inactive),
+  },
+  {
+    title: `Idle (${workforce.idle.length}) — no project assigned`,
+    rows: composeFn(workforce.idle),
+  },
+];
 
 // ===============================================
 // DASHBOARD COMPONENT
@@ -18,296 +185,535 @@ const Dashboard = () => {
   const [projectPage, setProjectPage] = useState(1);
 
   const { data: projects = [], isLoading: projectsLoading } = useQuery({
-    queryKey: ['sub-projects'],
+    queryKey: ["sub-projects"],
     queryFn: subProjectApi.getAll,
   });
 
   const { data: employees = [] } = useQuery({
-    queryKey: ['employees'],
+    queryKey: ["employees"],
     queryFn: employeeApi.getAll,
   });
 
   const { data: allocations = [] } = useQuery({
-    queryKey: ['allocations'],
+    queryKey: ["allocations"],
     queryFn: allocationApi.getAll,
   });
 
-  const { startStr, endStr } = useMemo(() => {
-    const today = new Date();
-    const y = today.getFullYear();
-    const m = today.getMonth();
-    const start = `${y}-${String(m + 1).padStart(2, '0')}-01`;
-    const end = `${y}-${String(m + 1).padStart(2, '0')}-${String(new Date(y, m + 1, 0).getDate()).padStart(2, '0')}`;
-    return { startStr: start, endStr: end };
-  }, []);
+  // Needed to credit program managers with the projects they run — without it a
+  // PM holding no worker allocation of their own counts as Idle here while the
+  // Employees page counts them Active.
+  const { data: mainProjects = [] } = useQuery({
+    queryKey: ["parent-projects"],
+    queryFn: parentProjectApi.getAll,
+    staleTime: 5 * 60 * 1000,
+  });
 
+  // Unscoped on purpose, and keyed identically to the Leaves page so the two
+  // share one cache entry. The previous month-window missed pending requests
+  // dated next month, which the "pending review" count has to include — and it
+  // also hid leaves overlapping a project window that ends beyond this month.
   const { data: leaves = [] } = useQuery({
-    queryKey: ['leaves', startStr, endStr],
-    queryFn: () => leaveApi.getAll({ start_date: startStr, end_date: endStr }),
+    queryKey: ["leaves"],
+    queryFn: leaveApi.getAll,
+  });
+
+  // Same cache key as the Leaves page's WFH tab.
+  const { data: wfhRequests = [] } = useQuery({
+    queryKey: ["wfh"],
+    queryFn: () => wfhApi.getAll(),
   });
 
   const { data: skillsSummary = {} } = useQuery({
-    queryKey: ['skillsSummary'],
+    queryKey: ["skillsSummary"],
     queryFn: skillsApi.getSummary,
   });
 
   // Autonex most-active user + project (this month, by time spent on Encord).
   const { data: autonexOverview } = useQuery({
-    queryKey: ['autonex-overview'],
+    queryKey: ["autonex-overview"],
     queryFn: analyticsApi.getAutonexOverview,
     // Encord data refreshes once a day; no need to poll in the background.
     refetchOnWindowFocus: true,
   });
-  const topUsers = autonexOverview?.top_users || [];
-  const topActiveProjects = autonexOverview?.top_projects || [];
-
-  // Stats
-  const totalProjects = projects.length;
-  const activeProjects = projects.filter(p => p.project_status === 'active').length;
-  const activeEmployees = employees.filter(e => e.status === 'active').length;
-  const allocatedEmployeeIds = new Set(allocations.map(a => a.employee_id));
-
-  const todayStr = format(new Date(), 'yyyy-MM-dd');
-  const employeesOnLeave = leaves.filter(leave => {
-    if (!leave.start_date || !leave.end_date || leave.status === 'rejected') return false;
-    return leave.start_date <= todayStr && leave.end_date >= todayStr;
+  // Daily series behind the panel's sparkline. The overview above is calendar
+  // month-to-date while this is a trailing 30 days, so the sparkline is labelled
+  // as such rather than implying it matches the headline window.
+  const { data: autonexKpis } = useQuery({
+    queryKey: ["autonex-kpis", "30"],
+    queryFn: () => analyticsApi.getAutonexKpis("30"),
+    refetchOnWindowFocus: true,
   });
+  const autonexDaily = autonexKpis?.daily || [];
+
+  // Stats. The list endpoint returns every project, archived included, so this
+  // total is the real project count.
+  const totalProjects = projects.length;
+  // Active is the complement of archived rather than project_status === "active":
+  // "in-progress", "poc" and blank are all live statuses (see STATUS_CONFIG in
+  // ProjectsPage), so a strict equality check dropped them and the two figures
+  // failed to add up to the total.
+  const archivedProjects = projects.filter(isArchivedProject).length;
+  const activeProjects = totalProjects - archivedProjects;
+
+  // Which organisation / vendor each project belongs to. Organisation is the
+  // free-text `client` on the MAIN project — the same field the project card
+  // shows beneath the title — and vendors come from the sub-project's own list.
+  const mainProjectById = useMemo(
+    () => new Map(mainProjects.map((mp) => [String(mp.id), mp])),
+    [mainProjects],
+  );
+  const projectsByOrganisation = useMemo(
+    () =>
+      countProjectsBy(
+        projects,
+        (p) => {
+          const org = mainProjectById.get(String(p.main_project_id))?.client;
+          return org ? [org] : [];
+        },
+        NO_ORG,
+      ),
+    [projects, mainProjectById],
+  );
+  const projectsByVendor = useMemo(
+    () =>
+      countProjectsBy(
+        projects,
+        (p) => (p.workforce_vendors || []).filter(Boolean),
+        NO_VENDOR,
+      ),
+    [projects],
+  );
+
+  const allocatedEmployeeIds = new Set(allocations.map((a) => a.employee_id));
+
+  // Engagement comes from the shared rules in utils/workforce so this page and
+  // the Employees page can't drift apart again. Previously this counted only
+  // status === "active" and treated any non-rejected leave as absence, which is
+  // why Team Available read 199 here against 204 on the Employees page.
+  const todayStr = todayLocalISO();
+  const assignedProjectsMap = useMemo(
+    () =>
+      buildAssignedProjectsMap({
+        allocations,
+        mainProjects,
+        subProjects: projects,
+      }),
+    [allocations, mainProjects, projects],
+  );
+  const onLeaveTodayIds = useMemo(
+    () => getOnLeaveTodayIds(leaves, todayStr),
+    [leaves, todayStr],
+  );
+  const workforce = useMemo(
+    () =>
+      bucketWorkforce({
+        employees,
+        onLeaveIds: onLeaveTodayIds,
+        projectsMap: assignedProjectsMap,
+      }),
+    [employees, onLeaveTodayIds, assignedProjectsMap],
+  );
+
+  // ── Leave / WFH desk ───────────────────────────────────────────────────────
+  // GET /leaves is served through a response model that drops employee_name, so
+  // leave names are joined here. WFH responses do carry employee_name.
+  const nameById = useMemo(
+    () => new Map(employees.map((e) => [String(e.id), e.name])),
+    [employees],
+  );
+  const nameOf = (employeeId, fallback) =>
+    nameById.get(String(employeeId)) || fallback || `#${employeeId}`;
+
+  const isPending = (row) => (row?.status || "").toLowerCase() === "pending";
+
+  const leaveDesk = useMemo(() => {
+    const pending = leaves.filter(isPending);
+    return {
+      pendingCount: pending.length,
+      todayCount: onLeaveTodayIds.size,
+      timing: splitPendingByTiming(
+        pending,
+        {
+          startKey: "start_date",
+          endKey: "end_date",
+          nameOf: (l) => nameOf(l.employee_id),
+        },
+        todayStr,
+      ),
+    };
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [leaves, onLeaveTodayIds, todayStr, nameById]);
+
+  const wfhDesk = useMemo(() => {
+    const pending = wfhRequests.filter(isPending);
+    return {
+      pendingCount: pending.length,
+      todayCount: getWfhTodayIds(wfhRequests, todayStr).size,
+      timing: splitPendingByTiming(
+        pending,
+        {
+          startKey: "wfh_date",
+          endKey: "end_date",
+          nameOf: (r) => nameOf(r.employee_id, r.employee_name),
+        },
+        todayStr,
+      ),
+    };
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [wfhRequests, todayStr, nameById]);
+
+  // KPI cards navigate with router state so useBreadcrumbTrail treats it as a
+  // drill rather than a top-level jump — the trail then reads
+  // "Autonex › Dashboard › Leaves" instead of resetting to just the destination.
+  const goFromKpi = (path) => navigate(path, { state: { from: "dashboard" } });
+  // Clicking a name opens the target page pre-filtered to that person by
+  // seeding its existing search box via ?q=.
+  const goToPerson = (basePath, person) =>
+    goFromKpi(
+      `${basePath}${basePath.includes("?") ? "&" : "?"}q=${encodeURIComponent(person.name)}`,
+    );
+
+  const timingTabs = (timing) => [
+    { label: "Today", people: timing.today },
+    { label: "Future", people: timing.future },
+    { label: "Past", people: timing.past },
+  ];
 
   // Project analysis
-  const getProjectAnalysis = useMemo(() => (project) => {
-    if (!project.end_date) return { status: 'unknown', recommendation: null };
+  const getProjectAnalysis = useMemo(
+    () => (project) => {
+      if (!project.end_date) return { status: "unknown", recommendation: null };
 
-    // Use remaining tasks if available, otherwise total tasks
-    const taskCount = project.remaining_tasks !== undefined ? project.remaining_tasks : project.total_tasks;
-    const requiredHours = taskCount * project.estimated_time_per_task;
-    const workingDaysRemaining = getWorkingDays(new Date(), project.end_date);
+      // Use remaining tasks if available, otherwise total tasks
+      const taskCount =
+        project.remaining_tasks !== undefined
+          ? project.remaining_tasks
+          : project.total_tasks;
+      const requiredHours = taskCount * project.estimated_time_per_task;
+      const workingDaysRemaining = getWorkingDays(new Date(), project.end_date);
 
-    if (workingDaysRemaining <= 0) return { status: 'overdue', recommendation: { message: 'Past deadline' } };
+      if (workingDaysRemaining <= 0)
+        return {
+          status: "overdue",
+          recommendation: { message: "Past deadline" },
+        };
 
-    // Get all allocations for this project
-    const projectAllocations = allocations.filter(a => a.sub_project_id === project.id);
-    const allocatedCount = projectAllocations.length;
-
-    // Count employees on leave during project dates (active count excludes those on leave)
-    const activeAllocatedCount = projectAllocations.filter(a => {
-      const empLeaves = leaves.filter(l => l.employee_id === a.employee_id);
-      const hasOverlap = empLeaves.some(l =>
-        new Date(l.start_date) <= new Date(project.end_date) &&
-        new Date(l.end_date) >= new Date(project.start_date)
+      // Get all allocations for this project
+      const projectAllocations = allocations.filter(
+        (a) => a.sub_project_id === project.id,
       );
-      return !hasOverlap;
-    }).length;
+      const allocatedCount = projectAllocations.length;
 
-    // Fix: If explicitly allocated enough people (active, not on leave), it is balanced
-    if (project.required_manpower && activeAllocatedCount >= project.required_manpower) {
-      return { status: 'balanced', recommendation: null };
-    }
+      // Count employees on leave during project dates (active count excludes those on leave)
+      const activeAllocatedCount = projectAllocations.filter((a) => {
+        const empLeaves = leaves.filter((l) => l.employee_id === a.employee_id);
+        const hasOverlap = empLeaves.some(
+          (l) =>
+            new Date(l.start_date) <= new Date(project.end_date) &&
+            new Date(l.end_date) >= new Date(project.start_date),
+        );
+        return !hasOverlap;
+      }).length;
 
-    const standardDayHours = 8; // Use standard 8h day instead of average of all employees
-    const totalCap = activeAllocatedCount * standardDayHours * workingDaysRemaining;
-
-    if (activeAllocatedCount === 0) return { status: 'no_staff', recommendation: { message: 'Needs staffing' } };
-
-    const loadRatio = requiredHours / totalCap;
-    if (loadRatio > 1.1) {
-      // Calculate deficit based on required manpower if available, otherwise by hours
-      if (project.required_manpower && activeAllocatedCount < project.required_manpower) {
-        const extraNeeded = project.required_manpower - activeAllocatedCount;
-        return { status: 'overburden', recommendation: { message: `+${extraNeeded} staff needed` } };
+      // Fix: If explicitly allocated enough people (active, not on leave), it is balanced
+      if (
+        project.required_manpower &&
+        activeAllocatedCount >= project.required_manpower
+      ) {
+        return { status: "balanced", recommendation: null };
       }
-      const deficitHours = requiredHours - totalCap;
-      const extraNeeded = Math.ceil(deficitHours / (workingDaysRemaining * standardDayHours));
-      return { status: 'overburden', recommendation: { message: `+${extraNeeded} staff needed` } };
+
+      const standardDayHours = 8; // Use standard 8h day instead of average of all employees
+      const totalCap =
+        activeAllocatedCount * standardDayHours * workingDaysRemaining;
+
+      if (activeAllocatedCount === 0)
+        return {
+          status: "no_staff",
+          recommendation: { message: "Needs staffing" },
+        };
+
+      const loadRatio = requiredHours / totalCap;
+      if (loadRatio > 1.1) {
+        // Calculate deficit based on required manpower if available, otherwise by hours
+        if (
+          project.required_manpower &&
+          activeAllocatedCount < project.required_manpower
+        ) {
+          const extraNeeded = project.required_manpower - activeAllocatedCount;
+          return {
+            status: "overburden",
+            recommendation: { message: `+${extraNeeded} staff needed` },
+          };
+        }
+        const deficitHours = requiredHours - totalCap;
+        const extraNeeded = Math.ceil(
+          deficitHours / (workingDaysRemaining * standardDayHours),
+        );
+        return {
+          status: "overburden",
+          recommendation: { message: `+${extraNeeded} staff needed` },
+        };
+      }
+      if (loadRatio < 0.5 && activeAllocatedCount > 1)
+        return {
+          status: "underutilized",
+          recommendation: { message: "Surplus capacity" },
+        };
+      return { status: "balanced", recommendation: null };
+    },
+    [allocations, leaves],
+  );
+
+  const projectAnalyses = projects.map((p) => ({
+    project: p,
+    analysis: getProjectAnalysis(p),
+  }));
+
+  // ── People breakdowns (on-roster staff) ────────────────────────────────────
+  // On-roster = everyone except archived/former, so the breakdowns no longer
+  // silently drop the stored-"inactive" staff the Employees page includes.
+  const onRosterList = workforce.onRoster;
+
+  // "Full-Time", "full time" and "full_time" all mean the same thing in the
+  // employees table (see the sync_employee_type_values migration), so compare
+  // on a normalised form rather than the raw string.
+  const norm = (v) =>
+    (v || "")
+      .trim()
+      .toLowerCase()
+      .replace(/[\s_]+/g, "-");
+
+  // Assigns every employee to the FIRST bucket that matches and sweeps the
+  // remainder into "Other / unset". Buckets therefore always sum to
+  // list.length, so a breakdown can never silently lose people the way the
+  // old employee_type counts dropped Part-time and blank values.
+  const bucketCounts = (list, field, buckets) => {
+    const counts = new Map(buckets.map((b) => [b.label, 0]));
+    let other = 0;
+    for (const e of list) {
+      const v = norm(e[field]);
+      const hit = buckets.find((b) => b.match(v));
+      if (hit) counts.set(hit.label, counts.get(hit.label) + 1);
+      else other += 1;
     }
-    if (loadRatio < 0.5 && activeAllocatedCount > 1) return { status: 'underutilized', recommendation: { message: 'Surplus capacity' } };
-    return { status: 'balanced', recommendation: null };
-  }, [allocations, leaves]);
-
-  const projectAnalyses = projects.map(p => ({ project: p, analysis: getProjectAnalysis(p) }));
-
-  // Delivery risks are now driven by PM-set project sentiment: any active project
-  // marked "Poor" is considered at risk.
-  const atRiskProjects = projects.filter(p => p.project_status === 'active' && p.sentiment === 'Poor');
-
-  // ── People breakdowns (active employees only) ──────────────────────────────
-  const isPmDesig = (d) => (d || '').toLowerCase().includes('program manager') || (d || '').toLowerCase().includes('project manager');
-  const isReviewerAnnotator = (d) => {
-    const s = (d || '').toLowerCase();
-    return s.includes('annotator') || s.includes('reviewer');
+    const rows = buckets.map((b) => ({
+      label: b.label,
+      value: counts.get(b.label),
+    }));
+    if (other > 0) rows.push({ label: "Other / unset", value: other });
+    return rows.filter((r) => r.value > 0);
   };
-  const activeEmployeesList = employees.filter(e => e.status === 'active');
-  const typeBreakdown = (list) => {
-    const norm = (t) => (t || '').toLowerCase();
-    return [
-      { label: 'Full-time', value: list.filter(e => norm(e.employee_type) === 'full-time').length },
-      { label: 'Interns', value: list.filter(e => norm(e.employee_type) === 'intern').length },
-      { label: 'Contract', value: list.filter(e => norm(e.employee_type) === 'contract' || norm(e.employee_type) === 'contractor').length },
-    ];
-  };
-  const projectManagers = activeEmployeesList.filter(e => isPmDesig(e.designation));
-  const reviewersAnnotators = activeEmployeesList.filter(e => isReviewerAnnotator(e.designation));
-  const teamAvailable = activeEmployees - employeesOnLeave.length;
 
+  const TYPE_BUCKETS = [
+    { label: "Full-time", match: (v) => v === "full-time" },
+    { label: "Part-time", match: (v) => v === "part-time" },
+    { label: "Interns", match: (v) => v === "intern" },
+    { label: "Contract", match: (v) => v === "contract" || v === "contractor" },
+  ];
 
+  // Ordered most-specific first: "Annotator/ Reviewer" must be claimed before
+  // any looser rule, and legacy spellings (Annotator, Reviewer) fold into it.
+  const ROLE_BUCKETS = [
+    {
+      label: "Annotator / Reviewer",
+      match: (v) => v.includes("annotator") || v.includes("reviewer"),
+    },
+    {
+      label: "Program Manager",
+      match: (v) =>
+        v.includes("program-manager") || v.includes("project-manager"),
+    },
+    { label: "Developer", match: (v) => v.includes("developer") },
+    { label: "Quality Analyst", match: (v) => v.includes("quality-analyst") },
+    { label: "Data Scientist", match: (v) => v.includes("data-scientist") },
+    { label: "Admin", match: (v) => v === "admin" },
+  ];
+
+  const typeBreakdown = (list) =>
+    bucketCounts(list, "employee_type", TYPE_BUCKETS);
+  const roleBreakdown = (list) =>
+    bucketCounts(list, "designation", ROLE_BUCKETS);
   // Project sentiment badge (PM-set): GOOD / AVG / Poor.
   const SentimentBadge = ({ sentiment }) => {
     const config = {
-      GOOD: { text: 'text-emerald-600 dark:text-emerald-400', bg: 'bg-emerald-50 dark:bg-emerald-500/10', label: 'GOOD' },
-      AVG: { text: 'text-amber-600 dark:text-amber-400', bg: 'bg-amber-50 dark:bg-amber-500/10', label: 'AVG' },
-      Poor: { text: 'text-red-600 dark:text-red-400', bg: 'bg-red-50 dark:bg-red-500/10', label: 'Poor' },
+      GOOD: { text: "text-emerald-600 ", bg: "bg-emerald-50 ", label: "GOOD" },
+      AVG: { text: "text-amber-600 ", bg: "bg-amber-50 ", label: "AVG" },
+      Poor: { text: "text-red-600 ", bg: "bg-red-50 ", label: "Poor" },
     };
     const c = config[sentiment];
-    if (!c) return <span className="text-xs text-slate-400 dark:text-zinc-600">Not set</span>;
+    if (!c) return <span className="text-xs text-slate-400 ">Not set</span>;
     return (
-      <span className={`inline-flex items-center rounded-full px-2.5 py-1 text-xs font-semibold ${c.bg} ${c.text}`}>{c.label}</span>
+      <span
+        className={`inline-flex items-center rounded-full px-2.5 py-1 text-xs font-semibold ${c.bg} ${c.text}`}
+      >
+        {c.label}
+      </span>
     );
   };
 
   return (
     <div className="space-y-4">
       {/* Page Header */}
-      <div>
-        <h1 className="text-lg font-semibold text-slate-900 dark:text-zinc-100">Dashboard</h1>
-        <p className="text-slate-500 dark:text-zinc-500 text-[13px] mt-0.5">Resource allocation & project insights</p>
-      </div>
+    
 
-      {/* ===== KPI Cards ===== */}
-      <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-5 gap-3">
+      {/* ===== KPI cards (compact, 2/3) + Most active (1/3) =====
+          items-start keeps the short KPI row from stretching to the taller panel. */}
+      <div className="grid grid-cols-1 items-start gap-4 lg:grid-cols-3">
+        {/* Left column: compact KPI row stacked above Project Status, so the table
+            fills the space alongside the much taller Most active panel. */}
+        <div className="space-y-4 lg:col-span-2">
+          <div className="grid grid-cols-1 gap-3 sm:grid-cols-3">
         <StatCard
-          title="Active Projects"
-          value={activeProjects}
-          icon={FolderKanban}
-          tone="emerald"
-          hint={`of ${totalProjects} total`}
-          onClick={() => navigate('/admin/sub-projects?status=active')}
-        />
-        <StatCard
-          title="Delivery Risks"
-          value={atRiskProjects.length}
-          icon={AlertTriangle}
-          tone="rose"
-          hint={atRiskProjects.length > 0 ? 'need attention' : 'all clear'}
-          onClick={() => navigate('/admin/sub-projects')}
-        />
-        <StatCard
-          title="Project Managers"
-          value={projectManagers.length}
-          icon={UserCog}
-          tone="violet"
-          hint="program managers"
-          breakdown={typeBreakdown(projectManagers)}
-          onClick={() => navigate('/admin/employees')}
-        />
-        <StatCard
-          title="Reviewers / Annotators"
-          value={reviewersAnnotators.length}
-          icon={ClipboardCheck}
-          tone="sky"
-          hint="annotators & reviewers"
-          breakdown={typeBreakdown(reviewersAnnotators)}
-          onClick={() => navigate('/admin/employees')}
-        />
-        <StatCard
-          title="Team Available"
-          value={teamAvailable}
+          compact
+          title="Total Employees"
+          label="On roster"
+          value={workforce.onRoster.length}
           icon={Users}
           tone="amber"
-          hint={`${employeesOnLeave.length} on leave`}
-          breakdown={typeBreakdown(activeEmployeesList)}
-          onClick={() => navigate('/admin/employees')}
+          hint={<WorkforceSplit workforce={workforce} />}
+          // Same three buckets cut two ways, behind a tab strip: what people DO
+          // (designation) and how they're employed (type).
+          breakdownTabs={[
+            {
+              label: "By designation",
+              sections: workforceSections(workforce, roleBreakdown),
+            },
+            {
+              label: "By type",
+              sections: workforceSections(workforce, typeBreakdown),
+            },
+          ]}
+          breakdownFooter={`${workforce.onRoster.length} on roster · excludes archived`}
+          onClick={() => goFromKpi("/admin/employees")}
         />
-      </div>
+        <StatCard
+          compact
+          title="Total Projects"
+          label="All projects"
+          value={totalProjects}
+          icon={FolderKanban}
+          tone="emerald"
+          hint={
+            <ProjectSplit active={activeProjects} archived={archivedProjects} />
+          }
+          breakdownTabs={[
+            {
+              label: "Organisation",
+              sections: [{ rows: projectsByOrganisation }],
+            },
+            { label: "Vendor", sections: [{ rows: projectsByVendor }] },
+          ]}
+          breakdownFooter={`${totalProjects} projects · includes archived`}
+          onClick={() => goFromKpi("/admin/sub-projects")}
+        />
+        {/* Leave + WFH share one slot, split across the card's height. */}
+        <SplitStatCard
+          halves={[
+            {
+              key: "leave",
+              title: "Leave",
+              icon: CalendarDays,
+              tone: "rose",
+              stats: [
+                {
+                  value: leaveDesk.pendingCount,
+                  label: "to review",
+                  tone: leaveDesk.pendingCount
+                    ? "text-amber-600"
+                    : "text-slate-400",
+                },
+                { value: leaveDesk.todayCount, label: "today" },
+              ],
+              tabs: timingTabs(leaveDesk.timing),
+              emptyLabel: "Nothing pending for this period",
+              onClick: () => goFromKpi("/admin/leaves"),
+              onSelectPerson: (person) => goToPerson("/admin/leaves", person),
+            },
+            {
+              key: "wfh",
+              title: "Work from home",
+              icon: Home,
+              tone: "violet",
+              stats: [
+                {
+                  value: wfhDesk.pendingCount,
+                  label: "to review",
+                  tone: wfhDesk.pendingCount
+                    ? "text-amber-600"
+                    : "text-slate-400",
+                },
+                { value: wfhDesk.todayCount, label: "today" },
+              ],
+              tabs: timingTabs(wfhDesk.timing),
+              emptyLabel: "Nothing pending for this period",
+              onClick: () => goFromKpi("/admin/leaves?tab=WFH%20Requests"),
+              onSelectPerson: (person) => goToPerson("/admin/leaves?tab=WFH%20Requests", person),
+            },
+          ]}
+        />
+          </div>
 
-      {/* Row 2: Project Status table + Top Performers side panel */}
-      <div className="grid grid-cols-1 gap-4 lg:grid-cols-3">
-        {/* Project Status */}
-        <div className="lg:col-span-2">
           <Table
             variant="v1"
             title="Project Status"
             count={`${projectAnalyses.length} projects`}
             headerAction={
-              <Button variant="link" onClick={() => navigate('/admin/sub-projects')}>
+              <Button
+                variant="link"
+                onClick={() => goFromKpi("/admin/sub-projects")}
+              >
                 View all <ChevronRight className="w-4 h-4" />
               </Button>
             }
             loading={projectsLoading}
-            rowClassName={() => 'group'}
+            rowClassName={() => "group"}
             currentPage={projectPage}
             pageSize={5}
             onPageChange={setProjectPage}
             columns={[
-                    {
-                      key: 'project',
-                      label: 'Project',
-                      render: (project) => (
-                        <div className="min-w-0">
-                          <div className="truncate font-medium text-slate-800 dark:text-zinc-200">{project.name}</div>
-                          <div className="truncate text-xs text-slate-400 dark:text-zinc-500">{project.client}</div>
-                        </div>
-                      ),
-                    },
-                    {
-                      key: '_sentiment',
-                      label: 'Sentiment',
-                      align: 'left',
-                      width: 'w-32',
-                      render: (_, row) => <SentimentBadge sentiment={row.project.sentiment} />,
-                    },
+              {
+                key: "project",
+                label: "Project",
+                render: (project) => (
+                  <div className="min-w-0">
+                    <div className="truncate font-medium text-slate-800 ">
+                      {project.name}
+                    </div>
+                    <div className="truncate text-xs text-slate-400 ">
+                      {project.client}
+                    </div>
+                  </div>
+                ),
+              },
+              {
+                key: "_sentiment",
+                label: "Sentiment",
+                align: "left",
+                width: "w-32",
+                render: (_, row) => (
+                  <SentimentBadge sentiment={row.project.sentiment} />
+                ),
+              },
             ]}
             data={projectAnalyses}
-            emptyState={{ title: 'No projects', description: 'Active projects will appear here' }}
+            emptyState={{
+              title: "No projects",
+              description: "Active projects will appear here",
+            }}
           />
         </div>
 
-        {/* Most Active — Autonex users & projects (Encord, this month) */}
-        <div className="space-y-4">
-          {/* Most Active User */}
-          <div className="rounded-2xl border border-slate-200/60 bg-white shadow-[0_1px_3px_rgba(0,0,0,0.04)] dark:border-neutral-800 dark:bg-[#0f0f0f]">
-            <div className="flex items-center justify-between px-5 py-4 border-b border-slate-100 dark:border-neutral-800">
-              <h3 className="text-sm font-semibold text-slate-800 dark:text-zinc-100">Most Active Autonex Users</h3>
-              <span className="text-xs text-slate-400">By hours</span>
-            </div>
-            {topUsers.length === 0 ? (
-              <div className="py-8 text-center text-sm text-slate-400">No activity yet</div>
-            ) : (
-              <ul className="divide-y divide-slate-100 px-3 dark:divide-neutral-800">
-                {topUsers.map((u, idx) => (
-                  <li key={u.user_email} className="flex items-center gap-3 rounded-lg px-2 py-2.5">
-                    <span className={`flex h-7 w-7 shrink-0 items-center justify-center rounded-full text-xs font-bold ${['bg-amber-100 text-amber-700','bg-slate-100 text-slate-600','bg-orange-100 text-orange-700'][idx] || 'bg-slate-50 text-slate-500'}`}>{idx + 1}</span>
-                    <p className="min-w-0 flex-1 truncate text-sm font-medium text-slate-800 dark:text-zinc-200">{u.employee_name || u.user_email}</p>
-                    <span className="inline-flex shrink-0 items-center gap-1 rounded-full bg-indigo-50 px-2.5 py-1 text-xs font-semibold text-indigo-700"><Clock className="h-3 w-3" />{u.hours}h</span>
-                  </li>
-                ))}
-              </ul>
-            )}
-          </div>
-
-          {/* Most Active Project */}
-          <div className="rounded-2xl border border-slate-200/60 bg-white shadow-[0_1px_3px_rgba(0,0,0,0.04)] dark:border-neutral-800 dark:bg-[#0f0f0f]">
-            <div className="flex items-center justify-between px-5 py-4 border-b border-slate-100 dark:border-neutral-800">
-              <h3 className="text-sm font-semibold text-slate-800 dark:text-zinc-100">Most Active Projects</h3>
-              <span className="text-xs text-slate-400">By hours</span>
-            </div>
-            {topActiveProjects.length === 0 ? (
-              <div className="py-8 text-center text-sm text-slate-400">No activity yet</div>
-            ) : (
-              <ul className="divide-y divide-slate-100 px-3 dark:divide-neutral-800">
-                {topActiveProjects.map((p, idx) => (
-                  <li
-                    key={p.encord_project_hash}
-                    onClick={() => p.project_id && navigate(`/admin/analytics/${p.project_id}`)}
-                    className={`flex items-center gap-3 rounded-lg px-2 py-2.5 ${p.project_id ? 'cursor-pointer hover:bg-slate-50 dark:hover:bg-white/[0.03]' : ''}`}
-                  >
-                    <span className={`flex h-7 w-7 shrink-0 items-center justify-center rounded-full text-xs font-bold ${['bg-amber-100 text-amber-700','bg-slate-100 text-slate-600','bg-orange-100 text-orange-700'][idx] || 'bg-slate-50 text-slate-500'}`}>{idx + 1}</span>
-                    <p className="min-w-0 flex-1 truncate text-sm font-medium text-slate-800 dark:text-zinc-200">{p.name}</p>
-                    <span className="inline-flex shrink-0 items-center gap-1 rounded-full bg-emerald-50 px-2.5 py-1 text-xs font-semibold text-emerald-700"><Clock className="h-3 w-3" />{p.hours}h</span>
-                  </li>
-                ))}
-              </ul>
-            )}
-          </div>
-        </div>
+        {/* Most active — Encord time this month, Users / Projects behind tabs */}
+        <MostActivePanel
+          overview={autonexOverview}
+          daily={autonexDaily}
+          onViewAnalytics={() => goFromKpi("/admin/analytics")}
+          onOpenProject={(projectId) =>
+            goFromKpi(`/admin/analytics/${projectId}`)
+          }
+          onViewAllUsers={() => goFromKpi("/admin/employees")}
+        />
       </div>
     </div>
   );
