@@ -104,7 +104,10 @@ export const analyticsApi = {
     api
       .get(`/analytics/project/${mainProjectId}`, { params })
       .then((res) => res.data),
-  getSummary: () => api.get("/analytics/summary").then((res) => res.data),
+  getSummary: (range) =>
+    api
+      .get("/analytics/summary", { params: range ? { range } : {} })
+      .then((res) => res.data),
   // Autonex-only KPIs + daily graph for a project. range = '1' | '7' | '30'
   getAutonexProjectKpis: (subProjectId, range) =>
     api

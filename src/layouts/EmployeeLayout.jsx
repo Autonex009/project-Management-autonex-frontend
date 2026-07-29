@@ -4,6 +4,7 @@ import { authApi } from "../services/api";
 import { useState, useEffect, useRef } from "react";
 import { useQuery, useQueryClient } from "@tanstack/react-query";
 import NotificationBell from "../components/NotificationBell";
+import PortalSwitcher from "../components/PortalSwitcher";
 import Breadcrumbs from "../components/ui/Breadcrumbs";
 import { useBreadcrumbTrail } from "../hooks/useBreadcrumbTrail";
 import EmployeeSidebar from "./EmployeeSidebar";
@@ -273,6 +274,7 @@ const EmployeeLayout = () => {
           </div>
 
           <div className="flex items-center gap-2">
+            <PortalSwitcher />
             <NotificationBell />
           </div>
         </header>

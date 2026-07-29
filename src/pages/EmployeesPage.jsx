@@ -526,6 +526,7 @@ function EmployeeConvertToFulltimeModal({
 
 const ALLOWED_DESIGNATIONS = [
   "Admin",
+  "HR",
   "Annotator/ Reviewer",
   "Program Manager",
   "Developer",

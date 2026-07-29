@@ -95,8 +95,8 @@ const AnalyticsDashboard = () => {
   }, []);
 
   const { data: rows = [], isLoading } = useQuery({
-    queryKey: ["analytics-summary"],
-    queryFn: analyticsApi.getSummary,
+    queryKey: ["analytics-summary", range],
+    queryFn: () => analyticsApi.getSummary(range),
     // Encord data is refreshed once a day by the scheduler, so there is nothing
     // to gain from background polling — refetch on mount/focus is enough.
     refetchOnWindowFocus: true,

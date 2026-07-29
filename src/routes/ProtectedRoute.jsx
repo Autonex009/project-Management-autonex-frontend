@@ -76,6 +76,7 @@ const ProtectedRoute = ({ children, allowedRoles }) => {
     // Redirect to the correct dashboard for their role
     const dashboardMap = {
       admin: "/admin/dashboard",
+      hr: "/admin/dashboard", // HR lands in Admin; can switch to PM via the portal switcher
       pm: "/pm/dashboard",
       employee: "/employee/dashboard",
     };
