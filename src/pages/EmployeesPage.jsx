@@ -7,6 +7,7 @@ import {
   allocationApi,
   subProjectApi,
   parentProjectApi,
+  leaveApi,
 } from "../services/api";
 import {
   Plus,
@@ -34,6 +35,15 @@ import {
   Check,
 } from "lucide-react";
 import toast from "react-hot-toast";
+import MetricDots from "../components/ui/MetricDots";
+import {
+  todayLocalISO,
+  isArchived,
+  getOnLeaveTodayIds,
+  buildAssignedProjectsMap,
+  hasAssignedProject,
+  bucketWorkforce,
+} from "../utils/workforce";
 import Table, {
   ColumnTemplates,
   formatDateDeterministic,
@@ -986,7 +996,6 @@ function EmployeeActionMenu({
   setFormDesignation,
   setFormEmployeeType,
   setFormWorkModel,
-  setFormEmpStatus,
   setIsModalOpen,
   setArchiveTarget,
   convertPending,
@@ -1058,7 +1067,6 @@ function EmployeeActionMenu({
                   setFormDesignation(row.designation || "Annotator/ Reviewer");
                   setFormEmployeeType(row.employee_type || "Full-time");
                   setFormWorkModel(row.work_model || "WFO");
-                  setFormEmpStatus(row.status || "active");
                   setIsModalOpen(true);
                 }}
                 className="w-full text-left px-3 py-2 text-slate-700 hover:bg-slate-50 hover:text-indigo-600 flex items-center gap-2 transition-colors"
@@ -1124,23 +1132,20 @@ const EmployeesPage = () => {
   const [formDesignation, setFormDesignation] = useState("Annotator/ Reviewer");
   const [formEmployeeType, setFormEmployeeType] = useState("Full-time");
   const [formWorkModel, setFormWorkModel] = useState("WFO");
-  const [formEmpStatus, setFormEmpStatus] = useState("active");
   const PAGE_SIZE = 10;
 
   // Fetch employees
   const { data: employees = [], isLoading } = useQuery({
-    queryKey: ["employees", statusParam],
-    queryFn: () => {
-      if (statusParam === "active") {
-        return employeeApi.getActive();
-      } else if (statusParam === "inactive") {
-        return employeeApi.getInactive();
-      } else if (statusParam === "idle") {
-        return employeeApi.getIdle();
-      } else {
-        return employeeApi.getAll(statusParam ? { status: statusParam } : {});
-      }
-    },
+    // Active / Inactive / Idle are derived from leave + allocations, not from
+    // the stored status column, so the /status/* endpoints are no longer used —
+    // they would answer a different question. Fetch the whole roster and let the
+    // chips narrow it client-side. Archived stays a server-side filter because
+    // it IS the stored column.
+    queryKey: ["employees", statusParam === "archived" ? "archived" : "roster"],
+    queryFn: () =>
+      statusParam === "archived"
+        ? employeeApi.getAll({ status: "archived" })
+        : employeeApi.getAll(),
   });
 
   // Fetch all allocations so we can show assigned projects per employee
@@ -1168,46 +1173,29 @@ const EmployeesPage = () => {
     queryFn: () => employeeApi.getAll({ include_archived: true }),
   });
 
+  // Who is away today drives the Inactive bucket. GET /leaves filters by
+  // overlap (end_date >= start param AND start_date <= end param), so asking
+  // for today..today returns every leave that covers today — including
+  // multi-day ones that started earlier.
+  const todayStr = todayLocalISO();
+  const { data: leavesToday = [] } = useQuery({
+    queryKey: ["leaves", "today", todayStr],
+    queryFn: () => leaveApi.getAll({ start_date: todayStr, end_date: todayStr }),
+  });
+
   const allStaff = allEmployeesData.length > 0 ? allEmployeesData : employees;
 
-  // Build employee_id -> Set<project_name> map (excluding inactive employees)
-  const employeeProjectsMap = allocations.reduce((map, alloc) => {
-    const emp = allStaff.find(
-      (e) => String(e.id) === String(alloc.employee_id),
-    );
-    if (emp && (emp.status || "").toLowerCase() === "inactive") {
-      return map;
-    }
-    const projectName = alloc.sub_project_name || alloc.project_name;
-    if (!projectName) return map;
-    if (!map[alloc.employee_id]) map[alloc.employee_id] = new Set();
-    map[alloc.employee_id].add(projectName);
-    return map;
-  }, {});
-
-  // Program Managers own the parent projects (organizations) they manage — surface
-  // the actual projects (sub-projects) under those organizations as "assigned", so a
-  // PM who manages a project is never shown as idle even without a worker allocation.
-  mainProjects.forEach((mp) => {
-    if (!mp?.id) return;
-    const ids = mp.program_manager_ids?.length
-      ? mp.program_manager_ids
-      : mp.program_manager_id
-        ? [mp.program_manager_id]
-        : [];
-    if (ids.length === 0) return;
-    const childProjects = subProjects.filter(
-      (sp) => String(sp.main_project_id) === String(mp.id),
-    );
-    if (childProjects.length === 0) return;
-    ids.forEach((pmId) => {
-      const emp = allStaff.find((e) => String(e.id) === String(pmId));
-      if (emp && (emp.status || "").toLowerCase() === "inactive") return;
-      if (!employeeProjectsMap[pmId]) employeeProjectsMap[pmId] = new Set();
-      childProjects.forEach((sp) => {
-        if (sp.name) employeeProjectsMap[pmId].add(sp.name);
-      });
-    });
+  // employee id -> Set<project name>. Shared with the Dashboard via
+  // utils/workforce so both pages credit program managers the same way — a PM
+  // running projects is working even with no allocation of their own, whether
+  // that assignment sits on the main project or directly on the sub-project.
+  // Stored status is deliberately not consulted: hiding a stored-"inactive"
+  // person's real allocations would have filed them as Idle regardless of what
+  // they are actually working on.
+  const employeeProjectsMap = buildAssignedProjectsMap({
+    allocations,
+    mainProjects,
+    subProjects,
   });
 
   // Resolve reporting manager(s) per employee = PM(s) of the main project(s) they're
@@ -1267,64 +1255,86 @@ const EmployeesPage = () => {
     }
   }, [allocations, allStaff, queryClient]);
 
-  // KPI Classification 1: Status (Active, Inactive, Idle)
-  const activeCount = allStaff.filter(
-    (e) => (e.status || "active").toLowerCase() === "active",
-  ).length;
-  const inactiveCount = allStaff.filter(
-    (e) => (e.status || "").toLowerCase() === "inactive",
-  ).length;
-  const idleCount = allStaff.filter((e) => {
-    const isActive = (e.status || "active").toLowerCase() === "active";
-    const isIdle =
-      !employeeProjectsMap[e.id] || employeeProjectsMap[e.id].size === 0;
-    return isActive && isIdle;
-  }).length;
+  // KPI Classification 1: today's engagement (Active, Inactive, Idle).
+  //
+  // Derived by utils/workforce, which the Dashboard shares — when each page
+  // carried its own copy of these rules they disagreed (199 vs 204).
+  const onLeaveTodayIds = getOnLeaveTodayIds(leavesToday, todayStr);
+  const isOnLeaveToday = (e) => onLeaveTodayIds.has(String(e.id));
+  const hasProject = (e) => hasAssignedProject(employeeProjectsMap, e.id);
 
+  const {
+    onRoster: onRosterStaff,
+    active: activeStaff,
+    inactive: inactiveStaff,
+    idle: idleStaff,
+  } = bucketWorkforce({
+    employees: allStaff,
+    onLeaveIds: onLeaveTodayIds,
+    projectsMap: employeeProjectsMap,
+  });
+
+  const onRosterCount = onRosterStaff.length;
+  const activeCount = activeStaff.length;
+  const inactiveCount = inactiveStaff.length;
+  const idleCount = idleStaff.length;
+
+  // Tab totals read from the include_archived query so both tabs show a count
+  // no matter which one is currently loaded. While that query is still in
+  // flight the counts are hidden rather than rendering a misleading 0.
+  const archivedTeamCount = allEmployeesData.filter(
+    (e) => (e.status || "").toLowerCase() === "archived",
+  ).length;
+  const activeTeamCount = allEmployeesData.length - archivedTeamCount;
+  const hasTeamCounts = allEmployeesData.length > 0;
+
+  // Everything below counts the ON-ROSTER population, matching the headline on
+  // each card. These previously ran over allStaff, which includes the archived /
+  // former staff — that is why Work Model showed WFO 229 beneath a 204 total.
   // KPI Classification 2: Type (Full-time, Intern, Contract)
-  const fullTimeCount = allStaff.filter((e) => {
+  const fullTimeCount = onRosterStaff.filter((e) => {
     const t = (e.employee_type || "").toLowerCase();
     return t.includes("full") || t === "fulltime";
   }).length;
 
-  const internCount = allStaff.filter((e) => {
+  const internCount = onRosterStaff.filter((e) => {
     const t = (e.employee_type || "").toLowerCase();
     return t.includes("intern");
   }).length;
 
-  const contractCount = allStaff.filter((e) => {
+  const contractCount = onRosterStaff.filter((e) => {
     const t = (e.employee_type || "").toLowerCase();
     return t.includes("contract") || t.includes("part");
   }).length;
 
   // KPI Classification 3: Roles (Project Managers, Annotator/Reviewer, QC)
-  const pmCount = allStaff.filter((e) => {
+  const pmCount = onRosterStaff.filter((e) => {
     const d = (e.designation || "").toLowerCase();
     return d.includes("manager") || d.includes("pm") || d.includes("lead");
   }).length;
 
-  const annotatorCount = allStaff.filter((e) => {
+  const annotatorCount = onRosterStaff.filter((e) => {
     const d = (e.designation || "").toLowerCase();
     return d.includes("annotator") || d.includes("reviewer");
   }).length;
 
-  const qcCount = allStaff.filter((e) => {
+  const qcCount = onRosterStaff.filter((e) => {
     const d = (e.designation || "").toLowerCase();
     return d.includes("qc") || d.includes("quality");
   }).length;
 
   // KPI Classification 4: Work Model (WFO, WFH, Hybrid)
-  const wfoCount = allStaff.filter((e) => {
+  const wfoCount = onRosterStaff.filter((e) => {
     const wm = (e.work_model || "WFO").toUpperCase();
     return wm === "WFO" || wm.includes("OFFICE");
   }).length;
 
-  const wfhCount = allStaff.filter((e) => {
+  const wfhCount = onRosterStaff.filter((e) => {
     const wm = (e.work_model || "").toUpperCase();
     return wm === "WFH" || wm.includes("HOME");
   }).length;
 
-  const hybridCount = allStaff.filter((e) => {
+  const hybridCount = onRosterStaff.filter((e) => {
     const wm = (e.work_model || "").toUpperCase();
     return wm === "HYBRID";
   }).length;
@@ -1453,7 +1463,6 @@ const EmployeesPage = () => {
     setFormDesignation("Annotator/ Reviewer");
     setFormEmployeeType("Full-time");
     setFormWorkModel("WFO");
-    setFormEmpStatus("active");
   };
 
   const handleSubmit = (e) => {
@@ -1483,7 +1492,10 @@ const EmployeesPage = () => {
       weekly_availability: parseFloat(formData.get("weekly_availability")),
       skills,
       // productivity_baseline removed
-      status: formData.get("status") || "active",
+      // `status` is deliberately not sent. Active/Inactive is derived from
+      // leave + allocations now, and status only carries the archived flag.
+      // The create schema defaults it to "active" and the update endpoint uses
+      // exclude_unset, so omitting it preserves whatever is stored.
     };
 
     if (editingEmployee) {
@@ -1556,25 +1568,19 @@ const EmployeesPage = () => {
     const matchesColType = !colType || employee.employee_type === colType;
     const matchesColWorkModel =
       !colWorkModel || (employee.work_model || "WFO") === colWorkModel;
-    const isIdle = !employeeProjectsMap[employee.id];
+    const isIdle = !isOnLeaveToday(employee) && !hasProject(employee);
     const matchesIdle = !idleOnly || isIdle;
+    // Same three derived buckets the KPI card counts, so clicking a chip lists
+    // exactly the people that card totalled.
     const matchesStatus = (() => {
-      if (!statusParam) {
-        return employee.status?.toLowerCase() !== "archived";
-      }
-      if (statusParam === "archived") {
-        return employee.status?.toLowerCase() === "archived";
-      }
+      if (statusParam === "archived") return isArchived(employee);
+      if (isArchived(employee)) return false;
       if (statusParam === "active") {
-        return employee.status?.toLowerCase() === "active";
+        return !isOnLeaveToday(employee) && hasProject(employee);
       }
-      if (statusParam === "inactive") {
-        return employee.status?.toLowerCase() === "inactive";
-      }
-      if (statusParam === "idle") {
-        return employee.status?.toLowerCase() === "active" && isIdle;
-      }
-      return employee.status?.toLowerCase() === statusParam.toLowerCase();
+      if (statusParam === "inactive") return isOnLeaveToday(employee);
+      if (statusParam === "idle") return isIdle;
+      return true; // "all" / no chip → the whole on-roster list
     })();
     return (
       matchesSearch &&
@@ -1652,32 +1658,41 @@ const EmployeesPage = () => {
                 </div>
               </div>
               <div className="text-xl sm:text-2xl font-normal text-slate-800 tracking-tight flex-shrink-0">
-                {allStaff.length}
+                {onRosterCount}
               </div>
             </div>
 
-            <div className="pt-2 border-t border-slate-100 flex items-center justify-between text-[11px] gap-1 flex-wrap">
-              <div className="flex items-center gap-1">
-                <span className="w-1.5 h-1.5 rounded-full bg-indigo-500" />
-                <span className="text-slate-500 font-normal">WFO:</span>
-                <span className="font-normal text-indigo-600 ">{wfoCount}</span>
-              </div>
-              <div className="flex items-center gap-1">
-                <span className="w-1.5 h-1.5 rounded-full bg-cyan-500" />
-                <span className="text-slate-500 font-normal">WFH:</span>
-                <span className="font-normal text-cyan-600 ">{wfhCount}</span>
-              </div>
-              <div className="flex items-center gap-1">
-                <span className="w-1.5 h-1.5 rounded-full bg-purple-500" />
-                <span className="text-slate-500 font-normal">Hybrid:</span>
-                <span className="font-normal text-purple-600 ">
-                  {hybridCount}
-                </span>
-              </div>
+            <div className="pt-2 border-t border-slate-100">
+              <MetricDots
+                spread
+                labelFirst
+                items={[
+                  {
+                    label: "Active",
+                    value: activeCount,
+                    dot: "bg-emerald-500",
+                    tone: "text-emerald-600",
+                  },
+                  {
+                    label: "Inactive",
+                    value: inactiveCount,
+                    dot: "bg-slate-400",
+                    tone: "text-slate-500",
+                  },
+                  {
+                    label: "Idle",
+                    value: idleCount,
+                    dot: "bg-amber-500",
+                    tone: "text-amber-600",
+                  },
+                ]}
+              />
             </div>
           </div>
 
-          {/* KPI 2: Workforce Status */}
+          {/* KPI 2: Work Model — took over this slot when Active/Inactive/Idle
+              moved onto the Total Employees card, so the two stopped being
+              duplicates of each other. */}
           <div className="bg-white border border-slate-200/60 rounded-2xl p-3.5 shadow-[0_1px_3px_rgba(0,0,0,0.04)] flex flex-col justify-between hover:shadow-md transition-all duration-200">
             <div className="flex items-center justify-between gap-2 mb-2.5">
               <div className="flex items-center gap-2.5 min-w-0">
@@ -1685,34 +1700,39 @@ const EmployeesPage = () => {
                   <UserCheck className="w-4 h-4" />
                 </div>
                 <div className="text-[11px] font-semibold text-slate-500 uppercase tracking-wider truncate">
-                  WORKFORCE STATUS
+                  WORK MODEL
                 </div>
               </div>
               <div className="text-xl sm:text-2xl font-normal text-slate-800 tracking-tight flex-shrink-0">
-                {activeCount}
+                {onRosterCount}
               </div>
             </div>
 
-            <div className="pt-2 border-t border-slate-100 flex items-center justify-between text-[11px] gap-1 flex-wrap">
-              <div className="flex items-center gap-1">
-                <span className="w-1.5 h-1.5 rounded-full bg-emerald-500" />
-                <span className="text-slate-500 font-normal">Active:</span>
-                <span className="font-normal text-emerald-600 ">
-                  {activeCount}
-                </span>
-              </div>
-              <div className="flex items-center gap-1">
-                <span className="w-1.5 h-1.5 rounded-full bg-slate-400" />
-                <span className="text-slate-500 font-normal">Inactive:</span>
-                <span className="font-normal text-slate-500 ">
-                  {inactiveCount}
-                </span>
-              </div>
-              <div className="flex items-center gap-1">
-                <span className="w-1.5 h-1.5 rounded-full bg-amber-500" />
-                <span className="text-slate-500 font-normal">Idle:</span>
-                <span className="font-normal text-amber-600 ">{idleCount}</span>
-              </div>
+            <div className="pt-2 border-t border-slate-100">
+              <MetricDots
+                spread
+                labelFirst
+                items={[
+                  {
+                    label: "WFO",
+                    value: wfoCount,
+                    dot: "bg-indigo-500",
+                    tone: "text-indigo-600",
+                  },
+                  {
+                    label: "WFH",
+                    value: wfhCount,
+                    dot: "bg-cyan-500",
+                    tone: "text-cyan-600",
+                  },
+                  {
+                    label: "Hybrid",
+                    value: hybridCount,
+                    dot: "bg-purple-500",
+                    tone: "text-purple-600",
+                  },
+                ]}
+              />
             </div>
           </div>
 
@@ -1732,28 +1752,31 @@ const EmployeesPage = () => {
               </div>
             </div>
 
-            <div className="pt-2 border-t border-slate-100 flex items-center justify-between text-[11px] gap-1 flex-wrap">
-              <div className="flex items-center gap-1">
-                <span className="w-1.5 h-1.5 rounded-full bg-emerald-500" />
-                <span className="text-slate-500 font-normal">Full-time:</span>
-                <span className="font-normal text-emerald-600 ">
-                  {fullTimeCount}
-                </span>
-              </div>
-              <div className="flex items-center gap-1">
-                <span className="w-1.5 h-1.5 rounded-full bg-amber-500" />
-                <span className="text-slate-500 font-normal">Intern:</span>
-                <span className="font-normal text-amber-600 ">
-                  {internCount}
-                </span>
-              </div>
-              <div className="flex items-center gap-1">
-                <span className="w-1.5 h-1.5 rounded-full bg-sky-500" />
-                <span className="text-slate-500 font-normal">Contract:</span>
-                <span className="font-normal text-sky-500 ">
-                  {contractCount}
-                </span>
-              </div>
+            <div className="pt-2 border-t border-slate-100">
+              <MetricDots
+                spread
+                labelFirst
+                items={[
+                  {
+                    label: "Full-time",
+                    value: fullTimeCount,
+                    dot: "bg-emerald-500",
+                    tone: "text-emerald-600",
+                  },
+                  {
+                    label: "Intern",
+                    value: internCount,
+                    dot: "bg-amber-500",
+                    tone: "text-amber-600",
+                  },
+                  {
+                    label: "Contract",
+                    value: contractCount,
+                    dot: "bg-sky-500",
+                    tone: "text-sky-500",
+                  },
+                ]}
+              />
             </div>
           </div>
 
@@ -1773,24 +1796,31 @@ const EmployeesPage = () => {
               </div>
             </div>
 
-            <div className="pt-2 border-t border-slate-100 flex items-center justify-between text-[11px] gap-1 flex-wrap">
-              <div className="flex items-center gap-1">
-                <span className="w-1.5 h-1.5 rounded-full bg-indigo-500" />
-                <span className="text-slate-500 font-normal">PMs:</span>
-                <span className="font-normal text-slate-700 ">{pmCount}</span>
-              </div>
-              <div className="flex items-center gap-1">
-                <span className="w-1.5 h-1.5 rounded-full bg-sky-500" />
-                <span className="text-slate-500 font-normal">Annotators:</span>
-                <span className="font-normal text-slate-700 ">
-                  {annotatorCount}
-                </span>
-              </div>
-              <div className="flex items-center gap-1">
-                <span className="w-1.5 h-1.5 rounded-full bg-purple-500" />
-                <span className="text-slate-500 font-normal">QC:</span>
-                <span className="font-normal text-slate-700 ">{qcCount}</span>
-              </div>
+            <div className="pt-2 border-t border-slate-100">
+              <MetricDots
+                spread
+                labelFirst
+                items={[
+                  {
+                    label: "PMs",
+                    value: pmCount,
+                    dot: "bg-indigo-500",
+                    tone: "text-slate-700",
+                  },
+                  {
+                    label: "Annotators",
+                    value: annotatorCount,
+                    dot: "bg-sky-500",
+                    tone: "text-slate-700",
+                  },
+                  {
+                    label: "QC",
+                    value: qcCount,
+                    dot: "bg-purple-500",
+                    tone: "text-slate-700",
+                  },
+                ]}
+              />
             </div>
           </div>
         </div>
@@ -1808,7 +1838,20 @@ const EmployeesPage = () => {
                 : "border-transparent text-slate-500 hover:text-slate-700"
             }`}
           >
-            Active Team
+            <span className="inline-flex items-center gap-2">
+              Active Team
+              {hasTeamCounts && (
+                <span
+                  className={`rounded-md px-1.5 py-0.5 text-xs font-semibold tabular-nums ${
+                    statusParam !== "archived"
+                      ? "bg-indigo-50 text-indigo-600"
+                      : "bg-slate-100 text-slate-500"
+                  }`}
+                >
+                  {activeTeamCount}
+                </span>
+              )}
+            </span>
           </button>
           <button
             onClick={() => {
@@ -1822,7 +1865,20 @@ const EmployeesPage = () => {
                 : "border-transparent text-slate-500 hover:text-slate-700"
             }`}
           >
-            Archived / Former
+            <span className="inline-flex items-center gap-2">
+              Archived / Former
+              {hasTeamCounts && (
+                <span
+                  className={`rounded-md px-1.5 py-0.5 text-xs font-semibold tabular-nums ${
+                    statusParam === "archived"
+                      ? "bg-indigo-50 text-indigo-600"
+                      : "bg-slate-100 text-slate-500"
+                  }`}
+                >
+                  {archivedTeamCount}
+                </span>
+              )}
+            </span>
           </button>
         </div>
         {/* Toolbar — Untitled-UI style: status segment on the left · search / filter / sort on the right */}
@@ -1953,7 +2009,6 @@ const EmployeesPage = () => {
                 setFormDesignation("Annotator/ Reviewer");
                 setFormEmployeeType("Full-time");
                 setFormWorkModel("WFO");
-                setFormEmpStatus("active");
                 setIsModalOpen(true);
               }}
               className="inline-flex items-center gap-1.5 h-9 px-3.5 rounded-lg bg-indigo-600 text-white text-[13px] font-semibold hover:bg-indigo-700 shadow-sm transition-colors"
@@ -2379,7 +2434,6 @@ const EmployeesPage = () => {
                     setFormDesignation={setFormDesignation}
                     setFormEmployeeType={setFormEmployeeType}
                     setFormWorkModel={setFormWorkModel}
-                    setFormEmpStatus={setFormEmpStatus}
                     setIsModalOpen={setIsModalOpen}
                     setArchiveTarget={setArchiveTarget}
                     convertPending={convertMutation.isPending}
@@ -2604,25 +2658,6 @@ const EmployeesPage = () => {
                   max="168"
                   defaultValue={editingEmployee?.weekly_availability || 40}
                   className="input"
-                />
-              </div>
-            </div>
-
-            <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
-              <div>
-                <label className="block text-sm font-medium text-gray-700 mb-1">
-                  Status <span className="text-red-500">*</span>
-                </label>
-                <input type="hidden" name="status" value={formEmpStatus} />
-                <Dropdown
-                  options={[
-                    { value: "active", label: "Active" },
-                    { value: "inactive", label: "Inactive" },
-                    { value: "on-leave", label: "On Leave" },
-                  ]}
-                  value={formEmpStatus}
-                  onChange={setFormEmpStatus}
-                  placeholder="Select status"
                 />
               </div>
             </div>

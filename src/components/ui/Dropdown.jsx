@@ -1,5 +1,7 @@
 import { useState, useRef, useEffect } from "react";
-import { ChevronDown, X } from "lucide-react";
+import { ChevronDown, Search, X } from "lucide-react";
+
+const optionLabel = (opt) => (typeof opt === "string" ? opt : (opt?.label ?? ""));
 
 const Dropdown = ({
   options = [],
@@ -12,11 +14,17 @@ const Dropdown = ({
   allowCreate = true,
   optionsClassName = "w-full",
   defaultOpen = false,
+  // Adds a filter box above the option list. Unlike `editable` this stays a plain
+  // select — the trigger keeps showing the selected option's *label*, so it is safe
+  // for option lists whose value differs from its label (e.g. an id).
+  searchable = false,
+  searchPlaceholder = "Search...",
 }) => {
   const [open, setOpen] = useState(defaultOpen);
   const [searchText, setSearchText] = useState("");
   const ref = useRef(null);
   const inputRef = useRef(null);
+  const searchRef = useRef(null);
 
   useEffect(() => {
     const handler = (e) => {
@@ -39,7 +47,15 @@ const Dropdown = ({
     if (open && editable && inputRef.current) {
       inputRef.current.focus();
     }
-  }, [open, editable]);
+    if (open && searchable && searchRef.current) {
+      searchRef.current.focus();
+    }
+  }, [open, editable, searchable]);
+
+  // A stale query would silently hide options the next time the list opens.
+  useEffect(() => {
+    if (!open && searchable) setSearchText("");
+  }, [open, searchable]);
 
   const displayValue = options.find(
     (opt) => (typeof opt === "string" ? opt : opt.value) === value,
@@ -60,6 +76,11 @@ const Dropdown = ({
         const label = typeof opt === "string" ? opt : opt.label;
         return label.toLowerCase().includes(searchText.toLowerCase());
       })
+    : options;
+
+  const query = searchable ? searchText.trim().toLowerCase() : "";
+  const searchedOptions = query
+    ? options.filter((opt) => optionLabel(opt).toLowerCase().includes(query))
     : options;
 
   const handleSelect = (optValue) => {
@@ -190,31 +211,75 @@ const Dropdown = ({
       </button>
       {open && !disabled && (
         <div
-          className={`absolute left-0 top-full mt-1 z-[9999] ${optionsClassName} bg-white border border-slate-200 rounded-xl shadow-lg py-1 max-h-64 overflow-y-auto`}
+          className={`absolute left-0 top-full mt-1 z-[9999] ${optionsClassName} bg-white border border-slate-200 rounded-xl shadow-lg overflow-hidden`}
         >
-          {options.map((opt) => {
-            const optValue = typeof opt === "string" ? opt : opt.value;
-            const optLabel = typeof opt === "string" ? opt : opt.label;
-            return (
-              <button
-                key={optValue}
-                type="button"
-                onClick={(e) => {
-                  e.preventDefault();
-                  e.stopPropagation();
-                  onChange(optValue);
-                  setOpen(false);
-                }}
-                className={`w-full text-left px-3 py-1.5 text-sm transition-colors ${
-                  optValue === value
-                    ? "bg-indigo-50 text-indigo-700 font-medium"
-                    : "text-slate-700 hover:bg-slate-50"
-                }`}
-              >
-                {optLabel}
-              </button>
-            );
-          })}
+          {searchable && (
+            <div className="border-b border-slate-100 p-1.5">
+              <div className="flex items-center gap-1.5 rounded-lg bg-slate-50 px-2 py-1.5">
+                <Search className="h-3.5 w-3.5 shrink-0 text-slate-400" />
+                <input
+                  ref={searchRef}
+                  type="text"
+                  value={searchText}
+                  placeholder={searchPlaceholder}
+                  onClick={(e) => e.stopPropagation()}
+                  onChange={(e) => setSearchText(e.target.value)}
+                  onKeyDown={(e) => {
+                    if (e.key === "Escape") {
+                      e.stopPropagation();
+                      setOpen(false);
+                    }
+                  }}
+                  className="w-full bg-transparent text-sm text-slate-700 outline-none placeholder:text-slate-400"
+                />
+                {searchText && (
+                  <button
+                    type="button"
+                    onClick={(e) => {
+                      e.stopPropagation();
+                      setSearchText("");
+                      searchRef.current?.focus();
+                    }}
+                    className="p-0.5 text-slate-400 hover:text-slate-600"
+                  >
+                    <X className="h-3 w-3" />
+                  </button>
+                )}
+              </div>
+            </div>
+          )}
+          <div className="max-h-64 overflow-y-auto py-1">
+            {searchedOptions.length === 0 ? (
+              <div className="px-3 py-2 text-sm text-slate-400">
+                {query ? "No matches" : "No options"}
+              </div>
+            ) : (
+              searchedOptions.map((opt) => {
+                const optValue = typeof opt === "string" ? opt : opt.value;
+                const optLabel = typeof opt === "string" ? opt : opt.label;
+                return (
+                  <button
+                    key={optValue}
+                    type="button"
+                    onClick={(e) => {
+                      e.preventDefault();
+                      e.stopPropagation();
+                      onChange(optValue);
+                      setSearchText("");
+                      setOpen(false);
+                    }}
+                    className={`w-full text-left px-3 py-1.5 text-sm transition-colors ${
+                      optValue === value
+                        ? "bg-indigo-50 text-indigo-700 font-medium"
+                        : "text-slate-700 hover:bg-slate-50"
+                    }`}
+                  >
+                    {optLabel}
+                  </button>
+                );
+              })
+            )}
+          </div>
         </div>
       )}
     </div>

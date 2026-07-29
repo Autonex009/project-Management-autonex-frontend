@@ -320,11 +320,21 @@ const AllocationsPage = () => {
   const handleSubmit = (e) => {
     e.preventDefault();
 
-    // Check for over-allocation
-    const currentAllocated = allocations.filter(
-      (a) => a.sub_project_id === selectedProject.id,
-    ).length;
-    const newTotal = currentAllocated + selectedEmployees.length;
+    // Check for over-allocation. PMs already fill manpower slots and are counted
+    // in required_manpower, so the current fill must include them or this warning
+    // fires too late. Union by employee id so someone already allocated — or a PM
+    // being allocated now — is never counted twice.
+    const filledIds = new Set(
+      allocations
+        .filter((a) => a.sub_project_id === selectedProject.id)
+        .map((a) => String(a.employee_id)),
+    );
+    resolvePmIds(selectedProject).forEach((id) => {
+      if (id != null) filledIds.add(String(id));
+    });
+    const currentAllocated = filledIds.size;
+    selectedEmployees.forEach((emp) => filledIds.add(String(emp.id)));
+    const newTotal = filledIds.size;
     const required = selectedProject.required_manpower || 0;
 
     if (newTotal > required) {
@@ -418,15 +428,40 @@ const AllocationsPage = () => {
     return visibleAllocations.filter((a) => a.sub_project_id === projectId);
   };
 
+  // A project's PMs occupy manpower slots, and the backend already counts them
+  // in required_manpower — so the assigned side has to count them too or the
+  // ratio reads short by the number of managers. Same resolution order as
+  // ProjectsPage: the project's own PM ids win, else the main project's.
+  const resolvePmIds = (project) => {
+    if (project?.assigned_employee_ids?.length)
+      return project.assigned_employee_ids;
+    if (project?.pm_id) return [project.pm_id];
+    const parent = parentProjects.find((p) => p.id === project?.main_project_id);
+    if (parent?.program_manager_ids?.length) return parent.program_manager_ids;
+    return parent?.program_manager_id ? [parent.program_manager_id] : [];
+  };
+
   // Group allocations by project
   const projectAllocations = visibleProjects
-    .map((project) => ({
-      project,
-      allocations: visibleAllocations.filter(
+    .map((project) => {
+      const allocations = visibleAllocations.filter(
         (a) => a.sub_project_id === project.id,
-      ),
-      requiredManpower: project.required_manpower || 0,
-    }))
+      );
+      const pmIds = resolvePmIds(project);
+      // Count people, not allocation rows: a PM who is also allocated, or anyone
+      // holding two allocations here, must only fill one slot.
+      const filledIds = new Set(
+        allocations.map((a) => String(a.employee_id)),
+      );
+      pmIds.forEach((id) => id != null && filledIds.add(String(id)));
+      return {
+        project,
+        allocations,
+        pmIds,
+        assignedManpower: filledIds.size,
+        requiredManpower: project.required_manpower || 0,
+      };
+    })
     .filter((pa) => pa.allocations.length > 0 || pa.requiredManpower > 0);
 
   const [searchQuery, setSearchQuery] = useState("");
@@ -607,7 +642,7 @@ const AllocationsPage = () => {
             width: "w-[28%]",
             render: (_, row) => {
               const project = row.project;
-              const assigned = row.allocations.length;
+              const assigned = row.assignedManpower ?? row.allocations.length;
               const required = row.requiredManpower || 0;
               const full = assigned >= required && required > 0;
               // Split allocated employees into on-leave / WFH / WFO for today.
@@ -629,6 +664,7 @@ const AllocationsPage = () => {
                     project={project}
                     allocations={row.allocations}
                     employees={employees}
+                    pmIds={row.pmIds}
                     onLeaveEmployeeIds={leaveEmployeeIds}
                     locationByEmployeeId={locationByEmployeeId}
                     triggerClassName="inline-flex items-center rounded-md focus:outline-none"
