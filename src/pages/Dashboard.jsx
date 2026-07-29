@@ -36,8 +36,18 @@ import { getWorkingDays } from "../utils/dateCalculations";
 // The three engagement buckets, colour-matched to the dots on the Employees page
 // so Active / Inactive / Idle mean the same colour wherever they appear.
 const BUCKET_TONES = [
-  { key: "active", label: "active", dot: "bg-emerald-500", text: "text-emerald-600" },
-  { key: "inactive", label: "inactive", dot: "bg-slate-400", text: "text-slate-500" },
+  {
+    key: "active",
+    label: "active",
+    dot: "bg-emerald-500",
+    text: "text-emerald-600",
+  },
+  {
+    key: "inactive",
+    label: "inactive",
+    dot: "bg-slate-400",
+    text: "text-slate-500",
+  },
   { key: "idle", label: "idle", dot: "bg-amber-500", text: "text-amber-600" },
 ];
 
@@ -110,13 +120,25 @@ const ProjectSplit = ({ active, archived }) => (
 );
 
 const MONTHS = [
-  "Jan", "Feb", "Mar", "Apr", "May", "Jun",
-  "Jul", "Aug", "Sep", "Oct", "Nov", "Dec",
+  "Jan",
+  "Feb",
+  "Mar",
+  "Apr",
+  "May",
+  "Jun",
+  "Jul",
+  "Aug",
+  "Sep",
+  "Oct",
+  "Nov",
+  "Dec",
 ];
 // Formats a YYYY-MM-DD string without going through Date(), which would reparse
 // it as UTC midnight and can shift the day in IST.
 const shortDate = (iso) => {
-  const [, m, d] = String(iso || "").slice(0, 10).split("-");
+  const [, m, d] = String(iso || "")
+    .slice(0, 10)
+    .split("-");
   if (!m || !d) return "";
   return `${MONTHS[Number(m) - 1]} ${Number(d)}`;
 };
@@ -555,7 +577,6 @@ const Dashboard = () => {
   return (
     <div className="space-y-4">
       {/* Page Header */}
-    
 
       {/* ===== KPI cards (compact, 2/3) + Most active (1/3) =====
           items-start keeps the short KPI row from stretching to the taller panel. */}
@@ -564,94 +585,99 @@ const Dashboard = () => {
             fills the space alongside the much taller Most active panel. */}
         <div className="space-y-4 lg:col-span-2">
           <div className="grid grid-cols-1 gap-3 sm:grid-cols-3">
-        <StatCard
-          compact
-          title="Total Employees"
-          label="On roster"
-          value={workforce.onRoster.length}
-          icon={Users}
-          tone="amber"
-          hint={<WorkforceSplit workforce={workforce} />}
-          // Same three buckets cut two ways, behind a tab strip: what people DO
-          // (designation) and how they're employed (type).
-          breakdownTabs={[
-            {
-              label: "By designation",
-              sections: workforceSections(workforce, roleBreakdown),
-            },
-            {
-              label: "By type",
-              sections: workforceSections(workforce, typeBreakdown),
-            },
-          ]}
-          breakdownFooter={`${workforce.onRoster.length} on roster · excludes archived`}
-          onClick={() => goFromKpi("/admin/employees")}
-        />
-        <StatCard
-          compact
-          title="Total Projects"
-          label="All projects"
-          value={totalProjects}
-          icon={FolderKanban}
-          tone="emerald"
-          hint={
-            <ProjectSplit active={activeProjects} archived={archivedProjects} />
-          }
-          breakdownTabs={[
-            {
-              label: "Organisation",
-              sections: [{ rows: projectsByOrganisation }],
-            },
-            { label: "Vendor", sections: [{ rows: projectsByVendor }] },
-          ]}
-          breakdownFooter={`${totalProjects} projects · includes archived`}
-          onClick={() => goFromKpi("/admin/sub-projects")}
-        />
-        {/* Leave + WFH share one slot, split across the card's height. */}
-        <SplitStatCard
-          halves={[
-            {
-              key: "leave",
-              title: "Leave",
-              icon: CalendarDays,
-              tone: "rose",
-              stats: [
+            <StatCard
+              compact
+              title="Total Employees"
+              label="On roster"
+              value={workforce.onRoster.length}
+              icon={Users}
+              tone="amber"
+              hint={<WorkforceSplit workforce={workforce} />}
+              // Same three buckets cut two ways, behind a tab strip: what people DO
+              // (designation) and how they're employed (type).
+              breakdownTabs={[
                 {
-                  value: leaveDesk.pendingCount,
-                  label: "to review",
-                  tone: leaveDesk.pendingCount
-                    ? "text-amber-600"
-                    : "text-slate-400",
+                  label: "By designation",
+                  sections: workforceSections(workforce, roleBreakdown),
                 },
-                { value: leaveDesk.todayCount, label: "today" },
-              ],
-              tabs: timingTabs(leaveDesk.timing),
-              emptyLabel: "Nothing pending for this period",
-              onClick: () => goFromKpi("/admin/leaves"),
-              onSelectPerson: (person) => goToPerson("/admin/leaves", person),
-            },
-            {
-              key: "wfh",
-              title: "Work from home",
-              icon: Home,
-              tone: "violet",
-              stats: [
                 {
-                  value: wfhDesk.pendingCount,
-                  label: "to review",
-                  tone: wfhDesk.pendingCount
-                    ? "text-amber-600"
-                    : "text-slate-400",
+                  label: "By type",
+                  sections: workforceSections(workforce, typeBreakdown),
                 },
-                { value: wfhDesk.todayCount, label: "today" },
-              ],
-              tabs: timingTabs(wfhDesk.timing),
-              emptyLabel: "Nothing pending for this period",
-              onClick: () => goFromKpi("/admin/leaves?tab=WFH%20Requests"),
-              onSelectPerson: (person) => goToPerson("/admin/leaves?tab=WFH%20Requests", person),
-            },
-          ]}
-        />
+              ]}
+              breakdownFooter={`${workforce.onRoster.length} on roster · excludes archived`}
+              onClick={() => goFromKpi("/admin/employees")}
+            />
+            <StatCard
+              compact
+              title="Total Projects"
+              label="All projects"
+              value={totalProjects}
+              icon={FolderKanban}
+              tone="emerald"
+              hint={
+                <ProjectSplit
+                  active={activeProjects}
+                  archived={archivedProjects}
+                />
+              }
+              breakdownTabs={[
+                {
+                  label: "Organisation",
+                  sections: [{ rows: projectsByOrganisation }],
+                },
+                { label: "Vendor", sections: [{ rows: projectsByVendor }] },
+              ]}
+              breakdownFooter={`${totalProjects} projects · includes archived`}
+              onClick={() => goFromKpi("/admin/sub-projects")}
+            />
+            {/* Leave + WFH share one slot, split across the card's height. */}
+            <SplitStatCard
+              halves={[
+                {
+                  key: "leave",
+                  title: "Leave",
+                  icon: CalendarDays,
+                  tone: "rose",
+                  stats: [
+                    {
+                      value: leaveDesk.pendingCount,
+                      label: "to review",
+                      tone: leaveDesk.pendingCount
+                        ? "text-amber-600"
+                        : "text-slate-400",
+                    },
+                    { value: leaveDesk.todayCount, label: "on leave" },
+                  ],
+                  tabs: timingTabs(leaveDesk.timing),
+                  emptyLabel: "Nothing pending for this period",
+                  onClick: () => goFromKpi("/admin/leaves"),
+                  onSelectPerson: (person) =>
+                    goToPerson("/admin/leaves", person),
+                },
+                {
+                  key: "wfh",
+                  title: "Work from home",
+                  icon: Home,
+                  tone: "violet",
+                  stats: [
+                    {
+                      value: wfhDesk.pendingCount,
+                      label: "to review",
+                      tone: wfhDesk.pendingCount
+                        ? "text-amber-600"
+                        : "text-slate-400",
+                    },
+                    { value: wfhDesk.todayCount, label: "on WFH" },
+                  ],
+                  tabs: timingTabs(wfhDesk.timing),
+                  emptyLabel: "Nothing pending for this period",
+                  onClick: () => goFromKpi("/admin/leaves?tab=WFH%20Requests"),
+                  onSelectPerson: (person) =>
+                    goToPerson("/admin/leaves?tab=WFH%20Requests", person),
+                },
+              ]}
+            />
           </div>
 
           <Table
