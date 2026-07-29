@@ -279,7 +279,7 @@ const ProjectAnalyticsPage = () => {
               {data.name}
             </h1>
             <p className="text-slate-500 text-sm mt-1">
-              {data.client ? `${data.client} · ` : ""}Encord platform activity ·{" "}
+              {data.client ? `${data.client} · ` : ""}Autonex team · Encord platform activity ·{" "}
               {data.range.from} → {data.range.to}
             </p>
           </div>
@@ -320,8 +320,8 @@ const ProjectAnalyticsPage = () => {
         )}
       </div>
 
-      {/* KPI tiles */}
-      <div className="grid grid-cols-1 sm:grid-cols-3 gap-4">
+      {/* KPI tiles — range-based (top toggle) + latest-day snapshot, all one row */}
+      <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-5 gap-4">
         <MetricCard
           title="Platform Hours"
           value={`${data.month.platform_hours}h`}
@@ -329,15 +329,36 @@ const ProjectAnalyticsPage = () => {
           icon={Clock}
         />
         <MetricCard
-          title="Avg Hours / Annotator"
+          title="Annotation Avg"
           value={`${data.month.avg_hours_per_annotator}h`}
+          subtitle="per active annotator"
           icon={Gauge}
         />
         <MetricCard
-          title="Peak Active Annotators / day"
-          value={data.month.active_annotators_peak}
-          subtitle=">1h platform time"
+          title="Avg Hr / Person"
+          value={`${data.month.avg_hours_per_person ?? 0}h`}
+          subtitle="per person in project"
+          icon={Gauge}
+        />
+        <MetricCard
+          title="Active Annotators — Today"
+          value={data.fixed?.today?.active_annotators ?? 0}
+          subtitle={
+            data.fixed?.today?.date
+              ? `as of ${shortDate(data.fixed.today.date)}`
+              : ">1h annotation time"
+          }
           icon={Users}
+        />
+        <MetricCard
+          title="Platform / Annotator — Today"
+          value={`${data.fixed?.today?.avg_hours_per_annotator ?? 0}h`}
+          subtitle={
+            data.fixed?.today?.date
+              ? `as of ${shortDate(data.fixed.today.date)}`
+              : "avg hrs per annotator"
+          }
+          icon={Gauge}
         />
       </div>
 
@@ -345,7 +366,7 @@ const ProjectAnalyticsPage = () => {
       <Card>
         <CardHeader
           title="Platform hours per day"
-          subtitle="Total active editor time across the project"
+          subtitle="Autonex team active editor time across the project"
         />
         <CardContent>
           <div className="h-72">
