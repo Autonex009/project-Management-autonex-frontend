@@ -367,6 +367,25 @@ export const payrollApi = {
     api
       .post("/payroll/save", data, { headers: payrollHeaders() })
       .then((res) => res.data),
+  // Undo a finalize: unlocks the month back to draft and keeps every saved
+  // adjustment / bonus / additional payment, so it can be edited and re-finalized.
+  reopen: (month, reopenedBy) =>
+    api
+      .post(
+        "/payroll/reopen",
+        { month, reopened_by: reopenedBy ?? null },
+        { headers: payrollHeaders() },
+      )
+      .then((res) => res.data),
+  // DESTRUCTIVE — deletes the run and all its adjustments so the month
+  // recomputes from the auto leave classification. Not the undo.
+  discardRun: (month) =>
+    api
+      .delete("/payroll/run", {
+        params: { month },
+        headers: payrollHeaders(),
+      })
+      .then((res) => res.data),
   getSaved: (month) =>
     api
       .get("/payroll/saved", { params: { month }, headers: payrollHeaders() })

@@ -16,6 +16,7 @@ import {
   X,
   UserPlus,
   UserMinus,
+  UserX,
   CheckSquare,
   AlertTriangle,
   Users,
@@ -27,6 +28,15 @@ import {
 import toast from "react-hot-toast";
 import ConfirmDialog from "../components/ui/ConfirmDialog";
 import { getPmEmployeeId, getPmSubProjects } from "../utils/pmScope";
+import {
+  buildEmployeeIndex,
+  extraPmIds,
+  isArchived,
+  isStaleAllocation,
+  manpowerEmployeeIds,
+  staleAllocationName,
+  totalRequiredManpower,
+} from "../utils/workforce";
 import Table from "../components/ui/Table";
 import Button from "../components/ui/Button";
 import Modal from "../components/ui/Modal";
@@ -109,6 +119,14 @@ const AllocationsPage = () => {
     queryFn: allocationApi.getAll,
   });
 
+  // Archived staff. Used ONLY to name the stale allocations they left behind —
+  // never merged into the roster, or they would fill manpower slots again.
+  const { data: formerEmployees = [] } = useQuery({
+    queryKey: ["employees", "archived"],
+    queryFn: () => employeeApi.getAll({ status: "archived" }),
+    staleTime: 5 * 60 * 1000,
+  });
+
   const { startStr, endStr } = useMemo(() => {
     const today = new Date();
     const y = today.getFullYear();
@@ -133,6 +151,23 @@ const AllocationsPage = () => {
     queryKey: ["wfh"],
     queryFn: () => wfhApi.getAll(),
   });
+
+  // Roster lookup. `GET /employees` hides archived staff while `GET /allocations`
+  // hides nobody, so an allocation missing from this index belongs to somebody
+  // who has left: it is stale, and never counted as filling a manpower slot.
+  const employeeIndex = useMemo(
+    () => buildEmployeeIndex(employees),
+    [employees],
+  );
+  const formerIndex = useMemo(
+    () => buildEmployeeIndex(formerEmployees),
+    [formerEmployees],
+  );
+  const isStale = (alloc) => isStaleAllocation(alloc, employeeIndex);
+  // Whoever a stale allocation belonged to, named as precisely as we can manage.
+  const staleName = (alloc) =>
+    formerIndex.get(String(alloc?.employee_id))?.name ||
+    staleAllocationName(alloc);
 
   // Employees on approved leave today — shared by the Fill column and the allocation popover.
   const leaveEmployeeIds = useMemo(() => {
@@ -274,10 +309,14 @@ const AllocationsPage = () => {
         }
       });
 
-      // Get all active employees (including those already in this project so the list is never empty)
+      // Everyone on the roster (including those already in this project so the
+      // list is never empty). The test is "not archived", NOT status === "active":
+      // status only carries the archived flag now, so demanding "active" silently
+      // dropped employees whose status is blank or something else and made them
+      // impossible to allocate — the modal offered 202 of the roster's 206.
       const requiredSkills = selectedProject.required_expertise || [];
       const matchingEmployees = employees
-        .filter((emp) => (emp.status !== "active" ? false : true))
+        .filter((emp) => !isArchived(emp))
         .map((emp) => {
           const empSkills = emp.skills || [];
           const skillMatch =
@@ -320,22 +359,15 @@ const AllocationsPage = () => {
   const handleSubmit = (e) => {
     e.preventDefault();
 
-    // Check for over-allocation. PMs already fill manpower slots and are counted
-    // in required_manpower, so the current fill must include them or this warning
-    // fires too late. Union by employee id so someone already allocated — or a PM
-    // being allocated now — is never counted twice.
-    const filledIds = new Set(
-      allocations
-        .filter((a) => a.sub_project_id === selectedProject.id)
-        .map((a) => String(a.employee_id)),
-    );
-    resolvePmIds(selectedProject).forEach((id) => {
-      if (id != null) filledIds.add(String(id));
-    });
+    // Check for over-allocation against the same arithmetic the table shows —
+    // people, PMs counted on both sides. Counting PMs as filled while comparing
+    // against a required figure that excluded them fired this warning on projects
+    // that still had room.
+    const { assignedIds, required } = manpowerFor(selectedProject);
+    const filledIds = new Set(assignedIds);
     const currentAllocated = filledIds.size;
     selectedEmployees.forEach((emp) => filledIds.add(String(emp.id)));
     const newTotal = filledIds.size;
-    const required = selectedProject.required_manpower || 0;
 
     if (newTotal > required) {
       setConfirmState({
@@ -410,8 +442,8 @@ const AllocationsPage = () => {
   };
 
   const getEmployeeName = (employeeId) => {
-    const emp = employees.find((e) => e.id === employeeId);
-    return emp ? emp.name : "Unknown";
+    const emp = employeeIndex.get(String(employeeId));
+    return emp ? emp.name : "";
   };
 
   const getProjectName = (projectId) => {
@@ -419,26 +451,52 @@ const AllocationsPage = () => {
     return proj ? proj.name : "Unknown";
   };
 
-  const getRequiredManpower = (projectId) => {
-    const proj = visibleProjects.find((p) => p.id === projectId);
-    return proj ? proj.required_manpower : 0;
-  };
-
   const getAllocatedEmployees = (projectId) => {
     return visibleAllocations.filter((a) => a.sub_project_id === projectId);
   };
 
-  // A project's PMs occupy manpower slots, and the backend already counts them
-  // in required_manpower — so the assigned side has to count them too or the
-  // ratio reads short by the number of managers. Same resolution order as
-  // ProjectsPage: the project's own PM ids win, else the main project's.
+  // A project's PMs occupy manpower slots, so they count on BOTH sides of the
+  // ratio: manpowerEmployeeIds adds them to assigned, totalRequiredManpower adds
+  // them to required. Same resolution order as ProjectsPage: the project's own PM
+  // ids win, else the main project's.
   const resolvePmIds = (project) => {
     if (project?.assigned_employee_ids?.length)
       return project.assigned_employee_ids;
     if (project?.pm_id) return [project.pm_id];
-    const parent = parentProjects.find((p) => p.id === project?.main_project_id);
+    const parent = parentProjects.find(
+      (p) => p.id === project?.main_project_id,
+    );
     if (parent?.program_manager_ids?.length) return parent.program_manager_ids;
     return parent?.program_manager_id ? [parent.program_manager_id] : [];
+  };
+
+  // One definition of a project's manpower for the create modal, its project
+  // dropdown and the over-allocation guard. Each used to count it its own way —
+  // the modal counted allocation ROWS against the raw required (70/73) while the
+  // table counted PEOPLE including PMs (69/74) — so one project reported two
+  // different fill ratios on the same screen.
+  const manpowerFor = (project) => {
+    const projectAllocs = allocations.filter(
+      (a) => a.sub_project_id === project?.id,
+    );
+    const pmIds = resolvePmIds(project);
+    const assignedIds = manpowerEmployeeIds({
+      allocations: projectAllocs,
+      pmIds,
+      employeeIndex,
+    });
+    return {
+      projectAllocs,
+      pmIds,
+      assignedIds,
+      assigned: assignedIds.size,
+      required: totalRequiredManpower({
+        required: project?.required_manpower || 0,
+        allocations: projectAllocs,
+        pmIds,
+        employeeIndex,
+      }),
+    };
   };
 
   // Group allocations by project
@@ -449,17 +507,27 @@ const AllocationsPage = () => {
       );
       const pmIds = resolvePmIds(project);
       // Count people, not allocation rows: a PM who is also allocated, or anyone
-      // holding two allocations here, must only fill one slot.
-      const filledIds = new Set(
-        allocations.map((a) => String(a.employee_id)),
-      );
-      pmIds.forEach((id) => id != null && filledIds.add(String(id)));
+      // holding two allocations here, must only fill one slot. People who have
+      // left are excluded — a stale allocation staffs nothing.
+      const filledIds = manpowerEmployeeIds({
+        allocations,
+        pmIds,
+        employeeIndex,
+      });
+      // ...and since those PMs count as assigned, they count as required too. The
+      // server's required_manpower is annotators + reviewers + QC only, so on its
+      // own it made a project staffed by its PM alone read 1/2, and a fully
+      // staffed one read 12/10.
+      const pmSlots = extraPmIds({ allocations, pmIds, employeeIndex }).size;
+      const requestedManpower = project.required_manpower || 0;
       return {
         project,
         allocations,
         pmIds,
         assignedManpower: filledIds.size,
-        requiredManpower: project.required_manpower || 0,
+        requestedManpower,
+        pmSlots,
+        requiredManpower: requestedManpower + pmSlots,
       };
     })
     .filter((pa) => pa.allocations.length > 0 || pa.requiredManpower > 0);
@@ -553,9 +621,21 @@ const AllocationsPage = () => {
             label: "Required",
             align: "left",
             width: "w-[8%]",
-            render: (value) => (
-              <span className="text-[13px] font-medium text-slate-700 tabular-nums">
+            render: (value, row) => (
+              <span
+                className="text-[13px] font-medium text-slate-700 tabular-nums"
+                title={
+                  row.pmSlots > 0
+                    ? `${row.requestedManpower} requested + ${row.pmSlots} program manager${row.pmSlots === 1 ? "" : "s"}`
+                    : undefined
+                }
+              >
                 {value}
+                {row.pmSlots > 0 && (
+                  <span className="ml-1 text-[11px] font-normal text-slate-400">
+                    ({row.pmSlots} PM)
+                  </span>
+                )}
               </span>
             ),
           },
@@ -568,15 +648,20 @@ const AllocationsPage = () => {
               // Order the avatar stack so real profile photos fill the first 4
               // slots: employees with a profile image come first. But once there
               // are plenty of images (all of them, or more than 4), just show A→Z.
-              const withEmp = projectAllocs.map((a) => {
-                const emp = employees.find((e) => e.id === a.employee_id);
-                return {
-                  alloc: a,
-                  emp,
-                  name: emp?.name || "Unknown",
-                  hasImg: !!emp?.avatar_url,
-                };
-              });
+              // Stale allocations are left out of the stack: it pictures who is
+              // staffing the project, and they are not. The popover still lists
+              // them so they can be found and removed.
+              const withEmp = projectAllocs
+                .filter((a) => !isStale(a))
+                .map((a) => {
+                  const emp = employeeIndex.get(String(a.employee_id));
+                  return {
+                    alloc: a,
+                    emp,
+                    name: emp.name || "Unnamed",
+                    hasImg: !!emp.avatar_url,
+                  };
+                });
               const byName = (a, b) => a.name.localeCompare(b.name);
               // Profile photos ALWAYS come first so the visible avatars are real
               // images, never initials. Only when there are many photos (more
@@ -650,6 +735,8 @@ const AllocationsPage = () => {
                 wfhCount = 0,
                 wfoCount = 0;
               row.allocations.forEach((a) => {
+                // Somebody who has left is neither in the office nor at home.
+                if (isStale(a)) return;
                 if (leaveEmployeeIds.has(a.employee_id)) {
                   onLeaveToday += 1;
                   return;
@@ -664,6 +751,7 @@ const AllocationsPage = () => {
                     project={project}
                     allocations={row.allocations}
                     employees={employees}
+                    formerEmployees={formerEmployees}
                     pmIds={row.pmIds}
                     onLeaveEmployeeIds={leaveEmployeeIds}
                     locationByEmployeeId={locationByEmployeeId}
@@ -765,7 +853,7 @@ const AllocationsPage = () => {
                 <Dropdown
                   options={visibleProjects.map((project) => ({
                     value: project.id.toString(),
-                    label: `${project.name} - Required: ${project.required_manpower || 0}`,
+                    label: `${project.name} - Required: ${manpowerFor(project).required}`,
                   }))}
                   value={selectedProject?.id.toString() || ""}
                   onChange={(val) => {
@@ -780,11 +868,10 @@ const AllocationsPage = () => {
               </div>
               {selectedProject &&
                 (() => {
-                  const projectAllocs = allocations.filter(
-                    (a) => a.sub_project_id === selectedProject.id,
-                  );
-                  const required = selectedProject.required_manpower || 0;
-                  const filled = projectAllocs.length;
+                  // Same numbers as the table row behind this modal: people, with
+                  // PMs on both sides of the ratio.
+                  const { assigned: filled, required } =
+                    manpowerFor(selectedProject);
                   const skills = selectedProject.required_expertise || [];
                   return (
                     <div className="flex items-center gap-3 flex-wrap pb-0.5">
@@ -837,15 +924,24 @@ const AllocationsPage = () => {
               <>
                 {/* On this project — single row + see more */}
                 {(() => {
-                  const projectAllocs = allocations.filter(
-                    (a) => a.sub_project_id === selectedProject.id,
-                  );
+                  const { projectAllocs } = manpowerFor(selectedProject);
+                  // Stale rows are LISTED here, in red — this is where people get
+                  // removed from a project, so hiding them left no way to clear
+                  // them. They sort last and are not part of the headcount.
                   const allocatedEmps = projectAllocs
                     .map((a) => ({
                       alloc: a,
-                      emp: employees.find((e) => e.id === a.employee_id),
+                      emp: employeeIndex.get(String(a.employee_id)),
+                      stale: isStale(a),
                     }))
-                    .filter((x) => x.emp);
+                    .sort((a, b) => Number(a.stale) - Number(b.stale));
+                  const liveEmps = allocatedEmps.filter((x) => !x.stale);
+                  const staleEmps = allocatedEmps.filter((x) => x.stale);
+                  // People, not rows: somebody holding two allocations here is one
+                  // employee, and this count sits beside the table's own ratio.
+                  const distinctCount = new Set(
+                    liveEmps.map((x) => String(x.emp.id)),
+                  ).size;
 
                   return (
                     <div className="bg-blue-50/60 border border-blue-100 rounded-lg p-3">
@@ -853,9 +949,27 @@ const AllocationsPage = () => {
                         <span className="text-[11px] font-semibold text-blue-900/80 uppercase tracking-wide">
                           On this project
                         </span>
-                        <span className="text-[11px] text-blue-900/60">
-                          {allocatedEmps.length} employee
-                          {allocatedEmps.length === 1 ? "" : "s"}
+                        <span className="flex items-center gap-2">
+                          {staleEmps.length > 0 && (
+                            <span
+                              className="inline-flex items-center gap-1 rounded-full bg-rose-100 px-1.5 py-0.5 text-[10px] font-bold text-rose-700"
+                              title="Allocations left behind by people no longer on the roster — not counted, remove them"
+                            >
+                              <UserX className="w-3 h-3" />
+                              {staleEmps.length} archived
+                            </span>
+                          )}
+                          <span
+                            className="text-[11px] text-blue-900/60"
+                            title={
+                              liveEmps.length !== distinctCount
+                                ? `${liveEmps.length} allocation rows — ${liveEmps.length - distinctCount} duplicate${liveEmps.length - distinctCount === 1 ? "" : "s"}`
+                                : undefined
+                            }
+                          >
+                            {distinctCount} employee
+                            {distinctCount === 1 ? "" : "s"}
+                          </span>
                         </span>
                       </div>
                       {allocatedEmps.length === 0 ? (
@@ -864,12 +978,15 @@ const AllocationsPage = () => {
                         </p>
                       ) : (
                         <div className="flex flex-wrap gap-1.5">
+                          {/* Collapsed shows 3 of the team but ALWAYS every stale
+                              row — they are the ones needing action. */}
                           {(showAllAllocated
                             ? allocatedEmps
-                            : allocatedEmps.slice(0, 3)
-                          ).map(({ alloc, emp }) => {
+                            : [...liveEmps.slice(0, 3), ...staleEmps]
+                          ).map(({ alloc, emp, stale }) => {
+                            const name = stale ? staleName(alloc) : emp.name;
                             const initials =
-                              (emp.name || "")
+                              (name || "")
                                 .trim()
                                 .split(/\s+/)
                                 .map((p) => p.charAt(0).toUpperCase())
@@ -881,15 +998,44 @@ const AllocationsPage = () => {
                             return (
                               <div
                                 key={alloc.id}
-                                title={`${emp.name}${alloc.total_daily_hours ? ` · ${alloc.total_daily_hours}h/day` : ""}`}
-                                className={`group inline-flex items-center gap-1.5 pl-1 pr-1 py-0.5 bg-white border border-slate-200 rounded-full shadow-sm transition-opacity ${isRemoving ? "opacity-50" : ""}`}
+                                title={
+                                  stale
+                                    ? `${name} — archived, not counted towards manpower`
+                                    : `${name}${alloc.total_daily_hours ? ` · ${alloc.total_daily_hours}h/day` : ""}`
+                                }
+                                className={`group inline-flex items-center gap-1.5 pl-1 pr-1 py-0.5 rounded-full shadow-sm transition-opacity ${
+                                  stale
+                                    ? "border border-rose-300 bg-rose-50"
+                                    : "border border-slate-200 bg-white"
+                                } ${isRemoving ? "opacity-50" : ""}`}
                               >
-                                <span className="w-5 h-5 rounded-full bg-indigo-500 text-white text-[10px] font-semibold flex items-center justify-center">
-                                  {initials}
+                                <span
+                                  className={`w-5 h-5 rounded-full text-[10px] font-semibold flex items-center justify-center ${
+                                    stale
+                                      ? "bg-rose-200 text-rose-700"
+                                      : "bg-indigo-500 text-white"
+                                  }`}
+                                >
+                                  {stale ? (
+                                    <UserX className="w-3 h-3" />
+                                  ) : (
+                                    initials
+                                  )}
                                 </span>
-                                <span className="text-xs text-slate-700 max-w-[120px] truncate">
-                                  {emp.name}
+                                <span
+                                  className={`text-xs max-w-[120px] truncate ${
+                                    stale
+                                      ? "font-medium text-rose-700"
+                                      : "text-slate-700"
+                                  }`}
+                                >
+                                  {name}
                                 </span>
+                                {stale && (
+                                  <span className="text-[9px] font-bold uppercase tracking-wide text-rose-500">
+                                    archived
+                                  </span>
+                                )}
                                 <button
                                   type="button"
                                   disabled={isRemoving}
@@ -898,8 +1044,12 @@ const AllocationsPage = () => {
                                     e.stopPropagation();
                                     setConfirmState({
                                       variant: "danger",
-                                      title: "Remove team member",
-                                      message: `Remove ${emp.name} from "${selectedProject.name}"?`,
+                                      title: stale
+                                        ? "Remove stale allocation"
+                                        : "Remove team member",
+                                      message: stale
+                                        ? `${name} is no longer on the roster. Remove their leftover allocation from "${selectedProject.name}"?`
+                                        : `Remove ${name} from "${selectedProject.name}"?`,
                                       confirmText: "Remove",
                                       onConfirm: () => {
                                         deleteMutation.mutate(alloc.id);
@@ -907,15 +1057,19 @@ const AllocationsPage = () => {
                                       },
                                     });
                                   }}
-                                  className="ml-0.5 w-4 h-4 rounded-full text-slate-400 hover:text-white hover:bg-rose-500 flex items-center justify-center transition-colors disabled:cursor-not-allowed"
-                                  title={`Remove ${emp.name}`}
+                                  className={`ml-0.5 w-4 h-4 rounded-full flex items-center justify-center transition-colors disabled:cursor-not-allowed ${
+                                    stale
+                                      ? "text-rose-500 hover:text-white hover:bg-rose-500"
+                                      : "text-slate-400 hover:text-white hover:bg-rose-500"
+                                  }`}
+                                  title={`Remove ${name}`}
                                 >
                                   <X className="w-3 h-3" />
                                 </button>
                               </div>
                             );
                           })}
-                          {allocatedEmps.length > 3 && (
+                          {liveEmps.length > 3 && (
                             <button
                               type="button"
                               onClick={() => setShowAllAllocated((v) => !v)}
@@ -923,7 +1077,7 @@ const AllocationsPage = () => {
                             >
                               {showAllAllocated
                                 ? "Show less"
-                                : `+${allocatedEmps.length - 3}`}
+                                : `+${liveEmps.length - 3}`}
                             </button>
                           )}
                         </div>
@@ -1324,27 +1478,66 @@ const AllocationsPage = () => {
 
           <Modal.Body className="space-y-4">
             {editingAllocation.allocations.map((alloc) => {
-              const emp = employees.find((e) => e.id === alloc.employee_id);
+              const emp = employeeIndex.get(String(alloc.employee_id));
+              // A stale row is the one thing this modal must not render blank or
+              // anonymous: this is where it gets deleted, so name whoever it
+              // belonged to and flag it in red.
+              const stale = !emp;
+              const former = formerIndex.get(String(alloc.employee_id));
+              const name = stale ? staleName(alloc) : emp.name;
               return (
                 <div
                   key={alloc.id}
-                  className="flex items-center justify-between p-4 border border-gray-200 rounded-md hover:bg-gray-50"
+                  className={`flex items-center justify-between p-4 border rounded-md ${
+                    stale
+                      ? "border-rose-200 bg-rose-50"
+                      : "border-gray-200 hover:bg-gray-50"
+                  }`}
                 >
                   <div className="flex items-center gap-3">
-                    <div className="w-10 h-10 rounded-full bg-blue-500 text-white flex items-center justify-center font-medium">
-                      {emp?.name?.charAt(0).toUpperCase()}
+                    <div
+                      className={`w-10 h-10 rounded-full flex items-center justify-center font-medium ${
+                        stale
+                          ? "bg-rose-200 text-rose-700"
+                          : "bg-blue-500 text-white"
+                      }`}
+                    >
+                      {stale ? (
+                        <UserX className="w-4 h-4" />
+                      ) : (
+                        name.charAt(0).toUpperCase()
+                      )}
                     </div>
                     <div>
-                      <p className="font-medium text-gray-900">{emp?.name}</p>
-                      <p className="text-sm text-gray-500">{emp?.email}</p>
+                      <p
+                        className={`font-medium ${stale ? "text-rose-700" : "text-gray-900"}`}
+                      >
+                        {name}
+                        {stale && (
+                          <span className="ml-2 rounded-full bg-rose-100 px-1.5 py-0.5 text-[10px] font-semibold text-rose-700 align-middle">
+                            {former ? "Archived" : "Removed"}
+                          </span>
+                        )}
+                      </p>
+                      <p
+                        className={`text-sm ${stale ? "text-rose-500/90" : "text-gray-500"}`}
+                      >
+                        {stale
+                          ? `${former?.email ? `${former.email} · ` : ""}no longer on the roster — safe to remove`
+                          : emp.email}
+                      </p>
                     </div>
                   </div>
                   <button
                     onClick={() => {
                       setConfirmState({
                         variant: "danger",
-                        title: "Remove team member",
-                        message: `Remove ${emp?.name} from this project?`,
+                        title: stale
+                          ? "Remove stale allocation"
+                          : "Remove team member",
+                        message: stale
+                          ? `${name} is no longer on the roster. Remove their leftover allocation from "${editingAllocation.project.name}"?`
+                          : `Remove ${name} from this project?`,
                         confirmText: "Remove",
                         onConfirm: () => {
                           deleteMutation.mutate(alloc.id);

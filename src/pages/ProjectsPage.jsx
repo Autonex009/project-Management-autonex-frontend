@@ -51,6 +51,12 @@ import {
   isEndDateBeforeStartDate,
 } from "../utils/dateValidation";
 import AllocationPopover from "../components/AllocationPopover";
+import {
+  buildEmployeeIndex,
+  extraPmIds,
+  manpowerEmployeeIds,
+  totalRequiredManpower,
+} from "../utils/workforce";
 import Table, { ColumnTemplates } from "../components/ui/Table";
 import Dropdown from "../components/ui/Dropdown";
 import ConfirmDialog from "../components/ui/ConfirmDialog";
@@ -534,8 +540,11 @@ const ProjectCard = ({
   onLeaveEmployeeIds,
   locationByEmployeeId,
   allocatedManpower,
+  requiredManpower,
+  pmSlots = 0,
   allocations,
   employees,
+  formerEmployees,
   prefix,
   navigate,
   docs,
@@ -745,6 +754,7 @@ const ProjectCard = ({
             project={project}
             allocations={allocations}
             employees={employees}
+            formerEmployees={formerEmployees}
             pmIds={pmIds}
             onLeaveEmployeeIds={onLeaveEmployeeIds}
             locationByEmployeeId={locationByEmployeeId}
@@ -755,8 +765,17 @@ const ProjectCard = ({
             }
             triggerClassName="px-3 py-1.5 text-sm font-bold text-slate-800 tabular-nums hover:text-indigo-600 transition-colors cursor-pointer"
             badgeContent={
-              <span>
-                {allocatedManpower} / {project.required_manpower || 0}
+              // The PM count is spelled out because required now includes it —
+              // otherwise "1/3" on a project asking for 2 workers looks wrong.
+              <span className="inline-flex items-baseline gap-1">
+                <span>
+                  {allocatedManpower} / {requiredManpower}
+                </span>
+                {pmSlots > 0 && (
+                  <span className="text-[11px] font-normal text-slate-400">
+                    ({pmSlots} PM)
+                  </span>
+                )}
               </span>
             }
           />
@@ -1120,6 +1139,21 @@ const ProjectsPage = () => {
   const { data: employees = [] } = useQuery({
     queryKey: ["employees"],
     queryFn: employeeApi.getAll,
+  });
+
+  // Roster lookup — also the test for a stale allocation, since `GET /employees`
+  // omits archived staff that `GET /allocations` still references.
+  const employeeIndex = useMemo(
+    () => buildEmployeeIndex(employees),
+    [employees],
+  );
+
+  // Archived staff, so a stale allocation names who left instead of reading
+  // "Former employee". Naming only — never counted towards manpower.
+  const { data: formerEmployees = [] } = useQuery({
+    queryKey: ["employees", "archived"],
+    queryFn: () => employeeApi.getAll({ status: "archived" }),
+    staleTime: 5 * 60 * 1000,
   });
 
   const { data: skillsData = [] } = useQuery({
@@ -1604,19 +1638,39 @@ const ProjectsPage = () => {
   // Manpower counts PEOPLE, not allocation rows, and a PM running the project
   // occupies a slot just like an annotator. Union by employee id so someone with
   // two allocations — or a PM who is also allocated — is only counted once.
-  // The backend adds the same PMs to required_manpower, so both sides agree.
-  const getManpowerEmployeeIds = (project) => {
-    const ids = new Set();
-    allocations
-      .filter((a) => a.sub_project_id === project.id)
-      .forEach((a) => ids.add(String(a.employee_id)));
-    resolvePmIds(project).forEach((id) => {
-      if (id != null) ids.add(String(id));
+  //
+  // Anyone off the roster is skipped: allocations outlive an archived employee,
+  // and counting those ghosts reported projects as fully staffed by people who
+  // had left.
+  const getManpowerEmployeeIds = (project) =>
+    manpowerEmployeeIds({
+      allocations: allocations.filter((a) => a.sub_project_id === project.id),
+      pmIds: resolvePmIds(project),
+      employeeIndex,
     });
-    return ids;
-  };
 
-  const getAllocatedManpower = (project) => getManpowerEmployeeIds(project).size;
+  const getAllocatedManpower = (project) =>
+    getManpowerEmployeeIds(project).size;
+
+  // Required counts those same PMs. The server computes required_manpower as
+  // annotators + reviewers + QC, so a project asking for 2 QC and run by 1 PM
+  // showed 1/2 with only the PM on it — the manager filled a slot the required
+  // side didn't know about.
+  const getRequiredManpower = (project) =>
+    totalRequiredManpower({
+      required: project?.required_manpower || 0,
+      allocations: allocations.filter((a) => a.sub_project_id === project?.id),
+      pmIds: resolvePmIds(project),
+      employeeIndex,
+    });
+
+  // How many of those required slots are the managers' — shown next to the ratio.
+  const getPmSlots = (project) =>
+    extraPmIds({
+      allocations: allocations.filter((a) => a.sub_project_id === project?.id),
+      pmIds: resolvePmIds(project),
+      employeeIndex,
+    }).size;
 
   const calculateManpowerBalance = (project) => {
     const matchingTotal = getMatchingEmployees(project).length;
@@ -1881,13 +1935,13 @@ const ProjectsPage = () => {
     ).length;
 
     const overburdenedProjects = filteredProjects.filter((p) => {
-      const required = p.required_manpower || 0;
+      const required = getRequiredManpower(p);
       const allocated = getAllocatedManpower(p);
       return required > 0 ? allocated < required : false;
     }).length;
 
     const balancedProjects = filteredProjects.filter((p) => {
-      const required = p.required_manpower || 0;
+      const required = getRequiredManpower(p);
       const allocated = getAllocatedManpower(p);
       return required > 0 ? allocated >= required : allocated > 0;
     }).length;
@@ -2449,8 +2503,11 @@ const ProjectsPage = () => {
                     onLeaveEmployeeIds={leaveEmployeeIds}
                     locationByEmployeeId={locationByEmployeeId}
                     allocatedManpower={allocatedManpower}
+                    requiredManpower={getRequiredManpower(project)}
+                    pmSlots={getPmSlots(project)}
                     allocations={allocations}
                     employees={employees}
+                    formerEmployees={formerEmployees}
                     prefix={prefix}
                     navigate={navigate}
                     docs={guidelinesData.filter(

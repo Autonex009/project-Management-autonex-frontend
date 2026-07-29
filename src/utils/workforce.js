@@ -29,6 +29,114 @@ export const isArchived = (employee) =>
   (employee?.status || "").toLowerCase() === "archived";
 
 /**
+ * employee id -> employee, keyed as a string so a caller may look up with
+ * either a number or a string without knowing which the API handed back.
+ */
+export const buildEmployeeIndex = (employees = []) => {
+  const index = new Map();
+  employees.forEach((e) => {
+    if (e?.id != null) index.set(String(e.id), e);
+  });
+  return index;
+};
+
+/**
+ * True when an allocation points at somebody the roster no longer contains.
+ *
+ * `GET /allocations` returns every row whatever the employee's status, while
+ * `GET /employees` hides archived staff. Archiving somebody through the archive
+ * endpoint clears their allocations, but any other route to the same state — an
+ * HR sync, a direct status edit — leaves them behind. Those rows are not
+ * staffing the project: they must never fill a manpower slot, and the UI has to
+ * name them for what they are instead of rendering a nameless "Unknown".
+ */
+export const isStaleAllocation = (alloc, employeeIndex) =>
+  !employeeIndex?.has?.(String(alloc?.employee_id));
+
+/**
+ * Label for a stale allocation, in falling order of usefulness: the name the
+ * allocations payload embeds (`GET /allocations` looks employees up without a
+ * status filter, so archived staff are still named there), then the employee id.
+ *
+ * Never a bare "Former employee" when there is an id to show: several of these
+ * rows on one project were indistinguishable, and you cannot delete a row you
+ * cannot tell apart.
+ */
+export const staleAllocationName = (alloc) =>
+  alloc?.employee_name ||
+  (alloc?.employee_id != null
+    ? `Former employee #${alloc.employee_id}`
+    : "Former employee");
+
+/**
+ * Ids of the people a project's manpower is made of: everyone allocated plus
+ * the PMs running it, deduped so a PM who is also allocated — or anyone holding
+ * two allocations here — fills one slot, and narrowed to people still on the
+ * roster so stale allocations don't inflate the count.
+ *
+ * Pass no index to skip the roster check.
+ */
+export const manpowerEmployeeIds = ({
+  allocations = [],
+  pmIds = [],
+  employeeIndex,
+} = {}) => {
+  const onRoster = (id) => !employeeIndex || employeeIndex.has(String(id));
+  const ids = new Set();
+  allocations.forEach((a) => {
+    if (a?.employee_id != null && onRoster(a.employee_id))
+      ids.add(String(a.employee_id));
+  });
+  (pmIds || []).forEach((id) => {
+    if (id != null && onRoster(id)) ids.add(String(id));
+  });
+  return ids;
+};
+
+/**
+ * The PMs who occupy a slot of their own: on the roster, and not already holding
+ * an allocation here — counting one of those would be the same person twice.
+ */
+export const extraPmIds = ({
+  allocations = [],
+  pmIds = [],
+  employeeIndex,
+} = {}) => {
+  const allocated = new Set(
+    allocations
+      .filter((a) => a?.employee_id != null)
+      .map((a) => String(a.employee_id)),
+  );
+  const ids = new Set();
+  (pmIds || []).forEach((id) => {
+    if (id == null) return;
+    const key = String(id);
+    if (allocated.has(key)) return;
+    if (employeeIndex && !employeeIndex.has(key)) return;
+    ids.add(key);
+  });
+  return ids;
+};
+
+/**
+ * Required headcount as the UI must show it: the requested workers plus the PMs
+ * running the project.
+ *
+ * The server computes `required_manpower` as annotators + reviewers + QC (see
+ * `_autonex_headcount`) — PMs excluded — while `manpowerEmployeeIds` counts PMs
+ * as assigned. The two sides were measuring different things, so a project with
+ * 2 QC slots and 1 PM read 1/2 when the PM alone was on it, and a fully staffed
+ * project read 12/10. PMs now count on both sides.
+ */
+export const totalRequiredManpower = ({
+  required = 0,
+  allocations = [],
+  pmIds = [],
+  employeeIndex,
+} = {}) =>
+  (required || 0) + extraPmIds({ allocations, pmIds, employeeIndex }).size;
+
+/**
  * Ids of employees on leave today. Only APPROVED leave counts — a pending
  * request is not yet time off, and counting it marked people absent who were
  * at their desks.
@@ -56,7 +164,10 @@ export const getOnLeaveTodayIds = (leaves = [], todayStr = todayLocalISO()) => {
  * `wfh_date === today` would silently miss the middle of every multi-day
  * request.
  */
-export const getWfhTodayIds = (wfhRequests = [], todayStr = todayLocalISO()) => {
+export const getWfhTodayIds = (
+  wfhRequests = [],
+  todayStr = todayLocalISO(),
+) => {
   const ids = new Set();
   wfhRequests.forEach((req) => {
     if ((req?.status || "").toLowerCase() !== "approved") return;
