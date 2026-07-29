@@ -79,6 +79,7 @@ const AllocationPopover = ({
   triggerClassName,
   onLeaveEmployeeIds = new Set(),
   locationByEmployeeId,
+  pmIds = [],
 }) => {
   const [open, setOpen] = useState(false);
   const [position, setPosition] = useState({
@@ -91,7 +92,10 @@ const AllocationPopover = ({
   const popoverRef = useRef(null);
   const closeTimerRef = useRef(null);
 
-  // Support either pre-filtered allocations or the full list
+  // Support either pre-filtered allocations or the full list. PMs assigned to the
+  // project are listed alongside the allocations because they occupy a manpower
+  // slot too — without them the counter would exceed this list with no
+  // explanation. A PM who is also allocated appears once, as an allocation.
   const list = useMemo(() => {
     const filtered = Array.isArray(allocations)
       ? allocations.filter((a) =>
@@ -100,11 +104,26 @@ const AllocationPopover = ({
             : true,
         )
       : [];
-    return filtered.map((a) => ({
+    const rows = filtered.map((a) => ({
+      key: `alloc-${a.id}`,
       alloc: a,
       emp: employees.find((e) => e.id === a.employee_id),
+      isPm: false,
     }));
-  }, [allocations, employees, project]);
+
+    const seen = new Set(filtered.map((a) => String(a.employee_id)));
+    (pmIds || []).forEach((id) => {
+      if (id == null || seen.has(String(id))) return;
+      seen.add(String(id));
+      rows.push({
+        key: `pm-${id}`,
+        alloc: null,
+        emp: employees.find((e) => String(e.id) === String(id)),
+        isPm: true,
+      });
+    });
+    return rows;
+  }, [allocations, employees, project, pmIds]);
 
   // Position the popover relative to the trigger, flipping above when bottom space is tight
   const updatePosition = useCallback(() => {
@@ -282,7 +301,7 @@ const AllocationPopover = ({
                 </div>
               ) : (
                 <ul className="divide-y divide-slate-50">
-                  {list.map(({ alloc, emp }) => {
+                  {list.map(({ key, alloc, emp }) => {
                     const name = emp?.name || "Unknown";
                     const role =
                       emp?.designation || emp?.role || emp?.job_title;
@@ -295,7 +314,7 @@ const AllocationPopover = ({
                       : undefined;
                     return (
                       <li
-                        key={alloc.id}
+                        key={key}
                         className="flex items-center gap-3 px-3 py-2 hover:bg-slate-50 transition-colors"
                       >
                         <Avatar name={name} src={emp?.avatar_url} />

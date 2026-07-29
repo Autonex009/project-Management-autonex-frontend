@@ -12,6 +12,7 @@ import {
   leaveApi,
   guidelineApi,
   vendorApi,
+  wfhApi,
 } from "../services/api";
 import {
   Plus,
@@ -529,6 +530,9 @@ const ProjectCard = ({
   project,
   parentProject,
   pmNames,
+  pmIds = [],
+  onLeaveEmployeeIds,
+  locationByEmployeeId,
   allocatedManpower,
   allocations,
   employees,
@@ -741,6 +745,9 @@ const ProjectCard = ({
             project={project}
             allocations={allocations}
             employees={employees}
+            pmIds={pmIds}
+            onLeaveEmployeeIds={onLeaveEmployeeIds}
+            locationByEmployeeId={locationByEmployeeId}
             onOpenAllocations={() =>
               navigate(`${prefix}/allocations`, {
                 state: { projectId: project.id },
@@ -1155,6 +1162,60 @@ const ProjectsPage = () => {
     queryFn: () => leaveApi.getAll({ start_date: startStr, end_date: endStr }),
   });
 
+  // Approved WFH-for-a-day requests, so the allocation popover can say where
+  // each person actually is today.
+  const { data: wfh = [] } = useQuery({
+    queryKey: ["wfh"],
+    queryFn: () => wfhApi.getAll(),
+  });
+
+  // Local calendar date — never via toISOString(), which is UTC and would report
+  // yesterday for the first 5.5 hours of every IST day.
+  const todayStr = useMemo(() => {
+    const d = new Date();
+    return `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, "0")}-${String(d.getDate()).padStart(2, "0")}`;
+  }, []);
+
+  // Employees on approved leave today.
+  const leaveEmployeeIds = useMemo(() => {
+    const ids = new Set();
+    leaves.forEach((l) => {
+      if (
+        (l.status || "").toLowerCase() === "approved" &&
+        String(l.start_date).slice(0, 10) <= todayStr &&
+        String(l.end_date).slice(0, 10) >= todayStr
+      ) {
+        ids.add(l.employee_id);
+      }
+    });
+    return ids;
+  }, [leaves, todayStr]);
+
+  const wfhTodayIds = useMemo(() => {
+    const ids = new Set();
+    wfh.forEach((w) => {
+      if (
+        (w.status || "").toLowerCase() === "approved" &&
+        String(w.wfh_date).slice(0, 10) === todayStr
+      ) {
+        ids.add(w.employee_id);
+      }
+    });
+    return ids;
+  }, [wfh, todayStr]);
+
+  // Where each employee is TODAY: WFH if that's their standing work model or they
+  // have an approved WFH day; otherwise WFO.
+  const locationByEmployeeId = useMemo(() => {
+    const m = new Map();
+    employees.forEach((e) => {
+      const wm = (e.work_model || "WFO").toUpperCase();
+      const regularWfh = wm === "WFH" || wm.includes("HOME");
+      m.set(e.id, regularWfh || wfhTodayIds.has(e.id) ? "WFH" : "WFO");
+    });
+    return m;
+  }, [employees, wfhTodayIds]);
+
   const visibleMainProjects = isPm
     ? getPmProjects(mainProjects, pmEmployeeId)
     : mainProjects;
@@ -1518,9 +1579,44 @@ const ProjectsPage = () => {
     );
   };
 
-  const getAllocatedManpower = (project) => {
-    return allocations.filter((a) => a.sub_project_id === project.id).length;
+  const pmIdsOf = (mp) =>
+    mp?.program_manager_ids?.length
+      ? mp.program_manager_ids
+      : mp?.program_manager_id
+        ? [mp.program_manager_id]
+        : [];
+
+  // A project's PMs are recorded on the project itself (`assigned_employee_ids`,
+  // which only ever holds PM/admin ids) and fall back to the parent project's
+  // managers. The card, the PM filter, the filter's option list, and the manpower
+  // count must all resolve them through here — when the filter read only the
+  // parent while the card read the project, filtering by a PM shown on screen
+  // matched nothing.
+  const resolvePmIds = (project) => {
+    if (project?.assigned_employee_ids?.length)
+      return project.assigned_employee_ids;
+    if (project?.pm_id) return [project.pm_id];
+    return pmIdsOf(
+      visibleMainProjects.find((p) => p.id === project?.main_project_id),
+    );
   };
+
+  // Manpower counts PEOPLE, not allocation rows, and a PM running the project
+  // occupies a slot just like an annotator. Union by employee id so someone with
+  // two allocations — or a PM who is also allocated — is only counted once.
+  // The backend adds the same PMs to required_manpower, so both sides agree.
+  const getManpowerEmployeeIds = (project) => {
+    const ids = new Set();
+    allocations
+      .filter((a) => a.sub_project_id === project.id)
+      .forEach((a) => ids.add(String(a.employee_id)));
+    resolvePmIds(project).forEach((id) => {
+      if (id != null) ids.add(String(id));
+    });
+    return ids;
+  };
+
+  const getAllocatedManpower = (project) => getManpowerEmployeeIds(project).size;
 
   const calculateManpowerBalance = (project) => {
     const matchingTotal = getMatchingEmployees(project).length;
@@ -1639,26 +1735,29 @@ const ProjectsPage = () => {
   const [highlightId, setHighlightId] = useState(null);
   const PAGE_SIZE = 12;
 
-  // Program managers present across the visible parent projects (for the PM filter)
+  // Options for the PM filter: every program manager on the roster, not only those
+  // who currently hold a project — an admin should be able to pick any manager, and
+  // "no projects" is a legitimate answer. Unioned with the PMs actually resolved off
+  // the visible projects so anyone acting as a PM without the designation (a few
+  // Admins do) is still selectable.
   const projectManagers = useMemo(() => {
+    const nameById = new Map(employees.map((e) => [e.id, e.name]));
     const map = new Map();
-    visibleMainProjects.forEach((mp) => {
-      const ids = mp.program_manager_ids?.length
-        ? mp.program_manager_ids
-        : mp.program_manager_id
-          ? [mp.program_manager_id]
-          : [];
-      ids.forEach((id) => {
-        if (!map.has(id)) {
-          const emp = employees.find((e) => e.id === id);
-          map.set(id, emp?.name || `Manager #${id}`);
-        }
-      });
-    });
+    const add = (id) => {
+      if (id == null || map.has(id)) return;
+      map.set(id, nameById.get(id) || `Manager #${id}`);
+    };
+    employees
+      .filter((e) =>
+        (e.designation || "").toLowerCase().includes("program manager"),
+      )
+      .forEach((e) => add(e.id));
+    visibleProjects.forEach((project) => resolvePmIds(project).forEach(add));
     return [...map.entries()]
       .map(([id, name]) => ({ id, name }))
       .sort((a, b) => a.name.localeCompare(b.name));
-  }, [visibleMainProjects, employees]);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [visibleProjects, visibleMainProjects, employees]);
 
   // Close the Filters popover on outside click
   useEffect(() => {
@@ -1669,13 +1768,6 @@ const ProjectsPage = () => {
     document.addEventListener("mousedown", handler);
     return () => document.removeEventListener("mousedown", handler);
   }, []);
-
-  const pmIdsOf = (mp) =>
-    mp?.program_manager_ids?.length
-      ? mp.program_manager_ids
-      : mp?.program_manager_id
-        ? [mp.program_manager_id]
-        : [];
 
   const filteredProjects = (
     filterMainProjectId
@@ -1707,10 +1799,7 @@ const ProjectsPage = () => {
     })
     .filter((project) => {
       if (selectedPm === "all") return true;
-      const parentProject = visibleMainProjects.find(
-        (p) => p.id === project.main_project_id,
-      );
-      return pmIdsOf(parentProject).includes(Number(selectedPm));
+      return resolvePmIds(project).includes(Number(selectedPm));
     })
     .filter((project) => {
       if (selectedStatus === "all") return true;
@@ -2223,6 +2312,8 @@ const ProjectsPage = () => {
                   <Dropdown
                     value={selectedPm}
                     onChange={setSelectedPm}
+                    searchable
+                    searchPlaceholder="Search managers..."
                     options={[
                       { value: "all", label: "All managers" },
                       ...projectManagers.map((pm) => ({
@@ -2339,18 +2430,7 @@ const ProjectsPage = () => {
                   (p) => p.id === project.main_project_id,
                 );
 
-                const mainProject = parentProject;
-
-                const pmIds = project?.assigned_employee_ids?.length
-                  ? project.assigned_employee_ids
-                  : project?.pm_id
-                    ? [project.pm_id]
-                    : mainProject?.program_manager_ids?.length
-                      ? mainProject.program_manager_ids
-                      : mainProject?.program_manager_id
-                        ? [mainProject.program_manager_id]
-                        : [];
-
+                const pmIds = resolvePmIds(project);
                 const pmNames = pmIds
                   .map((id) => employees.find((e) => e.id === id)?.name)
                   .filter(Boolean);
@@ -2365,6 +2445,9 @@ const ProjectsPage = () => {
                     project={project}
                     parentProject={parentProject}
                     pmNames={pmNames}
+                    pmIds={pmIds}
+                    onLeaveEmployeeIds={leaveEmployeeIds}
+                    locationByEmployeeId={locationByEmployeeId}
                     allocatedManpower={allocatedManpower}
                     allocations={allocations}
                     employees={employees}

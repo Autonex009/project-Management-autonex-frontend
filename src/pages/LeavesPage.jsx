@@ -1,4 +1,5 @@
 import { useState, useRef, useEffect } from "react";
+import { useSearchParams } from "react-router-dom";
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
 import { leaveApi, employeeApi, wfhApi } from "../services/api";
 import Spinner from "../components/ui/LoadingSpinner";
@@ -90,12 +91,35 @@ const checkHalfDayTiming = (startDateStr, slot) => {
 
 const LeavesPage = () => {
   const queryClient = useQueryClient();
-  const [activeTab, setActiveTab] = useState("Leave List");
+  // ?tab= lets other screens deep-link a specific tab (the Dashboard's WFH card
+  // opens "WFH Requests" directly). Unknown values fall back to the default.
+  const [searchParams] = useSearchParams();
+  const tabParam = searchParams.get("tab");
+  const [activeTab, setActiveTab] = useState(
+    TABS.includes(tabParam) ? tabParam : "Leave List",
+  );
+  const queryParam = searchParams.get("q");
   const [currentPage, setCurrentPage] = useState(1);
   const PAGE_SIZE = 10;
   const [isModalOpen, setIsModalOpen] = useState(false);
   const [selectedLeaveType, setSelectedLeaveType] = useState("");
-  const [searchQuery, setSearchQuery] = useState("");
+  // ?q= seeds the search box so a Dashboard card can deep-link straight to one
+  // person's requests. It stays editable — clearing the box just clears it.
+  const [searchQuery, setSearchQuery] = useState(queryParam || "");
+
+  // Also react to the params changing while the page is already mounted — e.g.
+  // clicking a second name in the Dashboard popover without leaving the page.
+  // Declared after the state above so the setters are initialised.
+  useEffect(() => {
+    if (tabParam && TABS.includes(tabParam)) setActiveTab(tabParam);
+  }, [tabParam]);
+  useEffect(() => {
+    if (queryParam === null) return;
+    setSearchQuery(queryParam);
+    // Match handleSearchChange: a narrowed list must start at page 1, or the
+    // deep-linked person can land off-screen on a stale page.
+    setCurrentPage(1);
+  }, [queryParam]);
   const [statusFilter, setStatusFilter] = useState("all"); // all | pending | approved | rejected
   const [todayOnly, setTodayOnly] = useState(false); // only leaves that start today
   const [dateSort, setDateSort] = useState(""); // '' | 'asc' (Jan→Dec) | 'desc' (Dec→Jan)

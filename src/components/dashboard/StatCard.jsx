@@ -1,4 +1,5 @@
-import React from "react";
+import React, { useEffect, useLayoutEffect, useRef, useState } from "react";
+import { ChevronDown } from "lucide-react";
 
 // Clean metric KPI card (reference design): a small icon tile + title on top,
 // a big tabular number (with optional unit), and a delta / hint line below
@@ -14,6 +15,14 @@ const ICON_TONES = {
   indigo: "from-indigo-500 to-indigo-600",
 };
 
+const VIEWPORT_PAD = 12; // keep the popover this far inside the viewport
+const GAP = 8; // gap between the card and the popover (matches the pt-2 bridge)
+
+// This card is server-rendered, and useLayoutEffect is a no-op (plus a warning)
+// on the server. The measurement only ever runs after a client interaction.
+const useMeasureEffect =
+  typeof window === "undefined" ? useEffect : useLayoutEffect;
+
 const StatCard = ({
   title,
   value,
@@ -22,30 +31,181 @@ const StatCard = ({
   tone = "slate",
   delta,
   hint,
+  label,
   breakdown,
+  breakdownTabs,
+  breakdownFooter,
+  breakdownActionLabel = "View all",
+  // Tighter padding and type scale for dense KPI rows. Only the card chrome
+  // changes — the popover is identical, so a compact card reads the same on hover.
+  compact = false,
   onClick,
 }) => {
   const iconTone = ICON_TONES[tone] || ICON_TONES.slate;
+
+  // `breakdown` takes either a flat [{ label, value }] list or a sectioned
+  // [{ title, rows: [...] }] list — normalise both to sections so the popover
+  // has one shape to render.
+  const toSections = (source) =>
+    !source?.length
+      ? []
+      : source[0]?.rows
+        ? source.filter((s) => s.rows?.length)
+        : [{ rows: source }];
+
+  // `breakdownTabs` is [{ label, sections }] — the same breakdown cut more than
+  // one way (e.g. by designation vs by employment type) behind a tab strip.
+  const tabs = (breakdownTabs || [])
+    .map((tab) => ({ ...tab, sections: toSections(tab.sections) }))
+    .filter((tab) => tab.sections.length > 0);
+
+  const [activeTab, setActiveTab] = useState(0);
+  const tabIndex = Math.min(activeTab, Math.max(tabs.length - 1, 0));
+  const sections = tabs.length
+    ? tabs[tabIndex].sections
+    : toSections(breakdown);
+  const hasBreakdown = sections.some((s) => s.rows.length > 0);
+
+  // Hover previews the breakdown; a click pins it open until the next click
+  // (on the card again, outside it, or Escape).
+  const [hovered, setHovered] = useState(false);
+  const [pinned, setPinned] = useState(false);
+  // Dismissing by click happens while the pointer is still on the card, so hover
+  // alone would immediately re-open it. Suppress hover until the pointer leaves.
+  const [suppressed, setSuppressed] = useState(false);
+  const open = hasBreakdown && (pinned || (hovered && !suppressed));
+
+  const cardRef = useRef(null);
+  const popRef = useRef(null);
+  // Horizontal nudge + vertical flip so edge cards don't spill off-screen.
+  const [shiftX, setShiftX] = useState(0);
+  const [above, setAbove] = useState(false);
+
+  useMeasureEffect(() => {
+    if (!open || !cardRef.current || !popRef.current) return;
+    // offsetWidth/Height are layout values, so the open transition's `scale`
+    // doesn't skew the measurement the way getBoundingClientRect would.
+    const card = cardRef.current.getBoundingClientRect();
+    const popW = popRef.current.offsetWidth;
+    const popH = popRef.current.offsetHeight;
+
+    const left = card.left + card.width / 2 - popW / 2;
+    let nudge = 0;
+    if (left + popW > window.innerWidth - VIEWPORT_PAD) {
+      nudge = window.innerWidth - VIEWPORT_PAD - (left + popW);
+    } else if (left < VIEWPORT_PAD) {
+      nudge = VIEWPORT_PAD - left;
+    }
+    setShiftX(nudge);
+
+    const fitsBelow = card.bottom + GAP + popH <= window.innerHeight - VIEWPORT_PAD;
+    const fitsAbove = card.top - GAP - popH >= VIEWPORT_PAD;
+    setAbove(!fitsBelow && fitsAbove);
+    // Switching tabs changes the popover's height, so re-measure to keep the
+    // flip-above decision and the viewport clamp correct.
+  }, [open, sections.length, tabIndex]);
+
+  // Pinned-only dismissals: click anywhere outside, or Escape.
+  useEffect(() => {
+    if (!pinned) return;
+    const onPointerDown = (e) => {
+      if (cardRef.current && !cardRef.current.contains(e.target)) setPinned(false);
+    };
+    const onKeyDown = (e) => {
+      if (e.key === "Escape") {
+        setPinned(false);
+        setSuppressed(true);
+      }
+    };
+    document.addEventListener("mousedown", onPointerDown);
+    document.addEventListener("keydown", onKeyDown);
+    return () => {
+      document.removeEventListener("mousedown", onPointerDown);
+      document.removeEventListener("keydown", onKeyDown);
+    };
+  }, [pinned]);
+
+  // Without a breakdown the whole card is the action; with one, the click pins
+  // the popover and the action moves into its footer.
+  const handleCardClick = () => {
+    if (!hasBreakdown) {
+      onClick?.();
+      return;
+    }
+    if (open) {
+      setPinned(false);
+      setSuppressed(true);
+    } else {
+      setPinned(true);
+      setSuppressed(false);
+    }
+  };
+
+  const interactive = hasBreakdown || onClick;
+
   return (
     <div
-      onClick={onClick}
-      className={`group relative rounded-xl border border-slate-200 bg-white p-3 shadow-[0_1px_2px_rgba(0,0,0,0.03)] transition-colors hover:border-slate-300 ${onClick ? "cursor-pointer" : ""}`}
+      ref={cardRef}
+      onClick={handleCardClick}
+      onMouseEnter={() => setHovered(true)}
+      onMouseLeave={() => {
+        setHovered(false);
+        setSuppressed(false);
+      }}
+      onKeyDown={(e) => {
+        if (!interactive) return;
+        if (e.key === "Enter" || e.key === " ") {
+          e.preventDefault();
+          handleCardClick();
+        }
+      }}
+      role={interactive ? "button" : undefined}
+      tabIndex={interactive ? 0 : undefined}
+      aria-expanded={hasBreakdown ? open : undefined}
+      className={`group relative rounded-xl border bg-white ${compact ? "px-3 py-2.5" : "p-3"} shadow-[0_1px_2px_rgba(0,0,0,0.03)] transition-colors focus:outline-none focus-visible:ring-2 focus-visible:ring-indigo-500/40 ${
+        pinned ? "border-slate-300" : "border-slate-200 hover:border-slate-300"
+      } ${interactive ? "cursor-pointer" : ""}`}
     >
       <div className="flex items-center gap-2.5">
         {Icon && (
           <span
-            className={`flex h-9 w-9 shrink-0 items-center justify-center rounded-xl bg-gradient-to-br ${iconTone} text-white shadow-sm`}
+            className={`flex shrink-0 items-center justify-center bg-gradient-to-br ${iconTone} text-white shadow-sm ${
+              compact ? "h-8 w-8 rounded-lg" : "h-9 w-9 rounded-xl"
+            }`}
           >
-            <Icon className="h-[18px] w-[18px]" />
+            <Icon className={compact ? "h-4 w-4" : "h-[18px] w-[18px]"} />
           </span>
         )}
-        <span className="truncate text-[13px] font-medium text-slate-600">
+        <span
+          className={`truncate font-medium text-slate-600 ${compact ? "text-[12px]" : "text-[13px]"}`}
+        >
           {title}
         </span>
+        {hasBreakdown && (
+          <ChevronDown
+            className={`ml-auto h-3.5 w-3.5 shrink-0 text-slate-300 transition-[transform,color] duration-150 group-hover:text-slate-400 ${
+              open ? "rotate-180 text-slate-400" : ""
+            }`}
+          />
+        )}
       </div>
 
-      <div className="mt-2 flex items-baseline gap-1">
-        <span className="text-2xl font-bold leading-none tracking-tight text-slate-900 tabular-nums">
+      {/* Mono, like the other micro-copy: short metric captions read as data,
+          not prose, and a fixed pitch keeps them aligned between sibling cards. */}
+      {label && (
+        <p
+          className={`font-mono font-medium text-slate-400 ${compact ? "mt-1.5 text-[11px]" : "mt-2.5 text-[12px]"}`}
+        >
+          {label}
+        </p>
+      )}
+
+      <div
+        className={`${label ? "mt-0.5" : compact ? "mt-1.5" : "mt-2"} flex items-baseline gap-1`}
+      >
+        <span
+          className={`font-bold leading-none tracking-tight text-slate-900 tabular-nums ${compact ? "text-[26px]" : "text-[32px]"}`}
+        >
           {value}
         </span>
         {unit && (
@@ -54,7 +214,9 @@ const StatCard = ({
       </div>
 
       {(delta || hint) && (
-        <div className="mt-1.5 flex items-center gap-1.5 text-xs">
+        <div
+          className={`flex items-center gap-1.5 text-xs ${compact ? "mt-1.5" : "mt-2"}`}
+        >
           {delta && (
             <span
               className={`font-semibold tabular-nums ${delta.positive ? "text-emerald-600" : "text-red-500"}`}
@@ -63,28 +225,116 @@ const StatCard = ({
               {delta.value}
             </span>
           )}
-          {hint && <span className="text-slate-400">{hint}</span>}
+          {/* A string hint is muted supporting text; a node brings its own colour
+              (the Total Employees card colour-codes each bucket). */}
+          {hint &&
+            (typeof hint === "string" ? (
+              <span className="text-slate-400">{hint}</span>
+            ) : (
+              hint
+            ))}
         </div>
       )}
 
-      {breakdown && breakdown.length > 0 && (
-        <div className="pointer-events-none absolute left-1/2 top-full z-20 mt-2 w-52 -translate-x-1/2 rounded-2xl border border-slate-200 bg-white p-3 opacity-0 shadow-xl ring-1 ring-slate-900/5 transition-opacity duration-150 group-hover:opacity-100">
-          <div className="absolute -top-1.5 left-1/2 h-3 w-3 -translate-x-1/2 rotate-45 border-l border-t border-slate-200 bg-white" />
-          <p className="mb-2 text-[11px] font-semibold uppercase tracking-wide text-slate-400">
-            {title} breakdown
-          </p>
-          <div className="space-y-1.5">
-            {breakdown.map((row) => (
+      {hasBreakdown && (
+        // Outer wrapper is a transparent bridge across the 8px gap so moving the
+        // pointer from the card into the popover never crosses a dead zone.
+        <div
+          className={`absolute left-1/2 z-50 ${above ? "bottom-full pb-2" : "top-full pt-2"} ${
+            open ? "" : "pointer-events-none"
+          }`}
+          style={{ transform: `translateX(calc(-50% + ${shiftX}px))` }}
+        >
+          <div
+            ref={popRef}
+            role="dialog"
+            aria-label={`${title} breakdown`}
+            onClick={(e) => e.stopPropagation()}
+            className={`w-[17rem] overflow-hidden rounded-xl border border-slate-200/80 bg-white shadow-[0_1px_2px_rgba(15,23,42,0.04),0_2px_6px_-2px_rgba(15,23,42,0.06),0_12px_28px_-8px_rgba(15,23,42,0.14)] ring-1 ring-slate-900/[0.03] transition-[opacity,transform] duration-150 ease-out ${
+              above ? "origin-bottom" : "origin-top"
+            } ${open ? "translate-y-0 scale-100 opacity-100" : `${above ? "translate-y-1" : "-translate-y-1"} scale-[0.97] opacity-0`}`}
+          >
+            <div className="flex items-baseline justify-between gap-2 px-3 pb-2 pt-2.5">
+              <p className="truncate text-[13px] font-semibold text-slate-900">
+                {title}
+              </p>
+              <p className="shrink-0 font-mono text-[13px] font-semibold tabular-nums text-slate-900">
+                {value}
+              </p>
+            </div>
+
+            {tabs.length > 1 && (
               <div
-                key={row.label}
-                className="flex items-center justify-between text-sm"
+                role="tablist"
+                className="mx-1.5 mb-1 flex items-center gap-0.5 rounded-lg bg-slate-100/80 p-0.5"
               >
-                <span className="text-slate-500">{row.label}</span>
-                <span className="font-semibold text-slate-800">
-                  {row.value}
-                </span>
+                {tabs.map((tab, i) => (
+                  <button
+                    key={tab.label || i}
+                    type="button"
+                    role="tab"
+                    aria-selected={i === tabIndex}
+                    onClick={() => setActiveTab(i)}
+                    className={`flex-1 rounded-md px-2 py-1 text-[11px] font-semibold transition-colors ${
+                      i === tabIndex
+                        ? "bg-white text-slate-900 shadow-sm ring-1 ring-slate-200/70"
+                        : "text-slate-500 hover:text-slate-800"
+                    }`}
+                  >
+                    {tab.label}
+                  </button>
+                ))}
               </div>
-            ))}
+            )}
+
+            <div className="max-h-[min(60vh,24rem)] overflow-y-auto px-1.5 pb-1.5">
+              {sections.map((section, i) => (
+                <div
+                  key={section.title || i}
+                  className={i === 0 ? "" : "mt-1 border-t border-slate-100 pt-1"}
+                >
+                  {section.title && (
+                    <p className="px-1.5 pb-1 pt-1.5 font-mono text-[10px] font-semibold uppercase tracking-[0.06em] text-slate-400">
+                      {section.title}
+                    </p>
+                  )}
+                  {section.rows.map((row) => (
+                    <div
+                      key={row.label}
+                      className="flex items-center justify-between gap-3 rounded-md px-1.5 py-1 transition-colors hover:bg-slate-50"
+                    >
+                      <span className="truncate text-[13px] text-slate-600">
+                        {row.label}
+                      </span>
+                      <span className="shrink-0 font-mono text-[13px] font-semibold tabular-nums text-slate-900">
+                        {row.value}
+                      </span>
+                    </div>
+                  ))}
+                </div>
+              ))}
+            </div>
+
+            {(breakdownFooter || onClick) && (
+              <div className="flex items-center justify-between gap-2 border-t border-slate-100 bg-slate-50/60 px-3 py-2">
+                <p className="truncate font-mono text-[11px] text-slate-500">
+                  {breakdownFooter}
+                </p>
+                {onClick && (
+                  <button
+                    type="button"
+                    onClick={(e) => {
+                      e.stopPropagation();
+                      setPinned(false);
+                      onClick();
+                    }}
+                    className="shrink-0 text-[11px] font-semibold text-indigo-600 transition-colors hover:text-indigo-700"
+                  >
+                    {breakdownActionLabel} →
+                  </button>
+                )}
+              </div>
+            )}
           </div>
         </div>
       )}
