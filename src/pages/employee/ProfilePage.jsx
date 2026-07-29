@@ -86,6 +86,135 @@ const EditableFieldCard = ({
   );
 };
 
+/* ── email card with its own inline editor ─────────────────────────
+ Kept separate from the main Edit Profile form: changing this moves the
+ login identity, so it saves on its own endpoint, is restricted to the
+ company domain, and triggers a confirmation email. */
+const COMPANY_DOMAIN = "autonexai360.com";
+
+const EmailCard = ({ value, onSave, isSaving, error, onDismissError }) => {
+  const [editing, setEditing] = useState(false);
+  const [draft, setDraft] = useState("");
+
+  const start = () => {
+    // Pre-fill the local part so only the domain has to be corrected.
+    const localPart = (value || "").split("@")[0] || "";
+    setDraft(localPart ? `${localPart}@${COMPANY_DOMAIN}` : `@${COMPANY_DOMAIN}`);
+    onDismissError();
+    setEditing(true);
+  };
+
+  const cancel = () => {
+    setEditing(false);
+    onDismissError();
+  };
+
+  const trimmed = draft.trim().toLowerCase();
+  const domainOk = trimmed.endsWith(`@${COMPANY_DOMAIN}`);
+  const hasLocalPart = trimmed.split("@")[0].length > 0;
+  const unchanged = trimmed === (value || "").trim().toLowerCase();
+  const canSave = domainOk && hasLocalPart && !unchanged && !isSaving;
+
+  const submit = (e) => {
+    e.preventDefault();
+    if (canSave) onSave(trimmed, () => setEditing(false));
+  };
+
+  if (!editing) {
+    return (
+      <div className="rounded-2xl border border-slate-200/70 bg-white p-4 shadow-sm">
+        <div className="flex items-start gap-3">
+          <div className="rounded-xl bg-emerald-50 p-2.5">
+            <Mail className="h-5 w-5 text-emerald-600" />
+          </div>
+          <div className="min-w-0 flex-1">
+            <p className="text-xs font-medium uppercase tracking-[0.16em] text-slate-400">
+              Email
+            </p>
+            <p className="mt-1 break-words text-sm font-medium text-slate-800">
+              {value || "Not available"}
+            </p>
+          </div>
+          <button
+            type="button"
+            onClick={start}
+            title="Change your login email"
+            className="shrink-0 rounded-lg border border-emerald-200 bg-white p-1.5 text-emerald-700 transition-all hover:bg-emerald-50"
+          >
+            <Pencil className="h-3.5 w-3.5" />
+          </button>
+        </div>
+      </div>
+    );
+  }
+
+  return (
+    <form
+      onSubmit={submit}
+      className="rounded-2xl border-2 border-emerald-200 bg-white p-4 shadow-sm ring-1 ring-emerald-100"
+    >
+      <div className="flex items-start gap-3">
+        <div className="rounded-xl bg-emerald-50 p-2.5">
+          <Mail className="h-5 w-5 text-emerald-600" />
+        </div>
+        <div className="min-w-0 flex-1">
+          <p className="text-xs font-medium uppercase tracking-[0.16em] text-slate-400">
+            Email
+          </p>
+          <input
+            type="email"
+            autoFocus
+            value={draft}
+            onChange={(e) => setDraft(e.target.value)}
+            placeholder={`you@${COMPANY_DOMAIN}`}
+            className="mt-1 w-full rounded-lg border border-slate-200 bg-slate-50/80 px-3 py-1.5 text-sm font-medium text-slate-800 outline-none transition-colors placeholder:text-slate-300 focus:border-emerald-400 focus:bg-white focus:ring-2 focus:ring-emerald-100"
+          />
+
+          {trimmed && !domainOk ? (
+            <p className="mt-2 flex items-start gap-1.5 text-xs font-medium text-rose-600">
+              <Info className="mt-0.5 h-3.5 w-3.5 shrink-0" />
+              Must be a @{COMPANY_DOMAIN} address.
+            </p>
+          ) : (
+            <p className="mt-2 text-xs text-slate-400">
+              Only @{COMPANY_DOMAIN} addresses. Your password stays the same —
+              you'll sign in with the new email.
+            </p>
+          )}
+
+          {error && (
+            <p className="mt-2 flex items-start gap-1.5 text-xs font-medium text-rose-600">
+              <X className="mt-0.5 h-3.5 w-3.5 shrink-0" />
+              {error}
+            </p>
+          )}
+
+          <div className="mt-3 flex items-center gap-2">
+            <Button
+              variant="success"
+              size="sm"
+              type="submit"
+              disabled={!canSave}
+              isLoading={isSaving}
+            >
+              {!isSaving && <Save className="h-3.5 w-3.5" />}
+              {isSaving ? "Saving…" : "Save email"}
+            </Button>
+            <button
+              type="button"
+              onClick={cancel}
+              disabled={isSaving}
+              className="rounded-lg border border-slate-200 bg-white px-3 py-1.5 text-xs font-semibold text-slate-600 transition-all hover:bg-slate-50 disabled:opacity-50"
+            >
+              Cancel
+            </button>
+          </div>
+        </div>
+      </div>
+    </form>
+  );
+};
+
 /* ── skills multi-select dropdown ──────────────────────────────── */
 const SkillsMultiSelect = ({ selected, onChange, options, isLoading }) => {
   const [open, setOpen] = useState(false);
@@ -291,6 +420,44 @@ const ProfilePage = () => {
       slack_user_id: editSlackId || null,
       encord_id: editEncordId || null,
     });
+  };
+
+  /* ── login email change (own endpoint, own state) ──────────── */
+  const [emailError, setEmailError] = useState("");
+  const [emailChangedTo, setEmailChangedTo] = useState("");
+
+  const changeEmailMutation = useMutation({
+    mutationFn: (newEmail) => employeeApi.changeEmail(employeeId, newEmail),
+    onSuccess: (updated) => {
+      // The cached user drives the header and API calls, so keep it in step with
+      // the new login identity rather than waiting for the next sign-in.
+      try {
+        const cached = JSON.parse(localStorage.getItem("user") || "{}");
+        localStorage.setItem(
+          "user",
+          JSON.stringify({ ...cached, email: updated.email }),
+        );
+      } catch {
+        /* a corrupt cache shouldn't block the change that already succeeded */
+      }
+      queryClient.invalidateQueries({ queryKey: ["auth-me"] });
+      queryClient.invalidateQueries({
+        queryKey: ["employee-profile", employeeId],
+      });
+      setEmailError("");
+      setEmailChangedTo(updated.email);
+    },
+    onError: (err) => {
+      setEmailError(
+        err?.response?.data?.detail ||
+          "Could not change your email. Please try again.",
+      );
+    },
+  });
+
+  const handleChangeEmail = (newEmail, closeEditor) => {
+    setEmailChangedTo("");
+    changeEmailMutation.mutate(newEmail, { onSuccess: closeEditor });
   };
 
   /* ── avatar (profile picture) ──────────────────────────────── */
@@ -499,6 +666,27 @@ const ProfilePage = () => {
           {saveError}
         </div>
       )}
+      {emailChangedTo && (
+        <div className="flex items-start gap-3 rounded-2xl border border-emerald-200 bg-emerald-50 px-5 py-3 text-sm text-emerald-800 shadow-sm animate-in fade-in slide-in-from-top-2">
+          <Check className="mt-0.5 h-5 w-5 shrink-0 text-emerald-600" />
+          <div>
+            <p className="font-semibold">
+              Your login email is now {emailChangedTo}
+            </p>
+            <p className="mt-0.5 text-emerald-700/90">
+              A confirmation was sent there. Next time, sign in with this address
+              and your <strong>existing password</strong> — it hasn't changed.
+            </p>
+          </div>
+          <button
+            type="button"
+            onClick={() => setEmailChangedTo("")}
+            className="ml-auto shrink-0 rounded-lg p-1 text-emerald-600 transition-colors hover:bg-emerald-100"
+          >
+            <X className="h-4 w-4" />
+          </button>
+        </div>
+      )}
 
       {isLoading ? (
         <div className="rounded-2xl border border-slate-200 bg-white p-10 text-center text-sm text-slate-400 shadow-sm">
@@ -515,8 +703,14 @@ const ProfilePage = () => {
               value={mergedProfile.name}
             />
 
-            {/* Email — always read-only */}
-            <FieldCard icon={Mail} label="Email" value={mergedProfile.email} />
+            {/* Email — self-service, company domain only */}
+            <EmailCard
+              value={mergedProfile.email}
+              onSave={handleChangeEmail}
+              isSaving={changeEmailMutation.isPending}
+              error={emailError}
+              onDismissError={() => setEmailError("")}
+            />
 
             {/* Phone — editable */}
             {isEditing ? (
