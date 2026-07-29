@@ -6,6 +6,7 @@ import { authApi } from "../../services/api";
 import Spinner from "../../components/ui/LoadingSpinner";
 import toast from "react-hot-toast";
 import AuthBrandPanel from "../../components/brand/AuthBrandPanel";
+import { parseAuthError } from "../../utils/authErrors";
 
 const PMLogin = () => {
   const navigate = useNavigate();
@@ -26,9 +27,9 @@ const PMLogin = () => {
       navigate(from, { replace: true });
     },
     onError: (err) => {
-      const message = err.response?.data?.detail || "Invalid credentials.";
+      // Banner only — a toast saying the same thing is just a second copy.
+      const { message } = parseAuthError(err);
       setError(message);
-      toast.error(message);
     },
   });
 
@@ -36,9 +37,7 @@ const PMLogin = () => {
     e.preventDefault();
     setError(null);
     if (!formData.email || !formData.password) {
-      const message = "Please fill in all fields";
-      setError(message);
-      toast.error(message);
+      setError("Please fill in all fields");
       return;
     }
     loginMutation.mutate(formData);
