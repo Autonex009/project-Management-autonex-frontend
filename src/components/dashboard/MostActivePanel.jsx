@@ -9,14 +9,26 @@ import { Clock, ArrowUpRight, BarChart3 } from "lucide-react";
 // hero figure (total platform hours) is shared and only the leaderboard changes.
 
 const MONTHS = [
-  "Jan", "Feb", "Mar", "Apr", "May", "Jun",
-  "Jul", "Aug", "Sep", "Oct", "Nov", "Dec",
+  "Jan",
+  "Feb",
+  "Mar",
+  "Apr",
+  "May",
+  "Jun",
+  "Jul",
+  "Aug",
+  "Sep",
+  "Oct",
+  "Nov",
+  "Dec",
 ];
 
 // Parse the Y-M-D parts directly; going through Date() would reparse as UTC
 // midnight and can shift the label by a day in IST.
 const monthLabel = (iso) => {
-  const [, m] = String(iso || "").slice(0, 10).split("-");
+  const [, m] = String(iso || "")
+    .slice(0, 10)
+    .split("-");
   return m ? MONTHS[Number(m) - 1] : "";
 };
 
@@ -48,13 +60,15 @@ const Sparkline = ({ data, onHoverPoint }) => {
       const y = H - 2 - ((Number(p.hours) || 0) / max) * (H - 4);
       return { x, y };
     });
-    const line = coords.map((c, i) => `${i ? "L" : "M"}${c.x.toFixed(1)},${c.y.toFixed(1)}`).join(" ");
+    const line = coords
+      .map((c, i) => `${i ? "L" : "M"}${c.x.toFixed(1)},${c.y.toFixed(1)}`)
+      .join(" ");
     return { coords, line, area: `${line} L${W},${H} L0,${H} Z` };
   }, [pts]);
 
   if (!geometry) {
     return (
-      <div className="flex h-[56px] w-[220px] items-end justify-center text-[10px] text-slate-300">
+      <div className="flex h-[56px] w-[220px] min-w-[110px] shrink items-end justify-center text-[10px] text-slate-300">
         Not enough data
       </div>
     );
@@ -64,7 +78,10 @@ const Sparkline = ({ data, onHoverPoint }) => {
   const labelIdx = [0, Math.floor(pts.length / 2), pts.length - 1];
 
   return (
-    <div className="w-[220px] shrink-0">
+    // Holds 220px when there is room and gives width back down to 110px when
+    // there isn't, so it shares the squeeze with the figure instead of forcing
+    // all of it onto the text.
+    <div className="w-[220px] min-w-[110px] shrink">
       <svg
         viewBox={`0 0 ${W} ${H}`}
         className="h-[56px] w-full overflow-visible"
@@ -109,15 +126,17 @@ const Sparkline = ({ data, onHoverPoint }) => {
   );
 };
 
-// Share-of-total meter drawn as discrete ticks, matching the reference card.
+// Share-of-total meter drawn as discrete ticks, matching the reference card. The
+// ticks flex so the meter fills whatever width the card has instead of
+// overflowing it at a fixed 3px each.
 const TickMeter = ({ pct }) => {
   const filled = Math.round((Math.min(Math.max(pct, 0), 100) / 100) * TICKS);
   return (
-    <div className="flex items-center gap-[2px]" aria-hidden="true">
+    <div className="flex w-full items-center gap-[2px]" aria-hidden="true">
       {Array.from({ length: TICKS }, (_, i) => (
         <span
           key={i}
-          className={`h-3 w-[3px] rounded-sm ${i < filled ? "bg-orange-500" : "bg-slate-200"}`}
+          className={`h-3 min-w-[2px] flex-1 rounded-sm ${i < filled ? "bg-orange-500" : "bg-slate-200"}`}
         />
       ))}
     </div>
@@ -163,12 +182,13 @@ const MostActivePanel = ({
   const leader = rows[0];
   // Share of the month's platform hours held by the leader — the headline figure
   // and the meter therefore always describe the same denominator.
-  const leaderPct = totalHours > 0 && leader ? (leader.hours / totalHours) * 100 : 0;
+  const leaderPct =
+    totalHours > 0 && leader ? (leader.hours / totalHours) * 100 : 0;
 
   return (
     <div className="overflow-hidden rounded-2xl border border-slate-200/70 bg-slate-50/70 shadow-[0_1px_3px_rgba(15,23,42,0.05)]">
       {/* Header bar */}
-      <div className="flex items-center justify-between gap-2 px-4 pb-2.5 pt-3.5">
+      <div className="flex flex-wrap items-center justify-between gap-2 px-4 pb-2.5 pt-3.5">
         <div className="flex min-w-0 items-baseline gap-1.5">
           <h3 className="text-[13px] font-semibold text-slate-900">
             Most active
@@ -196,30 +216,62 @@ const MostActivePanel = ({
         </div>
       </div>
 
-      {/* Hero block */}
-      <div className="mx-2 rounded-xl border border-slate-200/80 bg-white p-4">
+      {/* Hero block. container-type makes the cqw units below measure THIS card
+          rather than the viewport, so the figure responds to the width it
+          actually has — the dashboard column is narrower than the window. */}
+      <div
+        className="mx-2 rounded-xl border border-slate-200/80 bg-white p-4"
+        style={{ containerType: "inline-size" }}
+      >
+        {/* Figure and sparkline stay side by side at every width; when space runs
+            short the headline scales down instead of the chart dropping onto a
+            half-empty row of its own. */}
         <div className="flex items-start justify-between gap-3">
-          <div className="min-w-0">
+          <div className="min-w-0 flex-1">
             <p className="font-mono text-[10px] uppercase tracking-[0.12em] text-slate-400">
               Platform hours
             </p>
             <p className="mt-1 flex items-baseline gap-0.5">
-              <span className="text-[30px] font-bold leading-none tracking-tight text-slate-900 tabular-nums">
+              <span
+                className="font-bold leading-none tracking-tight text-slate-900 tabular-nums"
+                style={{ fontSize: "clamp(17px, 9cqw, 30px)" }}
+              >
                 {fmtHours(totalHours)}
               </span>
-              <span className="text-[15px] font-semibold text-slate-400">h</span>
-            </p>
-            <p className="mt-1.5 font-mono text-[10px] uppercase tracking-wider text-slate-400">
-              {overview?.autonex_people ?? 0} people
-              <span className="mx-1 text-slate-300">·</span>
-              <span className="text-emerald-600">
-                {overview?.active_annotators ?? 0} annotating
-              </span>
-              <span className="mx-1 text-slate-300">·</span>
-              <span className="text-sky-600">
-                {overview?.active_reviewers ?? 0} reviewing
+              <span
+                className="font-semibold text-slate-400"
+                style={{ fontSize: "clamp(11px, 4.5cqw, 15px)" }}
+              >
+                h
               </span>
             </p>
+            {/* One line per figure — the single run-on line wrapped unreadably. */}
+            <div className="mt-2 flex flex-col gap-0.5 font-mono text-[10px] uppercase tracking-wider">
+              {[
+                {
+                  value: overview?.autonex_people ?? 0,
+                  label: "people",
+                  tone: "text-slate-600",
+                },
+                {
+                  value: overview?.active_annotators ?? 0,
+                  label: "annotating",
+                  tone: "text-emerald-600",
+                },
+                {
+                  value: overview?.active_reviewers ?? 0,
+                  label: "reviewing",
+                  tone: "text-sky-600",
+                },
+              ].map(({ value, label, tone }) => (
+                <span key={label} className="flex items-baseline gap-1.5">
+                  <span className={`font-semibold tabular-nums ${tone}`}>
+                    {value}
+                  </span>
+                  <span className="text-slate-400">{label}</span>
+                </span>
+              ))}
+            </div>
           </div>
           <Sparkline data={daily} onHoverPoint={setHovered} />
         </div>
@@ -234,7 +286,9 @@ const MostActivePanel = ({
             </>
           ) : leader ? (
             <>
-              <span className="font-semibold text-slate-800">{leader.name}</span>{" "}
+              <span className="font-semibold text-slate-800">
+                {leader.name}
+              </span>{" "}
               leads with {fmtHours(leader.hours)}h of the month&apos;s{" "}
               {fmtHours(totalHours)}h.
             </>
@@ -245,7 +299,7 @@ const MostActivePanel = ({
 
         <div className="mt-2">
           <TickMeter pct={leaderPct} />
-          <div className="mt-1.5 flex items-center justify-between font-mono text-[10px] uppercase tracking-wider">
+          <div className="mt-1.5 flex flex-wrap items-center justify-between gap-x-2 font-mono text-[10px] uppercase tracking-wider">
             <span className="font-semibold text-orange-600 tabular-nums">
               {leaderPct.toFixed(1)}% top share
             </span>
@@ -317,7 +371,7 @@ const MostActivePanel = ({
       </div>
 
       {/* Footer action bar */}
-      <div className="mt-2 flex items-center justify-between gap-2 border-t border-slate-200/70 px-3 py-2.5">
+      <div className="mt-2 flex flex-wrap items-center justify-between gap-2 border-t border-slate-200/70 px-3 py-2.5">
         <span className="inline-flex items-center gap-1 font-mono text-[10px] uppercase tracking-wider text-slate-400">
           <Clock className="h-3 w-3" />
           Encord time

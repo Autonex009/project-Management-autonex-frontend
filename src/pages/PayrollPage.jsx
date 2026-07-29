@@ -12,8 +12,11 @@ import {
   TrendingDown,
   Wallet,
   Lock,
+  Unlock,
   Gift,
   PlusCircle,
+  RotateCcw,
+  Trash2,
 } from "lucide-react";
 import SearchBar from "../components/ui/SearchBar";
 import Table from "../components/ui/Table";
@@ -54,18 +57,30 @@ const fmtDay = (iso) => {
     : iso;
 };
 
+// Render a UTC audit timestamp (…Z from the API) in the viewer's local time.
+const fmtStamp = (iso) => {
+  if (!iso) return "";
+  const d = new Date(iso);
+  return Number.isNaN(d.getTime())
+    ? ""
+    : `on ${d.toLocaleDateString("en-IN", { day: "numeric", month: "short", year: "numeric" })} at ${d.toLocaleTimeString("en-IN", { hour: "2-digit", minute: "2-digit" })}`;
+};
+
 const currentMonthStr = () => {
   const d = new Date();
   return `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, "0")}`;
 };
 
 // Extracted column builder to top-level to avoid recreating on every render.
+// `locked` = the month's run is finalized. Editable cells become read-only text
+// so a finalized payroll can't be silently altered; Undo (reopen) unlocks it.
 const getColumns = ({
   bonuses,
   setBonuses,
   additionalPayments,
   setAdditionalPayments,
   setReviewModal,
+  locked,
 }) => [
   {
     key: "employee",
@@ -135,6 +150,14 @@ const getColumns = ({
     render: (_, row) => {
       if (row.salary_missing || row.bonus_limit <= 0)
         return <span className="text-slate-300 text-xs">—</span>;
+      if (locked)
+        return row.bonus > 0 ? (
+          <span className="font-medium text-amber-700">
+            {fmtCurrency(row.bonus)}
+          </span>
+        ) : (
+          <span className="text-slate-300 text-xs">—</span>
+        );
       return (
         <div className="flex items-center justify-end gap-2">
           <input
@@ -188,6 +211,14 @@ const getColumns = ({
     render: (_, row) =>
       row.salary_missing ? (
         <span className="text-slate-300 text-xs">—</span>
+      ) : locked ? (
+        row.additional_payment > 0 ? (
+          <span className="font-medium text-sky-700">
+            {fmtCurrency(row.additional_payment)}
+          </span>
+        ) : (
+          <span className="text-slate-300 text-xs">—</span>
+        )
       ) : (
         <div className="flex items-center justify-end gap-1">
           <span className="text-slate-400 text-xs">₹</span>
@@ -235,7 +266,7 @@ const getColumns = ({
           variant="secondary"
           onClick={() => setReviewModal(row.employee_id)}
         >
-          Review Leaves
+          {locked ? "View Leaves" : "Review Leaves"}
           <span className="inline-flex items-center justify-center h-4 min-w-[16px] px-1 rounded-full bg-indigo-200 text-[10px] font-bold">
             {row.leaves.length}
           </span>
@@ -267,6 +298,10 @@ const PayrollPage = () => {
 
   // Which employee's leave modal is open
   const [reviewModal, setReviewModal] = useState(null); // employee row object
+
+  // Discarding a run deletes its adjustments, so it sits behind a typed confirm.
+  const [confirmDiscard, setConfirmDiscard] = useState(false);
+  const [discardConfirmText, setDiscardConfirmText] = useState("");
 
   // ── Payroll passcode gate ──────────────────────────────────────────
   const [unlocked, setUnlocked] = useState(
@@ -323,10 +358,49 @@ const PayrollPage = () => {
         data.status === "finalized" ? "Payroll finalized!" : "Draft saved",
       );
       queryClient.invalidateQueries(["payroll-preview", month]);
+      // The query is manual (enabled: false), so invalidation alone won't refetch —
+      // pull the run's new status so the lock state on screen is correct.
+      refetch();
     },
     onError: (err) =>
       toast.error(err.response?.data?.detail || "Failed to save payroll"),
   });
+
+  // Undo a finalize. Keeps every saved figure — only the lock is removed, so the
+  // same numbers come back for editing and re-finalizing.
+  const reopenMutation = useMutation({
+    mutationFn: () => payrollApi.reopen(month, user.id),
+    onSuccess: () => {
+      toast.success("Payroll unlocked — adjustments kept. Edit and re-finalize.");
+      queryClient.invalidateQueries(["payroll-preview", month]);
+      refetch();
+    },
+    onError: (err) =>
+      toast.error(err.response?.data?.detail || "Failed to unlock payroll"),
+  });
+
+  // Discard the run outright. Destructive — clears local edits too so the screen
+  // reflects the freshly auto-computed month rather than stale overrides.
+  const discardMutation = useMutation({
+    mutationFn: () => payrollApi.discardRun(month),
+    onSuccess: () => {
+      toast.success("Payroll run discarded — recomputed from scratch.");
+      setAdjustments({});
+      setBonuses({});
+      setAdditionalPayments({});
+      setConfirmDiscard(false);
+      queryClient.invalidateQueries(["payroll-preview", month]);
+      refetch();
+    },
+    onError: (err) =>
+      toast.error(err.response?.data?.detail || "Failed to discard payroll run"),
+  });
+
+  // A finalized run is locked: no edits, no re-finalize until it's reopened.
+  const isFinalized = generated && preview?.run_status === "finalized";
+  // Draft but previously finalized → this month was finalized and then undone.
+  const wasReopened =
+    generated && !isFinalized && !!preview?.reopened_at && !!preview?.run_id;
 
   const handleGenerate = () => {
     refetch().then(({ data }) => {
@@ -340,12 +414,15 @@ const PayrollPage = () => {
   };
 
   // Admin override: set the exact list of UNPAID dates (ISO strings) for a leave.
+  // No-op while the run is finalized — the month is locked until it's reopened.
   const setLeaveDates = (leaveId, unpaidDates) => {
+    if (isFinalized) return;
     setAdjustments((prev) => ({ ...prev, [leaveId]: unpaidDates }));
   };
 
   // Flip a single day of a leave between paid and unpaid; rest stay as-is.
   const toggleLeaveDay = (leaf, date) => {
+    if (isFinalized) return;
     const current = leaf.dates.filter((d) => d.unpaid).map((d) => d.date);
     const set = new Set(current);
     if (set.has(date)) set.delete(date);
@@ -462,8 +539,9 @@ const PayrollPage = () => {
         additionalPayments,
         setAdditionalPayments,
         setReviewModal,
+        locked: isFinalized,
       }),
-    [bonuses, additionalPayments],
+    [bonuses, additionalPayments, isFinalized],
   );
 
   const buildAdjustmentsPayload = () =>
@@ -708,13 +786,52 @@ const PayrollPage = () => {
         </div>
       )}
 
-      {/* Payroll status banner */}
-      {generated && preview?.run_status === "finalized" && (
-        <div className="bg-emerald-50 border border-emerald-200 rounded-2xl px-5 py-3 flex items-center gap-3">
-          <CheckCircle2 className="w-5 h-5 text-emerald-600 shrink-0" />
-          <p className="text-sm text-emerald-800 font-medium">
-            Payroll for {month} has been finalized. You can still adjust and
-            re-finalize.
+      {/* Payroll status banner — finalized months are locked; Undo unlocks them
+          without changing a single figure. */}
+      {isFinalized && (
+        <div className="bg-emerald-50 border border-emerald-200 rounded-2xl px-5 py-3 flex items-center justify-between gap-3 flex-wrap">
+          <div className="flex items-center gap-3">
+            <CheckCircle2 className="w-5 h-5 text-emerald-600 shrink-0" />
+            <div>
+              <p className="text-sm text-emerald-800 font-medium">
+                Payroll for {month} is finalized and locked.
+                {preview?.finalized_at
+                  ? ` Finalized ${fmtStamp(preview.finalized_at)}.`
+                  : ""}
+              </p>
+              <p className="text-xs text-emerald-700/80 mt-0.5">
+                Undo to unlock it for editing — all deductions, bonuses and
+                additional payments are kept exactly as they are.
+              </p>
+            </div>
+          </div>
+          <Button
+            variant="secondary"
+            onClick={() => reopenMutation.mutate()}
+            disabled={reopenMutation.isPending}
+            isLoading={reopenMutation.isPending}
+          >
+            {!reopenMutation.isPending && (
+              <>
+                <RotateCcw className="w-4 h-4" />
+                Undo Finalize
+              </>
+            )}
+          </Button>
+        </div>
+      )}
+
+      {/* Reopened months are editable again — say so, so the state isn't ambiguous. */}
+      {wasReopened && (
+        <div className="bg-amber-50 border border-amber-200 rounded-2xl px-5 py-3 flex items-center gap-3">
+          <Unlock className="w-5 h-5 text-amber-600 shrink-0" />
+          <p className="text-sm text-amber-800">
+            <span className="font-medium">
+              Payroll for {month} was reopened
+              {preview?.reopened_at ? ` ${fmtStamp(preview.reopened_at)}` : ""}.
+            </span>{" "}
+            Your previously finalized figures are loaded and editable —
+            re-finalize when you're done.
           </p>
         </div>
       )}
@@ -775,21 +892,67 @@ const PayrollPage = () => {
                 <Download className="w-4 h-4" />
                 Export CSV
               </Button>
-              <Button
-                variant="secondary"
-                onClick={() => handleSave("draft")}
-                disabled={saveMutation.isPending}
-              >
-                Save Draft
-              </Button>
-              <Button
-                variant="success"
-                onClick={() => handleSave("finalized")}
-                disabled={saveMutation.isPending}
-                isLoading={saveMutation.isPending}
-              >
-                {!saveMutation.isPending && "Finalize Payroll"}
-              </Button>
+              {isFinalized ? (
+                <>
+                  {/* Locked: the only ways forward are unlock (safe) or start over
+                      (destructive). Saving is disabled until one is chosen. */}
+                  <Button
+                    variant="secondary"
+                    onClick={() => reopenMutation.mutate()}
+                    disabled={reopenMutation.isPending}
+                    isLoading={reopenMutation.isPending}
+                  >
+                    {!reopenMutation.isPending && (
+                      <>
+                        <RotateCcw className="w-4 h-4" />
+                        Undo Finalize
+                      </>
+                    )}
+                  </Button>
+                  <Button
+                    variant="danger"
+                    onClick={() => {
+                      setDiscardConfirmText("");
+                      setConfirmDiscard(true);
+                    }}
+                  >
+                    <Trash2 className="w-4 h-4" />
+                    Discard Run
+                  </Button>
+                </>
+              ) : (
+                <>
+                  {/* An existing draft run can also be thrown away to get back to
+                      the auto-computed figures. */}
+                  {preview?.run_id ? (
+                    <Button
+                      variant="secondary"
+                      onClick={() => {
+                        setDiscardConfirmText("");
+                        setConfirmDiscard(true);
+                      }}
+                    >
+                      <Trash2 className="w-4 h-4" />
+                      Discard Run
+                    </Button>
+                  ) : null}
+                  <Button
+                    variant="secondary"
+                    onClick={() => handleSave("draft")}
+                    disabled={saveMutation.isPending}
+                  >
+                    Save Draft
+                  </Button>
+                  <Button
+                    variant="success"
+                    onClick={() => handleSave("finalized")}
+                    disabled={saveMutation.isPending}
+                    isLoading={saveMutation.isPending}
+                  >
+                    {!saveMutation.isPending && "Finalize Payroll"}
+                  </Button>
+                </>
+              )}
             </div>
           </div>
         </div>
@@ -811,10 +974,11 @@ const PayrollPage = () => {
         <Modal isOpen onClose={() => setReviewModal(null)} size="lg">
           <Modal.Header onClose={() => setReviewModal(null)}>
             <h3 className="font-bold text-lg text-slate-800">
-              Leave Adjustments
+              {isFinalized ? "Leave Adjustments (locked)" : "Leave Adjustments"}
             </h3>
             <p className="text-sm text-slate-500 mt-0.5">
               {modalRow.employee_name} · {month}
+              {isFinalized && " · finalized — undo to edit"}
             </p>
           </Modal.Header>
 
@@ -908,40 +1072,43 @@ const PayrollPage = () => {
                             )}
                         </p>
                       </div>
-                      {/* Quick set: Auto / All unpaid / All paid */}
-                      <div className="flex gap-1.5 shrink-0">
-                        <button
-                          onClick={() => setLeaveDates(l.leave_id, autoUnpaid)}
-                          title={`Auto (balance-based): ${autoUnpaid.length}d unpaid`}
-                          className={`px-2.5 py-1.5 text-xs font-semibold rounded-lg transition-colors ${
-                            isAuto
-                              ? "bg-indigo-100 text-indigo-700"
-                              : "bg-slate-100 text-slate-400 hover:bg-indigo-50 hover:text-indigo-600"
-                          }`}
-                        >
-                          Auto
-                        </button>
-                        <button
-                          onClick={() => setLeaveDates(l.leave_id, allDates)}
-                          className={`px-2.5 py-1.5 text-xs font-semibold rounded-lg transition-colors ${
-                            !isAuto && l.unpaidDays >= l.days_in_month
-                              ? "bg-red-100 text-red-700"
-                              : "bg-slate-100 text-slate-400 hover:bg-red-50 hover:text-red-600"
-                          }`}
-                        >
-                          All unpaid
-                        </button>
-                        <button
-                          onClick={() => setLeaveDates(l.leave_id, [])}
-                          className={`px-2.5 py-1.5 text-xs font-semibold rounded-lg transition-colors ${
-                            !isAuto && l.unpaidDays <= 0
-                              ? "bg-emerald-100 text-emerald-700"
-                              : "bg-slate-100 text-slate-400 hover:bg-emerald-50 hover:text-emerald-600"
-                          }`}
-                        >
-                          All paid
-                        </button>
-                      </div>
+                      {/* Quick set: Auto / All unpaid / All paid. Hidden while the
+                          run is finalized — the modal is read-only until undo. */}
+                      {!isFinalized && (
+                        <div className="flex gap-1.5 shrink-0">
+                          <button
+                            onClick={() => setLeaveDates(l.leave_id, autoUnpaid)}
+                            title={`Auto (balance-based): ${autoUnpaid.length}d unpaid`}
+                            className={`px-2.5 py-1.5 text-xs font-semibold rounded-lg transition-colors ${
+                              isAuto
+                                ? "bg-indigo-100 text-indigo-700"
+                                : "bg-slate-100 text-slate-400 hover:bg-indigo-50 hover:text-indigo-600"
+                            }`}
+                          >
+                            Auto
+                          </button>
+                          <button
+                            onClick={() => setLeaveDates(l.leave_id, allDates)}
+                            className={`px-2.5 py-1.5 text-xs font-semibold rounded-lg transition-colors ${
+                              !isAuto && l.unpaidDays >= l.days_in_month
+                                ? "bg-red-100 text-red-700"
+                                : "bg-slate-100 text-slate-400 hover:bg-red-50 hover:text-red-600"
+                            }`}
+                          >
+                            All unpaid
+                          </button>
+                          <button
+                            onClick={() => setLeaveDates(l.leave_id, [])}
+                            className={`px-2.5 py-1.5 text-xs font-semibold rounded-lg transition-colors ${
+                              !isAuto && l.unpaidDays <= 0
+                                ? "bg-emerald-100 text-emerald-700"
+                                : "bg-slate-100 text-slate-400 hover:bg-emerald-50 hover:text-emerald-600"
+                            }`}
+                          >
+                            All paid
+                          </button>
+                        </div>
+                      )}
                     </div>
                     {/* Per-day toggles — click a day to flip paid/unpaid; the rest stay as-is */}
                     {dateList.length > 0 && (
@@ -950,16 +1117,21 @@ const PayrollPage = () => {
                           <button
                             key={d.date}
                             onClick={() => toggleLeaveDay(l, d.date)}
+                            disabled={isFinalized}
                             title={
-                              d.unpaid
-                                ? "Unpaid — click to mark paid"
-                                : "Paid — click to mark unpaid"
+                              isFinalized
+                                ? d.unpaid
+                                  ? "Unpaid (locked)"
+                                  : "Paid (locked)"
+                                : d.unpaid
+                                  ? "Unpaid — click to mark paid"
+                                  : "Paid — click to mark unpaid"
                             }
                             className={`px-2 py-1 rounded-lg text-xs font-medium border transition-colors ${
                               d.unpaid
-                                ? "bg-red-50 border-red-200 text-red-700 hover:bg-red-100"
-                                : "bg-emerald-50 border-emerald-200 text-emerald-700 hover:bg-emerald-100"
-                            } ${d.unpaid !== d.auto_unpaid ? "ring-1 ring-indigo-300" : ""}`}
+                                ? "bg-red-50 border-red-200 text-red-700"
+                                : "bg-emerald-50 border-emerald-200 text-emerald-700"
+                            } ${isFinalized ? "cursor-default opacity-80" : d.unpaid ? "hover:bg-red-100" : "hover:bg-emerald-100"} ${d.unpaid !== d.auto_unpaid ? "ring-1 ring-indigo-300" : ""}`}
                           >
                             {fmtDay(d.date)} · {d.unpaid ? "Unpaid" : "Paid"}
                           </button>
@@ -989,6 +1161,74 @@ const PayrollPage = () => {
               </p>
             </div>
             <Button onClick={() => setReviewModal(null)}>Done</Button>
+          </Modal.Footer>
+        </Modal>
+      )}
+
+      {/* Discard confirmation — destructive, so it needs the month typed out.
+          This is NOT the undo: it deletes the saved run and its adjustments. */}
+      {confirmDiscard && (
+        <Modal isOpen onClose={() => setConfirmDiscard(false)} size="md">
+          <Modal.Header onClose={() => setConfirmDiscard(false)}>
+            <h3 className="font-bold text-lg text-slate-800">
+              Discard payroll run?
+            </h3>
+            <p className="text-sm text-slate-500 mt-0.5">{month}</p>
+          </Modal.Header>
+
+          <Modal.Body className="space-y-3">
+            <div className="flex gap-3 p-3 rounded-xl bg-red-50 border border-red-100">
+              <AlertTriangle className="w-5 h-5 text-red-600 shrink-0" />
+              <p className="text-sm text-red-800">
+                This deletes the saved run for {month} — every leave override,
+                bonus and additional payment on it. The month will recompute from
+                the automatic leave classification. This can't be undone.
+              </p>
+            </div>
+            <p className="text-sm text-slate-500">
+              Want to keep the figures and just unlock the month?{" "}
+              <span className="font-medium text-slate-700">
+                Use Undo Finalize instead.
+              </span>
+            </p>
+            <div>
+              <label className="text-xs font-medium text-slate-500">
+                Type <span className="font-mono text-slate-700">{month}</span> to
+                confirm
+              </label>
+              <input
+                autoFocus
+                value={discardConfirmText}
+                onChange={(e) => setDiscardConfirmText(e.target.value)}
+                placeholder={month}
+                className="mt-1 w-full px-3 py-2 border border-slate-200 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-red-200"
+              />
+            </div>
+          </Modal.Body>
+
+          <Modal.Footer align="between">
+            <Button
+              variant="secondary"
+              onClick={() => setConfirmDiscard(false)}
+              disabled={discardMutation.isPending}
+            >
+              Cancel
+            </Button>
+            <Button
+              variant="danger"
+              onClick={() => discardMutation.mutate()}
+              disabled={
+                discardConfirmText.trim() !== month || discardMutation.isPending
+              }
+              isLoading={discardMutation.isPending}
+            >
+              {!discardMutation.isPending && (
+                <>
+                  <Trash2 className="w-4 h-4" />
+                  Discard Run
+                </>
+              )}
+            </Button>
           </Modal.Footer>
         </Modal>
       )}
