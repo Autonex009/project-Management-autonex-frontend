@@ -246,7 +246,9 @@ const PM_SELF_PROJECT = {
 const SelfEvaluationPage = () => {
   const user = JSON.parse(localStorage.getItem("user") || "{}");
   const role = localStorage.getItem("role") || user.role || "employee";
-  const isPm = role === "pm";
+  // PM and HR file a single self-report (reviewed by Admin), not per-project reviews —
+  // they aren't allocated to annotation projects.
+  const isPm = role === "pm" || role === "hr";
   const employeeId = user.employee_id;
 
   const { data: allocations = [], isLoading: allocLoading } = useQuery({
