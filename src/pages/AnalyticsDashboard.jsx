@@ -13,6 +13,8 @@ import {
   ClipboardCheck,
   RefreshCw,
   BarChart3,
+  Layers,
+  ChevronDown,
 } from "lucide-react";
 import {
   ResponsiveContainer,
@@ -40,7 +42,7 @@ const shortDate = (s) => {
   }
 };
 
-const AutonexKpiCard = ({ icon: Icon, label, value, tone = "indigo" }) => {
+const AutonexKpiCard = ({ icon: Icon, label, value, tone = "indigo", breakdown }) => {
   const tones = {
     indigo: "bg-indigo-500",
     emerald: "bg-emerald-500",
@@ -48,20 +50,47 @@ const AutonexKpiCard = ({ icon: Icon, label, value, tone = "indigo" }) => {
     sky: "bg-sky-500",
     violet: "bg-violet-500",
     rose: "bg-rose-500",
+    slate: "bg-slate-500",
   };
+  const hasBreakdown = Array.isArray(breakdown) && breakdown.length > 0;
   return (
-    <div className="rounded-xl border border-slate-200 bg-white p-3.5 shadow-sm">
+    <div
+      className={`group relative rounded-xl border border-slate-200 bg-white p-3.5 shadow-sm ${hasBreakdown ? "cursor-help" : ""}`}
+    >
       <div
         className={`flex h-9 w-9 items-center justify-center rounded-lg text-white ${tones[tone]}`}
       >
         {Icon && <Icon className="h-[18px] w-[18px]" />}
       </div>
-      <p className="mt-3 text-[11px] font-semibold uppercase tracking-wide text-slate-400">
+      <p className="mt-3 flex items-center gap-1 text-[11px] font-semibold uppercase tracking-wide text-slate-400">
         {label}
+        {hasBreakdown && <ChevronDown className="h-3 w-3 text-slate-300" />}
       </p>
       <p className="mt-0.5 text-2xl font-bold tracking-tight text-slate-900">
         {value}
       </p>
+      {hasBreakdown && (
+        <div className="pointer-events-none absolute right-0 top-full z-30 mt-1.5 w-max min-w-[220px] max-w-[320px] origin-top-right scale-95 rounded-xl border border-slate-200 bg-white p-2 opacity-0 shadow-xl transition-all duration-150 group-hover:scale-100 group-hover:opacity-100">
+          <p className="px-1.5 pb-1 text-[10px] font-semibold uppercase tracking-wide text-slate-400">
+            Where time went
+          </p>
+          <div className="space-y-0.5">
+            {breakdown.map((b) => (
+              <div
+                key={b.stage}
+                className="flex items-center justify-between gap-6 rounded-md px-1.5 py-1 text-xs hover:bg-slate-50"
+              >
+                <span className="whitespace-nowrap text-slate-600">
+                  {b.stage}
+                </span>
+                <span className="shrink-0 font-mono text-slate-800">
+                  {b.hours}h
+                </span>
+              </div>
+            ))}
+          </div>
+        </div>
+      )}
     </div>
   );
 };
@@ -224,7 +253,7 @@ const AnalyticsDashboard = () => {
       </div>
 
       {/* Unified Autonex KPIs — all driven by the selected range */}
-      <div className="grid grid-cols-2 gap-3 sm:grid-cols-3 lg:grid-cols-6">
+      <div className="grid grid-cols-2 gap-3 sm:grid-cols-3 lg:grid-cols-7">
         <AutonexKpiCard
           icon={FolderKanban}
           label="Live Projects"
@@ -260,6 +289,13 @@ const AnalyticsDashboard = () => {
           label="Review Time"
           value={`${k?.review_hours ?? 0}h`}
           tone="rose"
+        />
+        <AutonexKpiCard
+          icon={Layers}
+          label="Other"
+          value={`${k?.other_hours ?? 0}h`}
+          tone="slate"
+          breakdown={k?.other_breakdown}
         />
       </div>
 
