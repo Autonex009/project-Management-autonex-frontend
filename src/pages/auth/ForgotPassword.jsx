@@ -3,9 +3,9 @@ import { Link, useSearchParams } from "react-router-dom";
 import { useMutation } from "@tanstack/react-query";
 import { ArrowLeft, Mail, Send } from "lucide-react";
 import Spinner from "../../components/ui/LoadingSpinner";
-import toast from "react-hot-toast";
 import AuthBrandPanel from "../../components/brand/AuthBrandPanel";
 import { authApi } from "../../services/api";
+import { parseAuthError } from "../../utils/authErrors";
 
 const themeMap = {
   admin: {
@@ -23,6 +23,10 @@ const themeMap = {
     link: "text-blue-300 hover:text-blue-200",
     backButton:
       "border-white/10 bg-slate-900/50 text-blue-300 hover:bg-slate-900 hover:text-blue-200 hover:border-white/20",
+    // Result banner tints, per theme: the light pairs are unreadable on the dark
+    // admin card.
+    bannerSuccess: "border-emerald-400/30 bg-emerald-400/10 text-emerald-300",
+    bannerError: "border-rose-400/30 bg-rose-400/10 text-rose-300",
     title: "Recover admin access",
     eyebrow: "Admin Recovery",
     backTo: "/login/admin",
@@ -42,6 +46,8 @@ const themeMap = {
     link: "text-blue-600 hover:text-blue-700",
     backButton:
       "border-slate-200 bg-slate-50/50 text-blue-600 hover:bg-slate-100 hover:text-blue-700 hover:border-slate-300",
+    bannerSuccess: "border-emerald-200 bg-emerald-50 text-emerald-700",
+    bannerError: "border-rose-200 bg-rose-50 text-rose-700",
     title: "Reset your PM password",
     eyebrow: "PM Recovery",
     backTo: "/login/pm",
@@ -61,6 +67,8 @@ const themeMap = {
     link: "text-emerald-600 hover:text-emerald-700",
     backButton:
       "border-slate-200 bg-slate-50/50 text-emerald-600 hover:bg-slate-100 hover:text-emerald-700 hover:border-slate-300",
+    bannerSuccess: "border-emerald-200 bg-emerald-50 text-emerald-700",
+    bannerError: "border-rose-200 bg-rose-50 text-rose-700",
     title: "Reset your workspace password",
     eyebrow: "Employee Recovery",
     backTo: "/login/employee",
@@ -75,23 +83,32 @@ const ForgotPassword = () => {
     [searchParams],
   );
 
+  // One result message, shown in the card — no toast saying the same thing.
+  const [status, setStatus] = useState(null); // { type: "success" | "error", message }
+
   const forgotPasswordMutation = useMutation({
     mutationFn: (payload) => authApi.forgotPassword(payload),
-    onSuccess: (data) => toast.success(data.message),
+    onSuccess: (data) =>
+      setStatus({
+        type: "success",
+        message: data.message || "Reset link sent. Check your inbox.",
+      }),
     onError: (error) => {
-      const message =
-        error.response?.data?.detail ||
-        "Unable to send reset instructions right now.";
-      toast.error(message);
+      const { message } = parseAuthError(
+        error,
+        "Unable to send reset instructions right now.",
+      );
+      setStatus({ type: "error", message });
     },
   });
 
   const handleSubmit = (event) => {
     event.preventDefault();
     if (!email.trim()) {
-      toast.error("Please enter your email address");
+      setStatus({ type: "error", message: "Please enter your email address" });
       return;
     }
+    setStatus(null);
     forgotPasswordMutation.mutate({ email: email.trim() });
   };
 
@@ -138,6 +155,19 @@ const ForgotPassword = () => {
             </p>
           </div>
 
+          {status && (
+            <div
+              className={`mt-5 rounded-2xl border px-4 py-3 text-sm ${
+                status.type === "success"
+                  ? theme.bannerSuccess
+                  : theme.bannerError
+              }`}
+              role="status"
+            >
+              {status.message}
+            </div>
+          )}
+
           <form onSubmit={handleSubmit} className="mt-8 space-y-5">
             <div>
               <label
@@ -150,9 +180,17 @@ const ForgotPassword = () => {
                 <input
                   type="email"
                   value={email}
-                  onChange={(event) => setEmail(event.target.value)}
+                  onChange={(event) => {
+                    setEmail(event.target.value);
+                    // Drop a stale result the moment the address changes.
+                    if (status) setStatus(null);
+                  }}
                   placeholder="you@company.com"
-                  className={`w-full rounded-2xl border py-3 pl-11 pr-4 text-sm outline-none transition-all focus:ring-2 ${theme.input}`}
+                  // ring, not border: overriding theme.input's border colour with
+                  // another border-* utility is a coin toss on CSS order.
+                  className={`w-full rounded-2xl border py-3 pl-11 pr-4 text-sm outline-none transition-all focus:ring-2 ${theme.input} ${
+                    status?.type === "error" ? "ring-1 ring-rose-400" : ""
+                  }`}
                   disabled={forgotPasswordMutation.isPending}
                 />
               </div>
@@ -176,8 +214,8 @@ const ForgotPassword = () => {
 
           <div className={`mt-6 border-t pt-5 text-sm ${theme.border}`}>
             <p className={theme.helper}>
-              For security, the response stays generic even if the email address
-              is not found.
+              The link expires 15 minutes after it is sent, and stops working
+              once it has been used.
             </p>
           </div>
         </div>

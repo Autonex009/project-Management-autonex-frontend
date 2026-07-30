@@ -14,6 +14,7 @@ import { authApi } from "../../services/api";
 import Spinner from "../../components/ui/LoadingSpinner";
 import toast from "react-hot-toast";
 import AuthBrandPanel from "../../components/brand/AuthBrandPanel";
+import { parseAuthError } from "../../utils/authErrors";
 
 const AdminLogin = () => {
   const navigate = useNavigate();
@@ -38,11 +39,9 @@ const AdminLogin = () => {
       navigate(from, { replace: true });
     },
     onError: (err) => {
-      const message =
-        err.response?.data?.detail ||
-        "Invalid email or password. Please try again.";
+      // Banner only — a toast saying the same thing is just a second copy.
+      const { message } = parseAuthError(err);
       setError(message);
-      toast.error(message);
     },
   });
 
@@ -50,9 +49,7 @@ const AdminLogin = () => {
     e.preventDefault();
     setError(null);
     if (!formData.email || !formData.password) {
-      const message = "Please fill in all fields";
-      setError(message);
-      toast.error(message);
+      setError("Please fill in all fields");
       return;
     }
     loginMutation.mutate(formData);
