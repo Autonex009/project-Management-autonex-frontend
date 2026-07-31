@@ -36,6 +36,7 @@ import {
   PauseCircle,
   CheckCircle2,
   XCircle,
+  Eye,
 } from "lucide-react";
 import { Link } from "react-router-dom";
 import { format, parseISO } from "date-fns";
@@ -807,6 +808,7 @@ const ProjectCard = ({
                 value={draft[field]}
                 onChange={(e) => onDraftChange(field, e.target.value)}
                 onClick={stop}
+                onWheel={(e) => e.target.blur()}
                 className={cardInputClass}
               />
             ) : (
@@ -828,6 +830,7 @@ const ProjectCard = ({
                 onChange={(e) =>
                   onDraftChange("annotation_minutes", e.target.value)
                 }
+                onWheel={(e) => e.target.blur()}
                 className={cardInputClass}
               />
               <span className="text-[11px] text-slate-400">min</span>
@@ -917,20 +920,35 @@ const ProjectCard = ({
                     <ul className="max-h-48 overflow-y-auto">
                       {docs.map((g) => (
                         <li key={g.id}>
-                          <a
-                            href={g.file_url || undefined}
-                            target="_blank"
-                            rel="noreferrer"
-                            className={`flex items-center gap-2 rounded-lg px-2 py-1.5 text-xs ${g.file_url ? "text-slate-700 hover:bg-slate-50" : "cursor-default text-slate-400"}`}
-                          >
-                            <FileText className="h-3.5 w-3.5 shrink-0 text-indigo-500" />
-                            <span className="truncate">
-                              {g.title || g.file_name || "Document"}
-                            </span>
-                            {g.file_url && (
-                              <Download className="ml-auto h-3.5 w-3.5 shrink-0 text-slate-400" />
-                            )}
-                          </a>
+                          {g.file_url ? (
+                            <div className="flex items-center gap-1 rounded-lg px-2 py-1.5 text-xs text-slate-700 hover:bg-slate-50">
+                              <span className="flex-1 flex items-center gap-2 text-left min-w-0">
+                                <FileText className="h-3.5 w-3.5 shrink-0 text-indigo-500" />
+                                <span className="truncate">
+                                  {g.title || g.file_name || "Document"}
+                                </span>
+                              </span>
+                              <div className="flex items-center gap-1 shrink-0">
+                                <a
+                                  href={g.file_url}
+                                  target="_blank"
+                                  rel="noreferrer"
+                                  download
+                                  className="p-1 hover:bg-indigo-100 hover:text-indigo-600 rounded text-slate-400 transition-colors"
+                                  title="Download"
+                                >
+                                  <Download className="w-3.5 h-3.5" />
+                                </a>
+                              </div>
+                            </div>
+                          ) : (
+                            <div className="flex items-center gap-2 rounded-lg px-2 py-1.5 text-xs cursor-default text-slate-400">
+                              <FileText className="h-3.5 w-3.5 shrink-0 text-indigo-500" />
+                              <span className="truncate">
+                                {g.title || g.file_name || "Document"}
+                              </span>
+                            </div>
+                          )}
                         </li>
                       ))}
                     </ul>
@@ -1325,7 +1343,7 @@ const ProjectsPage = () => {
   useEffect(() => {
     if (!isLoading) {
       const initialScroll =
-        useScrollStore.getState().scrollPositions["projects-page"];
+        useScrollStore.getState().scrollPositions["projects-page"] || 0;
       const mainContainer = document.querySelector("main");
       if (mainContainer && initialScroll) {
         setTimeout(() => {
@@ -2853,6 +2871,7 @@ const ProjectsPage = () => {
                             )
                           : ""
                       }
+                      onWheel={(e) => e.target.blur()}
                       className="input [appearance:textfield] [&::-webkit-outer-spin-button]:appearance-none [&::-webkit-inner-spin-button]:appearance-none"
                       placeholder="30"
                     />
@@ -2876,6 +2895,7 @@ const ProjectsPage = () => {
                             )
                           : ""
                       }
+                      onWheel={(e) => e.target.blur()}
                       className="input [appearance:textfield] [&::-webkit-outer-spin-button]:appearance-none [&::-webkit-inner-spin-button]:appearance-none"
                       placeholder="15"
                     />
@@ -2895,6 +2915,7 @@ const ProjectsPage = () => {
                       defaultValue={
                         (editingProject || copyingProject)?.gearing_ratio ?? ""
                       }
+                      onWheel={(e) => e.target.blur()}
                       className="input flex-1 [appearance:textfield] [&::-webkit-outer-spin-button]:appearance-none [&::-webkit-inner-spin-button]:appearance-none"
                       placeholder="e.g. 3.1"
                     />
@@ -3173,6 +3194,7 @@ const ProjectsPage = () => {
                           defaultValue={
                             (editingProject || copyingProject)?.[field] ?? ""
                           }
+                          onWheel={(e) => e.target.blur()}
                           className="input"
                           placeholder="0"
                         />
@@ -3214,6 +3236,7 @@ const ProjectsPage = () => {
         title="Delete Project"
         message={`Are you sure you want to delete "${deleteConfirm?.name}"? This action cannot be undone.`}
         isPending={deleteMutation.isPending}
+      />
       />
     </div>
   );

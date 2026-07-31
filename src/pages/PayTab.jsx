@@ -1,40 +1,58 @@
-import { useMemo, useState } from "react";
+import { useMemo, useState, useRef, useEffect } from "react";
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
 import toast from "react-hot-toast";
 import {
-  IndianRupee,
-  Users,
-  UserCheck,
-  UserX,
   Edit2,
   Save,
   X,
   Search,
-  ChevronLeft,
-  ChevronRight,
   AlertTriangle,
+  ArrowUpDown,
+  ArrowUp,
+  ArrowDown,
+  ChevronDown,
+  Filter,
+  Check,
+  Users,
+  UserCheck,
+  UserX,
 } from "lucide-react";
 import { payrollApi } from "../services/api";
+import { usePayrollStore } from "../store/usePayrollStore";
+import { Table } from "../components/ui/Table";
+import Dropdown from "../components/ui/Dropdown";
+import { formatDisplayName, getNameInitials } from "../utils/displayName";
 
-/**
- * Pay — every active employee, matched to their row in the `salary` table where
- * one exists. Employees with no row yet show as "Not set"; saving their pay here
- * creates it. Each row's monthly pay can be edited, and its Active/Inactive status
- * toggled. Inactive rows are excluded from the Monthly Pay run, which itself only
- * ever includes people who already have a row here.
- */
+const SORT_OPTIONS = [
+  { value: "name-asc", label: "Name A → Z" },
+  { value: "name-desc", label: "Name Z → A" },
+  { value: "base-high", label: "Base Pay: High → Low" },
+  { value: "base-low", label: "Base Pay: Low → High" },
+];
+
 const toNum = (s) => Number(String(s ?? "").replace(/[^0-9.]/g, "")) || 0;
 const isActive = (status) => (status || "").trim().toLowerCase() !== "inactive";
-// Rows without a salary record yet (id === null) share no natural identity, so
-// key them by employee_id instead — row.id alone can't distinguish two unset rows.
 const rowKey = (row) =>
   row.id != null ? `s-${row.id}` : `e-${row.employee_id}`;
 
 const PayTab = () => {
   const queryClient = useQueryClient();
 
-  // row key → { base, bonus } while editing (undefined = not editing)
-  const [edits, setEdits] = useState({});
+  const {
+    payTabEdits: edits,
+    setPayTabEdits: setEdits,
+    payTabSearch: search,
+    setPayTabSearch: setSearch,
+    payTabSortBy: sortBy,
+    setPayTabSortBy: setSortBy,
+    payTabTypeFilter: typeFilter,
+    setPayTabTypeFilter: setTypeFilter,
+    payTabStatusFilter: statusFilter,
+    setPayTabStatusFilter: setStatusFilter,
+    payTabPage: page,
+    setPayTabPage: setPage,
+  } = usePayrollStore();
+
   const [savingKey, setSavingKey] = useState(null);
 
   const { data, isLoading, isError } = useQuery({
@@ -47,7 +65,6 @@ const PayTab = () => {
 
   const invalidate = () => {
     queryClient.invalidateQueries(["salary-records"]);
-    // Monthly Pay derives from these rows — refresh it on next view.
     queryClient.invalidateQueries(["payroll-preview"]);
   };
 
@@ -55,7 +72,6 @@ const PayTab = () => {
     mutationFn: ({ id, baseMonthly, bonusMonthly }) =>
       payrollApi.updateSalaryRecord(id, { baseMonthly, bonusMonthly }),
     onSuccess: (_res, vars) => {
-      toast.success("Salary saved");
       setEdits((p) => {
         const n = { ...p };
         delete n[vars.key];
@@ -74,7 +90,6 @@ const PayTab = () => {
     mutationFn: ({ employeeId, baseMonthly, bonusMonthly }) =>
       payrollApi.createSalaryRecord(employeeId, { baseMonthly, bonusMonthly }),
     onSuccess: (_res, vars) => {
-      toast.success("Salary saved");
       setEdits((p) => {
         const n = { ...p };
         delete n[vars.key];
@@ -113,31 +128,74 @@ const PayTab = () => {
     };
   }, [salaries]);
 
-  // Search + pagination (display only — totals above use the full list).
   const PAGE_SIZE = 12;
-  const [search, setSearch] = useState("");
-  const [page, setPage] = useState(1);
+  const [sortOpen, setSortOpen] = useState(false);
+  const [filterOpen, setFilterOpen] = useState(false);
+  const sortRef = useRef(null);
+  const filterRef = useRef(null);
+
+  useEffect(() => {
+    const handler = (e) => {
+      if (sortRef.current && !sortRef.current.contains(e.target)) setSortOpen(false);
+      if (filterRef.current && !filterRef.current.contains(e.target)) setFilterOpen(false);
+    };
+    document.addEventListener("mousedown", handler);
+    return () => document.removeEventListener("mousedown", handler);
+  }, []);
+
+  const typeOptions = useMemo(() => {
+    const types = new Set(salaries.map((r) => r.employment_type).filter(Boolean));
+    return [...types].sort();
+  }, [salaries]);
+
+  const activeFilterCount = [typeFilter, statusFilter].filter(Boolean).length;
 
   const filtered = useMemo(() => {
     const q = search.trim().toLowerCase();
-    if (!q) return salaries;
-    return salaries.filter(
-      (r) =>
-        (r.full_name || "").toLowerCase().includes(q) ||
-        (r.employment_type || "").toLowerCase().includes(q),
-    );
-  }, [salaries, search]);
+    let result = salaries;
 
-  const totalPages = Math.max(1, Math.ceil(filtered.length / PAGE_SIZE));
-  const safePage = Math.min(page, totalPages);
-  const paged = filtered.slice(
-    (safePage - 1) * PAGE_SIZE,
-    safePage * PAGE_SIZE,
-  );
-  const onSearch = (v) => {
-    setSearch(v);
-    setPage(1);
-  };
+    // text search
+    if (q) {
+      result = result.filter(
+        (r) =>
+          (r.full_name || "").toLowerCase().includes(q) ||
+          (r.employment_type || "").toLowerCase().includes(q),
+      );
+    }
+
+    // type filter
+    if (typeFilter) {
+      result = result.filter((r) => r.employment_type === typeFilter);
+    }
+
+    // status filter
+    if (statusFilter === "Active") {
+      result = result.filter((r) => isActive(r.status));
+    } else if (statusFilter === "Inactive") {
+      result = result.filter((r) => !isActive(r.status));
+    }
+
+    // sort: active first within each sort order
+    result = [...result].sort((a, b) => {
+      const aActive = isActive(a.status) ? 0 : 1;
+      const bActive = isActive(b.status) ? 0 : 1;
+      if (aActive !== bActive) return aActive - bActive;
+
+      switch (sortBy) {
+        case "name-desc":
+          return (b.full_name || "").localeCompare(a.full_name || "");
+        case "base-high":
+          return (toNum(b.base_pay_monthly) || 0) - (toNum(a.base_pay_monthly) || 0);
+        case "base-low":
+          return (toNum(a.base_pay_monthly) || 0) - (toNum(b.base_pay_monthly) || 0);
+        case "name-asc":
+        default:
+          return (a.full_name || "").localeCompare(b.full_name || "");
+      }
+    });
+
+    return result;
+  }, [salaries, search, sortBy, typeFilter, statusFilter]);
 
   const startEdit = (row) =>
     setEdits((p) => ({
@@ -147,6 +205,7 @@ const PayTab = () => {
         bonus: toNum(row.opt_bonus_monthly) || "",
       },
     }));
+    
   const cancelEdit = (row) =>
     setEdits((p) => {
       const n = { ...p };
@@ -165,308 +224,457 @@ const PayTab = () => {
     const bonus = e.bonus === "" ? null : parseFloat(e.bonus);
     setSavingKey(key);
     if (row.id != null) {
-      updateMutation.mutate({
-        id: row.id,
-        key,
-        baseMonthly: base,
-        bonusMonthly: bonus,
-      });
+      updateMutation.mutate(
+        { id: row.id, key, baseMonthly: base, bonusMonthly: bonus },
+        { onSuccess: () => toast.success("Salary saved") }
+      );
     } else {
-      createMutation.mutate({
-        employeeId: row.employee_id,
-        key,
-        baseMonthly: base,
-        bonusMonthly: bonus,
-      });
+      createMutation.mutate(
+        { employeeId: row.employee_id, key, baseMonthly: base, bonusMonthly: bonus },
+        { onSuccess: () => toast.success("Salary saved") }
+      );
+    }
+  };
+
+  const saveAllEdits = async () => {
+    const keys = Object.keys(edits);
+    if (keys.length === 0) return;
+
+    const invalidKeys = keys.filter(key => {
+      const base = parseFloat(edits[key].base);
+      return !base || base <= 0;
+    });
+
+    if (invalidKeys.length > 0) {
+      toast.error("Please ensure all base pays are valid numbers greater than 0");
+      return;
+    }
+
+    const toastId = toast.loading("Saving all edits...");
+
+    try {
+      for (const key of keys) {
+        const e = edits[key];
+        const base = parseFloat(e.base);
+        const bonus = e.bonus === "" ? null : parseFloat(e.bonus);
+        
+        const row = salaries.find(r => rowKey(r) === key);
+        if (!row) continue;
+        
+        if (row.id != null) {
+          await payrollApi.updateSalaryRecord(row.id, { baseMonthly: base, bonusMonthly: bonus });
+        } else {
+          await payrollApi.createSalaryRecord(row.employee_id, { baseMonthly: base, bonusMonthly: bonus });
+        }
+      }
+      toast.success("All edits saved successfully", { id: toastId });
+      setEdits({});
+      invalidate();
+    } catch (err) {
+      toast.error("Failed to save some edits", { id: toastId });
     }
   };
 
   const toggleStatus = (row) => {
-    if (row.id == null) return; // no salary record yet — nothing to toggle
+    if (row.id == null) return;
     statusMutation.mutate({
       id: row.id,
       status: isActive(row.status) ? "Inactive" : "Active",
     });
   };
 
-  return (
-    <div className="space-y-6">
-      <div>
-        <h1 className="text-lg font-semibold text-slate-800">Pay</h1>
-        <p className="mt-1 text-sm text-slate-500">
-          Salary records for everyone. Edit monthly pay here, and toggle
-          Active/Inactive — inactive people are left out of the Monthly Pay run.
-        </p>
-      </div>
-
-      {/* Stats */}
-      <div className="grid grid-cols-3 gap-4">
-        {[
-          {
-            label: "Total Records",
-            value: totals.total,
-            icon: Users,
-            color: "text-slate-700",
-            bg: "bg-slate-100",
-          },
-          {
-            label: "Active",
-            value: totals.active,
-            icon: UserCheck,
-            color: "text-emerald-700",
-            bg: "bg-emerald-100",
-          },
-          {
-            label: "Inactive",
-            value: totals.inactive,
-            icon: UserX,
-            color: "text-slate-500",
-            bg: "bg-slate-100",
-          },
-        ].map((s) => (
-          <div
-            key={s.label}
-            className="bg-white rounded-2xl border border-slate-200/60 shadow-sm p-5"
-          >
-            <div className={`inline-flex p-2 rounded-xl ${s.bg} mb-3`}>
-              <s.icon className={`w-5 h-5 ${s.color}`} />
-            </div>
-            <p className={`text-xl font-bold ${s.color}`}>{s.value}</p>
-            <p className="text-xs text-slate-400 mt-1">{s.label}</p>
-          </div>
-        ))}
-      </div>
-
-      {/* Search */}
-      <div className="relative max-w-sm">
-        <Search className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-slate-400" />
-        <input
-          type="text"
-          value={search}
-          onChange={(e) => onSearch(e.target.value)}
-          placeholder="Search by name or type…"
-          className="w-full pl-9 pr-3 py-2 bg-white border border-slate-200 rounded-xl text-sm focus:outline-none focus:ring-2 focus:ring-indigo-200 focus:border-indigo-300"
-        />
-      </div>
-
-      {/* Table */}
-      <div className="bg-white rounded-2xl border border-slate-200/60 shadow-sm overflow-hidden">
-        {isLoading ? (
-          <div className="flex items-center justify-center py-16 text-slate-400 text-sm">
-            Loading salaries…
-          </div>
-        ) : isError ? (
-          <div className="flex items-center justify-center py-16 text-red-400 text-sm">
-            Failed to load salary records.
-          </div>
-        ) : salaries.length === 0 ? (
-          <div className="flex items-center justify-center py-16 text-slate-400 text-sm">
-            No salary records found.
-          </div>
-        ) : filtered.length === 0 ? (
-          <div className="flex items-center justify-center py-16 text-slate-400 text-sm">
-            No people match “{search}”.
-          </div>
-        ) : (
-          <div className="overflow-x-auto">
-            <table className="w-full text-sm">
-              <thead className="bg-slate-50/80 border-b border-slate-100">
-                <tr>
-                  <th className="px-5 py-4 text-left text-xs font-bold text-slate-700 uppercase tracking-wider">
-                    Employee
-                  </th>
-                  <th className="px-5 py-4 text-left text-xs font-bold text-slate-700 uppercase tracking-wider">
-                    Status
-                  </th>
-                  <th className="px-5 py-4 text-right text-xs font-bold text-slate-700 uppercase tracking-wider">
-                    Base Pay (Monthly)
-                  </th>
-                  <th className="px-5 py-4 text-right text-xs font-bold text-slate-700 uppercase tracking-wider">
-                    Bonus (Monthly)
-                  </th>
-                  <th className="px-5 py-4 text-center text-xs font-bold text-slate-700 uppercase tracking-wider">
-                    Actions
-                  </th>
-                </tr>
-              </thead>
-              <tbody className="divide-y divide-slate-100">
-                {paged.map((row) => {
-                  const key = rowKey(row);
-                  const editing = edits[key] !== undefined;
-                  const active = isActive(row.status);
-                  const unset = row.id == null;
-                  return (
-                    <tr
-                      key={key}
-                      className={`transition-colors ${active ? "hover:bg-slate-50/50" : "bg-slate-50/40 text-slate-400"}`}
-                    >
-                      <td className="px-5 py-4">
-                        <p
-                          className={`font-semibold ${active ? "text-slate-800" : "text-slate-500"}`}
-                        >
-                          {row.full_name}
-                        </p>
-                        <p className="text-xs text-slate-400">
-                          {row.employment_type}
-                        </p>
-                      </td>
-                      <td className="px-5 py-4">
-                        {unset ? (
-                          <span
-                            title="Save a base pay below to create this person's salary record"
-                            className="inline-flex items-center gap-1.5 px-2.5 py-1 rounded-full text-xs font-medium bg-slate-100 text-slate-400"
-                          >
-                            <span className="w-1.5 h-1.5 rounded-full bg-slate-300" />
-                            Not set
-                          </span>
-                        ) : (
-                          <button
-                            onClick={() => toggleStatus(row)}
-                            disabled={statusMutation.isPending}
-                            title={
-                              active
-                                ? "Click to mark Inactive"
-                                : "Click to mark Active"
-                            }
-                            className={`inline-flex items-center gap-1.5 px-2.5 py-1 rounded-full text-xs font-medium transition-colors disabled:opacity-50 ${
-                              active
-                                ? "bg-emerald-50 text-emerald-700 hover:bg-emerald-100"
-                                : "bg-slate-200 text-slate-500 hover:bg-slate-300"
-                            }`}
-                          >
-                            <span
-                              className={`w-1.5 h-1.5 rounded-full ${active ? "bg-emerald-500" : "bg-slate-400"}`}
-                            />
-                            {active ? "Active" : "Inactive"}
-                          </button>
-                        )}
-                      </td>
-
-                      {/* Base Pay */}
-                      <td className="px-5 py-4 text-right">
-                        {editing ? (
-                          <div className="flex items-center justify-end gap-1.5">
-                            <span className="text-slate-400">₹</span>
-                            <input
-                              type="number"
-                              autoFocus
-                              value={edits[key].base}
-                              onChange={(e) =>
-                                setEdits((p) => ({
-                                  ...p,
-                                  [key]: { ...p[key], base: e.target.value },
-                                }))
-                              }
-                              placeholder="Base pay"
-                              className="w-28 px-2 py-1 border border-indigo-300 rounded-lg text-sm text-right focus:outline-none focus:ring-2 focus:ring-indigo-200"
-                            />
-                          </div>
-                        ) : unset ? (
-                          <span className="inline-flex items-center justify-end gap-1 text-xs font-medium text-amber-600">
-                            <AlertTriangle className="w-3 h-3" />
-                            Not set
-                          </span>
-                        ) : (
-                          <span className="font-mono text-slate-700">
-                            {row.base_pay_monthly ?? "—"}
-                          </span>
-                        )}
-                      </td>
-
-                      {/* Bonus */}
-                      <td className="px-5 py-4 text-right">
-                        {editing ? (
-                          <div className="flex items-center justify-end gap-1.5">
-                            <span className="text-slate-400">₹</span>
-                            <input
-                              type="number"
-                              value={edits[key].bonus}
-                              onChange={(e) =>
-                                setEdits((p) => ({
-                                  ...p,
-                                  [key]: { ...p[key], bonus: e.target.value },
-                                }))
-                              }
-                              placeholder="0"
-                              className="w-24 px-2 py-1 border border-indigo-300 rounded-lg text-sm text-right focus:outline-none focus:ring-2 focus:ring-indigo-200"
-                            />
-                          </div>
-                        ) : (
-                          <span className="font-mono text-slate-500">
-                            {row.opt_bonus_monthly ?? "—"}
-                          </span>
-                        )}
-                      </td>
-
-                      {/* Actions */}
-                      <td className="px-5 py-4">
-                        {editing ? (
-                          <div className="flex items-center justify-center gap-1.5">
-                            <button
-                              onClick={() => saveEdit(row)}
-                              disabled={savingKey === key}
-                              className="p-1.5 bg-emerald-100 text-emerald-700 rounded-lg hover:bg-emerald-200 transition-colors disabled:opacity-50"
-                              title="Save"
-                            >
-                              <Save className="w-3.5 h-3.5" />
-                            </button>
-                            <button
-                              onClick={() => cancelEdit(row)}
-                              className="p-1.5 text-slate-400 hover:text-slate-600 rounded-lg"
-                              title="Cancel"
-                            >
-                              <X className="w-3.5 h-3.5" />
-                            </button>
-                          </div>
-                        ) : (
-                          <div className="flex items-center justify-center">
-                            <button
-                              onClick={() => startEdit(row)}
-                              className="p-1.5 text-slate-300 hover:text-indigo-600 rounded-lg transition-colors"
-                              title="Edit pay"
-                            >
-                              <Edit2 className="w-3.5 h-3.5" />
-                            </button>
-                          </div>
-                        )}
-                      </td>
-                    </tr>
-                  );
-                })}
-              </tbody>
-            </table>
-            {/* Pagination */}
-            <div className="flex items-center justify-between px-5 py-3 border-t border-slate-100 text-sm text-slate-500">
-              <span>
-                Showing {(safePage - 1) * PAGE_SIZE + 1}–
-                {Math.min(safePage * PAGE_SIZE, filtered.length)} of{" "}
-                {filtered.length}
-              </span>
-              <div className="flex items-center gap-2">
-                <button
-                  onClick={() => setPage(safePage - 1)}
-                  disabled={safePage <= 1}
-                  className="p-1.5 rounded-lg hover:bg-slate-100 disabled:opacity-30 disabled:hover:bg-transparent transition-colors"
-                  title="Previous page"
-                >
-                  <ChevronLeft className="w-4 h-4" />
-                </button>
-                <span className="text-xs font-medium text-slate-600">
-                  Page {safePage} / {totalPages}
-                </span>
-                <button
-                  onClick={() => setPage(safePage + 1)}
-                  disabled={safePage >= totalPages}
-                  className="p-1.5 rounded-lg hover:bg-slate-100 disabled:opacity-30 disabled:hover:bg-transparent transition-colors"
-                  title="Next page"
-                >
-                  <ChevronRight className="w-4 h-4" />
-                </button>
+  const columns = [
+    {
+      key: "employee",
+      label: (
+        <button
+          type="button"
+          onClick={() => setSortBy(sortBy === "name-asc" ? "name-desc" : "name-asc")}
+          className="inline-flex items-center gap-1 hover:text-slate-900"
+          title="Sort by name"
+        >
+          Employee
+          {sortBy === "name-asc" ? (
+            <ArrowUp className="w-3.5 h-3.5 text-indigo-600" />
+          ) : sortBy === "name-desc" ? (
+            <ArrowDown className="w-3.5 h-3.5 text-indigo-600" />
+          ) : (
+            <ArrowUpDown className="w-3.5 h-3.5 text-slate-400" />
+          )}
+        </button>
+      ),
+      width: "w-[24%]",
+      render: (_, row) => {
+        const active = isActive(row.status);
+        const shortName = formatDisplayName(row.full_name) || row.full_name;
+        return (
+          <div className="flex items-center gap-3">
+            {row.avatar_url ? (
+              <img
+                src={row.avatar_url}
+                alt={shortName}
+                className="w-8 h-8 rounded-full object-cover flex-shrink-0"
+              />
+            ) : (
+              <div className="w-8 h-8 rounded-full flex items-center justify-center flex-shrink-0 bg-indigo-50 text-indigo-600 text-[13px] font-semibold">
+                {getNameInitials(row.full_name)}
               </div>
+            )}
+            <div className="group relative min-w-0">
+              <div 
+                className={`font-semibold truncate ${active ? "text-slate-800" : "text-slate-500"}`}
+              >
+                {shortName}
+              </div>
+              {row.full_name !== shortName && (
+                <div className="absolute left-0 bottom-full mb-1.5 hidden group-hover:block z-50 pointer-events-none">
+                  <div className="px-2.5 py-1.5 bg-white text-slate-700 text-xs font-medium rounded-lg shadow-lg border border-slate-200 whitespace-nowrap">
+                    {row.full_name}
+                  </div>
+                </div>
+              )}
             </div>
           </div>
-        )}
+        );
+      }
+    },
+    {
+      key: "employment_type",
+      label: "Employment Type",
+      width: "w-[16%]",
+      render: (_, row) => (
+        <span className="text-slate-600">
+          {row.employment_type || "—"}
+        </span>
+      )
+    },
+    {
+      key: "status",
+      label: "Status",
+      width: "w-[12%]",
+      render: (_, row) => {
+        const active = isActive(row.status);
+        const unset = row.id == null;
+        if (unset) {
+          return (
+            <span
+              title="Save a base pay below to create this person's salary record"
+              className="inline-flex items-center gap-1.5 px-2.5 py-1 rounded-full text-xs font-medium bg-slate-100 text-slate-400"
+            >
+              <span className="w-1.5 h-1.5 rounded-full bg-slate-300" />
+              Not set
+            </span>
+          );
+        }
+        return (
+          <button
+            onClick={() => toggleStatus(row)}
+            disabled={statusMutation.isPending}
+            title={active ? "Click to mark Inactive" : "Click to mark Active"}
+            className={`inline-flex items-center gap-1.5 px-2.5 py-1 rounded-full text-xs font-medium transition-colors disabled:opacity-50 ${
+              active ? "bg-emerald-50 text-emerald-700 hover:bg-emerald-100" : "bg-slate-200 text-slate-500 hover:bg-slate-300"
+            }`}
+          >
+            <span className={`w-1.5 h-1.5 rounded-full ${active ? "bg-emerald-500" : "bg-slate-400"}`} />
+            {active ? "Active" : "Inactive"}
+          </button>
+        );
+      }
+    },
+    {
+      key: "base_pay",
+      label: "Base Pay (Monthly)",
+      align: "right",
+      width: "w-[18%]",
+      render: (_, row) => {
+        const key = rowKey(row);
+        const editing = edits[key] !== undefined;
+        const unset = row.id == null;
+        if (editing) {
+          return (
+            <div className="flex items-center justify-end gap-1.5">
+              <span className="text-slate-400">₹</span>
+              <input
+                type="number"
+                autoFocus
+                value={edits[key].base}
+                onChange={(e) =>
+                  setEdits((p) => ({
+                    ...p,
+                    [key]: { ...p[key], base: e.target.value },
+                  }))
+                }
+                onWheel={(e) => e.target.blur()}
+                placeholder="Base pay"
+                className="w-28 px-2 py-1 border border-indigo-300 rounded-lg text-sm text-right focus:outline-none focus:ring-2 focus:ring-indigo-200 [appearance:textfield] [&::-webkit-outer-spin-button]:appearance-none [&::-webkit-inner-spin-button]:appearance-none"
+              />
+            </div>
+          );
+        }
+        if (unset) {
+          return (
+            <span className="inline-flex items-center justify-end gap-1 text-xs font-medium text-amber-600">
+              <AlertTriangle className="w-3 h-3" />
+              Not set
+            </span>
+          );
+        }
+        return (
+          <span 
+            className="font-mono text-slate-700 cursor-pointer select-none inline-block w-full text-right"
+            onDoubleClick={() => startEdit(row)}
+            title="Double click to edit"
+          >
+            {row.base_pay_monthly ?? "—"}
+          </span>
+        );
+      }
+    },
+    {
+      key: "bonus",
+      label: "Bonus (Monthly)",
+      align: "right",
+      width: "w-[16%]",
+      render: (_, row) => {
+        const key = rowKey(row);
+        const editing = edits[key] !== undefined;
+        if (editing) {
+          return (
+            <div className="flex items-center justify-end gap-1.5">
+              <span className="text-slate-400">₹</span>
+              <input
+                type="number"
+                value={edits[key].bonus}
+                onChange={(e) =>
+                  setEdits((p) => ({
+                    ...p,
+                    [key]: { ...p[key], bonus: e.target.value },
+                  }))
+                }
+                onWheel={(e) => e.target.blur()}
+                placeholder="0"
+                className="w-24 px-2 py-1 border border-indigo-300 rounded-lg text-sm text-right focus:outline-none focus:ring-2 focus:ring-indigo-200 [appearance:textfield] [&::-webkit-outer-spin-button]:appearance-none [&::-webkit-inner-spin-button]:appearance-none"
+              />
+            </div>
+          );
+        }
+        return (
+          <span 
+            className="font-mono text-slate-500 cursor-pointer select-none inline-block w-full text-right"
+            onDoubleClick={() => startEdit(row)}
+            title="Double click to edit"
+          >
+            {row.opt_bonus_monthly ?? "—"}
+          </span>
+        );
+      }
+    },
+    {
+      key: "actions",
+      label: "Actions",
+      align: "center",
+      width: "w-[14%]",
+      render: (_, row) => {
+        const key = rowKey(row);
+        const editing = edits[key] !== undefined;
+        if (editing) {
+          return (
+            <div className="flex items-center justify-center gap-1.5">
+              <button
+                onClick={() => saveEdit(row)}
+                disabled={savingKey === key}
+                className="px-2.5 py-1.5 bg-emerald-100 text-emerald-700 rounded-lg hover:bg-emerald-200 transition-colors disabled:opacity-50 text-xs font-semibold"
+                title="Save"
+              >
+                Save
+              </button>
+              <button
+                onClick={() => cancelEdit(row)}
+                className="p-1.5 text-slate-400 hover:text-slate-600 rounded-lg"
+                title="Cancel"
+              >
+                <X className="w-3.5 h-3.5" />
+              </button>
+            </div>
+          );
+        }
+        return (
+          <div className="flex items-center justify-center">
+            <button
+              onClick={() => startEdit(row)}
+              className="p-1.5 text-slate-300 hover:text-indigo-600 rounded-lg transition-colors"
+              title="Edit pay"
+            >
+              <Edit2 className="w-3.5 h-3.5" />
+            </button>
+          </div>
+        );
+      }
+    }
+  ];
+
+  return (
+    <div className="space-y-4">
+      <div className="flex items-center justify-between w-full px-1">
+        {/* Left: Search + Save All */}
+        <div className="flex items-center gap-3">
+          <div className="relative w-64">
+            <Search className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-slate-400 pointer-events-none" />
+            <input
+              type="text"
+              value={search}
+              onChange={(e) => setSearch(e.target.value)}
+              placeholder="Search by name or type…"
+              className="w-full h-9 pl-9 pr-3 rounded-lg border border-slate-200 bg-white text-[13px] text-slate-700 placeholder:text-slate-400 focus:outline-none focus:ring-2 focus:ring-indigo-100 focus:border-indigo-300 transition-all"
+            />
+          </div>
+
+          {Object.keys(edits).length > 1 && (
+            <button
+              onClick={saveAllEdits}
+              className="flex items-center gap-1.5 h-9 px-3 bg-indigo-50 text-indigo-600 hover:bg-indigo-100 rounded-lg transition-colors text-[13px] font-semibold border border-indigo-100/50"
+            >
+              <Save className="w-3.5 h-3.5" /> Save All
+            </button>
+          )}
+        </div>
+
+        {/* Right: Filter + Sort + Stats */}
+        <div className="flex items-center gap-3">
+          {/* Filter */}
+          <div ref={filterRef} className="relative">
+            <button
+              type="button"
+              onClick={() => setFilterOpen((o) => !o)}
+              className="inline-flex items-center gap-2 h-9 px-3 rounded-lg border border-slate-200 bg-white text-[13px] font-medium text-slate-700 hover:bg-slate-50 transition-colors"
+            >
+              <Filter className="w-4 h-4 text-slate-500" />
+              Filters
+              {activeFilterCount > 0 && (
+                <span className="inline-flex items-center justify-center h-4 min-w-4 px-1 rounded-full bg-indigo-600 text-white text-[10px] font-semibold">
+                  {activeFilterCount}
+                </span>
+              )}
+            </button>
+
+            {filterOpen && (
+              <div className="absolute right-0 mt-1.5 z-40 w-56 bg-white rounded-xl shadow-xl border border-slate-200 p-3">
+                <div className="flex flex-col gap-2.5">
+                  <div className="space-y-1">
+                    <label className="text-[10px] font-semibold uppercase tracking-wide text-slate-400">
+                      Employment Type
+                    </label>
+                    <Dropdown
+                      options={[
+                        { value: "", label: "All Types" },
+                        ...typeOptions.map((t) => ({ value: t, label: t })),
+                      ]}
+                      value={typeFilter}
+                      onChange={(val) => setTypeFilter(val)}
+                      placeholder="All Types"
+                      optionsClassName="w-full"
+                    />
+                  </div>
+                  <div className="space-y-1">
+                    <label className="text-[10px] font-semibold uppercase tracking-wide text-slate-400">
+                      Status
+                    </label>
+                    <Dropdown
+                      options={[
+                        { value: "", label: "All" },
+                        { value: "Active", label: "Active" },
+                        { value: "Inactive", label: "Inactive" },
+                      ]}
+                      value={statusFilter}
+                      onChange={(val) => setStatusFilter(val)}
+                      placeholder="All"
+                      optionsClassName="w-full"
+                    />
+                  </div>
+                </div>
+                {activeFilterCount > 0 && (
+                  <button
+                    type="button"
+                    onClick={() => {
+                      setTypeFilter("");
+                      setStatusFilter("");
+                    }}
+                    className="w-full text-center mt-2.5 pt-2.5 text-xs font-medium text-indigo-600 hover:text-indigo-700 border-t border-slate-100"
+                  >
+                    Clear filters
+                  </button>
+                )}
+              </div>
+            )}
+          </div>
+
+          {/* Sort Menu */}
+          <div ref={sortRef} className="relative">
+            <button
+              type="button"
+              onClick={() => setSortOpen((o) => !o)}
+              className="inline-flex items-center gap-2 h-9 px-3 rounded-lg border border-slate-200 bg-white text-[13px] font-medium text-slate-700 hover:bg-slate-50 transition-colors"
+            >
+              <ArrowUpDown className="w-4 h-4 text-slate-500" />
+              <span className="hidden sm:inline">
+                Sort: {SORT_OPTIONS.find((o) => o.value === sortBy)?.label}
+              </span>
+              <ChevronDown
+                className={`w-3.5 h-3.5 text-slate-400 transition-transform ${sortOpen ? "rotate-180" : ""}`}
+              />
+            </button>
+
+            {sortOpen && (
+              <div className="absolute right-0 mt-1.5 z-40 w-52 bg-white rounded-xl shadow-xl border border-slate-200 py-1">
+                {SORT_OPTIONS.map((opt) => (
+                  <button
+                    key={opt.value}
+                    type="button"
+                    onClick={() => { setSortBy(opt.value); setSortOpen(false); }}
+                    className="w-full flex items-center justify-between gap-2 px-3 py-2 text-[13px] text-slate-700 hover:bg-slate-50 transition-colors"
+                  >
+                    {opt.label}
+                    {sortBy === opt.value && <Check className="w-4 h-4 text-indigo-600" />}
+                  </button>
+                ))}
+              </div>
+            )}
+          </div>
+
+          {/* Stats pills */}
+          <div className="inline-flex items-center h-9 rounded-lg border border-slate-200 bg-white overflow-hidden text-[13px]">
+            <div className="flex items-center gap-1.5 px-3 border-r border-slate-200">
+              <Users className="w-3.5 h-3.5 text-slate-400" />
+              <span className="font-semibold text-slate-700">{totals.total}</span>
+            </div>
+            <div className="flex items-center gap-1.5 px-3 border-r border-slate-200">
+              <UserCheck className="w-3.5 h-3.5 text-emerald-500" />
+              <span className="font-semibold text-emerald-600">{totals.active}</span>
+            </div>
+            <div className="flex items-center gap-1.5 px-3">
+              <UserX className="w-3.5 h-3.5 text-rose-400" />
+              <span className="font-semibold text-rose-500">{totals.inactive}</span>
+            </div>
+          </div>
+        </div>
       </div>
+
+      <Table 
+        columns={columns}
+        data={filtered}
+        currentPage={page}
+        pageSize={PAGE_SIZE}
+        onPageChange={setPage}
+        loading={isLoading}
+        variant="untitled"
+        emptyState={
+          isError ? (
+            <div className="flex items-center justify-center py-16 text-red-400 text-sm">Failed to load salary records.</div>
+          ) : (
+            <div className="flex items-center justify-center py-16 text-slate-400 text-sm">No records found.</div>
+          )
+        }
+      />
     </div>
   );
 };

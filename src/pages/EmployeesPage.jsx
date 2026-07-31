@@ -2650,6 +2650,7 @@ const EmployeesPage = () => {
                   min="1"
                   max="24"
                   defaultValue={editingEmployee?.working_hours_per_day || 8}
+                  onWheel={(e) => e.target.blur()}
                   className="input"
                 />
               </div>
@@ -2665,6 +2666,7 @@ const EmployeesPage = () => {
                   min="1"
                   max="168"
                   defaultValue={editingEmployee?.weekly_availability || 40}
+                  onWheel={(e) => e.target.blur()}
                   className="input"
                 />
               </div>

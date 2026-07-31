@@ -1,6 +1,7 @@
 import { useMemo, useState } from "react";
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
 import Button from "./ui/Button";
+import DatePicker from "./ui/DatePicker";
 import { leaveApi, wfhApi } from "../services/api";
 import Spinner from "./ui/LoadingSpinner";
 import {
@@ -114,11 +115,11 @@ function FloaterDatePicker({
       <label className="block text-sm font-medium text-slate-700">
         {label}
       </label>
-      <input
+      <DatePicker
         type="date"
         value={value}
         onChange={onChange}
-        className={`w-full px-3 py-2 border rounded-lg text-sm ${isInvalid ? "border-red-400 bg-red-50" : "border-slate-200"}`}
+        error={isInvalid}
         required={required}
       />
       {isInvalid && (
@@ -821,7 +822,7 @@ const MyLeavesPanel = ({
                           ? "Date"
                           : "Start Date"}
                       </label>
-                      <input
+                      <DatePicker
                         type="date"
                         value={leaveForm.start_date}
                         onChange={(e) => {
@@ -836,7 +837,6 @@ const MyLeavesPanel = ({
                                 : prev.end_date,
                           }));
                         }}
-                        className="w-full px-3 py-2 border border-slate-200 rounded-lg text-sm"
                         required
                       />
                     </div>
@@ -848,7 +848,7 @@ const MyLeavesPanel = ({
                         <label className="block text-sm font-medium text-slate-700 mb-1">
                           End Date
                         </label>
-                        <input
+                        <DatePicker
                           type="date"
                           value={leaveForm.end_date}
                           onChange={(e) =>
@@ -857,7 +857,6 @@ const MyLeavesPanel = ({
                               end_date: e.target.value,
                             })
                           }
-                          className="w-full px-3 py-2 border border-slate-200 rounded-lg text-sm"
                           required
                         />
                       </div>
@@ -998,7 +997,7 @@ const MyLeavesPanel = ({
                           ? "Date"
                           : "Start Date"}
                       </label>
-                      <input
+                      <DatePicker
                         type="date"
                         value={editForm.start_date}
                         onChange={(e) => {
@@ -1013,7 +1012,6 @@ const MyLeavesPanel = ({
                                 : prev.end_date,
                           }));
                         }}
-                        className="w-full px-3 py-2 border border-slate-200 rounded-lg text-sm"
                         required
                       />
                     </div>
@@ -1025,7 +1023,7 @@ const MyLeavesPanel = ({
                         <label className="block text-sm font-medium text-slate-700 mb-1">
                           End Date
                         </label>
-                        <input
+                        <DatePicker
                           type="date"
                           value={editForm.end_date}
                           onChange={(e) =>
@@ -1034,7 +1032,6 @@ const MyLeavesPanel = ({
                               end_date: e.target.value,
                             })
                           }
-                          className="w-full px-3 py-2 border border-slate-200 rounded-lg text-sm"
                           required
                         />
                       </div>
@@ -1278,13 +1275,12 @@ const MyLeavesPanel = ({
                   <label className="block text-sm font-medium text-slate-700 mb-1">
                     Date
                   </label>
-                  <input
+                  <DatePicker
                     type="date"
                     value={wfhForm.wfh_date}
                     onChange={(e) =>
                       setWfhForm({ ...wfhForm, wfh_date: e.target.value })
                     }
-                    className="w-full px-3 py-2 border border-slate-200 rounded-lg text-sm"
                     required
                   />
                 </div>

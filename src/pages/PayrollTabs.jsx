@@ -1,8 +1,10 @@
 import { useState } from "react";
-import { Lock, IndianRupee, CalendarClock } from "lucide-react";
+import { Lock, IndianRupee, CalendarClock, History } from "lucide-react";
 import { payrollApi } from "../services/api";
 import PayTab from "./PayTab";
+import PayrollHistoryTab from "./PayrollHistoryTab";
 import PayrollPage from "./PayrollPage";
+import { usePayrollStore } from "../store/usePayrollStore";
 
 /**
  * Payroll shell — two tabs:
@@ -16,10 +18,13 @@ import PayrollPage from "./PayrollPage";
 const TABS = [
   { key: "pay", label: "Pay", icon: IndianRupee },
   { key: "monthly", label: "Monthly Pay", icon: CalendarClock },
+  { key: "history", label: "History", icon: History },
 ];
 
 const PayrollTabs = () => {
   const [active, setActive] = useState("pay");
+  const setPayrollMonth = usePayrollStore((state) => state.setMonth);
+  const setAutoGenerate = usePayrollStore((state) => state.setAutoGenerate);
 
   const [unlocked, setUnlocked] = useState(
     !!sessionStorage.getItem("payroll_passcode"),
@@ -133,9 +138,18 @@ const PayrollTabs = () => {
         </button>
       </div>
 
-      {/* Active tab. Keep both mounted? No — render the active one. Monthly Pay
- (PayrollPage) is self-contained and auto-unlocks from sessionStorage. */}
-      {active === "pay" ? <PayTab /> : <PayrollPage />}
+      {/* Active tab */}
+      {active === "pay" ? (
+        <PayTab />
+      ) : active === "history" ? (
+        <PayrollHistoryTab onViewDetails={(month) => {
+          setPayrollMonth(month);
+          setAutoGenerate(true);
+          setActive("monthly");
+        }} />
+      ) : (
+        <PayrollPage />
+      )}
     </div>
   );
 };

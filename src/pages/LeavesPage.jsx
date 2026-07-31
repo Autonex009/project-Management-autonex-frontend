@@ -4,6 +4,7 @@ import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
 import { leaveApi, employeeApi, wfhApi } from "../services/api";
 import Spinner from "../components/ui/LoadingSpinner";
 import Button from "../components/ui/Button";
+import DatePicker from "../components/ui/DatePicker";
 import {
   Plus,
   Calendar,
@@ -23,6 +24,7 @@ import {
   getEndDateValidationMessage,
   isEndDateBeforeStartDate,
 } from "../utils/dateValidation";
+import { getNameInitials } from "../utils/displayName";
 import {
   getLeaveTypeBadgeClass,
   getLeaveTypeLabel,
@@ -602,28 +604,45 @@ const LeavesPage = () => {
               key: "employee_id",
               label: "Employee",
               width: "w-[22%]",
-              render: (_, leave) => (
-                <div className="min-w-0">
-                  <div className="flex items-center gap-2 min-w-0">
-                    <span className="font-semibold text-slate-800 truncate">
-                      {getEmployeeName(leave.employee_id)}
-                    </span>
-                    {leave.flagged && (
-                      <span
-                        title="Over limit"
-                        className="inline-flex items-center justify-center h-5 w-5 shrink-0 rounded-full bg-orange-100 text-orange-600 border border-orange-200 cursor-help"
-                      >
-                        <AlertTriangle className="w-3 h-3" />
-                      </span>
+              render: (_, leave) => {
+                const emp = employees.find(e => e.id === leave.employee_id);
+                const empName = emp ? emp.name : getEmployeeName(leave.employee_id);
+                return (
+                  <div className="flex items-center gap-3 min-w-0">
+                    {emp?.avatar_url ? (
+                      <img
+                        src={emp.avatar_url}
+                        alt={empName}
+                        className="w-9 h-9 rounded-full object-cover flex-shrink-0 ring-1 ring-slate-200"
+                      />
+                    ) : (
+                      <div className="w-9 h-9 rounded-full flex items-center justify-center flex-shrink-0 bg-indigo-50 text-indigo-600 text-[13px] font-semibold ring-1 ring-slate-200">
+                        {getNameInitials(empName, 1)}
+                      </div>
                     )}
+                    <div className="min-w-0">
+                      <div className="flex items-center gap-2 min-w-0">
+                        <span className="font-semibold text-slate-800 truncate">
+                          {empName}
+                        </span>
+                        {leave.flagged && (
+                          <span
+                            title="Over limit"
+                            className="inline-flex items-center justify-center h-5 w-5 shrink-0 rounded-full bg-orange-100 text-orange-600 border border-orange-200 cursor-help"
+                          >
+                            <AlertTriangle className="w-3 h-3" />
+                          </span>
+                        )}
+                      </div>
+                      {leave.approval_remark && (
+                        <p className="text-xs text-slate-400 mt-0.5 truncate">
+                          Remark: {leave.approval_remark}
+                        </p>
+                      )}
+                    </div>
                   </div>
-                  {leave.approval_remark && (
-                    <p className="text-xs text-slate-400 mt-0.5 truncate">
-                      Remark: {leave.approval_remark}
-                    </p>
-                  )}
-                </div>
-              ),
+                );
+              },
             },
             {
               key: "leave_type",
@@ -793,11 +812,28 @@ const LeavesPage = () => {
             {
               key: "employee_name",
               label: "Employee",
-              render: (value, w) => (
-                <span className="font-semibold text-slate-800">
-                  {value || getEmployeeName(w.employee_id)}
-                </span>
-              ),
+              render: (value, w) => {
+                const emp = employees.find(e => e.id === w.employee_id);
+                const empName = value || getEmployeeName(w.employee_id);
+                return (
+                  <div className="flex items-center gap-3">
+                    {emp?.avatar_url ? (
+                      <img
+                        src={emp.avatar_url}
+                        alt={empName}
+                        className="w-9 h-9 rounded-full object-cover flex-shrink-0 ring-1 ring-slate-200"
+                      />
+                    ) : (
+                      <div className="w-9 h-9 rounded-full flex items-center justify-center flex-shrink-0 bg-indigo-50 text-indigo-600 text-[13px] font-semibold ring-1 ring-slate-200">
+                        {getNameInitials(empName, 1)}
+                      </div>
+                    )}
+                    <span className="font-semibold text-slate-800 truncate">
+                      {empName}
+                    </span>
+                  </div>
+                );
+              },
             },
             {
               key: "wfh_date",
@@ -1027,11 +1063,10 @@ const LeavesPage = () => {
                     : "Start Date"}{" "}
                   <span className="text-red-500">*</span>
                 </label>
-                <input
+                <DatePicker
                   type="date"
                   name="start_date"
                   required
-                  className="input"
                 />
               </div>
               {!(
@@ -1042,11 +1077,10 @@ const LeavesPage = () => {
                   <label className="block text-sm font-medium text-gray-700 mb-1">
                     End Date <span className="text-red-500">*</span>
                   </label>
-                  <input
+                  <DatePicker
                     type="date"
                     name="end_date"
                     required
-                    className="input"
                   />
                 </div>
               )}
