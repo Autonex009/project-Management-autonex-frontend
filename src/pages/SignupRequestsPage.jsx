@@ -15,6 +15,7 @@ import Dropdown from "../components/ui/Dropdown";
 import Modal from "../components/ui/Modal";
 import SearchBar from "../components/ui/SearchBar";
 import Table from "../components/ui/Table";
+import { formatDisplayName } from "../utils/displayName";
 
 const EMPLOYEE_TYPES = ["Full-time", "Part-time", "Intern", "Contractor"];
 
@@ -304,20 +305,24 @@ const SignupRequestsPage = () => {
             render: (value, req) => (
               <div className="flex items-center gap-3">
                 <div className="w-9 h-9 rounded-full bg-indigo-50 text-indigo-600 flex items-center justify-center text-[13px] font-semibold ring-1 ring-slate-200 shrink-0">
-                  {req.name.charAt(0).toUpperCase()}
+                  {(formatDisplayName(req.name) || "U").charAt(0).toUpperCase()}
                 </div>
                 <div className="min-w-0">
-                  <div
-                    className="text-[13.5px] font-semibold text-slate-900 truncate"
-                    title={req.name}
-                  >
-                    {req.name}
+                  <div className="group/tip relative">
+                    <div className="text-[13.5px] font-semibold text-slate-900 truncate">
+                      {formatDisplayName(req.name)}
+                    </div>
+                    <span className="pointer-events-none absolute left-0 top-full z-30 mt-1 hidden w-max max-w-[240px] whitespace-normal break-words rounded-lg border border-slate-200 bg-white px-2.5 py-1.5 text-[11px] font-medium text-slate-600 shadow-lg group-hover/tip:block">
+                      {req.name}
+                    </span>
                   </div>
-                  <div
-                    className="text-[12px] text-slate-400 truncate"
-                    title={req.email}
-                  >
-                    {req.email}
+                  <div className="group/tip relative -mt-0.5">
+                    <div className="text-[12px] text-slate-400 truncate">
+                      {req.email}
+                    </div>
+                    <span className="pointer-events-none absolute left-0 top-full z-30 mt-1 hidden w-max max-w-[240px] whitespace-normal break-words rounded-lg border border-slate-200 bg-white px-2.5 py-1.5 text-[11px] font-medium text-slate-600 shadow-lg group-hover/tip:block">
+                      {req.email}
+                    </span>
                   </div>
                 </div>
               </div>
@@ -449,7 +454,7 @@ const SignupRequestsPage = () => {
                   Reject Signup Request
                 </h3>
                 <p className="text-sm text-slate-500 mt-1">
-                  Rejecting <strong>{rejectModal.name}</strong>'s request. They
+                  Rejecting <strong>{formatDisplayName(rejectModal.name)}</strong>'s request. They
                   will receive an email notification.
                 </p>
               </div>

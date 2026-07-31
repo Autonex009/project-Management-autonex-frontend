@@ -31,6 +31,7 @@ import {
 import LeaveCalendar from "../../components/LeaveCalendar";
 import EmployeeKPIPanel from "../../components/EmployeeKPIPanel";
 import Modal from "../../components/ui/Modal";
+import { formatDisplayName, getNameInitials } from "../../utils/displayName";
 
 const TABS = ["Leave Requests", "Calendar", "WFH Requests", "Employee KPI"];
 
@@ -218,26 +219,43 @@ const PMLeavesPage = () => {
               width: "w-[22%]",
               render: (_, leave) => {
                 const emp = employees.find((e) => e.id === leave.employee_id);
+                const empName = formatDisplayName(emp?.name) || `#${leave.employee_id}`;
                 return (
-                  <div className="min-w-0">
-                    <div className="flex items-center gap-2 min-w-0">
-                      <span className="font-semibold text-slate-800 truncate">
-                        {emp?.name || `#${leave.employee_id}`}
-                      </span>
+                  <div className="flex items-center gap-3 min-w-0">
+                    {emp?.avatar_url ? (
+                      <img
+                        src={emp.avatar_url}
+                        alt={empName}
+                        className="w-9 h-9 rounded-full object-cover flex-shrink-0 ring-1 ring-slate-200"
+                      />
+                    ) : (
+                      <div className="w-9 h-9 rounded-full flex items-center justify-center flex-shrink-0 bg-indigo-50 text-indigo-600 text-[13px] font-semibold ring-1 ring-slate-200">
+                        {getNameInitials(empName, 1)}
+                      </div>
+                    )}
+                    <div className="flex items-center min-w-0">
+                      <div className="flex flex-col min-w-0 pr-4">
+                        <span className="font-bold text-slate-800 truncate">
+                          {empName}
+                        </span>
+                        <span className="text-[11px] text-slate-400 truncate">
+                          {emp?.email || ""}
+                        </span>
+                      </div>
                       {leave.flagged && (
                         <span
                           title="Over limit"
-                          className="inline-flex items-center justify-center h-5 w-5 shrink-0 rounded-full bg-orange-100 text-orange-600 border border-orange-200 cursor-help"
+                          className="inline-flex items-center justify-center h-5 w-5 shrink-0 rounded-full bg-orange-100 text-orange-600 border border-orange-200 cursor-help ml-2"
                         >
                           <AlertTriangle className="w-3 h-3" />
                         </span>
                       )}
+                      {leave.approval_remark && (
+                        <p className="text-xs text-slate-400 mt-0.5 truncate ml-2">
+                          Remark: {leave.approval_remark}
+                        </p>
+                      )}
                     </div>
-                    {leave.approval_remark && (
-                      <p className="text-xs text-slate-400 mt-0.5 truncate">
-                        Remark: {leave.approval_remark}
-                      </p>
-                    )}
                   </div>
                 );
               },
@@ -380,9 +398,33 @@ const PMLeavesPage = () => {
             {
               key: "employee_name",
               label: "Employee",
-              render: (value) => (
-                <span className="font-semibold text-slate-800">{value}</span>
-              ),
+              render: (value, req) => {
+                const emp = employees.find((e) => e.id === req.employee_id);
+                const empName = formatDisplayName(value) || `#${req.employee_id}`;
+                return (
+                  <div className="flex items-center gap-3 min-w-0">
+                    {emp?.avatar_url ? (
+                      <img
+                        src={emp.avatar_url}
+                        alt={empName}
+                        className="w-9 h-9 rounded-full object-cover flex-shrink-0 ring-1 ring-slate-200"
+                      />
+                    ) : (
+                      <div className="w-9 h-9 rounded-full flex items-center justify-center flex-shrink-0 bg-indigo-50 text-indigo-600 text-[13px] font-semibold ring-1 ring-slate-200">
+                        {getNameInitials(empName, 1)}
+                      </div>
+                    )}
+                    <div className="flex flex-col min-w-0 pr-4">
+                      <span className="font-bold text-slate-800 truncate">
+                        {empName}
+                      </span>
+                      <span className="text-[11px] text-slate-400 truncate">
+                        {emp?.email || ""}
+                      </span>
+                    </div>
+                  </div>
+                );
+              },
             },
             {
               key: "wfh_date",

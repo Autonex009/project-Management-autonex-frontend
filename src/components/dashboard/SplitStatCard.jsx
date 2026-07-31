@@ -1,5 +1,6 @@
 import React, { useState } from "react";
 import { ChevronDown } from "lucide-react";
+import { formatDisplayName } from "../../utils/displayName";
 
 // Two related metrics sharing one card, divided across its height — so a pair of
 // small stats (Leave / WFH) occupies the same grid slot as a single StatCard
@@ -170,14 +171,14 @@ const SplitStatCard = ({ halves = [] }) => {
                   ) : (
                     people.map((person, idx) => (
                       <button
-                        key={person.id ?? `${person.name}-${idx}`}
+                        key={person.id ?? `${formatDisplayName(person.name)}-${idx}`}
                         type="button"
                         onClick={() => half.onSelectPerson?.(person)}
-                        title={`Open ${person.name} in ${half.title}`}
+                        title={`Open ${formatDisplayName(person.name)} in ${half.title}`}
                         className="flex w-full items-center justify-between gap-2 rounded-md px-1.5 py-1 text-left transition-colors hover:bg-indigo-50/70"
                       >
                         <span className="truncate text-[13px] text-slate-700">
-                          {person.name}
+                          {formatDisplayName(person.name)}
                         </span>
                         {person.meta && (
                           <span className="shrink-0 text-[11px] tabular-nums text-slate-400">

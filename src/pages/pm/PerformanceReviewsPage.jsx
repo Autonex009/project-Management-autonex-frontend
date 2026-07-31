@@ -17,13 +17,14 @@ import {
 } from "lucide-react";
 import EvalReviewCard from "../../components/perf/EvalReviewCard";
 import StatCard from "../../components/dashboard/StatCard";
+import { formatDisplayName } from "../../utils/displayName";
 
 const ProjectPanel = ({ project, employees, evaluations, reviewerId }) => {
   const [expanded, setExpanded] = useState(false);
   const projectEvals = evaluations.filter((e) => e.project_id === project.id);
   const pending = projectEvals.filter((e) => e.status === "submitted").length;
   const empName = (id) =>
-    employees.find((e) => e.id === id)?.name || `Employee #${id}`;
+    formatDisplayName(employees.find((e) => e.id === id)?.name) || `Employee #${id}`;
 
   return (
     <article className="overflow-hidden rounded-3xl border border-slate-200/70 bg-white shadow-sm">

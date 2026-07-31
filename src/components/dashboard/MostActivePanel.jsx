@@ -1,6 +1,7 @@
 import React, { useMemo, useState } from "react";
 import { Clock, ArrowUpRight, BarChart3 } from "lucide-react";
 import Button from "../ui/Button";
+import { formatDisplayName } from "../../utils/displayName";
 
 // "Most active" panel, laid out like the reference account card: a header bar with
 // tabs, an inset hero block (headline figure + sparkline), a share-of-total meter,
@@ -292,7 +293,7 @@ const MostActivePanel = ({
           ) : leader ? (
             <>
               <span className="font-semibold text-slate-800">
-                {leader.name}
+                {formatDisplayName(leader.name)}
               </span>{" "}
               leads with {fmtHours(leader.hours)}h of the month&apos;s{" "}
               {fmtHours(totalHours)}h.
@@ -363,7 +364,7 @@ const MostActivePanel = ({
                     </span>
                     <span className="min-w-0 flex-1">
                       <span className="block truncate text-[13px] font-medium text-slate-800">
-                        {row.name}
+                        {formatDisplayName(row.name)}
                       </span>
                       <span className="block truncate font-mono text-[10px] text-slate-400">
                         {row.sub}
