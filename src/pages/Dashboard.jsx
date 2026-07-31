@@ -265,6 +265,13 @@ const Dashboard = () => {
     queryFn: () => analyticsApi.getAutonexKpis("30"),
     refetchOnWindowFocus: true,
   });
+  // Per-project Autonex figures (hours / annotators / reviewers) for the Project
+  // Status table. Month-to-date; keyed by project_id.
+  const { data: analyticsSummary = [] } = useQuery({
+    queryKey: ["analytics-summary"],
+    queryFn: () => analyticsApi.getSummary(),
+    refetchOnWindowFocus: true,
+  });
   const autonexDaily = autonexKpis?.daily || [];
 
   // Stats. The list endpoint returns every project, archived included, so this
@@ -487,10 +494,37 @@ const Dashboard = () => {
     [allocations, leaves],
   );
 
-  const projectAnalyses = projects.map((p) => ({
-    project: p,
-    analysis: getProjectAnalysis(p),
-  }));
+  // Autonex per-project figures keyed by project id (from the analytics summary).
+  const summaryById = useMemo(() => {
+    const m = {};
+    for (const r of analyticsSummary) m[r.project_id] = r;
+    return m;
+  }, [analyticsSummary]);
+
+  // Sort order for the Project Status table: Poor → Avg → Good → Not set.
+  const SENTIMENT_ORDER = { Poor: 0, AVG: 1, GOOD: 2 };
+  const projectAnalyses = useMemo(
+    () =>
+      projects
+        .map((p) => {
+          const s = summaryById[p.id] || {};
+          return {
+            project: p,
+            analysis: getProjectAnalysis(p),
+            autonexHours: s.autonex_platform_hours ?? null,
+            annotators: s.autonex_active_annotators ?? null,
+            reviewers: s.autonex_active_reviewers ?? null,
+          };
+        })
+        .sort((a, b) => {
+          const oa = SENTIMENT_ORDER[a.project.sentiment] ?? 3;
+          const ob = SENTIMENT_ORDER[b.project.sentiment] ?? 3;
+          if (oa !== ob) return oa - ob;
+          // within a sentiment, most Autonex hours first
+          return (b.autonexHours ?? 0) - (a.autonexHours ?? 0);
+        }),
+    [projects, summaryById, getProjectAnalysis],
+  );
 
   // ── People breakdowns (on-roster staff) ────────────────────────────────────
   // On-roster = everyone except archived/former, so the breakdowns no longer
@@ -693,7 +727,19 @@ const Dashboard = () => {
               </Button>
             }
             loading={projectsLoading}
-            rowClassName={() => "group"}
+            rowClassName={(row) =>
+              row?.project?.encord_project_hash
+                ? "group cursor-pointer"
+                : "group"
+            }
+            onRowClick={(row) => {
+              // Analytics only exists for Encord-mapped projects.
+              if (row?.project?.encord_project_hash) {
+                navigate(`/admin/analytics/${row.project.id}`, {
+                  state: { from: "dashboard" },
+                });
+              }
+            }}
             currentPage={projectPage}
             pageSize={5}
             onPageChange={setProjectPage}
@@ -713,10 +759,43 @@ const Dashboard = () => {
                 ),
               },
               {
+                key: "_hours",
+                label: "Autonex Hrs",
+                align: "center",
+                width: "w-28",
+                render: (_, row) => (
+                  <span className="font-mono text-sm text-slate-700">
+                    {row.autonexHours != null ? `${row.autonexHours}h` : "—"}
+                  </span>
+                ),
+              },
+              {
+                key: "_ann",
+                label: "Annotators",
+                align: "center",
+                width: "w-24",
+                render: (_, row) => (
+                  <span className="text-slate-700">
+                    {row.annotators ?? "—"}
+                  </span>
+                ),
+              },
+              {
+                key: "_rev",
+                label: "Reviewers",
+                align: "center",
+                width: "w-24",
+                render: (_, row) => (
+                  <span className="text-slate-700">
+                    {row.reviewers ?? "—"}
+                  </span>
+                ),
+              },
+              {
                 key: "_sentiment",
-                label: "Sentiment",
+                label: "Status",
                 align: "left",
-                width: "w-32",
+                width: "w-28",
                 render: (_, row) => (
                   <SentimentBadge sentiment={row.project.sentiment} />
                 ),
