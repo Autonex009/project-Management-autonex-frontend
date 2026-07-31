@@ -74,15 +74,18 @@ const EmployeeGuidelinesPage = () => {
                 </div>
               )}
               {g.file_url && (
-                <a
-                  href={g.file_url}
-                  target="_blank"
-                  rel="noreferrer"
-                  className="mt-3 inline-flex items-center gap-2 px-3 py-2 bg-emerald-50 text-emerald-700 rounded-lg text-sm font-medium hover:bg-emerald-100 transition-colors"
-                >
-                  <Download className="w-4 h-4" />
-                  {g.file_name || "Open guideline file"}
-                </a>
+                <div className="mt-3 flex items-center gap-2">
+                  <a
+                    href={g.file_url}
+                    download
+                    target="_blank"
+                    rel="noreferrer"
+                    className="inline-flex items-center justify-center p-2 text-slate-400 hover:text-emerald-600 hover:bg-emerald-50 rounded-lg transition-colors"
+                    title="Download file"
+                  >
+                    <Download className="w-4 h-4" />
+                  </a>
+                </div>
               )}
               <p className="text-xs text-slate-400 mt-3">
                 Created{" "}

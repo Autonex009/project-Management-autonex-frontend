@@ -1403,6 +1403,7 @@ const AllocationsPage = () => {
                                     [tag]: Math.min(hours, totalDailyHours),
                                   });
                                 }}
+                                onWheel={(e) => e.target.blur()}
                                 className="input w-20 text-center"
                               />
                               <span className="text-xs text-gray-500">hrs</span>

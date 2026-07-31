@@ -28,6 +28,7 @@ export const Table = ({
   getRowId = (row) => row.id,
   renderExpandedRow,
   allowOverflow = false, // let row popovers/menus escape the card instead of being clipped
+  tableLayout = "fixed", // "fixed" or "auto"
 }) => {
   const serverSide = totalItems != null;
   const itemCount = serverSide ? totalItems : data?.length || 0;
@@ -79,21 +80,24 @@ export const Table = ({
 
   return (
     <div className={outerClass}>
-      {title && (
+      {(title || headerAction) && (
         <div className="flex items-center justify-between gap-3 px-5 py-4 border-b border-slate-100 ">
-          <div className="flex items-center gap-2">
-            <h3 className="text-sm font-semibold text-slate-800 ">{title}</h3>
+          <div className="flex items-center gap-2 w-full">
+            {title && <h3 className="text-sm font-semibold text-slate-800 ">{title}</h3>}
             {count != null && (
               <span className="rounded-full border border-slate-200 px-2 py-0.5 text-[11px] font-medium text-slate-500 ">
                 {count}
               </span>
             )}
+            {!title && headerAction && (
+              <div className="flex-1">{headerAction}</div>
+            )}
           </div>
-          {headerAction}
+          {title && headerAction && <div>{headerAction}</div>}
         </div>
       )}
       <div className="overflow-visible">
-        <table className="w-full table-fixed border-separate border-spacing-0">
+        <table className={`w-full border-separate border-spacing-0 ${tableLayout === "auto" ? "table-auto" : "table-fixed"}`}>
           <thead
             className={`${theadBg} ${allowOverflow && !title ? "rounded-t-2xl" : ""} border-b border-slate-100 `}
           >

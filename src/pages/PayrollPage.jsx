@@ -1,4 +1,4 @@
-import { useState, useMemo } from "react";
+import { useState, useMemo, useEffect, useRef } from "react";
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
 import { payrollApi } from "../services/api";
 import Button from "../components/ui/Button";
@@ -17,10 +17,19 @@ import {
   PlusCircle,
   RotateCcw,
   Trash2,
+  Search,
+  Filter,
+  Sparkles,
+  Minus,
+  ChevronDown,
 } from "lucide-react";
+import { usePayrollStore } from "../store/usePayrollStore";
 import SearchBar from "../components/ui/SearchBar";
 import Table from "../components/ui/Table";
 import Modal from "../components/ui/Modal";
+import DatePicker from "../components/ui/DatePicker";
+import Dropdown from "../components/ui/Dropdown";
+import { formatDisplayName, getNameInitials } from "../utils/displayName";
 
 const LEAVE_LABELS = {
   paid: "Paid",
@@ -85,14 +94,36 @@ const getColumns = ({
   {
     key: "employee",
     label: "Employee",
-    render: (_, row) => (
-      <>
-        <p className="font-semibold text-slate-800">{row.employee_name}</p>
-        <p className="text-xs text-slate-400">
-          {row.designation} · {row.employee_type}
-        </p>
-      </>
-    ),
+    render: (_, row) => {
+      const shortName = formatDisplayName(row.employee_name) || row.employee_name;
+      return (
+        <div className="flex items-center gap-3">
+          {row.avatar_url ? (
+            <img
+              src={row.avatar_url}
+              alt={shortName}
+              className="w-8 h-8 rounded-full object-cover flex-shrink-0"
+            />
+          ) : (
+            <div className="w-8 h-8 rounded-full flex items-center justify-center flex-shrink-0 bg-indigo-50 text-indigo-600 text-[13px] font-semibold">
+              {getNameInitials(row.employee_name)}
+            </div>
+          )}
+          <div className="group relative min-w-0">
+            <div className="font-semibold truncate text-slate-800">
+              {shortName}
+            </div>
+            {row.employee_name !== shortName && (
+              <div className="absolute left-0 bottom-full mb-1.5 hidden group-hover:block z-50 pointer-events-none">
+                <div className="px-2.5 py-1.5 bg-white text-slate-700 text-xs font-medium rounded-lg shadow-lg border border-slate-200 whitespace-nowrap">
+                  {row.employee_name}
+                </div>
+              </div>
+            )}
+          </div>
+        </div>
+      );
+    },
   },
 
   {
@@ -187,7 +218,8 @@ const getColumns = ({
                       [row.employee_id]: e.target.value,
                     }))
                   }
-                  className="w-24 px-2 py-1 border border-indigo-300 rounded-lg text-sm text-right"
+                  onWheel={(e) => e.target.blur()}
+                  className="w-24 px-2 py-1 border border-indigo-300 rounded-lg text-sm text-right [appearance:textfield] [&::-webkit-outer-spin-button]:appearance-none [&::-webkit-inner-spin-button]:appearance-none"
                 />
               </div>
               <p className="text-[10px] text-slate-400">
@@ -236,8 +268,9 @@ const getColumns = ({
                 [row.employee_id]: e.target.value,
               }))
             }
+            onWheel={(e) => e.target.blur()}
             placeholder="0"
-            className="w-24 px-2 py-1 border border-slate-300 rounded-lg text-sm text-right focus:outline-none focus:ring-2 focus:ring-indigo-200"
+            className="w-24 px-2 py-1 border border-slate-300 rounded-lg text-sm text-right [appearance:textfield] [&::-webkit-outer-spin-button]:appearance-none [&::-webkit-inner-spin-button]:appearance-none focus:outline-none focus:ring-2 focus:ring-indigo-200"
           />
         </div>
       ),
@@ -279,22 +312,46 @@ const PayrollPage = () => {
   const queryClient = useQueryClient();
   const user = JSON.parse(localStorage.getItem("user") || "{}");
 
-  const [month, setMonth] = useState(currentMonthStr());
-  const [generated, setGenerated] = useState(false);
+  const {
+    month,
+    generated,
+    autoGenerate,
+    adjustments,
+    bonuses,
+    additionalPayments,
+    setMonth,
+    setGenerated,
+    setAutoGenerate,
+    setAdjustments,
+    setBonuses,
+    setAdditionalPayments,
+    payrollSearch: search,
+    setPayrollSearch: setSearch,
+    payrollTypeFilter: typeFilter,
+    setPayrollTypeFilter: setTypeFilter,
+    payrollPage: page,
+    setPayrollPage: setPage,
+  } = usePayrollStore();
 
-  // leave_id → deduct (true/false)
-  const [adjustments, setAdjustments] = useState({});
+  const filterRef = useRef(null);
+  const [filterOpen, setFilterOpen] = useState(false);
 
-  // employee_id → bonus amount (number). Absent = use the saved/default value.
-  const [bonuses, setBonuses] = useState({});
+  // Close filter when clicking outside
+  useEffect(() => {
+    const handleClickOutside = (e) => {
+      if (filterRef.current && !filterRef.current.contains(e.target)) {
+        setFilterOpen(false);
+      }
+    };
+    document.addEventListener("mousedown", handleClickOutside);
+    return () => document.removeEventListener("mousedown", handleClickOutside);
+  }, []);
 
-  // employee_id → additional payment amount (number). Absent = use the saved/default value.
-  const [additionalPayments, setAdditionalPayments] = useState({});
-
-  // Search + pagination (display only — totals/save/CSV use the full `rows`).
-  const PAGE_SIZE = 12;
-  const [search, setSearch] = useState("");
-  const [page, setPage] = useState(1);
+  useEffect(() => {
+    if (!month) {
+      setMonth(currentMonthStr());
+    }
+  }, [month, setMonth]);
 
   // Which employee's leave modal is open
   const [reviewModal, setReviewModal] = useState(null); // employee row object
@@ -343,11 +400,12 @@ const PayrollPage = () => {
   const {
     data: preview,
     isLoading,
+    isFetching,
     refetch,
   } = useQuery({
     queryKey: ["payroll-preview", month],
     queryFn: () => payrollApi.getPreview(month),
-    enabled: false,
+    enabled: generated && !!month,
     staleTime: 0,
   });
 
@@ -413,6 +471,13 @@ const PayrollPage = () => {
     });
   };
 
+  useEffect(() => {
+    if (autoGenerate && month) {
+      setAutoGenerate(false);
+      handleGenerate();
+    }
+  }, [autoGenerate, month, setAutoGenerate]);
+
   // Admin override: set the exact list of UNPAID dates (ISO strings) for a leave.
   // No-op while the run is finalized — the month is locked until it's reopened.
   const setLeaveDates = (leaveId, unpaidDates) => {
@@ -434,9 +499,11 @@ const PayrollPage = () => {
   const rows = useMemo(() => {
     if (!preview?.employees) return [];
     return preview.employees.map((emp) => {
-      const perDay = emp.base_salary
+      const rawPerDay = emp.base_salary
         ? emp.base_salary / (preview.working_days || 22)
         : 0;
+      const perDay = Math.round(rawPerDay * 100) / 100;
+
       let totalDeductedDays = 0;
       let totalPaidDays = 0;
       const leaves = emp.leaves.map((l) => {
@@ -450,9 +517,12 @@ const PayrollPage = () => {
           ...d,
           unpaid: unpaidSet.has(d.date),
         }));
-        const unpaidDays = dates.filter((d) => d.unpaid).length;
+        
+        const weight = l.is_half_day ? 0.5 : 1.0;
+        const unpaidDays = dates.filter((d) => d.unpaid).length * weight;
         const paidDays = Math.max(l.days_in_month - unpaidDays, 0);
-        const deductionAmount = unpaidDays * perDay;
+        const deductionAmount = Math.round(unpaidDays * perDay * 100) / 100;
+        
         totalDeductedDays += unpaidDays;
         totalPaidDays += paidDays;
         const classification =
@@ -471,20 +541,26 @@ const PayrollPage = () => {
           deductionAmount,
         };
       });
-      const totalDeduction = totalDeductedDays * perDay;
+      
+      const totalDeduction = Math.round(totalDeductedDays * perDay * 100) / 100;
+      
       // Bonus: capped at the employee's limit; uses the in-progress edit if any,
       // else the saved/default amount from the preview.
       const bonusLimit = emp.bonus_limit || 0;
       const rawBonus = bonuses[emp.employee_id] ?? emp.bonus ?? 0;
-      const bonus = Math.max(0, Math.min(Number(rawBonus) || 0, bonusLimit));
+      const bonus = Math.round(Math.max(0, Math.min(Number(rawBonus) || 0, bonusLimit)) * 100) / 100;
+      
       // Additional payment: free-form, no cap (just non-negative).
       const rawAdditional =
         additionalPayments[emp.employee_id] ?? emp.additional_payment ?? 0;
-      const additional = Math.max(0, Number(rawAdditional) || 0);
-      const finalSalary =
-        Math.max((emp.base_salary || 0) - totalDeduction, 0) +
+      const additional = Math.round(Math.max(0, Number(rawAdditional) || 0) * 100) / 100;
+      
+      const finalSalary = Math.round(
+        (Math.max((emp.base_salary || 0) - totalDeduction, 0) +
         bonus +
-        additional;
+        additional) * 100
+      ) / 100;
+      
       return {
         ...emp,
         leaves,
@@ -515,16 +591,31 @@ const PayrollPage = () => {
     [rows],
   );
 
+  const PAGE_SIZE = 12;
+
+  const typeOptions = useMemo(
+    () => Array.from(new Set(rows.map((r) => r.employee_type).filter(Boolean))),
+    [rows]
+  );
+
   const filtered = useMemo(() => {
+    let result = rows;
+    
+    if (typeFilter) {
+      result = result.filter(r => r.employee_type === typeFilter);
+    }
+
     const q = search.trim().toLowerCase();
-    if (!q) return rows;
-    return rows.filter(
-      (r) =>
-        (r.employee_name || "").toLowerCase().includes(q) ||
-        (r.designation || "").toLowerCase().includes(q) ||
-        (r.employee_type || "").toLowerCase().includes(q),
-    );
-  }, [rows, search]);
+    if (q) {
+      result = result.filter(
+        (r) =>
+          (r.employee_name || "").toLowerCase().includes(q) ||
+          (r.designation || "").toLowerCase().includes(q) ||
+          (r.employee_type || "").toLowerCase().includes(q),
+      );
+    }
+    return result;
+  }, [rows, search, typeFilter]);
 
   const onSearch = (v) => {
     setSearch(v);
@@ -582,48 +673,7 @@ const PayrollPage = () => {
   };
 
   const handleExportCSV = () => {
-    const headers = [
-      "Employee",
-      "Designation",
-      "Type",
-      "Base Salary (₹)",
-      `Per Day (₹, ÷${preview?.working_days || 22})`,
-      "Leave Days",
-      "Paid Days",
-      "Unpaid (Deducted) Days",
-      "Deduction (₹)",
-      "Bonus (₹)",
-      "Additional Payments (₹)",
-      "Final Salary (₹)",
-      "Notes",
-    ];
-    const csvRows = [
-      headers.join(","),
-      ...rows.map((r) =>
-        [
-          `"${r.employee_name}"`,
-          `"${r.designation || ""}"`,
-          `"${r.employee_type}"`,
-          r.base_salary || 0,
-          r.per_day_rate.toFixed(2),
-          r.total_leave_days,
-          r.total_paid_days,
-          r.total_deducted_days,
-          r.total_deduction.toFixed(2),
-          (r.bonus || 0).toFixed(2),
-          (r.additional_payment || 0).toFixed(2),
-          r.final_salary.toFixed(2),
-          r.salary_missing ? '"Salary not set"' : "",
-        ].join(","),
-      ),
-    ];
-    const blob = new Blob([csvRows.join("\n")], { type: "text/csv" });
-    const url = URL.createObjectURL(blob);
-    const a = document.createElement("a");
-    a.href = url;
-    a.download = `payroll_${month}.csv`;
-    a.click();
-    URL.revokeObjectURL(url);
+    window.location.href = payrollApi.exportCsvUrl(month);
   };
 
   const modalRow = reviewModal
@@ -689,168 +739,213 @@ const PayrollPage = () => {
           </p>
         </div>
         <div className="flex items-center gap-3">
-          <input
+          {isFinalized && (
+            <div className="group relative">
+               <div className="flex items-center gap-1.5 px-3 h-9 rounded-lg border border-emerald-200 bg-emerald-50 text-emerald-700 text-[13px] font-medium cursor-help">
+                 <CheckCircle2 className="w-4 h-4" />
+                 Finalized
+                 <ChevronDown className="w-3.5 h-3.5 opacity-60 ml-0.5" />
+               </div>
+               <div className="absolute right-0 top-full pt-2 hidden group-hover:block z-50 w-72">
+                  <div className="p-3 bg-white rounded-xl shadow-xl border border-slate-200 text-sm">
+                    <p className="text-slate-800 font-medium mb-1">
+                      Payroll for {month} is finalized and locked.
+                      {preview?.finalized_at ? ` Finalized ${fmtStamp(preview.finalized_at)}.` : ""}
+                    </p>
+                    <p className="text-slate-500 text-xs mb-3">
+                      Undo to unlock it for editing — all deductions, bonuses and additional payments are kept exactly as they are.
+                    </p>
+                    <Button size="sm" variant="secondary" className="w-full" onClick={() => reopenMutation.mutate()} disabled={reopenMutation.isPending} isLoading={reopenMutation.isPending}>
+                      {!reopenMutation.isPending && (
+                        <><RotateCcw className="w-3.5 h-3.5 mr-1" /> Undo Finalize</>
+                      )}
+                    </Button>
+                  </div>
+               </div>
+            </div>
+          )}
+
+          {wasReopened && (
+            <div className="group relative">
+               <div className="flex items-center gap-1.5 px-3 h-9 rounded-lg border border-amber-200 bg-amber-50 text-amber-700 text-[13px] font-medium cursor-help">
+                 <Unlock className="w-4 h-4" />
+                 Reopened
+                 <ChevronDown className="w-3.5 h-3.5 opacity-60 ml-0.5" />
+               </div>
+               <div className="absolute right-0 top-full pt-2 hidden group-hover:block z-50 w-72">
+                  <div className="p-3 bg-white rounded-xl shadow-xl border border-slate-200 text-sm">
+                    <p className="text-slate-800 font-medium mb-1">
+                      Payroll for {month} was reopened
+                      {preview?.reopened_at ? ` ${fmtStamp(preview.reopened_at)}` : ""}.
+                    </p>
+                    <p className="text-slate-500 text-xs">
+                      Your previously finalized figures are loaded and editable — re-finalize when you're done.
+                    </p>
+                  </div>
+               </div>
+            </div>
+          )}
+
+          <DatePicker
             type="month"
-            value={month}
-            onChange={(e) => {
-              setMonth(e.target.value);
-              setGenerated(false);
-              setAdjustments({});
-            }}
-            className="px-3 py-2 border border-slate-200 rounded-xl text-sm outline-none focus:border-indigo-400 focus:ring-2 focus:ring-indigo-100"
+            value={month || ""}
+            onChange={(e) => setMonth(e.target.value)}
+            className="w-40"
           />
           <Button
             onClick={handleGenerate}
-            disabled={isLoading}
-            isLoading={isLoading}
+            disabled={isFetching}
+            isLoading={isFetching}
+            className="h-9 px-4 font-semibold rounded-lg shadow-md shadow-indigo-500/20 hover:shadow-indigo-500/30 transition-all active:scale-95"
           >
-            {!isLoading && "Generate"}
+            {!isFetching && (
+              <span className="flex items-center gap-1.5">
+                <Sparkles className="w-3.5 h-3.5 text-indigo-100" />
+                Generate Payroll
+              </span>
+            )}
           </Button>
-          <Button
-            variant="ghost"
-            size="icon"
-            onClick={handleLock}
-            title="Lock payroll"
-          >
-            <Lock className="w-4 h-4" />
-          </Button>
+
         </div>
       </div>
 
-      {/* Stats bar */}
-      {generated && preview && (
-        <div className="grid grid-cols-2 lg:grid-cols-6 gap-4">
-          {[
-            {
-              label: "Employees",
-              value: totals.employeesWithSalary,
-              suffix: `/ ${rows.length}`,
-              icon: Users,
-              color: "text-slate-700",
-              bg: "bg-slate-100",
-            },
-            {
-              label: "Total Base Salary",
-              value: fmtCurrency(totals.baseSalary),
-              icon: Wallet,
-              color: "text-indigo-700",
-              bg: "bg-indigo-100",
-            },
-            {
-              label: "Total Deductions",
-              value: fmtCurrency(totals.totalDeduction),
-              icon: TrendingDown,
-              color: "text-red-700",
-              bg: "bg-red-100",
-            },
-            {
-              label: "Total Bonus",
-              value: fmtCurrency(totals.totalBonus),
-              icon: Gift,
-              color: "text-amber-700",
-              bg: "bg-amber-100",
-            },
-            {
-              label: "Total Additional",
-              value: fmtCurrency(totals.totalAdditional),
-              icon: PlusCircle,
-              color: "text-sky-700",
-              bg: "bg-sky-100",
-            },
-            {
-              label: "Total Payable",
-              value: fmtCurrency(totals.finalSalary),
-              icon: IndianRupee,
-              color: "text-emerald-700",
-              bg: "bg-emerald-100",
-            },
-          ].map((s) => (
-            <div
-              key={s.label}
-              className="bg-white rounded-2xl border border-slate-200/60 shadow-sm p-5"
-            >
-              <div className={`inline-flex p-2 rounded-xl ${s.bg} mb-3`}>
-                <s.icon className={`w-5 h-5 ${s.color}`} />
-              </div>
-              <p className={`text-xl font-bold ${s.color}`}>
-                {s.value}
-                {s.suffix ? (
-                  <span className="text-sm font-normal text-slate-400 ml-1">
-                    {s.suffix}
-                  </span>
-                ) : null}
-              </p>
-              <p className="text-xs text-slate-400 mt-1">{s.label}</p>
-            </div>
-          ))}
-        </div>
-      )}
-
-      {/* Payroll status banner — finalized months are locked; Undo unlocks them
-          without changing a single figure. */}
-      {isFinalized && (
-        <div className="bg-emerald-50 border border-emerald-200 rounded-2xl px-5 py-3 flex items-center justify-between gap-3 flex-wrap">
+      {/* Toolbar */}
+      {(generated || isFetching) && (
+        <div className="flex items-center justify-between w-full px-1">
+          {/* Left: Search */}
           <div className="flex items-center gap-3">
-            <CheckCircle2 className="w-5 h-5 text-emerald-600 shrink-0" />
-            <div>
-              <p className="text-sm text-emerald-800 font-medium">
-                Payroll for {month} is finalized and locked.
-                {preview?.finalized_at
-                  ? ` Finalized ${fmtStamp(preview.finalized_at)}.`
-                  : ""}
-              </p>
-              <p className="text-xs text-emerald-700/80 mt-0.5">
-                Undo to unlock it for editing — all deductions, bonuses and
-                additional payments are kept exactly as they are.
-              </p>
-            </div>
-          </div>
-          <Button
-            variant="secondary"
-            onClick={() => reopenMutation.mutate()}
-            disabled={reopenMutation.isPending}
-            isLoading={reopenMutation.isPending}
-          >
-            {!reopenMutation.isPending && (
-              <>
-                <RotateCcw className="w-4 h-4" />
-                Undo Finalize
-              </>
+            {rows.length > 0 && (
+              <div className="relative w-64">
+                <Search className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-slate-400 pointer-events-none" />
+                <input
+                  type="text"
+                  value={search}
+                  onChange={(e) => onSearch(e.target.value)}
+                  placeholder="Search by name or type…"
+                  className="w-full h-9 pl-9 pr-3 rounded-lg border border-slate-200 bg-white text-[13px] text-slate-700 placeholder:text-slate-400 focus:outline-none focus:ring-2 focus:ring-indigo-100 focus:border-indigo-300 transition-all"
+                />
+              </div>
             )}
-          </Button>
-        </div>
-      )}
+          </div>
 
-      {/* Reopened months are editable again — say so, so the state isn't ambiguous. */}
-      {wasReopened && (
-        <div className="bg-amber-50 border border-amber-200 rounded-2xl px-5 py-3 flex items-center gap-3">
-          <Unlock className="w-5 h-5 text-amber-600 shrink-0" />
-          <p className="text-sm text-amber-800">
-            <span className="font-medium">
-              Payroll for {month} was reopened
-              {preview?.reopened_at ? ` ${fmtStamp(preview.reopened_at)}` : ""}.
-            </span>{" "}
-            Your previously finalized figures are loaded and editable —
-            re-finalize when you're done.
-          </p>
-        </div>
-      )}
-
-      {/* Search */}
-      {generated && rows.length > 0 && (
-        <div className="flex justify-between items-center mb-4">
-          <SearchBar
-            responsive
-            value={search}
-            onChange={onSearch}
-            placeholder="Search by name, designation or type…"
-          />
+          {/* Right: Filter + Stats Pill */}
+          <div className="flex items-center gap-3">
+            {/* Filter */}
+            {rows.length > 0 && (
+              <div ref={filterRef} className="relative">
+                <button
+                  type="button"
+                  onClick={() => setFilterOpen((o) => !o)}
+                  className="inline-flex items-center gap-2 h-9 px-3 rounded-lg border border-slate-200 bg-white text-[13px] font-medium text-slate-700 hover:bg-slate-50 transition-colors"
+                >
+                  <Filter className="w-4 h-4 text-slate-500" />
+                  Filters
+                  {typeFilter && (
+                    <span className="inline-flex items-center justify-center h-4 min-w-4 px-1 rounded-full bg-indigo-600 text-white text-[10px] font-semibold">
+                      1
+                    </span>
+                  )}
+                </button>
+    
+                {filterOpen && (
+                  <div className="absolute right-0 mt-1.5 z-40 w-56 bg-white rounded-xl shadow-xl border border-slate-200 p-3">
+                    <div className="flex flex-col gap-2.5">
+                      <div className="space-y-1">
+                        <label className="text-[10px] font-semibold uppercase tracking-wide text-slate-400">
+                          Employment Type
+                        </label>
+                        <Dropdown
+                          options={[
+                            { value: "", label: "All Types" },
+                            ...typeOptions.map((t) => ({ value: t, label: t })),
+                          ]}
+                          value={typeFilter}
+                          onChange={(val) => setTypeFilter(val)}
+                          placeholder="All Types"
+                          optionsClassName="w-full"
+                        />
+                      </div>
+                    </div>
+                    {typeFilter && (
+                      <button
+                        type="button"
+                        onClick={() => setTypeFilter("")}
+                        className="w-full text-center mt-2.5 pt-2.5 text-xs font-medium text-indigo-600 hover:text-indigo-700 border-t border-slate-100"
+                      >
+                        Clear filters
+                      </button>
+                    )}
+                  </div>
+                )}
+              </div>
+            )}
+            
+            {/* Stats Pill */}
+            {preview && (
+            <div className="inline-flex items-center h-9 rounded-lg border border-slate-200 bg-white text-[13px] whitespace-nowrap">
+              <div className="group relative flex items-center gap-1.5 px-3 border-r border-slate-200">
+                <Users className="w-3.5 h-3.5 text-slate-400" />
+                <span className="font-semibold text-slate-700">{totals.employeesWithSalary}/{rows.length}</span>
+                <div className="absolute left-1/2 -translate-x-1/2 bottom-full mb-1.5 hidden group-hover:block z-50 pointer-events-none">
+                  <div className="px-2.5 py-1.5 bg-white text-slate-700 text-xs font-medium rounded-lg shadow-lg border border-slate-200 whitespace-nowrap">
+                    Employees
+                  </div>
+                </div>
+              </div>
+              <div className="group relative flex items-center gap-1.5 px-3 border-r border-slate-200">
+                <Wallet className="w-3.5 h-3.5 text-indigo-500" />
+                <span className="font-semibold text-indigo-600">{fmtCurrency(totals.baseSalary)}</span>
+                <div className="absolute left-1/2 -translate-x-1/2 bottom-full mb-1.5 hidden group-hover:block z-50 pointer-events-none">
+                  <div className="px-2.5 py-1.5 bg-white text-slate-700 text-xs font-medium rounded-lg shadow-lg border border-slate-200 whitespace-nowrap">
+                    Total Base Salary
+                  </div>
+                </div>
+              </div>
+              <div className="group relative flex items-center gap-1.5 px-3 border-r border-slate-200">
+                <Gift className="w-3.5 h-3.5 text-amber-500" />
+                <span className="font-semibold text-amber-600">{fmtCurrency(totals.totalBonus)}</span>
+                <div className="absolute left-1/2 -translate-x-1/2 bottom-full mb-1.5 hidden group-hover:block z-50 pointer-events-none">
+                  <div className="px-2.5 py-1.5 bg-white text-slate-700 text-xs font-medium rounded-lg shadow-lg border border-slate-200 whitespace-nowrap">
+                    Total Bonus
+                  </div>
+                </div>
+              </div>
+              <div className="group relative flex items-center gap-1.5 px-3 border-r border-slate-200">
+                <Minus className="w-4 h-4 text-red-500" />
+                <span className="font-semibold text-red-600">{fmtCurrency(totals.totalDeduction)}</span>
+                <div className="absolute left-1/2 -translate-x-1/2 bottom-full mb-1.5 hidden group-hover:block z-50 pointer-events-none">
+                  <div className="px-2.5 py-1.5 bg-white text-slate-700 text-xs font-medium rounded-lg shadow-lg border border-slate-200 whitespace-nowrap">
+                    Total Deductions
+                  </div>
+                </div>
+              </div>
+              <div className="group relative flex items-center gap-1.5 px-3 border-r border-slate-200">
+                <PlusCircle className="w-3.5 h-3.5 text-sky-500" />
+                <span className="font-semibold text-sky-600">{fmtCurrency(totals.totalAdditional)}</span>
+                <div className="absolute left-1/2 -translate-x-1/2 bottom-full mb-1.5 hidden group-hover:block z-50 pointer-events-none">
+                  <div className="px-2.5 py-1.5 bg-white text-slate-700 text-xs font-medium rounded-lg shadow-lg border border-slate-200 whitespace-nowrap">
+                    Total Additional
+                  </div>
+                </div>
+              </div>
+              <div className="group relative flex items-center gap-1.5 px-3">
+                <IndianRupee className="w-3.5 h-3.5 text-emerald-500" />
+                <span className="font-semibold text-emerald-600">{fmtCurrency(totals.finalSalary)}</span>
+                <div className="absolute right-0 bottom-full mb-1.5 hidden group-hover:block z-50 pointer-events-none">
+                  <div className="px-2.5 py-1.5 bg-white text-slate-700 text-xs font-medium rounded-lg shadow-lg border border-slate-200 whitespace-nowrap">
+                    Total Payable
+                  </div>
+                </div>
+              </div>
+            </div>
+          )}
+          </div>
         </div>
       )}
 
       {/* Main table */}
       {generated && (
-        <div className="bg-white rounded-2xl border border-slate-200/60 shadow-sm overflow-hidden">
+        <div className="bg-white rounded-2xl border border-slate-200/60 shadow-sm">
           {rows.length === 0 ? (
             <div className="flex items-center justify-center py-16 text-slate-400 text-sm">
               No active employees found.
@@ -863,10 +958,12 @@ const PayrollPage = () => {
             <Table
               columns={columns}
               data={filtered}
-              loading={isLoading}
+              loading={isFetching}
               currentPage={page}
               pageSize={PAGE_SIZE}
               onPageChange={setPage}
+              variant="untitled"
+              tableLayout="auto"
               emptyState={{
                 title: "No employees found",
                 description: "Try adjusting your search.",
@@ -875,18 +972,7 @@ const PayrollPage = () => {
           )}
 
           {/* Footer actions */}
-          <div className="px-5 py-4 border-t border-slate-100 bg-slate-50/50 flex items-center justify-between flex-wrap gap-3">
-            <div className="text-sm text-slate-500">
-              Total payable:{" "}
-              <span className="font-bold text-emerald-700">
-                {fmtCurrency(totals.finalSalary)}
-              </span>{" "}
-              across{" "}
-              <span className="font-semibold">
-                {totals.employeesWithSalary}
-              </span>{" "}
-              employees
-            </div>
+          <div className="px-5 py-4 border-t border-slate-100 bg-slate-50/50 flex items-center justify-end flex-wrap gap-3 rounded-b-2xl">
             <div className="flex items-center gap-3">
               <Button variant="secondary" onClick={handleExportCSV}>
                 <Download className="w-4 h-4" />
@@ -959,7 +1045,7 @@ const PayrollPage = () => {
       )}
 
       {/* Empty state before generate */}
-      {!generated && (
+      {!generated && !isFetching && (
         <div className="bg-white rounded-2xl border border-slate-200/60 shadow-sm flex flex-col items-center justify-center py-20 text-slate-400">
           <IndianRupee className="w-12 h-12 mb-4 text-slate-200" />
           <p className="font-medium text-slate-500">
