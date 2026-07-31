@@ -23,6 +23,31 @@ export function getPmProjects(parentProjects = [], pmEmployeeId) {
   return parentProjects.filter((project) => projectIds.has(project.id));
 }
 
+// Organizations a PM should see: ones they manage PLUS any that contain a project
+// they own (assigned to them). This lets a PM reach their own projects that live
+// under a shared organization they don't manage (e.g. "Autonex" owned by another PM).
+export function getPmVisibleOrgs(
+  parentProjects = [],
+  subProjects = [],
+  pmEmployeeId,
+) {
+  if (!pmEmployeeId) return [];
+  const managed = getPmProjectIds(parentProjects, pmEmployeeId);
+  const orgsWithOwnedProject = new Set(
+    subProjects
+      .filter(
+        (sp) =>
+          Array.isArray(sp.assigned_employee_ids) &&
+          sp.assigned_employee_ids.includes(pmEmployeeId),
+      )
+      .map((sp) => sp.main_project_id)
+      .filter(Boolean),
+  );
+  return parentProjects.filter(
+    (p) => managed.has(p.id) || orgsWithOwnedProject.has(p.id),
+  );
+}
+
 export function getPmSubProjects(
   subProjects = [],
   parentProjects = [],
@@ -38,13 +63,22 @@ export function getPmSubProjects(
   );
 
   return subProjects.filter((subProject) => {
-    const belongsToPmProject =
-      subProject.main_project_id && projectIds.has(subProject.main_project_id);
-    const directlyAssigned =
-      Array.isArray(subProject.assigned_employee_ids) &&
-      subProject.assigned_employee_ids.includes(pmEmployeeId);
+    const projectPms = Array.isArray(subProject.assigned_employee_ids)
+      ? subProject.assigned_employee_ids
+      : [];
+    const directlyAssigned = projectPms.includes(pmEmployeeId);
     const directlyAllocated = allocatedSubProjectIds.has(subProject.id);
 
-    return belongsToPmProject || directlyAssigned || directlyAllocated;
+    // Organization-level inheritance applies ONLY to projects that have no explicit
+    // project-level PM. Once a project lists its own PM(s), it is scoped to them — so
+    // when several PMs share an organization (e.g. "AMAZON") each sees only the
+    // projects they own, while unowned/legacy projects still surface to the org's PMs.
+    const hasProjectPm = projectPms.length > 0;
+    const orgFallback =
+      !hasProjectPm &&
+      subProject.main_project_id &&
+      projectIds.has(subProject.main_project_id);
+
+    return directlyAssigned || directlyAllocated || orgFallback;
   });
 }

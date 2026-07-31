@@ -1285,6 +1285,12 @@ const ProjectsPage = () => {
   const organizations = [...new Set(visibleMainProjects.map(clientOf))].sort(
     (a, b) => (a === NO_ORG ? 1 : b === NO_ORG ? -1 : a.localeCompare(b)),
   );
+  // The create/edit modal lets a PM pick ANY existing organization (not just their
+  // own), so they reuse "Autonex" etc. instead of creating a duplicate. The top
+  // filter above stays PM-scoped (organizations); this is modal-only.
+  const allOrganizations = [...new Set(mainProjects.map(clientOf))].sort(
+    (a, b) => (a === NO_ORG ? 1 : b === NO_ORG ? -1 : a.localeCompare(b)),
+  );
   // The organization a given main-project id belongs to (used to prefill on edit/copy).
   const orgOfMainProject = (mpId) => {
     const mp = visibleMainProjects.find((p) => p.id === parseInt(mpId));
@@ -1477,9 +1483,15 @@ const ProjectsPage = () => {
         return;
       }
 
-      const existingOrg = visibleMainProjects.find(
-        (p) => (p.name || "").trim().toLowerCase() === orgName.toLowerCase(),
-      );
+      // Match against ALL organizations (not just the PM's own) so a PM reuses an
+      // existing org like "Autonex" instead of silently creating a duplicate.
+      const existingOrg =
+        mainProjects.find(
+          (p) => (p.name || "").trim().toLowerCase() === orgName.toLowerCase(),
+        ) ||
+        mainProjects.find(
+          (p) => (p.client || "").trim().toLowerCase() === orgName.toLowerCase(),
+        );
 
       if (existingOrg) {
         selectedMainProjectId = existingOrg.id;
@@ -2702,14 +2714,14 @@ const ProjectsPage = () => {
                 />
                 <Dropdown
                   editable={true}
-                  options={organizations.map((org) => ({
+                  options={allOrganizations.map((org) => ({
                     value: org,
                     label: org,
                   }))}
                   value={formOrg}
                   onChange={(val) => {
                     setFormOrg(val);
-                    const projs = visibleMainProjects.filter(
+                    const projs = mainProjects.filter(
                       (p) => clientOf(p) === val,
                     );
                     setFormMainProjectId(

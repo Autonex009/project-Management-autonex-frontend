@@ -16,7 +16,7 @@ import {
 import toast from "react-hot-toast";
 import {
   getPmEmployeeId,
-  getPmProjects,
+  getPmVisibleOrgs,
   getPmSubProjects,
 } from "../../utils/pmScope";
 
@@ -85,7 +85,7 @@ const GuidelinesPage = () => {
   });
 
   const visibleMainProjects = isPm
-    ? getPmProjects(mainProjects, pmEmployeeId)
+    ? getPmVisibleOrgs(mainProjects, subProjects, pmEmployeeId)
     : mainProjects;
   const visibleSubProjectsForRole = isPm
     ? getPmSubProjects(subProjects, mainProjects, pmEmployeeId, [])
