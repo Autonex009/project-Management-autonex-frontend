@@ -43,6 +43,7 @@ import Modal from "../components/ui/Modal";
 import AllocationPopover from "../components/AllocationPopover";
 import Dropdown from "../components/ui/Dropdown";
 import SearchBar from "../components/ui/SearchBar";
+import { formatDisplayName } from "../utils/displayName";
 
 // Stable color palette for avatars based on the employee name
 const AVATAR_PALETTE = [
@@ -658,7 +659,7 @@ const AllocationsPage = () => {
                   return {
                     alloc: a,
                     emp,
-                    name: emp.name || "Unnamed",
+                    name: formatDisplayName(emp.name) || "Unnamed",
                     hasImg: !!emp.avatar_url,
                   };
                 });
@@ -984,7 +985,8 @@ const AllocationsPage = () => {
                             ? allocatedEmps
                             : [...liveEmps.slice(0, 3), ...staleEmps]
                           ).map(({ alloc, emp, stale }) => {
-                            const name = stale ? staleName(alloc) : emp.name;
+                            const rawName = stale ? staleName(alloc) : emp.name;
+                            const name = formatDisplayName(rawName);
                             const initials =
                               (name || "")
                                 .trim()
@@ -1207,7 +1209,7 @@ const AllocationsPage = () => {
                                   className="rounded border-slate-300 text-blue-600 focus:ring-blue-500 disabled:opacity-40 shrink-0"
                                 />
                                 <span className="text-[13px] font-semibold text-slate-900 shrink-0">
-                                  {employee.name}
+                                  {formatDisplayName(employee.name)}
                                 </span>
                                 {employee.skillMatch && (
                                   <span className="px-1.5 py-0.5 text-[10px] bg-green-100 text-green-700 rounded-full font-semibold shrink-0">
@@ -1403,6 +1405,7 @@ const AllocationsPage = () => {
                                     [tag]: Math.min(hours, totalDailyHours),
                                   });
                                 }}
+                                onWheel={(e) => e.target.blur()}
                                 className="input w-20 text-center"
                               />
                               <span className="text-xs text-gray-500">hrs</span>
@@ -1484,7 +1487,7 @@ const AllocationsPage = () => {
               // belonged to and flag it in red.
               const stale = !emp;
               const former = formerIndex.get(String(alloc.employee_id));
-              const name = stale ? staleName(alloc) : emp.name;
+              const name = formatDisplayName(stale ? staleName(alloc) : emp.name);
               return (
                 <div
                   key={alloc.id}

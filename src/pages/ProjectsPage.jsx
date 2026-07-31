@@ -36,6 +36,7 @@ import {
   PauseCircle,
   CheckCircle2,
   XCircle,
+  Eye,
 } from "lucide-react";
 import { Link } from "react-router-dom";
 import { format, parseISO } from "date-fns";
@@ -63,6 +64,7 @@ import ConfirmDialog from "../components/ui/ConfirmDialog";
 import Modal from "../components/ui/Modal";
 import StatCard from "../components/dashboard/StatCard";
 import useScrollStore from "../store/useScrollStore";
+import { formatDisplayName } from "../utils/displayName";
 
 const STATUS_CONFIG = {
   poc: {
@@ -333,7 +335,7 @@ const EmployeeMultiSelect = ({
                 key={emp.id}
                 className="inline-flex items-center px-2 py-0.5 rounded text-xs bg-blue-100 text-blue-700 border border-blue-200"
               >
-                {emp.name}
+                {formatDisplayName(emp.name)}
               </span>
             ))
           ) : (
@@ -376,7 +378,7 @@ const EmployeeMultiSelect = ({
                     />
                     <div className="ml-3 flex-1">
                       <div className="text-sm font-medium text-gray-900">
-                        {emp.name}
+                        {formatDisplayName(emp.name)}
                       </div>
                       <div className="text-xs text-gray-500">{emp.email}</div>
                       <div className="flex flex-wrap gap-1 mt-1">
@@ -417,7 +419,7 @@ const EmployeeMultiSelect = ({
                     />
                     <div className="ml-3 flex-1">
                       <div className="text-sm font-medium text-gray-900">
-                        {emp.name}
+                        {formatDisplayName(emp.name)}
                       </div>
                       <div className="text-xs text-gray-500">{emp.email}</div>
                       <div className="flex flex-wrap gap-1 mt-1">
@@ -807,6 +809,7 @@ const ProjectCard = ({
                 value={draft[field]}
                 onChange={(e) => onDraftChange(field, e.target.value)}
                 onClick={stop}
+                onWheel={(e) => e.target.blur()}
                 className={cardInputClass}
               />
             ) : (
@@ -828,6 +831,7 @@ const ProjectCard = ({
                 onChange={(e) =>
                   onDraftChange("annotation_minutes", e.target.value)
                 }
+                onWheel={(e) => e.target.blur()}
                 className={cardInputClass}
               />
               <span className="text-[11px] text-slate-400">min</span>
@@ -917,20 +921,35 @@ const ProjectCard = ({
                     <ul className="max-h-48 overflow-y-auto">
                       {docs.map((g) => (
                         <li key={g.id}>
-                          <a
-                            href={g.file_url || undefined}
-                            target="_blank"
-                            rel="noreferrer"
-                            className={`flex items-center gap-2 rounded-lg px-2 py-1.5 text-xs ${g.file_url ? "text-slate-700 hover:bg-slate-50" : "cursor-default text-slate-400"}`}
-                          >
-                            <FileText className="h-3.5 w-3.5 shrink-0 text-indigo-500" />
-                            <span className="truncate">
-                              {g.title || g.file_name || "Document"}
-                            </span>
-                            {g.file_url && (
-                              <Download className="ml-auto h-3.5 w-3.5 shrink-0 text-slate-400" />
-                            )}
-                          </a>
+                          {g.file_url ? (
+                            <div className="flex items-center gap-1 rounded-lg px-2 py-1.5 text-xs text-slate-700 hover:bg-slate-50">
+                              <span className="flex-1 flex items-center gap-2 text-left min-w-0">
+                                <FileText className="h-3.5 w-3.5 shrink-0 text-indigo-500" />
+                                <span className="truncate">
+                                  {g.title || g.file_name || "Document"}
+                                </span>
+                              </span>
+                              <div className="flex items-center gap-1 shrink-0">
+                                <a
+                                  href={g.file_url}
+                                  target="_blank"
+                                  rel="noreferrer"
+                                  download
+                                  className="p-1 hover:bg-indigo-100 hover:text-indigo-600 rounded text-slate-400 transition-colors"
+                                  title="Download"
+                                >
+                                  <Download className="w-3.5 h-3.5" />
+                                </a>
+                              </div>
+                            </div>
+                          ) : (
+                            <div className="flex items-center gap-2 rounded-lg px-2 py-1.5 text-xs cursor-default text-slate-400">
+                              <FileText className="h-3.5 w-3.5 shrink-0 text-indigo-500" />
+                              <span className="truncate">
+                                {g.title || g.file_name || "Document"}
+                              </span>
+                            </div>
+                          )}
                         </li>
                       ))}
                     </ul>
@@ -1058,7 +1077,7 @@ const PmMultiSelect = ({ employees, value, onChange, isPm, pmEmployeeId }) => {
                       <Check className="h-3.5 w-3.5 text-indigo-600" />
                     )}
                   </span>
-                  <span className="flex-1 truncate">{emp.name}</span>
+                  <span className="flex-1 truncate">{formatDisplayName(emp.name)}</span>
                   {isPrimary && (
                     <span className="text-[9px] font-semibold uppercase tracking-wide text-indigo-400">
                       primary
@@ -1331,7 +1350,7 @@ const ProjectsPage = () => {
   useEffect(() => {
     if (!isLoading) {
       const initialScroll =
-        useScrollStore.getState().scrollPositions["projects-page"];
+        useScrollStore.getState().scrollPositions["projects-page"] || 0;
       const mainContainer = document.querySelector("main");
       if (mainContainer && initialScroll) {
         setTimeout(() => {
@@ -1811,7 +1830,7 @@ const ProjectsPage = () => {
     const map = new Map();
     const add = (id) => {
       if (id == null || map.has(id)) return;
-      map.set(id, nameById.get(id) || `Manager #${id}`);
+      map.set(id, formatDisplayName(nameById.get(id)) || `Manager #${id}`);
     };
     employees
       .filter((e) =>
@@ -2282,9 +2301,7 @@ const ProjectsPage = () => {
           )}
           {selectedPm !== "all" && (
             <span className="inline-flex items-center gap-1.5 rounded-lg border border-indigo-200 bg-indigo-50 px-2.5 py-1.5 text-xs font-medium text-indigo-700">
-              {projectManagers.find(
-                (pm) => String(pm.id) === String(selectedPm),
-              )?.name || "Manager"}
+              {projectManagers.find((pm) => String(pm.id) === String(selectedPm))?.name || "Manager"}
               <button
                 type="button"
                 onClick={() => setSelectedPm("all")}
@@ -2498,7 +2515,7 @@ const ProjectsPage = () => {
 
                 const pmIds = resolvePmIds(project);
                 const pmNames = pmIds
-                  .map((id) => employees.find((e) => e.id === id)?.name)
+                  .map((id) => formatDisplayName(employees.find((e) => e.id === id)?.name))
                   .filter(Boolean);
 
                 const allocatedManpower = getAllocatedManpower(project);
@@ -2736,7 +2753,7 @@ const ProjectsPage = () => {
                               key={id}
                               className="flex items-center gap-1.5 whitespace-nowrap py-0.5"
                             >
-                              {emp?.name || "Unknown"}
+                              {formatDisplayName(emp?.name) || "Unknown"}
                               {i === 0 && (
                                 <span className="text-[9px] font-semibold uppercase tracking-wide text-indigo-400">
                                   primary
@@ -2865,6 +2882,7 @@ const ProjectsPage = () => {
                             )
                           : ""
                       }
+                      onWheel={(e) => e.target.blur()}
                       className="input [appearance:textfield] [&::-webkit-outer-spin-button]:appearance-none [&::-webkit-inner-spin-button]:appearance-none"
                       placeholder="30"
                     />
@@ -2888,6 +2906,7 @@ const ProjectsPage = () => {
                             )
                           : ""
                       }
+                      onWheel={(e) => e.target.blur()}
                       className="input [appearance:textfield] [&::-webkit-outer-spin-button]:appearance-none [&::-webkit-inner-spin-button]:appearance-none"
                       placeholder="15"
                     />
@@ -2907,6 +2926,7 @@ const ProjectsPage = () => {
                       defaultValue={
                         (editingProject || copyingProject)?.gearing_ratio ?? ""
                       }
+                      onWheel={(e) => e.target.blur()}
                       className="input flex-1 [appearance:textfield] [&::-webkit-outer-spin-button]:appearance-none [&::-webkit-inner-spin-button]:appearance-none"
                       placeholder="e.g. 3.1"
                     />
@@ -3185,6 +3205,7 @@ const ProjectsPage = () => {
                           defaultValue={
                             (editingProject || copyingProject)?.[field] ?? ""
                           }
+                          onWheel={(e) => e.target.blur()}
                           className="input"
                           placeholder="0"
                         />

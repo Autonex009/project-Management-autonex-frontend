@@ -20,6 +20,7 @@ import { parentProjectApi } from "../../services/api";
 import { getPmEmployeeId, getPmSubProjects } from "../../utils/pmScope";
 import Table from "../../components/ui/Table";
 import StatCard from "../../components/dashboard/StatCard";
+import { formatDisplayName } from "../../utils/displayName";
 
 const PMDashboard = () => {
   const user = JSON.parse(localStorage.getItem("user") || "{}");
@@ -114,7 +115,7 @@ const PMDashboard = () => {
           <h1 className="text-lg font-semibold text-slate-900">
             PM Dashboard —{" "}
             <span className="text-blue-600">
-              {user.name?.split(" ")[0] || "Manager"}
+              {formatDisplayName(user.name)?.split(" ")[0] || "Manager"}
             </span>
           </h1>
           <p className="text-[13px] text-slate-500 mt-0.5">
@@ -261,7 +262,7 @@ const PMDashboard = () => {
                     >
                       <div>
                         <p className="text-sm font-medium text-slate-700">
-                          {emp?.name || `Employee #${l.employee_id}`}
+                          {formatDisplayName(emp?.name) || `Employee #${l.employee_id}`}
                         </p>
                         <p className="text-xs text-slate-400 capitalize">
                           {l.leave_type}
@@ -297,7 +298,7 @@ const PMDashboard = () => {
                     >
                       <div>
                         <p className="text-sm font-medium text-slate-700">
-                          {emp?.name || `Employee #${l.employee_id}`}
+                          {formatDisplayName(emp?.name) || `Employee #${l.employee_id}`}
                         </p>
                         <p className="text-xs text-slate-400 capitalize">
                           {l.leave_type}

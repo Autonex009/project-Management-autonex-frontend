@@ -11,6 +11,7 @@ import {
   Download,
   FolderOpen,
   UploadCloud,
+  Eye,
 } from "lucide-react";
 import toast from "react-hot-toast";
 import {
@@ -18,6 +19,7 @@ import {
   getPmVisibleOrgs,
   getPmSubProjects,
 } from "../../utils/pmScope";
+
 import SearchBar from "../../components/ui/SearchBar";
 import Dropdown from "../../components/ui/Dropdown";
 import Modal from "../../components/ui/Modal";
@@ -35,6 +37,8 @@ const TruncTip = ({ text, className = "" }) => (
   </span>
 );
 
+
+
 const GuidelinesPage = () => {
   const queryClient = useQueryClient();
   const user = JSON.parse(localStorage.getItem("user") || "{}");
@@ -50,6 +54,7 @@ const GuidelinesPage = () => {
     main_project_id: "",
     sub_project_id: "",
   });
+
   const [filterProject, setFilterProject] = useState("");
   const [selectedFile, setSelectedFile] = useState(null);
   const [isDragActive, setIsDragActive] = useState(false);
@@ -261,16 +266,16 @@ const GuidelinesPage = () => {
         <div className="flex items-center justify-end gap-1">
           {g.file_url && (
             <a
-              href={g.file_url}
-              target="_blank"
-              rel="noreferrer"
-              download
-              title={`Download ${g.file_name || "file"}`}
-              onClick={(e) => e.stopPropagation()}
-              className="rounded-lg p-1.5 text-slate-400 transition-colors hover:bg-indigo-50 hover:text-indigo-600"
-            >
-              <Download className="h-4 w-4" />
-            </a>
+                href={g.file_url}
+                target="_blank"
+                rel="noreferrer"
+                download
+                title={`Download ${g.file_name || "file"}`}
+                onClick={(e) => e.stopPropagation()}
+                className="rounded-lg p-1.5 text-slate-400 transition-colors hover:bg-indigo-50 hover:text-indigo-600"
+              >
+                <Download className="h-4 w-4" />
+              </a>
           )}
           {canEdit && (
             <>

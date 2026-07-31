@@ -30,6 +30,7 @@ import toast from "react-hot-toast";
 import { getPmEmployeeId, getPmVisibleOrgs } from "../utils/pmScope";
 import ConfirmDialog from "../components/ui/ConfirmDialog";
 import Modal from "../components/ui/Modal";
+import { formatDisplayName } from "../utils/displayName";
 
 const ParentProjectsPage = () => {
   const [isModalOpen, setIsModalOpen] = useState(false);
@@ -523,7 +524,7 @@ const ParentProjectsPage = () => {
                         key={id}
                         className="inline-flex items-center gap-1 pl-2.5 pr-1 py-0.5 bg-indigo-50 text-indigo-700 rounded-full text-xs font-medium"
                       >
-                        {emp.name}
+                        {formatDisplayName(emp.name)}
 
                         {selectedPmIds[0] === id && (
                           <span className="text-[9px] uppercase tracking-wide text-indigo-400">
