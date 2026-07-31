@@ -1,3 +1,4 @@
+import { formatDisplayName } from "../utils/displayName";
 import {
   Activity,
   Users,
@@ -201,7 +202,7 @@ const CapacityAnalysis = ({ recommendations }) => {
                         ? "bg-red-100 text-red-700"
                         : "bg-blue-100 text-blue-700"
                     }`}
-                    title={`${emp.employee_name}: ${emp.hours}h`}
+                    title={`${formatDisplayName(emp.employee_name)}: ${emp.hours}h`}
                   >
                     {emp.employee_name?.split(" ")[0]} ({emp.hours}h)
                   </span>

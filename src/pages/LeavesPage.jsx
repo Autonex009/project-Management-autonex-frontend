@@ -24,7 +24,7 @@ import {
   getEndDateValidationMessage,
   isEndDateBeforeStartDate,
 } from "../utils/dateValidation";
-import { getNameInitials } from "../utils/displayName";
+import { getNameInitials, formatDisplayName } from "../utils/displayName";
 import {
   getLeaveTypeBadgeClass,
   getLeaveTypeLabel,
@@ -339,7 +339,7 @@ const LeavesPage = () => {
   };
 
   const getEmployeeName = (id) =>
-    employees.find((e) => e.id === id)?.name || `Employee #${id}`;
+    formatDisplayName(employees.find((e) => e.id === id)?.name) || `Employee #${id}`;
   const activeEmployees = employees.filter((e) => e.status === "active");
 
   // Pagination: reset to page 1 when tab changes
@@ -606,7 +606,7 @@ const LeavesPage = () => {
               width: "w-[22%]",
               render: (_, leave) => {
                 const emp = employees.find(e => e.id === leave.employee_id);
-                const empName = emp ? emp.name : getEmployeeName(leave.employee_id);
+                const empName = getEmployeeName(leave.employee_id);
                 return (
                   <div className="flex items-center gap-3 min-w-0">
                     {emp?.avatar_url ? (
@@ -814,7 +814,7 @@ const LeavesPage = () => {
               label: "Employee",
               render: (value, w) => {
                 const emp = employees.find(e => e.id === w.employee_id);
-                const empName = value || getEmployeeName(w.employee_id);
+                const empName = value ? formatDisplayName(value) : getEmployeeName(w.employee_id);
                 return (
                   <div className="flex items-center gap-3">
                     {emp?.avatar_url ? (

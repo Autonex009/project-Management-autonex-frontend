@@ -22,6 +22,7 @@ import Dropdown from "../../components/ui/Dropdown";
 import StatCard from "../../components/dashboard/StatCard";
 import SlackIcon from "../../components/icons/SlackIcon";
 import { getPmEmployeeId, getPmSubProjects } from "../../utils/pmScope";
+import { formatDisplayName } from "../../utils/displayName";
 
 const badgeTone = {
   active: "border-emerald-200 bg-emerald-50 text-emerald-700",
@@ -266,12 +267,12 @@ const MyTeamPage = () => {
               <div className="flex flex-col gap-4 lg:flex-row lg:items-start lg:justify-between">
                 <div className="flex items-start gap-4">
                   <div className="flex h-14 w-14 items-center justify-center rounded-2xl bg-blue-100 text-lg font-semibold text-blue-700">
-                    {(member.name || "U").charAt(0)}
+                    {(formatDisplayName(member.name) || "U").charAt(0)}
                   </div>
                   <div>
                     <div className="flex flex-wrap items-center gap-2">
                       <h2 className="text-lg font-semibold text-slate-900">
-                        {member.name}
+                        {formatDisplayName(member.name)}
                       </h2>
                       <span
                         className={`inline-flex rounded-full border px-2.5 py-1 text-xs font-medium ${badgeTone[member.status] || badgeTone.active}`}

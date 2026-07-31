@@ -19,7 +19,7 @@ import {
   Users,
 } from "lucide-react";
 import { format, parseISO } from "date-fns";
-import { getNameInitials } from "../utils/displayName";
+import { getNameInitials, formatDisplayName } from "../utils/displayName";
 import {
   getWorkingDayCount,
   getLeaveTypeLabel,
@@ -543,18 +543,18 @@ const EmployeeKPIPanel = ({
                         {stat.employee.avatar_url ? (
                           <img
                             src={stat.employee.avatar_url}
-                            alt={stat.employee.name}
+                            alt={formatDisplayName(stat.employee.name)}
                             className="w-9 h-9 rounded-full object-cover flex-shrink-0 ring-1 ring-slate-200"
                           />
                         ) : (
                           <div className="w-9 h-9 rounded-full flex items-center justify-center flex-shrink-0 bg-indigo-50 text-indigo-600 text-[13px] font-semibold ring-1 ring-slate-200">
-                            {getNameInitials(stat.employee.name, 1)}
+                            {getNameInitials(formatDisplayName(stat.employee.name), 1)}
                           </div>
                         )}
 
                         <div className="min-w-0">
                           <p className="font-semibold text-slate-800 text-sm truncate">
-                            {stat.employee.name}
+                            {formatDisplayName(stat.employee.name)}
                           </p>
 
                           <div className="flex items-center gap-1.5 mt-0.5 min-w-0">
@@ -707,17 +707,17 @@ const EmployeeKPIPanel = ({
                     {employee.avatar_url ? (
                       <img
                         src={employee.avatar_url}
-                        alt={employee.name}
+                        alt={formatDisplayName(employee.name)}
                         className="w-12 h-12 rounded-full object-cover flex-shrink-0 ring-1 ring-slate-200"
                       />
                     ) : (
                       <div className="w-12 h-12 rounded-full flex items-center justify-center flex-shrink-0 bg-indigo-50 text-indigo-600 text-[16px] font-bold ring-1 ring-slate-200">
-                        {getNameInitials(employee.name, 1)}
+                        {getNameInitials(formatDisplayName(employee.name), 1)}
                       </div>
                     )}
                     <div>
                       <h3 className="font-bold text-slate-800 text-lg leading-snug">
-                        {employee.name}
+                        {formatDisplayName(employee.name)}
                       </h3>
                       <p className="text-xs text-slate-400">
                         {employee.designation || "No title"} &bull;{" "}

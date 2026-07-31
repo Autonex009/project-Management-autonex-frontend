@@ -22,6 +22,7 @@ import EvaluationDetail from "../../components/perf/EvaluationDetail";
 import EvalReviewCard from "../../components/perf/EvalReviewCard";
 import StatCard from "../../components/dashboard/StatCard";
 import Table from "../../components/ui/Table";
+import { formatDisplayName } from "../../utils/displayName";
 
 const isPm = (emp) =>
   (emp?.designation || "").toLowerCase().includes("program manager") ||
@@ -90,10 +91,10 @@ const RatingCell = ({ evaluation }) => {
           )}
           {params.map((p) => (
             <div
-              key={p.name}
+              key={formatDisplayName(p.name)}
               className="flex items-center justify-between gap-3"
             >
-              <span className="truncate text-xs text-slate-600">{p.name}</span>
+              <span className="truncate text-xs text-slate-600">{formatDisplayName(p.name)}</span>
               <StarRating
                 value={Math.round(
                   (reviewed ? p.pm_rating : p.employee_rating) || 0,
@@ -145,7 +146,7 @@ const AdminPerformancePage = () => {
     () => new Map(employees.map((e) => [e.id, e])),
     [employees],
   );
-  const empName = (id) => empById.get(id)?.name || `Employee #${id}`;
+  const empName = (id) => formatDisplayName(empById.get(id)?.name) || `Employee #${id}`;
   const projName = (id) =>
     projects.find((p) => p.id === id)?.name || `Project #${id}`;
 

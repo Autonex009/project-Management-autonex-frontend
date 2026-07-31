@@ -2,6 +2,7 @@ import React from "react";
 import StarRating, { formatPeriod } from "./StarRating";
 import { averageOf, normalizeParamValues } from "./perfParams";
 import { CheckCircle2, XCircle, Gift } from "lucide-react";
+import { formatDisplayName } from "../../utils/displayName";
 
 // Read-only rendering of a monthly performance evaluation (new star-rating shape).
 // Shows the employee's self-rating per parameter and, once the PM has reviewed,
@@ -50,13 +51,13 @@ const EvaluationDetail = ({ evaluation, showBonus }) => {
       <div className="space-y-2">
         {params.map((p) => (
           <div
-            key={p.name}
+            key={formatDisplayName(p.name)}
             className="rounded-xl border border-slate-100 bg-slate-50/70 px-3 py-2.5"
           >
             <div className="flex flex-wrap items-center justify-between gap-2">
               <div className="flex items-center gap-2">
                 <span className="text-sm font-medium text-slate-800">
-                  {p.name}
+                  {formatDisplayName(p.name)}
                 </span>
                 {reviewed &&
                   (p.approved ? (

@@ -11,6 +11,7 @@ import Button from "../../components/ui/Button";
 import { onboardingApi } from "../../services/api";
 import Table from "../../components/ui/Table";
 import SearchBar from "../../components/ui/SearchBar";
+import { formatDisplayName } from "../../utils/displayName";
 
 export default function AdminReportsPage() {
   const [reports, setReports] = useState([]);
@@ -155,7 +156,7 @@ export default function AdminReportsPage() {
           </div>
 
           <div>
-            <p className="text-sm font-bold text-slate-800">{row.name}</p>
+            <p className="text-sm font-bold text-slate-800">{formatDisplayName(row.name)}</p>
 
             <p className="text-xs text-slate-500">{row.email}</p>
           </div>
