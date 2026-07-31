@@ -27,7 +27,7 @@ import {
 import { Link } from "react-router-dom";
 import { format } from "date-fns";
 import toast from "react-hot-toast";
-import { getPmEmployeeId, getPmProjects } from "../utils/pmScope";
+import { getPmEmployeeId, getPmVisibleOrgs } from "../utils/pmScope";
 import ConfirmDialog from "../components/ui/ConfirmDialog";
 import Modal from "../components/ui/Modal";
 
@@ -91,7 +91,9 @@ const ParentProjectsPage = () => {
   const [searchQuery, setSearchQuery] = useState("");
 
   const visibleParentProjects = (
-    isPm ? getPmProjects(parentProjects, pmEmployeeId) : parentProjects
+    isPm
+      ? getPmVisibleOrgs(parentProjects, subProjects, pmEmployeeId)
+      : parentProjects
   )
     .filter(
       (p) =>
