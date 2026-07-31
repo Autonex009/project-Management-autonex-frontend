@@ -379,6 +379,10 @@ const payrollHeaders = () => {
 };
 
 export const payrollApi = {
+  getRuns: () =>
+    api
+      .get("/payroll/runs", { headers: payrollHeaders() })
+      .then((res) => res.data),
   getPreview: (month) =>
     api
       .get("/payroll/preview", { params: { month }, headers: payrollHeaders() })

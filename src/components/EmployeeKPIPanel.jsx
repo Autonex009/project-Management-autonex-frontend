@@ -19,6 +19,7 @@ import {
   Users,
 } from "lucide-react";
 import { format, parseISO } from "date-fns";
+import { getNameInitials } from "../utils/displayName";
 import {
   getWorkingDayCount,
   getLeaveTypeLabel,
@@ -539,11 +540,17 @@ const EmployeeKPIPanel = ({
                   >
                     <td className="px-4 py-3">
                       <div className="flex items-center gap-2.5 min-w-0">
-                        <div className="w-9 h-9 rounded-xl bg-gradient-to-br from-slate-100 to-indigo-50 flex items-center justify-center group-hover:from-indigo-100 group-hover:to-indigo-50 transition-colors shrink-0">
-                          <span className="text-sm font-bold text-indigo-600">
-                            {stat.employee.name.charAt(0).toUpperCase()}
-                          </span>
-                        </div>
+                        {stat.employee.avatar_url ? (
+                          <img
+                            src={stat.employee.avatar_url}
+                            alt={stat.employee.name}
+                            className="w-9 h-9 rounded-full object-cover flex-shrink-0 ring-1 ring-slate-200"
+                          />
+                        ) : (
+                          <div className="w-9 h-9 rounded-full flex items-center justify-center flex-shrink-0 bg-indigo-50 text-indigo-600 text-[13px] font-semibold ring-1 ring-slate-200">
+                            {getNameInitials(stat.employee.name, 1)}
+                          </div>
+                        )}
 
                         <div className="min-w-0">
                           <p className="font-semibold text-slate-800 text-sm truncate">
@@ -697,15 +704,17 @@ const EmployeeKPIPanel = ({
                 {/* Drawer Header */}
                 <div className="px-6 py-5 border-b border-slate-100 flex items-center justify-between">
                   <div className="flex items-center gap-3">
-                    <div
-                      className="w-12 h-12 rounded-xl bg-gradient-to-br from-indigo-505 to-indigo-600 flex items-center justify-center text-white text-lg font-bold"
-                      style={{
-                        background:
-                          "linear-gradient(135deg, #6366f1 0%, #4f46e5 100%)",
-                      }}
-                    >
-                      {employee.name.charAt(0).toUpperCase()}
-                    </div>
+                    {employee.avatar_url ? (
+                      <img
+                        src={employee.avatar_url}
+                        alt={employee.name}
+                        className="w-12 h-12 rounded-full object-cover flex-shrink-0 ring-1 ring-slate-200"
+                      />
+                    ) : (
+                      <div className="w-12 h-12 rounded-full flex items-center justify-center flex-shrink-0 bg-indigo-50 text-indigo-600 text-[16px] font-bold ring-1 ring-slate-200">
+                        {getNameInitials(employee.name, 1)}
+                      </div>
+                    )}
                     <div>
                       <h3 className="font-bold text-slate-800 text-lg leading-snug">
                         {employee.name}
