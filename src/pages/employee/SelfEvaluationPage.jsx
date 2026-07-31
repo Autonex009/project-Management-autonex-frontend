@@ -16,6 +16,7 @@ import StarRating, {
 import { PERF_PARAMETERS, averageOf } from "../../components/perf/perfParams";
 import EvaluationDetail from "../../components/perf/EvaluationDetail";
 import ConfirmDialog from "../../components/ui/ConfirmDialog";
+import { formatDisplayName } from "../../utils/displayName";
 
 const StatusBadge = ({ status }) => {
   if (status === "reviewed") {
@@ -171,11 +172,11 @@ const ProjectEvalPanel = ({
             <form onSubmit={handleSubmit} className="space-y-3">
               {PERF_PARAMETERS.map((p) => (
                 <div
-                  key={p.name}
+                  key={formatDisplayName(p.name)}
                   className="flex flex-col gap-2 rounded-2xl border border-slate-200 bg-white p-4 sm:flex-row sm:items-center sm:justify-between"
                 >
                   <div className="min-w-0 pr-4">
-                    <p className="font-semibold text-slate-900">{p.name}</p>
+                    <p className="font-semibold text-slate-900">{formatDisplayName(p.name)}</p>
                     <p className="mt-0.5 text-sm text-slate-400">
                       {p.description}
                     </p>

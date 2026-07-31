@@ -19,6 +19,7 @@ import SearchBar from "../components/ui/SearchBar";
 import AllocationModalV2 from "../components/AllocationModalV2";
 import CandidateAllocationsPopover from "../components/CandidateAllocationsPopover";
 import { getPmSubProjects, getPmEmployeeId } from "../utils/pmScope";
+import { formatDisplayName, getNameInitials } from "../utils/displayName";
 
 const scoreBadgeClass = (score) => {
   if (score >= 80) return "bg-emerald-50 text-emerald-700 border-emerald-100";
@@ -231,17 +232,11 @@ const NewlyOnboardedPage = ({ embedded = false }) => {
                       <td className="py-4 px-6">
                         <div className="flex items-center gap-3">
                           <div className="h-9 w-9 rounded-full flex items-center justify-center text-white text-xs font-bold bg-gradient-to-br from-indigo-600 to-blue-500 shadow-sm uppercase">
-                            {c.name
-                              ? c.name
-                                  .split(" ")
-                                  .map((n) => n[0])
-                                  .join("")
-                                  .substring(0, 2)
-                              : "EM"}
+                            {getNameInitials(c.name, 2) || "EM"}
                           </div>
                           <div>
                             <p className="font-bold text-slate-800 text-sm">
-                              {c.name}
+                              {formatDisplayName(c.name)}
                             </p>
                             <p className="text-[10px] text-slate-400">
                               {c.email}

@@ -18,6 +18,7 @@ import { leaveApi, wfhApi } from "../services/api";
 import toast from "react-hot-toast";
 import { format, parseISO } from "date-fns";
 import Dropdown from "./ui/Dropdown";
+import { formatDisplayName } from "../utils/displayName";
 import {
   isValidFloaterDate,
   getWorkingDayCount,
@@ -294,14 +295,8 @@ function OverflowPopover({ dateStr, events }) {
                     opacity: isPending ? PENDING_OPACITY : 1,
                   }}
                 >
-                  <span
-                    style={{
-                      fontSize: "13px",
-                      fontWeight: 600,
-                      color: "#334155",
-                    }}
-                  >
-                    {ev.employee_name}
+                  <span className="text-xs font-semibold text-slate-900 truncate max-w-[120px]">
+                    {formatDisplayName(ev.employee_name)}
                   </span>
                   <span
                     style={{
@@ -368,16 +363,16 @@ function EventChip({ ev }) {
   if (ev.kind === "wfh") {
     bg = WFH_COLOR.bg;
     color = WFH_COLOR.text;
-    label = `🏠 ${ev.employee_name?.split(" ")[0]}`;
+    label = `🏠 ${formatDisplayName(ev.employee_name)}`;
   } else {
     const c = LEAVE_COLORS[ev.leave_type] || LEAVE_COLORS.default;
     bg = c.bg;
     color = c.text;
-    label = ev.employee_name?.split(" ")[0];
+    label = formatDisplayName(ev.employee_name);
   }
   return (
     <div
-      title={`${ev.kind === "wfh" ? "WFH" : LEAVE_COLORS[ev.leave_type]?.label || "Leave"}: ${ev.employee_name}${isPending ? " (pending)" : ""}`}
+      className="group/tip relative"
       style={{
         background: bg,
         color,
@@ -388,12 +383,13 @@ function EventChip({ ev }) {
         fontWeight: 600,
         lineHeight: 1.4,
         whiteSpace: "nowrap",
-        overflow: "hidden",
-        textOverflow: "ellipsis",
         maxWidth: "100%",
       }}
     >
-      {label}
+      <div style={{ overflow: "hidden", textOverflow: "ellipsis" }}>{label}</div>
+      <span className="pointer-events-none absolute left-0 top-full z-50 mt-1 hidden w-max max-w-[240px] whitespace-normal break-words rounded-lg border border-slate-200 bg-white px-2.5 py-1.5 text-[11px] font-medium text-slate-600 shadow-lg group-hover/tip:block">
+        {`${ev.kind === "wfh" ? "WFH" : LEAVE_COLORS[ev.leave_type]?.label || "Leave"}: ${formatDisplayName(ev.employee_name)}${isPending ? " (pending)" : ""}`}
+      </span>
     </div>
   );
 }
@@ -1117,7 +1113,7 @@ export default function LeaveCalendar({ filterEmployeeIds = null }) {
                   <div
                     key={dateStr}
                     title={
-                      holiday ? `${holiday.name} (${holiday.type})` : undefined
+                      holiday ? `${formatDisplayName(holiday.name)} (${holiday.type})` : undefined
                     }
                     onClick={() => handleDateClick(dateStr)}
                     style={{
@@ -1178,20 +1174,12 @@ export default function LeaveCalendar({ filterEmployeeIds = null }) {
 
                     {/* Holiday label (tiny) */}
                     {holiday && (
-                      <span
-                        style={{
-                          fontSize: "9px",
-                          fontWeight: 600,
-                          color: isFixed ? "#b91c1c" : "#c2410c",
-                          lineHeight: 1.2,
-                          overflow: "hidden",
-                          textOverflow: "ellipsis",
-                          whiteSpace: "nowrap",
-                        }}
-                        title={holiday.name}
+                      <div
+                        className="truncate text-[10px] font-medium text-slate-600"
+                        title={formatDisplayName(holiday.name)}
                       >
-                        {holiday.name}
-                      </span>
+                        {formatDisplayName(holiday.name)}
+                      </div>
                     )}
 
                     {/* Events */}

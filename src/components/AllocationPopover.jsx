@@ -8,6 +8,7 @@ import React, {
 } from "react";
 import { createPortal } from "react-dom";
 import Button from "./ui/Button";
+import { formatDisplayName } from "../utils/displayName";
 import {
   UserPlus,
   Users,
@@ -69,8 +70,7 @@ const Avatar = ({ name, src, muted }) => {
       <img
         src={src}
         alt={name}
-        title={name}
-        className="w-9 h-9 rounded-full object-cover shadow-sm ring-2 ring-white shrink-0"
+                className="w-9 h-9 rounded-full object-cover shadow-sm ring-2 ring-white shrink-0"
       />
     );
   }
@@ -379,9 +379,8 @@ const AllocationPopover = ({
                     // Name a stale row from the archived roster first, then the
                     // name the allocations payload carries, then its employee id
                     // — anything that identifies WHICH row to delete.
-                    const name = isStale
-                      ? former?.name || staleAllocationName(alloc)
-                      : emp.name;
+                    const rawName = isStale ? former?.name || staleAllocationName(alloc) : emp.name;
+                    const name = formatDisplayName(rawName);
                     const formerDetail =
                       former?.email || former?.designation || former?.role;
                     const role =
@@ -409,15 +408,11 @@ const AllocationPopover = ({
                         />
                         <div className="flex-1 min-w-0">
                           <div className="flex items-center gap-1.5 min-w-0">
-                            <span
-                              className={`text-sm truncate ${
-                                isStale
-                                  ? "font-medium text-rose-700"
-                                  : "font-medium text-slate-800"
-                              }`}
-                            >
-                              {name}
-                            </span>
+                            <div className="flex-1 min-w-0">
+                              <span className={`text-sm truncate block ${isStale ? "font-medium text-rose-700" : "font-medium text-slate-800"}`}>
+                                {name}
+                              </span>
+                            </div>
                             {isStale ? (
                               <span
                                 className="inline-flex items-center gap-1 rounded-full bg-rose-100 px-1.5 py-0.5 text-[10px] font-semibold text-rose-700 shrink-0"
@@ -429,31 +424,37 @@ const AllocationPopover = ({
                               >
                                 {former ? "Archived" : "Removed"}
                               </span>
-                            ) : isOnLeave ? (
-                              <span
-                                className="inline-flex items-center gap-1 rounded-full bg-amber-50 px-1.5 py-0.5 text-[10px] font-semibold text-amber-700 shrink-0"
-                                title="On approved leave today"
-                              >
-                                <span className="w-1.5 h-1.5 rounded-full bg-amber-500" />
-                                On leave
-                              </span>
-                            ) : location === "WFH" ? (
-                              <span
-                                className="inline-flex items-center gap-1 rounded-full bg-violet-50 px-1.5 py-0.5 text-[10px] font-semibold text-violet-700 shrink-0"
-                                title="Working from home today"
-                              >
-                                <Home className="w-3 h-3" />
-                                WFH
-                              </span>
-                            ) : location === "WFO" ? (
-                              <span
-                                className="inline-flex items-center gap-1 rounded-full bg-slate-100 px-1.5 py-0.5 text-[10px] font-semibold text-slate-600 shrink-0"
-                                title="Working from office today"
-                              >
-                                <Building2 className="w-3 h-3" />
-                                WFO
-                              </span>
-                            ) : null}
+                            ) : (
+                              <>
+                                {isOnLeave && (
+                                  <span
+                                    className="inline-flex items-center gap-1 rounded-full bg-amber-50 px-1.5 py-0.5 text-[10px] font-semibold text-amber-700 shrink-0"
+                                    title="On approved leave today"
+                                  >
+                                    <span className="w-1.5 h-1.5 rounded-full bg-amber-500" />
+                                    On leave
+                                  </span>
+                                )}
+                                {location === "WFH" && (
+                                  <span
+                                    className="inline-flex items-center gap-1 rounded-full bg-violet-50 px-1.5 py-0.5 text-[10px] font-semibold text-violet-700 shrink-0"
+                                    title="Working from home today"
+                                  >
+                                    <Home className="w-3 h-3" />
+                                    WFH
+                                  </span>
+                                )}
+                                {location === "WFO" && (
+                                  <span
+                                    className="inline-flex items-center gap-1 rounded-full bg-slate-100 px-1.5 py-0.5 text-[10px] font-semibold text-slate-600 shrink-0"
+                                    title="Working from office today"
+                                  >
+                                    <Building2 className="w-3 h-3" />
+                                    WFO
+                                  </span>
+                                )}
+                              </>
+                            )}
                             {rowsForPerson > 1 && (
                               <span
                                 className="inline-flex items-center rounded-full bg-amber-50 px-1.5 py-0.5 text-[10px] font-semibold text-amber-700 shrink-0"
@@ -501,11 +502,7 @@ const AllocationPopover = ({
                             </div>
                           )}
                         </div>
-                        {alloc?.total_daily_hours && !isStale ? (
-                          <span className="text-[11px] font-semibold text-slate-500 bg-slate-100 rounded px-1.5 py-0.5 shrink-0">
-                            {alloc.total_daily_hours}h
-                          </span>
-                        ) : null}
+
                       </li>
                     );
                   })}

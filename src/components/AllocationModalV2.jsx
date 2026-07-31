@@ -13,6 +13,7 @@ import Button from "./ui/Button";
 import Dropdown from "./ui/Dropdown";
 import Modal from "./ui/Modal";
 import { recommendationsApi } from "../services/api";
+import { formatDisplayName } from "../utils/displayName";
 
 const capacityPill = (status) => {
   if (status === "overburdened")
@@ -252,7 +253,7 @@ const AllocationModalV2 = ({
               </label>
               {presetEmployeeId ? (
                 <div className="w-full px-3 py-2 border border-gray-200 rounded-md bg-gray-50 text-sm font-medium text-gray-800">
-                  {presetEmployeeName || "Selected candidate"}
+                  {formatDisplayName(presetEmployeeName) || "Selected candidate"}
                 </div>
               ) : (
                 <Dropdown
@@ -260,7 +261,7 @@ const AllocationModalV2 = ({
                     .filter((e) => e.status === "active")
                     .map((emp) => ({
                       value: emp.id.toString(),
-                      label: `${emp.name} - ${emp.employee_type}`,
+                      label: `${formatDisplayName(emp.name)} - ${emp.employee_type}`,
                     }))}
                   value={formData.employee_id.toString()}
                   onChange={(val) =>

@@ -95,7 +95,7 @@ function EmployeeAvailabilityModal({ employee, onClose }) {
           </div>
           <div>
             <h2 className="text-base font-semibold text-slate-800">
-              {employee.name}
+              {formatDisplayName(employee.name)}
             </h2>
             <p className="text-sm text-slate-400">
               {employee.designation || "Employee"}
@@ -318,7 +318,7 @@ function EmployeeArchiveModal({ employee, onClose, onConfirm, isPending }) {
             <h2 className="text-base font-semibold text-slate-800">
               {hasAllocations ? "Cannot Archive Employee" : "Archive Employee"}
             </h2>
-            <p className="text-sm text-slate-400">{employee.name}</p>
+            <p className="text-sm text-slate-400">{formatDisplayName(employee.name)}</p>
           </div>
         </div>
       </Modal.Header>
@@ -335,7 +335,7 @@ function EmployeeArchiveModal({ employee, onClose, onConfirm, isPending }) {
             {hasAllocations ? (
               <div className="space-y-3">
                 <p className="text-sm text-slate-600 leading-relaxed">
-                  <strong>{employee.name}</strong> cannot be archived because
+                  <strong>{formatDisplayName(employee.name)}</strong> cannot be archived because
                   they are currently allocated to the following projects. Please
                   remove their allocations first:
                 </p>
@@ -362,7 +362,7 @@ function EmployeeArchiveModal({ employee, onClose, onConfirm, isPending }) {
               <div className="space-y-4">
                 <p className="text-sm text-slate-600 leading-relaxed">
                   Are you sure you want to archive{" "}
-                  <strong>{employee.name}</strong>?
+                  <strong>{formatDisplayName(employee.name)}</strong>?
                 </p>
                 <div className="bg-amber-50 border border-amber-100 rounded-xl p-4 space-y-2.5">
                   <div className="flex gap-2.5 text-xs text-amber-850 leading-relaxed">
@@ -431,14 +431,14 @@ function EmployeeRestoreModal({ employee, onClose, onConfirm, isPending }) {
             <h2 className="text-base font-semibold text-slate-800">
               Restore Employee
             </h2>
-            <p className="text-sm text-slate-400">{employee.name}</p>
+            <p className="text-sm text-slate-400">{formatDisplayName(employee.name)}</p>
           </div>
         </div>
       </Modal.Header>
 
       <Modal.Body className="space-y-4">
         <p className="text-sm text-slate-600 leading-relaxed">
-          Are you sure you want to restore <strong>{employee.name}</strong> as
+          Are you sure you want to restore <strong>{formatDisplayName(employee.name)}</strong> as
           an active employee?
         </p>
         <div className="bg-emerald-50 border border-emerald-100 rounded-xl p-4 space-y-2.5">
@@ -489,14 +489,14 @@ function EmployeeConvertToFulltimeModal({
             <h2 className="text-base font-semibold text-slate-800">
               Convert to Full-time
             </h2>
-            <p className="text-sm text-slate-400">{employee.name}</p>
+            <p className="text-sm text-slate-400">{formatDisplayName(employee.name)}</p>
           </div>
         </div>
       </Modal.Header>
 
       <Modal.Body className="space-y-4">
         <p className="text-sm text-slate-600 leading-relaxed">
-          Convert <strong>{employee.name}</strong> from Intern to Full-time
+          Convert <strong>{formatDisplayName(employee.name)}</strong> from Intern to Full-time
           employee?
         </p>
         <div className="bg-indigo-50 border border-indigo-100 rounded-xl p-4 space-y-2.5">
@@ -1449,7 +1449,7 @@ const EmployeesPage = () => {
     onSuccess: (emp) => {
       queryClient.invalidateQueries(["employees"]);
       queryClient.invalidateQueries(["all-employees-kpis"]);
-      toast.success(`${emp.name} converted to Full-time`);
+      toast.success(`${formatDisplayName(emp.name)} converted to Full-time`);
     },
     onError: (err) => {
       toast.error(err.response?.data?.detail || "Failed to convert employee");
