@@ -1,5 +1,5 @@
 import React, { useState } from "react";
-import { ChevronDown } from "lucide-react";
+import { ChevronDown, Siren } from "lucide-react";
 import { formatDisplayName } from "../../utils/displayName";
 
 // Two related metrics sharing one card, divided across its height — so a pair of
@@ -163,7 +163,7 @@ const SplitStatCard = ({ halves = [] }) => {
                   </div>
                 )}
 
-                <div className="max-h-[min(50vh,16rem)] overflow-y-auto px-1.5 pb-1.5">
+                <div className="max-h-[min(50vh,12rem)] overflow-y-auto px-1.5 pb-1.5">
                   {people.length === 0 ? (
                     <p className="px-2 py-4 text-center text-[12px] text-slate-400">
                       {half.emptyLabel || "Nothing to review"}
@@ -177,8 +177,13 @@ const SplitStatCard = ({ halves = [] }) => {
                         title={`Open ${formatDisplayName(person.name)} in ${half.title}`}
                         className="flex w-full items-center justify-between gap-2 rounded-md px-1.5 py-1 text-left transition-colors hover:bg-indigo-50/70"
                       >
-                        <span className="truncate text-[13px] text-slate-700">
-                          {formatDisplayName(person.name)}
+                        <span className="truncate flex items-center gap-1.5 text-[13px] text-slate-700">
+                          <span className="truncate">{formatDisplayName(person.name)}</span>
+                          {person.isEmergency && (
+                            <span className="inline-flex items-center justify-center shrink-0 h-4 w-4 rounded-full bg-red-100 border border-red-200" title="Emergency leave">
+                              <span className="h-1.5 w-1.5 rounded-full bg-red-600"></span>
+                            </span>
+                          )}
                         </span>
                         {person.meta && (
                           <span className="shrink-0 text-[11px] tabular-nums text-slate-400">
@@ -189,6 +194,36 @@ const SplitStatCard = ({ halves = [] }) => {
                     ))
                   )}
                 </div>
+
+                {activeTab?.label === "Today" && half.todayPeople && half.todayPeople.length > 0 && (
+                  <div className="border-t border-slate-100">
+                    <div className="px-3 pt-2 pb-1 bg-slate-50/50">
+                      <p className="text-[11px] font-extrabold text-slate-700 uppercase tracking-wider">
+                        {half.key === "wfh" ? "WFH Today" : "On Leave Today"} ({half.todayPeople.length})
+                      </p>
+                    </div>
+                    <div className="max-h-[min(30vh,8rem)] overflow-y-auto px-1.5 pb-1.5 pt-1 bg-slate-50/50">
+                      {half.todayPeople.map((person, idx) => (
+                        <button
+                          key={`today-${person.id ?? idx}`}
+                          type="button"
+                          onClick={() => half.onSelectPerson?.(person)}
+                          title={`Open ${formatDisplayName(person.name)} in ${half.title}`}
+                          className="flex w-full items-center justify-between gap-2 rounded-md px-1.5 py-1 text-left transition-colors hover:bg-indigo-50/70"
+                        >
+                          <span className="truncate flex items-center gap-1.5 text-[13px] text-slate-700">
+                            <span className="truncate">{formatDisplayName(person.name)}</span>
+                            {person.isEmergency && (
+                              <span className="inline-flex items-center justify-center shrink-0 h-4 w-4 rounded-full bg-red-100 border border-red-200" title="Emergency leave">
+                                <span className="h-1.5 w-1.5 rounded-full bg-red-600"></span>
+                              </span>
+                            )}
+                          </span>
+                        </button>
+                      ))}
+                    </div>
+                  </div>
+                )}
 
                 <div className="border-t border-slate-100 bg-slate-50/60 px-3 py-1.5 text-right">
                   <button

@@ -15,6 +15,7 @@ import {
   XCircle,
   Clock,
   AlertTriangle,
+  Siren,
   Home,
   BarChart2,
   RotateCcw,
@@ -26,7 +27,7 @@ import {
   getEndDateValidationMessage,
   isEndDateBeforeStartDate,
 } from "../utils/dateValidation";
-import { getNameInitials, formatDisplayName } from "../utils/displayName";
+import { formatDisplayName } from "../utils/displayName";
 import {
   getLeaveTypeBadgeClass,
   getLeaveTypeLabel,
@@ -41,12 +42,38 @@ import ConfirmDialog from "../components/ui/ConfirmDialog";
 import SearchBar from "../components/ui/SearchBar";
 import Dropdown from "../components/ui/Dropdown";
 import Table from "../components/ui/Table";
+import RowActionMenu from "../components/ui/RowActionMenu";
+import ReasonPopover, { ReasonText } from "../components/ui/ReasonPopover";
 import EmployeeKPIPanel from "../components/EmployeeKPIPanel";
 import Modal from "../components/ui/Modal";
 import OverLimitHoverCard from "../components/ui/OverLimitHoverCard";
 
 
 const TABS = ["Leave List", "Calendar", "WFH Requests", "Employee KPI"];
+
+const FLAG_TONES = {
+  orange: "bg-orange-100 text-orange-600 border-orange-200",
+  red: "bg-red-100 text-red-600 border-red-200",
+};
+
+/**
+ * Round icon flag beside an employee's name, labelled on hover.
+ *
+ * The name cell has very little room, so anything worth flagging goes in as an
+ * icon rather than a worded pill — the label lives in the tooltip.
+ */
+const FlagChip = ({ icon: Icon, label, tone = "orange", pulse = false }) => (
+  <div className="relative group flex items-center">
+    <span
+      className={`inline-flex items-center justify-center h-5 w-5 shrink-0 rounded-full border cursor-help ${FLAG_TONES[tone]} ${pulse ? "animate-pulse" : ""}`}
+    >
+      <Icon className="w-3 h-3" />
+    </span>
+    <div className="absolute bottom-full left-1/2 -translate-x-1/2 mb-1 hidden group-hover:block px-2 py-1 bg-white text-slate-700 shadow border border-slate-100 text-xs rounded whitespace-nowrap z-50">
+      {label}
+    </div>
+  </div>
+);
 
 const getISTDateTime = () => {
   const d = new Date();
@@ -121,6 +148,11 @@ const LeavesPage = () => {
   useEffect(() => {
     if (tabParam && TABS.includes(tabParam)) setActiveTab(tabParam);
   }, [tabParam]);
+
+  // Reset page when switching tabs
+  useEffect(() => {
+    setCurrentPage(1);
+  }, [activeTab]);
   useEffect(() => {
     if (queryParam === null) return;
     setSearchQuery(queryParam);
@@ -341,10 +373,16 @@ const LeavesPage = () => {
     const employeeId = formData.get("employee_id");
     const startDate = formData.get("start_date");
     const leaveType = formData.get("leave_type");
+    const reason = (formData.get("reason") || "").trim();
     const isHalf = leaveType === "first_half" || leaveType === "second_half";
     const endDate = isHalf ? startDate : formData.get("end_date");
     if (!employeeId) {
       toast.error("Please select an employee");
+      return;
+    }
+    // The API rejects a blank reason (LeaveCreate requires min_length 1).
+    if (!reason) {
+      toast.error("Please enter a reason for this leave");
       return;
     }
 
@@ -380,6 +418,7 @@ const LeavesPage = () => {
       start_date: startDate,
       end_date: endDate,
       leave_type: leaveType,
+      reason,
       is_half_day: isHalf,
       half_day_slot: isHalf ? leaveType : null,
       created_at: new Date().toISOString(),
@@ -448,25 +487,28 @@ const LeavesPage = () => {
     });
   }
 
+  // Plain coloured text — the pill border read as heavy against the rest of the
+  // row, and colour alone separates the three states well enough here.
   const STATUS_BADGE = {
     pending: (
-      <span className="inline-flex items-center gap-1 px-2.5 py-0.5 rounded-full text-xs font-medium bg-amber-50 text-amber-700 border border-amber-200">
-        <Clock className="w-3 h-3" />
-        Pending
-      </span>
+      <span className="text-[13px] font-medium text-amber-600">Pending</span>
     ),
     approved: (
-      <span className="inline-flex items-center gap-1 px-2.5 py-0.5 rounded-full text-xs font-medium bg-emerald-50 text-emerald-700 border border-emerald-200">
-        <CheckCircle className="w-3 h-3" />
-        Approved
-      </span>
+      <span className="text-[13px] font-medium text-emerald-600">Approved</span>
     ),
     rejected: (
-      <span className="inline-flex items-center gap-1 px-2.5 py-0.5 rounded-full text-xs font-medium bg-red-50 text-red-700 border border-red-200">
-        <XCircle className="w-3 h-3" />
-        Rejected
-      </span>
+      <span className="text-[13px] font-medium text-red-600">Rejected</span>
     ),
+  };
+
+  // A menu or popover on one of the last rows would otherwise overflow the card.
+  const opensUpward = (rows, row) => {
+    const pageStart = (currentPage - 1) * PAGE_SIZE;
+    const visible = rows.slice(pageStart, pageStart + PAGE_SIZE);
+    const idx = visible.indexOf(row);
+    return visible.length <= 2
+      ? idx === visible.length - 1
+      : idx >= visible.length - 2;
   };
 
   return (
@@ -649,28 +691,38 @@ const LeavesPage = () => {
       {activeTab === "Leave List" && (
         <Table
           variant="untitled"
+          allowOverflow
           columns={[
             {
               key: "employee_id",
+              // Sized to the longest name plus the avatar and not a pixel more:
+              // a wider share here is dead space that pushes Reason away from the
+              // name it belongs to, since the names are far shorter than the column.
               label: "Employee",
-              width: "w-[20%]",
+              width: "w-[19%]",
               render: (_, leave) => {
                 const emp = employees.find((e) => e.id === leave.employee_id);
                 const empName = getEmployeeName(leave.employee_id);
                 return (
                   <div className="flex items-center gap-3 min-w-0">
-                    <UserAvatar
-                      src={emp?.avatar_url}
-                      name={empName}
-                      size="sm"
-                    />
-                    <div className="flex items-center gap-2 min-w-0">
-                      <span className="font-semibold text-slate-800 truncate whitespace-nowrap">
-                        {empName}
-                      </span>
-                      {leave.flagged && (
-                        <OverLimitHoverCard leave={leave} allLeaves={leaves} />
-                      )}
+                    <UserAvatar src={emp?.avatar_url} name={empName} size="sm" />
+                    <div className="min-w-0">
+                      <div className="flex items-center gap-2 min-w-0">
+                        <span className="font-semibold text-slate-800 truncate whitespace-nowrap">
+                          {empName}
+                        </span>
+                        {leave.flagged && (
+                          <OverLimitHoverCard leave={leave} allLeaves={leaves} />
+                        )}
+                        {leave.is_emergency && (
+                          <FlagChip
+                            icon={Siren}
+                            label="Emergency"
+                            tone="red"
+                            pulse
+                          />
+                        )}
+                      </div>
                       {leave.approval_remark && (
                         <p className="text-xs text-slate-400 mt-0.5 truncate">
                           Remark: {leave.approval_remark}
@@ -682,9 +734,30 @@ const LeavesPage = () => {
               },
             },
             {
+              key: "reason",
+              label: "Reason",
+              align: "center",
+              width: "w-[7%]",
+              render: (value, leave) => (
+                <ReasonPopover
+                  reason={value}
+                  title={getEmployeeName(leave.employee_id)}
+                  subtitle={`${getLeaveTypeLabel(leave.leave_type)} · ${format(
+                    new Date(leave.start_date + "T00:00:00"),
+                    "MMM d, yyyy",
+                  )}`}
+                  openUpward={opensUpward(filteredLeaves, leave)}
+                />
+              ),
+            },
+            // Every column past the employee is centred on an even 12–14% share,
+            // so the row reads as a regular grid instead of left-hugging text with
+            // wide gaps opening up between the columns.
+            {
               key: "leave_type",
               label: "Leave Type",
-              width: "w-[12%]",
+              align: "center",
+              width: "w-[13%]",
               render: (value) => (
                 <span
                   className={`inline-flex whitespace-nowrap px-2.5 py-1 rounded-full text-xs font-medium ${getLeaveTypeBadgeClass(value)}`}
@@ -698,6 +771,7 @@ const LeavesPage = () => {
             {
               key: "start_date",
               label: "Start Date",
+              align: "center",
               width: "w-[11%]",
               render: (value) => (
                 <span className="text-[13px] text-slate-700 whitespace-nowrap">
@@ -708,6 +782,7 @@ const LeavesPage = () => {
             {
               key: "end_date",
               label: "End Date",
+              align: "center",
               width: "w-[11%]",
               render: (value) => (
                 <span className="text-[13px] text-slate-700 whitespace-nowrap">
@@ -718,6 +793,7 @@ const LeavesPage = () => {
             {
               key: "applied_on",
               label: "Applied On",
+              align: "center",
               width: "w-[11%]",
               render: (_, leave) => {
                 const rawApplied = resolveLeaveAppliedDate(leave);
@@ -772,72 +848,58 @@ const LeavesPage = () => {
               key: "status",
               label: "Status",
               align: "center",
-              width: "w-[11%]",
+              width: "w-[10%]",
               render: (value) => STATUS_BADGE[value] || STATUS_BADGE.pending,
             },
             {
               key: "_actions",
               label: "Actions",
-              align: "right",
-              width: "w-[13%]",
+              align: "center",
+              width: "w-[7%]",
               render: (_, leave) => {
                 const isPending = !leave.status || leave.status === "pending";
-                const btn =
-                  "inline-flex items-center gap-1 rounded-md border px-2 h-8 text-xs font-medium transition-colors disabled:opacity-50";
-                const iconBtn =
-                  "inline-flex items-center justify-center h-8 w-8 rounded-md border transition-colors disabled:opacity-50";
                 return (
-                  <div className="flex items-center justify-end gap-1.5">
-                    {isPending && (
-                      <>
-                        <button
-                          onClick={() => handleApprove(leave)}
-                          disabled={approveMutation.isPending}
-                          title="Approve"
-                          className={`${iconBtn} border-emerald-200 bg-emerald-50 text-emerald-700 hover:bg-emerald-100`}
-                        >
-                          <CheckCircle className="w-4 h-4" />
-                        </button>
-                        <button
-                          onClick={() => rejectMutation.mutate(leave.leave_id)}
-                          disabled={rejectMutation.isPending}
-                          title="Reject"
-                          className={`${iconBtn} border-red-200 bg-red-50 text-red-700 hover:bg-red-100`}
-                        >
-                          <XCircle className="w-4 h-4" />
-                        </button>
-                      </>
-                    )}
-                    {leave.status === "approved" && (
-                      <button
-                        onClick={() =>
-                          undoApproveMutation.mutate(leave.leave_id)
-                        }
-                        disabled={undoApproveMutation.isPending}
-                        className={`${btn} border-slate-200 bg-white text-slate-600 hover:bg-slate-50`}
-                      >
-                        <RotateCcw className="w-3.5 h-3.5" />
-                        Undo
-                      </button>
-                    )}
-                    {leave.status === "rejected" && (
-                      <button
-                        onClick={() =>
-                          undoRejectMutation.mutate(leave.leave_id)
-                        }
-                        disabled={undoRejectMutation.isPending}
-                        className={`${btn} border-slate-200 bg-white text-slate-600 hover:bg-slate-50`}
-                      >
-                        <RotateCcw className="w-3.5 h-3.5" />
-                        Undo
-                      </button>
-                    )}
-                    <button
-                      onClick={() => setDeleteTarget(leave)}
-                      className="p-1.5 text-slate-400 hover:text-red-600 hover:bg-red-50 rounded-md transition-colors"
-                    >
-                      <Trash2 className="w-4 h-4" />
-                    </button>
+                  <div className="flex items-center justify-center">
+                    <RowActionMenu
+                      openUpward={opensUpward(filteredLeaves, leave)}
+                      actions={[
+                        isPending && {
+                          label: "Approve",
+                          icon: CheckCircle,
+                          tone: "success",
+                          disabled: approveMutation.isPending,
+                          onClick: () => handleApprove(leave),
+                        },
+                        isPending && {
+                          label: "Reject",
+                          icon: XCircle,
+                          tone: "danger",
+                          disabled: rejectMutation.isPending,
+                          onClick: () => rejectMutation.mutate(leave.leave_id),
+                        },
+                        leave.status === "approved" && {
+                          label: "Undo approval",
+                          icon: RotateCcw,
+                          disabled: undoApproveMutation.isPending,
+                          onClick: () =>
+                            undoApproveMutation.mutate(leave.leave_id),
+                        },
+                        leave.status === "rejected" && {
+                          label: "Undo rejection",
+                          icon: RotateCcw,
+                          disabled: undoRejectMutation.isPending,
+                          onClick: () =>
+                            undoRejectMutation.mutate(leave.leave_id),
+                        },
+                        { divider: true },
+                        {
+                          label: "Delete",
+                          icon: Trash2,
+                          tone: "danger",
+                          onClick: () => setDeleteTarget(leave),
+                        },
+                      ]}
+                    />
                   </div>
                 );
               },
@@ -862,30 +924,27 @@ const LeavesPage = () => {
       {activeTab === "WFH Requests" && (
         <Table
           variant="untitled"
+          allowOverflow
           loading={wfhLoading}
           columns={[
             {
               key: "employee_name",
               label: "Employee",
+              width: "w-[20%]",
               render: (value, w) => {
                 const emp = employees.find(e => e.id === w.employee_id);
                 const empName = value ? formatDisplayName(value) : getEmployeeName(w.employee_id);
                 return (
                   <div className="flex items-center gap-3">
-                    {emp?.avatar_url ? (
-                      <img
-                        src={emp.avatar_url}
-                        alt={empName}
-                        className="w-9 h-9 rounded-full object-cover flex-shrink-0 ring-1 ring-slate-200"
-                      />
-                    ) : (
-                      <div className="w-9 h-9 rounded-full flex items-center justify-center flex-shrink-0 bg-indigo-50 text-indigo-600 text-[13px] font-semibold ring-1 ring-slate-200">
-                        {getNameInitials(empName, 1)}
-                      </div>
-                    )}
-                    <span className="font-semibold text-slate-800 truncate">
-                      {empName}
-                    </span>
+                    <UserAvatar src={emp?.avatar_url} name={empName} size="sm" />
+                    <div className="flex items-center gap-2 min-w-0">
+                      <span className="font-semibold text-slate-800 truncate whitespace-nowrap">
+                        {empName}
+                      </span>
+                      {w.flagged && (
+                        <FlagChip icon={AlertTriangle} label="Over limit" />
+                      )}
+                    </div>
                   </div>
                 );
               },
@@ -893,84 +952,87 @@ const LeavesPage = () => {
             {
               key: "wfh_date",
               label: "Date",
+              align: "center",
+              width: "w-[13%]",
               render: (value) => (
-                <span className="text-sm text-slate-700">
+                <span className="text-[13px] text-slate-700 whitespace-nowrap">
                   {format(new Date(value + "T00:00:00"), "MMM d, yyyy")}
                 </span>
               ),
             },
+            // Five columns here against the Leave List's eight, so the note is
+            // spelled out in the row rather than folded behind an icon.
             {
               key: "reason",
               label: "Reason",
-              render: (value) => (
-                <span className="text-sm text-slate-500">{value || "—"}</span>
+              width: "w-[44%]",
+              render: (value, w) => (
+                <ReasonText
+                  reason={value}
+                  openUpward={opensUpward(filteredWFH, w)}
+                />
               ),
             },
             {
               key: "status",
               label: "Status",
               align: "center",
+              width: "w-[12%]",
               render: (value) => STATUS_BADGE[value] || STATUS_BADGE.pending,
             },
             {
               key: "_wfh_actions",
               label: "Actions",
-              align: "right",
+              align: "center",
+              width: "w-[11%]",
               render: (_, w) => (
-                <div className="flex items-center justify-end gap-2">
-                  {w.status === "pending" && (
-                    <>
-                      <button
-                        onClick={() => wfhApproveMutation.mutate(w.id)}
-                        disabled={wfhApproveMutation.isPending}
-                        title="Approve"
-                        className="inline-flex items-center justify-center h-8 w-8 rounded-md border border-emerald-200 bg-emerald-50 text-emerald-700 hover:bg-emerald-100 transition-colors disabled:opacity-50"
-                      >
-                        <CheckCircle className="w-4 h-4" />
-                      </button>
-                      <button
-                        onClick={() => wfhRejectMutation.mutate(w.id)}
-                        disabled={wfhRejectMutation.isPending}
-                        title="Reject"
-                        className="inline-flex items-center justify-center h-8 w-8 rounded-md border border-red-200 bg-red-50 text-red-700 hover:bg-red-100 transition-colors disabled:opacity-50"
-                      >
-                        <XCircle className="w-4 h-4" />
-                      </button>
-                    </>
-                  )}
-                  {w.status === "approved" && (
-                    <Button
-                      variant="secondary"
-                      size="sm"
-                      onClick={() => wfhUndoApproveMutation.mutate(w.id)}
-                      disabled={wfhUndoApproveMutation.isPending}
-                    >
-                      <RotateCcw className="w-3.5 h-3.5" />
-                      Undo
-                    </Button>
-                  )}
-                  {w.status === "rejected" && (
-                    <Button
-                      variant="secondary"
-                      size="sm"
-                      onClick={() => wfhUndoRejectMutation.mutate(w.id)}
-                      disabled={wfhUndoRejectMutation.isPending}
-                    >
-                      <RotateCcw className="w-3.5 h-3.5" />
-                      Undo
-                    </Button>
-                  )}
-                  <button
-                    onClick={() => setWfhDeleteConfirm(w.id)}
-                    className="p-2 text-slate-400 hover:text-red-600 hover:bg-red-50 rounded-lg transition-colors"
-                  >
-                    <Trash2 className="w-4 h-4" />
-                  </button>
+                <div className="flex items-center justify-center">
+                  <RowActionMenu
+                    openUpward={opensUpward(filteredWFH, w)}
+                    actions={[
+                      w.status === "pending" && {
+                        label: "Approve",
+                        icon: CheckCircle,
+                        tone: "success",
+                        disabled: wfhApproveMutation.isPending,
+                        onClick: () => wfhApproveMutation.mutate(w.id),
+                      },
+                      w.status === "pending" && {
+                        label: "Reject",
+                        icon: XCircle,
+                        tone: "danger",
+                        disabled: wfhRejectMutation.isPending,
+                        onClick: () => wfhRejectMutation.mutate(w.id),
+                      },
+                      w.status === "approved" && {
+                        label: "Undo approval",
+                        icon: RotateCcw,
+                        disabled: wfhUndoApproveMutation.isPending,
+                        onClick: () => wfhUndoApproveMutation.mutate(w.id),
+                      },
+                      w.status === "rejected" && {
+                        label: "Undo rejection",
+                        icon: RotateCcw,
+                        disabled: wfhUndoRejectMutation.isPending,
+                        onClick: () => wfhUndoRejectMutation.mutate(w.id),
+                      },
+                      { divider: true },
+                      {
+                        label: "Delete",
+                        icon: Trash2,
+                        tone: "danger",
+                        onClick: () => setWfhDeleteConfirm(w.id),
+                      },
+                    ]}
+                  />
                 </div>
               ),
             },
           ]}
           data={filteredWFH}
+          currentPage={currentPage}
+          pageSize={PAGE_SIZE}
+          onPageChange={setCurrentPage}
           emptyState={{
             title: "No WFH requests yet",
             description: "WFH requests will appear here",
@@ -1140,6 +1202,18 @@ const LeavesPage = () => {
                     />
                   </div>
                 )}
+            </div>
+            <div>
+              <label className="block text-sm font-medium text-gray-700 mb-1">
+                Reason <span className="text-red-500">*</span>
+              </label>
+              <textarea
+                name="reason"
+                rows={3}
+                required
+                placeholder="Why is this leave being recorded?"
+                className="w-full rounded-xl border border-slate-200 p-3 text-sm resize-none focus:outline-none focus:ring-2 focus:ring-indigo-500 focus:border-transparent"
+              />
             </div>
             {(selectedLeaveType === "first_half" ||
               selectedLeaveType === "second_half") && (
