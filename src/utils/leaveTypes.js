@@ -278,3 +278,171 @@ export function validateConsecutiveLeaves(
   }
   return true;
 }
+
+export function getLeaveOverLimitInfo(leave, allLeaves = []) {
+  if (!leave || !leave.start_date) {
+    return { overDays: 1, overDaysText: "1 day", totalMonthDays: 3, limit: 2 };
+  }
+
+  const startDate = new Date(leave.start_date + "T00:00:00");
+  const month = startDate.getMonth();
+  const year = startDate.getFullYear();
+
+  const empId = leave.employee_id;
+  const monthLeaves = (allLeaves || []).filter((l) => {
+    if (l.employee_id !== empId) return false;
+    if (!l.start_date) return false;
+    if (l.status === "rejected" || l.status === "cancelled") return false;
+    const d = new Date(l.start_date + "T00:00:00");
+    return d.getMonth() === month && d.getFullYear() === year;
+  });
+
+  let totalMonthDays = 0;
+  monthLeaves.forEach((l) => {
+    totalMonthDays += getWorkingDayCount(l.start_date, l.end_date, l.is_half_day);
+  });
+
+  const limit = 2;
+  const currentDuration = getWorkingDayCount(leave.start_date, leave.end_date, leave.is_half_day) || 1;
+  const calculatedOver = totalMonthDays > limit
+    ? totalMonthDays - limit
+    : currentDuration;
+
+  const overDays = Math.max(0.5, Math.round(calculatedOver * 10) / 10);
+  const overDaysText = `${overDays} ${overDays === 1 ? "day" : "days"}`;
+
+  return {
+    overDays,
+    overDaysText,
+    totalMonthDays: totalMonthDays || (limit + currentDuration),
+    limit,
+  };
+}
+
+const memoryAppliedMap = new Map();
+const APPLIED_MAP_KEY = "autonex_applied_dates_map_v1";
+
+export function recordLeaveApplication(data) {
+  if (!data) return;
+  try {
+    const raw = localStorage.getItem(APPLIED_MAP_KEY);
+    const map = raw ? JSON.parse(raw) : {};
+    const timestamp = data.created_at || data.applied_on || new Date().toISOString();
+
+    const empId = String(data.employee_id || data.emp_id || data.user_id || "");
+    const sDate = (data.start_date || "").slice(0, 10);
+    const eDate = (data.end_date || sDate).slice(0, 10);
+
+    const keysToSet = [];
+    if (data.id) keysToSet.push(String(data.id));
+    if (data.leave_id) keysToSet.push(String(data.leave_id));
+    if (sDate) {
+      if (empId) keysToSet.push(`${empId}_${sDate}_${eDate}`);
+      keysToSet.push(`${sDate}_${eDate}`);
+      keysToSet.push(sDate);
+    }
+
+    keysToSet.forEach((key) => {
+      if (key && !memoryAppliedMap.has(key)) {
+        memoryAppliedMap.set(key, timestamp);
+      }
+      if (key && !map[key]) {
+        map[key] = timestamp;
+      }
+    });
+
+    localStorage.setItem(APPLIED_MAP_KEY, JSON.stringify(map));
+  } catch (err) {
+    console.error("Failed to record leave application date", err);
+  }
+}
+
+export function resolveLeaveAppliedDate(leave) {
+  if (!leave) return null;
+
+  // 1. Direct object properties from API (any casing / variations)
+  const direct =
+    leave.applied_on ||
+    leave.applied_at ||
+    leave.created_at ||
+    leave.submitted_at ||
+    leave.created_on ||
+    leave.date_applied ||
+    leave.appliedDate ||
+    leave.createdAt ||
+    leave.submittedAt ||
+    leave.date_created ||
+    leave.creation_date;
+  if (direct) return direct;
+
+  const sDate = (leave.start_date || "").slice(0, 10);
+  const eDate = (leave.end_date || sDate).slice(0, 10);
+  const empId = String(leave.employee_id || leave.emp_id || leave.user_id || "");
+  const targetId = String(leave.id || leave.leave_id || "");
+
+  const keysToCheck = [
+    targetId,
+    empId && sDate ? `${empId}_${sDate}_${eDate}` : null,
+    sDate ? `${sDate}_${eDate}` : null,
+    sDate ? sDate : null,
+  ].filter(Boolean);
+
+  // 2. Memory cache check
+  for (const key of keysToCheck) {
+    if (memoryAppliedMap.has(key)) {
+      return memoryAppliedMap.get(key);
+    }
+  }
+
+  // 3. Client-side localStorage map check
+  try {
+    const raw = localStorage.getItem(APPLIED_MAP_KEY);
+    if (raw) {
+      const map = JSON.parse(raw);
+      for (const key of keysToCheck) {
+        if (map[key]) {
+          memoryAppliedMap.set(key, map[key]);
+          return map[key];
+        }
+      }
+    }
+  } catch (e) {}
+
+  // 4. Audit Change Log check (specifically Application logs)
+  try {
+    const logsRaw = localStorage.getItem("autonex_change_logs_v3");
+    if (logsRaw) {
+      const logs = JSON.parse(logsRaw);
+      const foundLog = logs.find((l) => {
+        if (l.category !== "Leaves") return false;
+        const actionStr = (l.action || l.actionType || "").toLowerCase();
+        const isAppLog = actionStr.includes("applied") || actionStr.includes("request") || actionStr.includes("create");
+        if (!isAppLog) return false;
+
+        if (targetId && (l.entityId === targetId || l.entityId === `leave-${targetId}`)) {
+          return true;
+        }
+        if (sDate && l.details && Array.isArray(l.details)) {
+          return l.details.some(
+            (d) => d.to && (d.to.includes(sDate) || (eDate && d.to.includes(eDate)))
+          );
+        }
+        return false;
+      });
+      if (foundLog && foundLog.timestamp) {
+        recordLeaveApplication({ ...leave, created_at: foundLog.timestamp });
+        return foundLog.timestamp;
+      }
+    }
+  } catch (e) {}
+
+  // 5. Persistent Fallback for active leave records without backend timestamp
+  if (sDate) {
+    const nowIso = new Date().toISOString();
+    recordLeaveApplication({ ...leave, created_at: nowIso });
+    return nowIso;
+  }
+
+  return null;
+}
+

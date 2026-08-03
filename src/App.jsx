@@ -19,6 +19,7 @@ const Dashboard = lazy(() => import("./pages/Dashboard"));
 const AnalyticsDashboard = lazy(() => import("./pages/AnalyticsDashboard"));
 const ProjectAnalyticsPage = lazy(() => import("./pages/ProjectAnalyticsPage"));
 const EmployeesPage = lazy(() => import("./pages/EmployeesPage"));
+const ChangeLogPage = lazy(() => import("./pages/ChangeLogPage"));
 const SubProjectsPage = lazy(() => import("./pages/ProjectsPage"));
 const AllocationsPage = lazy(() => import("./pages/AllocationsPage"));
 const LeavesPage = lazy(() => import("./pages/LeavesPage"));
@@ -152,6 +153,7 @@ function App() {
               element={<Navigate to="/admin/sub-projects" replace />}
             />
             <Route path="employees" element={<EmployeesPage />} />
+            <Route path="change-log" element={<ChangeLogPage />} />
             <Route path="sub-projects" element={<SubProjectsPage />} />
             <Route path="allocations" element={<AllocationsPage />} />
             <Route path="leaves" element={<LeavesPage />} />

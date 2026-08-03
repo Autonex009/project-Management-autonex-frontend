@@ -101,7 +101,7 @@ export const Table = ({
           <thead
             className={`${theadBg} ${allowOverflow && !title ? "rounded-t-2xl" : ""} border-b border-slate-100 `}
           >
-            <tr>
+            <tr className="h-[44px]">
               {columns.map((col, cIdx) => (
                 <th
                   key={col.key}
@@ -170,14 +170,14 @@ export const Table = ({
                       onClick={
                         onRowClick ? () => onRowClick(row, idx) : undefined
                       }
-                      className={`${rowBg} hover:bg-slate-50 transition-colors ${
+                      className={`${rowBg} h-[52px] hover:bg-slate-50 transition-colors ${
                         onRowClick ? "cursor-pointer" : ""
                       } ${extraClass}`}
                     >
                       {columns.map((col, cIdx) => (
                         <td
                           key={col.key}
-                          className={`${cellPad} ${cellText} ${
+                          className={`${cellPad} ${cellText} align-middle whitespace-nowrap ${
                             isLast && cIdx === 0
                               ? "rounded-bl-2xl"
                               : isLast && cIdx === columns.length - 1
@@ -222,52 +222,54 @@ export const Table = ({
             Showing {paginatedData.length === 0 ? 0 : startIndex + 1}–
             {Math.min(startIndex + pageSize, itemCount)} of {itemCount} items
           </p>
-          <div className="flex items-center gap-1">
+          <div className="flex items-center gap-2">
             <button
               onClick={() => onPageChange(Math.max(1, currentPage - 1))}
               disabled={currentPage === 1}
-              className="h-8 px-2.5 text-[13px] rounded-md border border-slate-200 text-slate-600 hover:bg-slate-50 disabled:opacity-40 disabled:cursor-not-allowed transition-colors"
+              className="h-8 px-3 text-[13px] font-medium rounded-lg border border-slate-200 text-slate-600 hover:bg-slate-50 disabled:opacity-40 disabled:cursor-not-allowed transition-colors shrink-0"
             >
               Previous
             </button>
-            {Array.from({ length: totalPages }, (_, i) => i + 1)
-              .filter(
-                (p) =>
-                  p === 1 || p === totalPages || Math.abs(p - currentPage) <= 1,
-              )
-              .reduce((acc, p, idx, arr) => {
-                if (idx > 0 && p - arr[idx - 1] > 1) acc.push("...");
-                acc.push(p);
-                return acc;
-              }, [])
-              .map((p, idx) =>
-                p === "..." ? (
-                  <span
-                    key={`ellipsis-${idx}`}
-                    className="px-1.5 text-slate-400 text-[13px]"
-                  >
-                    ...
-                  </span>
-                ) : (
-                  <button
-                    key={p}
-                    onClick={() => onPageChange(p)}
-                    className={`h-8 min-w-8 px-2 text-[13px] rounded-md border transition-colors ${
-                      currentPage === p
-                        ? "bg-indigo-600 border-indigo-600 text-white font-medium"
-                        : "border-slate-200 text-slate-600 hover:bg-slate-50 "
-                    }`}
-                  >
-                    {p}
-                  </button>
-                ),
-              )}
+            <div className="flex items-center justify-center gap-1 w-[260px] shrink-0">
+              {Array.from({ length: totalPages }, (_, i) => i + 1)
+                .filter(
+                  (p) =>
+                    p === 1 || p === totalPages || Math.abs(p - currentPage) <= 1,
+                )
+                .reduce((acc, p, idx, arr) => {
+                  if (idx > 0 && p - arr[idx - 1] > 1) acc.push("...");
+                  acc.push(p);
+                  return acc;
+                }, [])
+                .map((p, idx) =>
+                  p === "..." ? (
+                    <span
+                      key={`ellipsis-${idx}`}
+                      className="px-1 text-slate-400 text-[13px] text-center"
+                    >
+                      ...
+                    </span>
+                  ) : (
+                    <button
+                      key={p}
+                      onClick={() => onPageChange(p)}
+                      className={`h-8 min-w-8 px-2 text-[13px] rounded-lg border transition-colors ${
+                        currentPage === p
+                          ? "bg-indigo-600 border-indigo-600 text-white font-medium"
+                          : "border-slate-200 text-slate-600 hover:bg-slate-50 "
+                      }`}
+                    >
+                      {p}
+                    </button>
+                  ),
+                )}
+            </div>
             <button
               onClick={() =>
                 onPageChange(Math.min(totalPages, currentPage + 1))
               }
               disabled={currentPage === totalPages}
-              className="h-8 px-2.5 text-[13px] rounded-md border border-slate-200 text-slate-600 hover:bg-slate-50 disabled:opacity-40 disabled:cursor-not-allowed transition-colors"
+              className="h-8 px-3 text-[13px] font-medium rounded-lg border border-slate-200 text-slate-600 hover:bg-slate-50 disabled:opacity-40 disabled:cursor-not-allowed transition-colors shrink-0"
             >
               Next
             </button>
