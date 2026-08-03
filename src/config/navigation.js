@@ -12,6 +12,7 @@ import {
   Settings,
   Star,
   BarChart3,
+  History,
 } from "lucide-react";
 
 export const navigation = [
@@ -26,5 +27,6 @@ export const navigation = [
   { name: "Payroll", href: "/admin/payroll", icon: IndianRupee },
   { name: "Referrals", href: "/admin/referrals", icon: Users2 },
   { name: "Guidelines", href: "/admin/guidelines", icon: FileText },
+  { name: "Change Log", href: "/admin/change-log", icon: History },
   { name: "Company Settings", href: "/admin/company-settings", icon: Settings },
 ];

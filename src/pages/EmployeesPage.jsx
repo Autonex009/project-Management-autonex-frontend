@@ -9,6 +9,7 @@ import {
   parentProjectApi,
   leaveApi,
 } from "../services/api";
+import { logChange } from "../services/changeLogService";
 import {
   Plus,
   Edit,
@@ -35,6 +36,7 @@ import {
   Check,
 } from "lucide-react";
 import toast from "react-hot-toast";
+import UserAvatar from "../components/ui/UserAvatar";
 import MetricDots from "../components/ui/MetricDots";
 import {
   todayLocalISO,
@@ -142,74 +144,74 @@ function EmployeeAvailabilityModal({ employee, onClose }) {
           {/* Upcoming Leaves */}
           {(data.upcoming_leaves.length > 0 ||
             data.upcoming_wfh.length > 0) && (
-            <section>
-              <h3 className="text-xs font-semibold text-slate-400 uppercase tracking-wider mb-3">
-                Upcoming (Next 30 Days)
-              </h3>
-              <div className="space-y-2">
-                {data.upcoming_leaves.map((leave) => (
-                  <div
-                    key={leave.leave_id}
-                    className="flex items-start gap-3 rounded-xl border border-slate-100 p-3"
-                  >
-                    <div className="mt-0.5">
-                      <span
-                        className={`inline-flex items-center px-2 py-0.5 rounded-full text-[11px] font-medium ${LEAVE_TYPE_COLORS[leave.leave_type] || "bg-slate-100 text-slate-600"}`}
-                      >
-                        {LEAVE_TYPE_LABELS[leave.leave_type] ||
-                          leave.leave_type}
-                      </span>
-                    </div>
-                    <div className="flex-1 min-w-0">
-                      <p className="text-sm font-medium text-slate-700">
-                        {formatDateRange(leave.start_date, leave.end_date)}
-                      </p>
-                      {leave.reason && (
-                        <p className="text-xs text-slate-400 mt-0.5 truncate">
-                          {leave.reason}
-                        </p>
-                      )}
-                    </div>
-                    <span
-                      className={`text-[11px] px-2 py-0.5 rounded-full font-medium flex-shrink-0 ${STATUS_COLORS[leave.status] || "bg-slate-100 text-slate-500"}`}
+              <section>
+                <h3 className="text-xs font-semibold text-slate-400 uppercase tracking-wider mb-3">
+                  Upcoming (Next 30 Days)
+                </h3>
+                <div className="space-y-2">
+                  {data.upcoming_leaves.map((leave) => (
+                    <div
+                      key={leave.leave_id}
+                      className="flex items-start gap-3 rounded-xl border border-slate-100 p-3"
                     >
-                      {leave.status}
-                    </span>
-                  </div>
-                ))}
-                {data.upcoming_wfh.map((wfh) => (
-                  <div
-                    key={wfh.id}
-                    className="flex items-start gap-3 rounded-xl border border-slate-100 p-3"
-                  >
-                    <div className="mt-0.5">
-                      <span className="inline-flex items-center px-2 py-0.5 rounded-full text-[11px] font-medium bg-purple-100 text-purple-700">
-                        ðŸ  WFH
-                      </span>
-                    </div>
-                    <div className="flex-1 min-w-0">
-                      <p className="text-sm font-medium text-slate-700">
-                        {new Date(wfh.date + "T00:00:00").toLocaleDateString(
-                          "en-IN",
-                          { day: "numeric", month: "short", weekday: "short" },
+                      <div className="mt-0.5">
+                        <span
+                          className={`inline-flex items-center px-2 py-0.5 rounded-full text-[11px] font-medium ${LEAVE_TYPE_COLORS[leave.leave_type] || "bg-slate-100 text-slate-600"}`}
+                        >
+                          {LEAVE_TYPE_LABELS[leave.leave_type] ||
+                            leave.leave_type}
+                        </span>
+                      </div>
+                      <div className="flex-1 min-w-0">
+                        <p className="text-sm font-medium text-slate-700">
+                          {formatDateRange(leave.start_date, leave.end_date)}
+                        </p>
+                        {leave.reason && (
+                          <p className="text-xs text-slate-400 mt-0.5 truncate">
+                            {leave.reason}
+                          </p>
                         )}
-                      </p>
-                      {wfh.reason && (
-                        <p className="text-xs text-slate-400 mt-0.5 truncate">
-                          {wfh.reason}
-                        </p>
-                      )}
+                      </div>
+                      <span
+                        className={`text-[11px] px-2 py-0.5 rounded-full font-medium flex-shrink-0 ${STATUS_COLORS[leave.status] || "bg-slate-100 text-slate-500"}`}
+                      >
+                        {leave.status}
+                      </span>
                     </div>
-                    <span
-                      className={`text-[11px] px-2 py-0.5 rounded-full font-medium flex-shrink-0 ${STATUS_COLORS[wfh.status] || "bg-slate-100 text-slate-500"}`}
+                  ))}
+                  {data.upcoming_wfh.map((wfh) => (
+                    <div
+                      key={wfh.id}
+                      className="flex items-start gap-3 rounded-xl border border-slate-100 p-3"
                     >
-                      {wfh.status}
-                    </span>
-                  </div>
-                ))}
-              </div>
-            </section>
-          )}
+                      <div className="mt-0.5">
+                        <span className="inline-flex items-center px-2 py-0.5 rounded-full text-[11px] font-medium bg-purple-100 text-purple-700">
+                          ðŸ  WFH
+                        </span>
+                      </div>
+                      <div className="flex-1 min-w-0">
+                        <p className="text-sm font-medium text-slate-700">
+                          {new Date(wfh.date + "T00:00:00").toLocaleDateString(
+                            "en-IN",
+                            { day: "numeric", month: "short", weekday: "short" },
+                          )}
+                        </p>
+                        {wfh.reason && (
+                          <p className="text-xs text-slate-400 mt-0.5 truncate">
+                            {wfh.reason}
+                          </p>
+                        )}
+                      </div>
+                      <span
+                        className={`text-[11px] px-2 py-0.5 rounded-full font-medium flex-shrink-0 ${STATUS_COLORS[wfh.status] || "bg-slate-100 text-slate-500"}`}
+                      >
+                        {wfh.status}
+                      </span>
+                    </div>
+                  ))}
+                </div>
+              </section>
+            )}
 
           {/* Past Leaves */}
           {(data.past_leaves.length > 0 || data.past_wfh.length > 0) && (
@@ -1035,9 +1037,8 @@ function EmployeeActionMenu({
           e.stopPropagation();
           setIsOpen((prev) => !prev);
         }}
-        className={`p-1.5 rounded-lg text-slate-400 hover:text-slate-700 hover:bg-slate-100 transition-colors ${
-          isOpen ? "bg-slate-100 text-slate-700 " : ""
-        }`}
+        className={`p-1.5 rounded-lg text-slate-400 hover:text-slate-700 hover:bg-slate-100 transition-colors ${isOpen ? "bg-slate-100 text-slate-700 " : ""
+          }`}
         title="More Actions"
       >
         <MoreVertical className="w-4 h-4" />
@@ -1353,11 +1354,23 @@ const EmployeesPage = () => {
 
   const createMutation = useMutation({
     mutationFn: employeeApi.create,
-    onSuccess: () => {
+    onSuccess: (res, variables) => {
       queryClient.invalidateQueries(["employees"]);
       queryClient.invalidateQueries(["skills"]); // Refresh skills in case new ones were added
       setIsModalOpen(false);
       toast.success("Employee created successfully");
+      logChange({
+        category: "Employees",
+        action: "Created New Employee",
+        actionType: "Created",
+        entity: "Employee",
+        entityId: res?.id || "",
+        entityName: variables?.name || res?.name || "New Employee",
+        details: [
+          { field: "Designation", from: "—", to: variables?.designation || "Annotator" },
+          { field: "Employee Type", from: "—", to: variables?.employee_type || "Intern" },
+        ],
+      });
     },
     onError: (err) => {
       toast.error(err.response?.data?.detail || "Failed to create employee");
@@ -1400,6 +1413,19 @@ const EmployeesPage = () => {
       } else {
         toast.success("Employee updated successfully");
       }
+
+      logChange({
+        category: "Employees",
+        action: "Updated Employee Details",
+        actionType: "Updated",
+        entity: "Employee",
+        entityId: variables?.id || "",
+        entityName: variables?.data?.name || res?.name || "Employee",
+        details: [
+          { field: "Designation", from: "Previous", to: variables?.data?.designation || "Updated" },
+          { field: "Work Model", from: "Previous", to: variables?.data?.work_model || "Updated" },
+        ],
+      });
     },
     onError: (err) => {
       toast.error(err.response?.data?.detail || "Failed to update employee");
@@ -1419,11 +1445,20 @@ const EmployeesPage = () => {
       }
       return res;
     },
-    onSuccess: () => {
+    onSuccess: (_, id) => {
       queryClient.invalidateQueries(["employees"]);
       queryClient.invalidateQueries(["all-employees-kpis"]);
       queryClient.invalidateQueries(["allocations"]);
       toast.success("Employee archived and projects unassigned");
+      logChange({
+        category: "Employees",
+        action: "Archived Employee",
+        actionType: "Archived",
+        entity: "Employee",
+        entityId: id,
+        entityName: "Employee",
+        details: [{ field: "Status", from: "Active", to: "Archived" }],
+      });
     },
     onError: (err) => {
       toast.error(err.response?.data?.detail || "Failed to archive employee");
@@ -1432,11 +1467,20 @@ const EmployeesPage = () => {
 
   const restoreMutation = useMutation({
     mutationFn: employeeApi.restore,
-    onSuccess: () => {
+    onSuccess: (_, id) => {
       queryClient.invalidateQueries(["employees"]);
       queryClient.invalidateQueries(["all-employees-kpis"]);
       queryClient.invalidateQueries(["allocations"]);
       toast.success("Employee restored successfully");
+      logChange({
+        category: "Employees",
+        action: "Restored Employee",
+        actionType: "Restored",
+        entity: "Employee",
+        entityId: id,
+        entityName: "Employee",
+        details: [{ field: "Status", from: "Archived", to: "Active" }],
+      });
     },
     onError: (err) => {
       toast.error(err.response?.data?.detail || "Failed to restore employee");
@@ -1449,7 +1493,19 @@ const EmployeesPage = () => {
     onSuccess: (emp) => {
       queryClient.invalidateQueries(["employees"]);
       queryClient.invalidateQueries(["all-employees-kpis"]);
-      toast.success(`${formatDisplayName(emp.name)} converted to Full-time`);
+      toast.success(`${formatDisplayName(emp?.name) || emp?.name || "Employee"} converted to Full-time`);
+      logChange({
+        category: "Employees",
+        action: "Promoted Employee to Full-time",
+        actionType: "Promoted",
+        entity: "Employee",
+        entityId: emp?.id || "",
+        entityName: emp?.name || "Employee",
+        details: [
+          { field: "Employee Type", from: emp?.previous_employee_type || "Intern", to: "Full-time" },
+          { field: "Promotion Date", from: "—", to: new Date().toLocaleDateString() },
+        ],
+      });
     },
     onError: (err) => {
       toast.error(err.response?.data?.detail || "Failed to convert employee");
@@ -1474,9 +1530,9 @@ const EmployeesPage = () => {
     const skillsRaw = formData.get("skills");
     const skills = skillsRaw
       ? skillsRaw
-          .split(",")
-          .map((s) => s.trim())
-          .filter(Boolean)
+        .split(",")
+        .map((s) => s.trim())
+        .filter(Boolean)
       : [];
 
     if (skills.length === 0) {
@@ -1566,11 +1622,36 @@ const EmployeesPage = () => {
     const matchesDesignation =
       designationFilter.length === 0 ||
       designationFilter.includes(employee.designation);
-    const matchesColDesignation =
-      !colDesignation || employee.designation === colDesignation;
-    const matchesColType = !colType || employee.employee_type === colType;
-    const matchesColWorkModel =
-      !colWorkModel || (employee.work_model || "WFO") === colWorkModel;
+    const matchesColDesignation = (() => {
+      if (!colDesignation) return true;
+      const d = (employee.designation || "").toLowerCase();
+      if (colDesignation === "Manager") {
+        return d.includes("manager") || d.includes("pm") || d.includes("lead");
+      }
+      if (colDesignation === "Annotator") {
+        return d.includes("annotator") || d.includes("reviewer");
+      }
+      if (colDesignation === "Quality") {
+        return d.includes("qc") || d.includes("quality");
+      }
+      return d === colDesignation.toLowerCase();
+    })();
+    const matchesColType = (() => {
+      if (!colType) return true;
+      const t = (employee.employee_type || "").toLowerCase();
+      if (colType === "Full-time") return t.includes("full");
+      if (colType === "Intern") return t.includes("intern");
+      if (colType === "Contract") return t.includes("contract") || t.includes("part");
+      return t === colType.toLowerCase();
+    })();
+    const matchesColWorkModel = (() => {
+      if (!colWorkModel) return true;
+      const wm = (employee.work_model || "WFO").toUpperCase();
+      if (colWorkModel === "WFO") return wm === "WFO" || wm.includes("OFFICE");
+      if (colWorkModel === "WFH") return wm === "WFH" || wm.includes("HOME");
+      if (colWorkModel === "Hybrid") return wm === "HYBRID";
+      return wm === colWorkModel.toUpperCase();
+    })();
     const isIdle = !isOnLeaveToday(employee) && !hasProject(employee);
     const matchesIdle = !idleOnly || isIdle;
     // Same three derived buckets the KPI card counts, so clicking a chip lists
@@ -1630,6 +1711,29 @@ const EmployeesPage = () => {
     colWorkModel,
   ]);
 
+  const handleSelectColDesignation = (roleKey) => {
+    if (colDesignation === roleKey) {
+      setColDesignation("");
+      setDesignationFilter([]);
+    } else {
+      setColDesignation(roleKey);
+      const matches = designationOptions.filter((dStr) => {
+        const d = (dStr || "").toLowerCase();
+        if (roleKey === "Manager") {
+          return d.includes("manager") || d.includes("pm") || d.includes("lead");
+        }
+        if (roleKey === "Annotator") {
+          return d.includes("annotator") || d.includes("reviewer");
+        }
+        if (roleKey === "Quality") {
+          return d.includes("qc") || d.includes("quality");
+        }
+        return false;
+      });
+      setDesignationFilter(matches);
+    }
+  };
+
   return (
     <div className="space-y-3">
       {/* Page Header */}
@@ -1650,180 +1754,274 @@ const EmployeesPage = () => {
         {/* KPI Overview Cards Grid */}
         <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-3.5">
           {/* KPI 1: Total Employees */}
-          <div className="bg-white border border-slate-200/60 rounded-2xl p-3.5 shadow-[0_1px_3px_rgba(0,0,0,0.04)] flex flex-col justify-between hover:shadow-md transition-all duration-200">
+          <div className="bg-white border border-slate-200/70 rounded-2xl p-3.5 shadow-[0_1px_3px_rgba(0,0,0,0.04)] flex flex-col justify-between hover:shadow-md transition-all duration-200">
             <div className="flex items-center justify-between gap-2 mb-2.5">
               <div className="flex items-center gap-2.5 min-w-0">
                 <div className="w-8 h-8 rounded-lg bg-indigo-50 text-indigo-600 flex items-center justify-center flex-shrink-0">
                   <Users className="w-4 h-4" />
                 </div>
-                <div className="text-[11px] font-semibold text-slate-500 uppercase tracking-wider truncate">
+                <div className="text-[12.5px] font-bold text-slate-800 uppercase tracking-wider truncate">
                   TOTAL EMPLOYEES
                 </div>
               </div>
-              <div className="text-xl sm:text-2xl font-normal text-slate-800 tracking-tight flex-shrink-0">
+              <div className="text-xl sm:text-2xl font-bold text-slate-900 tracking-tight font-mono flex-shrink-0">
                 {onRosterCount}
               </div>
             </div>
 
-            <div className="pt-2 border-t border-slate-100">
-              <MetricDots
-                spread
-                labelFirst
-                items={[
-                  {
-                    label: "Active",
-                    value: activeCount,
-                    dot: "bg-emerald-500",
-                    tone: "text-emerald-600",
-                  },
-                  {
-                    label: "Inactive",
-                    value: inactiveCount,
-                    dot: "bg-slate-400",
-                    tone: "text-slate-500",
-                  },
-                  {
-                    label: "Idle",
-                    value: idleCount,
-                    dot: "bg-amber-500",
-                    tone: "text-amber-600",
-                  },
-                ]}
-              />
+            {/* Highlighted Metric Stat Tiles */}
+            <div className="grid grid-cols-3 gap-1.5 pt-2 border-t border-slate-100">
+              <button
+                type="button"
+                onClick={() => {
+                  const params = new URLSearchParams(searchParams);
+                  if (statusParam === "active") params.delete("status");
+                  else params.set("status", "active");
+                  setSearchParams(params);
+                }}
+                className={`p-2 rounded-xl text-center border transition-all hover:scale-[1.02] ${statusParam === "active"
+                  ? "bg-emerald-100/90 border-emerald-300 ring-2 ring-emerald-500/20"
+                  : "bg-emerald-50/60 border-emerald-100/80 hover:bg-emerald-100/60"
+                  }`}
+              >
+                <div className="text-base sm:text-lg font-extrabold text-emerald-700 font-mono leading-none">
+                  {activeCount}
+                </div>
+                <div className="text-[10px] font-bold text-emerald-600 uppercase tracking-wider mt-1 truncate">
+                  Active
+                </div>
+              </button>
+
+              <button
+                type="button"
+                onClick={() => {
+                  const params = new URLSearchParams(searchParams);
+                  if (statusParam === "inactive") params.delete("status");
+                  else params.set("status", "inactive");
+                  setSearchParams(params);
+                }}
+                className={`p-2 rounded-xl text-center border transition-all hover:scale-[1.02] ${statusParam === "inactive"
+                  ? "bg-slate-200 border-slate-400 ring-2 ring-slate-500/20"
+                  : "bg-slate-50 border-slate-100 hover:bg-slate-100"
+                  }`}
+              >
+                <div className="text-base sm:text-lg font-extrabold text-slate-700 font-mono leading-none">
+                  {inactiveCount}
+                </div>
+                <div className="text-[10px] font-bold text-slate-500 uppercase tracking-wider mt-1 truncate">
+                  Inactive
+                </div>
+              </button>
+
+              <button
+                type="button"
+                onClick={() => {
+                  const params = new URLSearchParams(searchParams);
+                  if (statusParam === "idle") params.delete("status");
+                  else params.set("status", "idle");
+                  setSearchParams(params);
+                }}
+                className={`p-2 rounded-xl text-center border transition-all hover:scale-[1.02] ${statusParam === "idle"
+                  ? "bg-amber-100/90 border-amber-300 ring-2 ring-amber-500/20"
+                  : "bg-amber-50/60 border-amber-100/80 hover:bg-amber-100/60"
+                  }`}
+              >
+                <div className="text-base sm:text-lg font-extrabold text-amber-700 font-mono leading-none">
+                  {idleCount}
+                </div>
+                <div className="text-[10px] font-bold text-amber-600 uppercase tracking-wider mt-1 truncate">
+                  Idle
+                </div>
+              </button>
             </div>
           </div>
 
-          {/* KPI 2: Work Model — took over this slot when Active/Inactive/Idle
-              moved onto the Total Employees card, so the two stopped being
-              duplicates of each other. */}
-          <div className="bg-white border border-slate-200/60 rounded-2xl p-3.5 shadow-[0_1px_3px_rgba(0,0,0,0.04)] flex flex-col justify-between hover:shadow-md transition-all duration-200">
-            <div className="flex items-center justify-between gap-2 mb-2.5">
-              <div className="flex items-center gap-2.5 min-w-0">
-                <div className="w-8 h-8 rounded-lg bg-emerald-50 text-emerald-600 flex items-center justify-center flex-shrink-0">
-                  <UserCheck className="w-4 h-4" />
-                </div>
-                <div className="text-[11px] font-semibold text-slate-500 uppercase tracking-wider truncate">
-                  WORK MODEL
-                </div>
+          {/* KPI 2: Work Model */}
+          <div className="bg-white border border-slate-200/70 rounded-2xl p-3.5 shadow-[0_1px_3px_rgba(0,0,0,0.04)] flex flex-col justify-between hover:shadow-md transition-all duration-200">
+            <div className="flex items-center gap-2.5 mb-2.5 min-h-[32px]">
+              <div className="w-8 h-8 rounded-lg bg-emerald-50 text-emerald-600 flex items-center justify-center flex-shrink-0">
+                <UserCheck className="w-4 h-4" />
               </div>
-              <div className="text-xl sm:text-2xl font-normal text-slate-800 tracking-tight flex-shrink-0">
-                {onRosterCount}
+              <div className="text-[12.5px] font-bold text-slate-800 uppercase tracking-wider truncate">
+                WORK MODEL
               </div>
             </div>
 
-            <div className="pt-2 border-t border-slate-100">
-              <MetricDots
-                spread
-                labelFirst
-                items={[
-                  {
-                    label: "WFO",
-                    value: wfoCount,
-                    dot: "bg-indigo-500",
-                    tone: "text-indigo-600",
-                  },
-                  {
-                    label: "WFH",
-                    value: wfhCount,
-                    dot: "bg-cyan-500",
-                    tone: "text-cyan-600",
-                  },
-                  {
-                    label: "Hybrid",
-                    value: hybridCount,
-                    dot: "bg-purple-500",
-                    tone: "text-purple-600",
-                  },
-                ]}
-              />
+            {/* Highlighted Metric Stat Tiles */}
+            <div className="grid grid-cols-3 gap-1.5 pt-2 border-t border-slate-100">
+              <button
+                type="button"
+                onClick={() => setColWorkModel((prev) => (prev === "WFO" ? "" : "WFO"))}
+                className={`p-2 rounded-xl text-center border transition-all hover:scale-[1.02] ${colWorkModel === "WFO"
+                  ? "bg-indigo-100/90 border-indigo-300 ring-2 ring-indigo-500/20"
+                  : "bg-indigo-50/60 border-indigo-100/80 hover:bg-indigo-100/60"
+                  }`}
+              >
+                <div className="text-base sm:text-lg font-extrabold text-indigo-700 font-mono leading-none">
+                  {wfoCount}
+                </div>
+                <div className="text-[10px] font-bold text-indigo-600 uppercase tracking-wider mt-1 truncate">
+                  WFO
+                </div>
+              </button>
+
+              <button
+                type="button"
+                onClick={() => setColWorkModel((prev) => (prev === "WFH" ? "" : "WFH"))}
+                className={`p-2 rounded-xl text-center border transition-all hover:scale-[1.02] ${colWorkModel === "WFH"
+                  ? "bg-cyan-100/90 border-cyan-300 ring-2 ring-cyan-500/20"
+                  : "bg-cyan-50/60 border-cyan-100/80 hover:bg-cyan-100/60"
+                  }`}
+              >
+                <div className="text-base sm:text-lg font-extrabold text-cyan-700 font-mono leading-none">
+                  {wfhCount}
+                </div>
+                <div className="text-[10px] font-bold text-cyan-600 uppercase tracking-wider mt-1 truncate">
+                  WFH
+                </div>
+              </button>
+
+              <button
+                type="button"
+                onClick={() => setColWorkModel((prev) => (prev === "Hybrid" ? "" : "Hybrid"))}
+                className={`p-2 rounded-xl text-center border transition-all hover:scale-[1.02] ${colWorkModel === "Hybrid"
+                  ? "bg-purple-100/90 border-purple-300 ring-2 ring-purple-500/20"
+                  : "bg-purple-50/60 border-purple-100/80 hover:bg-purple-100/60"
+                  }`}
+              >
+                <div className="text-base sm:text-lg font-extrabold text-purple-700 font-mono leading-none">
+                  {hybridCount}
+                </div>
+                <div className="text-[10px] font-bold text-purple-600 uppercase tracking-wider mt-1 truncate">
+                  Hybrid
+                </div>
+              </button>
             </div>
           </div>
 
           {/* KPI 3: Employment Type */}
-          <div className="bg-white border border-slate-200/60 rounded-2xl p-3.5 shadow-[0_1px_3px_rgba(0,0,0,0.04)] flex flex-col justify-between hover:shadow-md transition-all duration-200">
-            <div className="flex items-center justify-between gap-2 mb-2.5">
-              <div className="flex items-center gap-2.5 min-w-0">
-                <div className="w-8 h-8 rounded-lg bg-purple-50 text-purple-600 flex items-center justify-center flex-shrink-0">
-                  <Briefcase className="w-4 h-4" />
-                </div>
-                <div className="text-[11px] font-semibold text-slate-500 uppercase tracking-wider truncate">
-                  EMPLOYEE TYPES
-                </div>
+          <div className="bg-white border border-slate-200/70 rounded-2xl p-3.5 shadow-[0_1px_3px_rgba(0,0,0,0.04)] flex flex-col justify-between hover:shadow-md transition-all duration-200">
+            <div className="flex items-center gap-2.5 mb-2.5 min-h-[32px]">
+              <div className="w-8 h-8 rounded-lg bg-purple-50 text-purple-600 flex items-center justify-center flex-shrink-0">
+                <Briefcase className="w-4 h-4" />
               </div>
-              <div className="text-xl sm:text-2xl font-normal text-slate-800 tracking-tight flex-shrink-0">
-                {fullTimeCount}
+              <div className="text-[12.5px] font-bold text-slate-800 uppercase tracking-wider truncate">
+                EMPLOYEE TYPES
               </div>
             </div>
 
-            <div className="pt-2 border-t border-slate-100">
-              <MetricDots
-                spread
-                labelFirst
-                items={[
-                  {
-                    label: "Full-time",
-                    value: fullTimeCount,
-                    dot: "bg-emerald-500",
-                    tone: "text-emerald-600",
-                  },
-                  {
-                    label: "Intern",
-                    value: internCount,
-                    dot: "bg-amber-500",
-                    tone: "text-amber-600",
-                  },
-                  {
-                    label: "Contract",
-                    value: contractCount,
-                    dot: "bg-sky-500",
-                    tone: "text-sky-500",
-                  },
-                ]}
-              />
+            {/* Highlighted Metric Stat Tiles */}
+            <div className="grid grid-cols-3 gap-1.5 pt-2 border-t border-slate-100">
+              <button
+                type="button"
+                onClick={() => setColType((prev) => (prev === "Full-time" ? "" : "Full-time"))}
+                className={`p-2 rounded-xl text-center border transition-all hover:scale-[1.02] ${colType === "Full-time"
+                  ? "bg-emerald-100/90 border-emerald-300 ring-2 ring-emerald-500/20"
+                  : "bg-emerald-50/60 border-emerald-100/80 hover:bg-emerald-100/60"
+                  }`}
+              >
+                <div className="text-base sm:text-lg font-extrabold text-emerald-700 font-mono leading-none">
+                  {fullTimeCount}
+                </div>
+                <div className="text-[10px] font-bold text-emerald-600 uppercase tracking-wider mt-1 truncate">
+                  Full-time
+                </div>
+              </button>
+
+              <button
+                type="button"
+                onClick={() => setColType((prev) => (prev === "Intern" ? "" : "Intern"))}
+                className={`p-2 rounded-xl text-center border transition-all hover:scale-[1.02] ${colType === "Intern"
+                  ? "bg-amber-100/90 border-amber-300 ring-2 ring-amber-500/20"
+                  : "bg-amber-50/60 border-amber-100/80 hover:bg-amber-100/60"
+                  }`}
+              >
+                <div className="text-base sm:text-lg font-extrabold text-amber-700 font-mono leading-none">
+                  {internCount}
+                </div>
+                <div className="text-[10px] font-bold text-amber-600 uppercase tracking-wider mt-1 truncate">
+                  Intern
+                </div>
+              </button>
+
+              <button
+                type="button"
+                onClick={() => setColType((prev) => (prev === "Contract" ? "" : "Contract"))}
+                className={`p-2 rounded-xl text-center border transition-all hover:scale-[1.02] ${colType === "Contract"
+                  ? "bg-sky-100/90 border-sky-300 ring-2 ring-sky-500/20"
+                  : "bg-sky-50/60 border-sky-100/80 hover:bg-sky-100/60"
+                  }`}
+              >
+                <div className="text-base sm:text-lg font-extrabold text-sky-700 font-mono leading-none">
+                  {contractCount}
+                </div>
+                <div className="text-[10px] font-bold text-sky-600 uppercase tracking-wider mt-1 truncate">
+                  Contract
+                </div>
+              </button>
             </div>
           </div>
 
           {/* KPI 4: Role Designations */}
-          <div className="bg-white border border-slate-200/60 rounded-2xl p-3.5 shadow-[0_1px_3px_rgba(0,0,0,0.04)] flex flex-col justify-between hover:shadow-md transition-all duration-200">
-            <div className="flex items-center justify-between gap-2 mb-2.5">
-              <div className="flex items-center gap-2.5 min-w-0">
-                <div className="w-8 h-8 rounded-lg bg-sky-50 text-sky-600 flex items-center justify-center flex-shrink-0">
-                  <Award className="w-4 h-4" />
-                </div>
-                <div className="text-[11px] font-semibold text-slate-500 uppercase tracking-wider truncate">
-                  DESIGNATION ROLES
-                </div>
+          <div className="bg-white border border-slate-200/70 rounded-2xl p-3.5 shadow-[0_1px_3px_rgba(0,0,0,0.04)] flex flex-col justify-between hover:shadow-md transition-all duration-200">
+            <div className="flex items-center gap-2.5 mb-2.5 min-h-[32px]">
+              <div className="w-8 h-8 rounded-lg bg-sky-50 text-sky-600 flex items-center justify-center flex-shrink-0">
+                <Award className="w-4 h-4" />
               </div>
-              <div className="text-xl sm:text-2xl font-normal text-slate-800 tracking-tight flex-shrink-0">
-                {annotatorCount}
+              <div className="text-[12.5px] font-bold text-slate-800 uppercase tracking-wider truncate">
+                DESIGNATION ROLES
               </div>
             </div>
 
-            <div className="pt-2 border-t border-slate-100">
-              <MetricDots
-                spread
-                labelFirst
-                items={[
-                  {
-                    label: "PMs",
-                    value: pmCount,
-                    dot: "bg-indigo-500",
-                    tone: "text-slate-700",
-                  },
-                  {
-                    label: "Annotators",
-                    value: annotatorCount,
-                    dot: "bg-sky-500",
-                    tone: "text-slate-700",
-                  },
-                  {
-                    label: "QC",
-                    value: qcCount,
-                    dot: "bg-purple-500",
-                    tone: "text-slate-700",
-                  },
-                ]}
-              />
+            {/* Highlighted Metric Stat Tiles */}
+            <div className="grid grid-cols-3 gap-1.5 pt-2 border-t border-slate-100">
+              <button
+                type="button"
+                onClick={() => handleSelectColDesignation("Manager")}
+                className={`p-2 rounded-xl text-center border transition-all hover:scale-[1.02] ${colDesignation === "Manager"
+                  ? "bg-indigo-100/90 border-indigo-300 ring-2 ring-indigo-500/20"
+                  : "bg-indigo-50/60 border-indigo-100/80 hover:bg-indigo-100/60"
+                  }`}
+              >
+                <div className="text-base sm:text-lg font-extrabold text-indigo-700 font-mono leading-none">
+                  {pmCount}
+                </div>
+                <div className="text-[10px] font-bold text-indigo-600 uppercase tracking-wider mt-1 truncate">
+                  PMs
+                </div>
+              </button>
+
+              <button
+                type="button"
+                onClick={() => handleSelectColDesignation("Annotator")}
+                className={`p-2 rounded-xl text-center border transition-all hover:scale-[1.02] ${colDesignation === "Annotator"
+                  ? "bg-sky-100/90 border-sky-300 ring-2 ring-sky-500/20"
+                  : "bg-sky-50/60 border-sky-100/80 hover:bg-sky-100/60"
+                  }`}
+              >
+                <div className="text-base sm:text-lg font-extrabold text-sky-700 font-mono leading-none">
+                  {annotatorCount}
+                </div>
+                <div className="text-[10px] font-bold text-sky-600 uppercase tracking-wider mt-1 truncate">
+                  Annotators
+                </div>
+              </button>
+
+              <button
+                type="button"
+                onClick={() => handleSelectColDesignation("Quality")}
+                className={`p-2 rounded-xl text-center border transition-all hover:scale-[1.02] ${colDesignation === "Quality"
+                  ? "bg-purple-100/90 border-purple-300 ring-2 ring-purple-500/20"
+                  : "bg-purple-50/60 border-purple-100/80 hover:bg-purple-100/60"
+                  }`}
+              >
+                <div className="text-base sm:text-lg font-extrabold text-purple-700 font-mono leading-none">
+                  {qcCount}
+                </div>
+                <div className="text-[10px] font-bold text-purple-600 uppercase tracking-wider mt-1 truncate">
+                  QC
+                </div>
+              </button>
             </div>
           </div>
         </div>
@@ -1835,21 +2033,19 @@ const EmployeesPage = () => {
               params.delete("status");
               setSearchParams(params);
             }}
-            className={`px-4 py-2 text-sm font-semibold border-b-2 -mb-px transition-colors ${
-              statusParam !== "archived"
-                ? "border-indigo-600 text-indigo-600"
-                : "border-transparent text-slate-500 hover:text-slate-700"
-            }`}
+            className={`px-4 py-2 text-sm font-semibold border-b-2 -mb-px transition-colors ${statusParam !== "archived"
+              ? "border-indigo-600 text-indigo-600"
+              : "border-transparent text-slate-500 hover:text-slate-700"
+              }`}
           >
             <span className="inline-flex items-center gap-2">
               Active Team
               {hasTeamCounts && (
                 <span
-                  className={`rounded-md px-1.5 py-0.5 text-xs font-semibold tabular-nums ${
-                    statusParam !== "archived"
-                      ? "bg-indigo-50 text-indigo-600"
-                      : "bg-slate-100 text-slate-500"
-                  }`}
+                  className={`rounded-md px-1.5 py-0.5 text-xs font-semibold tabular-nums ${statusParam !== "archived"
+                    ? "bg-indigo-50 text-indigo-600"
+                    : "bg-slate-100 text-slate-500"
+                    }`}
                 >
                   {activeTeamCount}
                 </span>
@@ -1862,21 +2058,19 @@ const EmployeesPage = () => {
               params.set("status", "archived");
               setSearchParams(params);
             }}
-            className={`px-4 py-2 text-sm font-semibold border-b-2 -mb-px transition-colors ${
-              statusParam === "archived"
-                ? "border-indigo-600 text-indigo-600"
-                : "border-transparent text-slate-500 hover:text-slate-700"
-            }`}
+            className={`px-4 py-2 text-sm font-semibold border-b-2 -mb-px transition-colors ${statusParam === "archived"
+              ? "border-indigo-600 text-indigo-600"
+              : "border-transparent text-slate-500 hover:text-slate-700"
+              }`}
           >
             <span className="inline-flex items-center gap-2">
               Archived / Former
               {hasTeamCounts && (
                 <span
-                  className={`rounded-md px-1.5 py-0.5 text-xs font-semibold tabular-nums ${
-                    statusParam === "archived"
-                      ? "bg-indigo-50 text-indigo-600"
-                      : "bg-slate-100 text-slate-500"
-                  }`}
+                  className={`rounded-md px-1.5 py-0.5 text-xs font-semibold tabular-nums ${statusParam === "archived"
+                    ? "bg-indigo-50 text-indigo-600"
+                    : "bg-slate-100 text-slate-500"
+                    }`}
                 >
                   {archivedTeamCount}
                 </span>
@@ -1906,11 +2100,10 @@ const EmployeesPage = () => {
                       }
                       setSearchParams(params);
                     }}
-                    className={`px-3.5 py-1.5 text-[13px] font-semibold rounded-md transition-all ${
-                      isActive
-                        ? "bg-white text-slate-900 shadow-sm ring-1 ring-slate-200/70"
-                        : "text-slate-500 hover:text-slate-800"
-                    }`}
+                    className={`px-3.5 py-1.5 text-[13px] font-semibold rounded-md transition-all ${isActive
+                      ? "bg-white text-slate-900 shadow-sm ring-1 ring-slate-200/70"
+                      : "text-slate-500 hover:text-slate-800"
+                      }`}
                   >
                     {label}
                   </button>
@@ -1962,7 +2155,10 @@ const EmployeesPage = () => {
               setSkillFilter={setSkillFilter}
               designationOptions={designationOptions}
               designationFilter={designationFilter}
-              setDesignationFilter={setDesignationFilter}
+              setDesignationFilter={(val) => {
+                setDesignationFilter(val);
+                if (!val || val.length === 0) setColDesignation("");
+              }}
               typeFilter={colType}
               setTypeFilter={setColType}
               typeOptions={typeValues}
@@ -2035,7 +2231,6 @@ const EmployeesPage = () => {
                 type="button"
                 onClick={cycleNameSort}
                 className="inline-flex items-center gap-1 hover:text-slate-900"
-                title="Sort by name"
               >
                 Employee
                 {sortBy === "name-asc" ? (
@@ -2054,9 +2249,7 @@ const EmployeesPage = () => {
                 currentPage * PAGE_SIZE,
               );
               const pageIndex = visibleRows.indexOf(row);
-              const totalVisible = visibleRows.length;
-              const isNearTop =
-                totalVisible <= 2 ? pageIndex === 0 : pageIndex <= 1;
+              const isNearTop = pageIndex < 4;
               const positionClass = isNearTop
                 ? "top-full mt-1.5"
                 : "bottom-full mb-1.5";
@@ -2066,17 +2259,7 @@ const EmployeesPage = () => {
               const shortName = formatDisplayName(value) || value;
               return (
                 <div className="flex items-center gap-3">
-                  {row.avatar_url ? (
-                    <img
-                      src={row.avatar_url}
-                      alt={shortName}
-                      className="w-9 h-9 rounded-full object-cover flex-shrink-0 ring-1 ring-slate-200"
-                    />
-                  ) : (
-                    <div className="w-9 h-9 rounded-full flex items-center justify-center flex-shrink-0 bg-indigo-50 text-indigo-600 text-[13px] font-semibold ring-1 ring-slate-200">
-                      {getNameInitials(value, 1)}
-                    </div>
-                  )}
+                  <UserAvatar src={row.avatar_url} name={shortName} size="md" />
                   <div className="group relative min-w-0">
                     <div className="text-[13.5px] font-semibold text-slate-900 truncate leading-tight">
                       {shortName}
@@ -2089,22 +2272,23 @@ const EmployeesPage = () => {
                           toast.success("Email copied to clipboard");
                         }
                       }}
-                      className="text-[12px] text-slate-400 truncate cursor-pointer hover:text-indigo-600 transition-colors leading-tight mt-0.5"
+                      className="text-[12px] text-slate-400 cursor-pointer hover:text-indigo-600 transition-colors leading-tight mt-0.5 min-w-0"
                     >
-                      {row.email}
+                      <span className="pointer-events-none block truncate">{row.email}</span>
                     </div>
-                    {/* Light hover card — the FULL stored name (middle names and
-                        all) plus the email, so nothing shortened above is lost. */}
-                    <div
-                      className={`absolute left-0 ${positionClass} hidden group-hover:block z-40 p-2.5 bg-white rounded-xl shadow-xl border border-slate-200 min-w-[180px] max-w-[280px] pointer-events-none`}
-                    >
-                      <div className="text-[13px] font-semibold text-slate-800 break-words">
-                        {value}
+                    {/* Light hover card — full name + email */}
+                    {((value || "").length > 22 || (row.email || "").length > 25) && (
+                      <div
+                        className={`absolute left-0 ${positionClass} hidden group-hover:block z-40 p-2.5 bg-white rounded-xl shadow-xl border border-slate-200 min-w-[180px] max-w-[280px] pointer-events-none`}
+                      >
+                        <div className="text-[13px] font-semibold text-slate-800 break-words">
+                          {value}
+                        </div>
+                        <div className="text-[12px] text-slate-500 break-words mt-0.5">
+                          {row.email}
+                        </div>
                       </div>
-                      <div className="text-[12px] text-slate-500 break-words mt-0.5">
-                        {row.email}
-                      </div>
-                    </div>
+                    )}
                   </div>
                 </div>
               );
@@ -2115,10 +2299,7 @@ const EmployeesPage = () => {
             label: "Designation",
             width: "w-[14%]",
             render: (value) => (
-              <span
-                className="text-[13px] font-medium text-slate-600 whitespace-nowrap truncate max-w-[140px] inline-block align-middle"
-                title={value || "—"}
-              >
+              <span className="pointer-events-none text-[13px] font-medium text-slate-600 whitespace-nowrap truncate max-w-[140px] inline-block align-middle">
                 {value || "—"}
               </span>
             ),
@@ -2162,9 +2343,7 @@ const EmployeesPage = () => {
                 currentPage * PAGE_SIZE,
               );
               const pageIndex = visibleRows.indexOf(row);
-              const totalVisible = visibleRows.length;
-              const isNearTop =
-                totalVisible <= 2 ? pageIndex === 0 : pageIndex <= 1;
+              const isNearTop = pageIndex < 4;
               const positionClass = isNearTop
                 ? "top-full mt-1.5"
                 : "bottom-full mb-1.5";
@@ -2242,9 +2421,7 @@ const EmployeesPage = () => {
                 currentPage * PAGE_SIZE,
               );
               const pageIndex = visibleRows.indexOf(row);
-              const totalVisible = visibleRows.length;
-              const isNearTop =
-                totalVisible <= 2 ? pageIndex === 0 : pageIndex <= 1;
+              const isNearTop = pageIndex < 4;
               const positionClass = isNearTop
                 ? "top-full mt-1.5"
                 : "bottom-full mb-1.5";
@@ -2252,7 +2429,7 @@ const EmployeesPage = () => {
 
               return (
                 <div className="group relative flex items-center gap-1 flex-nowrap whitespace-nowrap cursor-default">
-                  <span className="text-[13px] font-medium text-slate-700 truncate max-w-[150px]">
+                  <span className="pointer-events-none text-[13px] font-medium text-slate-700 truncate max-w-[150px] inline-block">
                     {managers[0]}
                   </span>
                   {extra > 0 && (
@@ -2261,24 +2438,26 @@ const EmployeesPage = () => {
                     </span>
                   )}
 
-                  <div
-                    className={`absolute left-0 ${positionClass} hidden group-hover:flex flex-col gap-1.5 z-30 p-2.5 bg-white text-slate-700 rounded-xl shadow-xl border border-slate-200 min-w-[180px] max-w-[260px] pointer-events-none`}
-                  >
-                    <div className="text-xs font-semibold text-slate-400 uppercase tracking-wider">
-                      Reporting Manager{managers.length > 1 ? "s" : ""} (
-                      {managers.length})
+                  {(extra > 0 || (managers[0] || "").length > 18) && (
+                    <div
+                      className={`absolute left-0 ${positionClass} hidden group-hover:flex flex-col gap-1.5 z-30 p-2.5 bg-white text-slate-700 rounded-xl shadow-xl border border-slate-200 min-w-[180px] max-w-[260px] pointer-events-none`}
+                    >
+                      <div className="text-xs font-semibold text-slate-400 uppercase tracking-wider">
+                        Reporting Manager{managers.length > 1 ? "s" : ""} (
+                        {managers.length})
+                      </div>
+                      <div className="flex flex-wrap gap-1">
+                        {managers.map((name, idx) => (
+                          <span
+                            key={idx}
+                            className="inline-flex items-center px-2 py-0.5 rounded-md text-xs font-medium bg-indigo-50 text-indigo-700 border border-indigo-200"
+                          >
+                            {name}
+                          </span>
+                        ))}
+                      </div>
                     </div>
-                    <div className="flex flex-wrap gap-1">
-                      {managers.map((name, idx) => (
-                        <span
-                          key={idx}
-                          className="inline-flex items-center px-2 py-0.5 rounded-md text-xs font-medium bg-indigo-50 text-indigo-700 border border-indigo-200"
-                        >
-                          {name}
-                        </span>
-                      ))}
-                    </div>
-                  </div>
+                  )}
                 </div>
               );
             },
@@ -2298,9 +2477,7 @@ const EmployeesPage = () => {
                 currentPage * PAGE_SIZE,
               );
               const pageIndex = visibleRows.indexOf(row);
-              const totalVisible = visibleRows.length;
-              const isNearTop =
-                totalVisible <= 2 ? pageIndex === 0 : pageIndex <= 1;
+              const isNearTop = pageIndex < 4;
               const positionClass = isNearTop
                 ? "top-full mt-1.5"
                 : "bottom-full mb-1.5";
@@ -2308,19 +2485,16 @@ const EmployeesPage = () => {
 
               return (
                 <div className="group relative flex items-center gap-1 flex-nowrap whitespace-nowrap cursor-default">
-                  <span className="min-w-0 truncate rounded-md border border-indigo-200 bg-indigo-50 px-2 py-0.5 text-[12px] font-medium text-indigo-700">
+                  <span className="pointer-events-none min-w-0 truncate max-w-[140px] inline-block rounded-md border border-indigo-200 bg-indigo-50 px-2 py-0.5 text-[12px] font-medium text-indigo-700">
                     {skillsList[0]}
                   </span>
                   {extra > 0 && (
-                    <span
-                      className="inline-flex items-center justify-center flex-shrink-0 h-5 min-w-5 rounded-full bg-slate-100 px-1 text-[10px] font-semibold text-slate-500"
-                      title={`${extra} more`}
-                    >
+                    <span className="inline-flex items-center justify-center flex-shrink-0 h-5 min-w-5 rounded-full bg-slate-100 px-1 text-[10px] font-semibold text-slate-500">
                       +{extra}
                     </span>
                   )}
 
-                  {skillsList.length > 1 && (
+                  {(extra > 0 || (skillsList[0] || "").length > 18) && (
                     <div
                       className={`absolute left-0 ${positionClass} hidden group-hover:flex flex-col gap-1.5 z-30 p-2.5 bg-white text-slate-700 rounded-xl shadow-xl border border-slate-200 min-w-[180px] max-w-[260px] pointer-events-none`}
                     >
@@ -2370,9 +2544,7 @@ const EmployeesPage = () => {
                 currentPage * PAGE_SIZE,
               );
               const pageIndex = visibleRows.indexOf(row);
-              const totalVisible = visibleRows.length;
-              const isNearTop =
-                totalVisible <= 2 ? pageIndex === 0 : pageIndex <= 1;
+              const isNearTop = pageIndex < 4;
               const positionClass = isNearTop
                 ? "top-full mt-1.5"
                 : "bottom-full mb-1.5";
@@ -2380,36 +2552,37 @@ const EmployeesPage = () => {
 
               return (
                 <div className="group relative flex items-center gap-1 flex-nowrap whitespace-nowrap cursor-default">
-                  <span className="min-w-0 truncate rounded-md border border-slate-200 bg-slate-50 px-2 py-0.5 text-[12px] font-medium text-slate-700">
+                  <span className="pointer-events-none min-w-0 truncate max-w-[170px] inline-block rounded-md border border-slate-200 bg-slate-50 px-2 py-0.5 text-[12px] font-medium text-slate-700">
                     {list[0]}
                   </span>
                   {extra > 0 && (
-                    <span
-                      className="inline-flex items-center justify-center flex-shrink-0 h-5 min-w-5 rounded-full bg-slate-100 px-1 text-[10px] font-semibold text-slate-500"
-                      title={`${extra} more`}
-                    >
+                    <span className="inline-flex items-center justify-center flex-shrink-0 h-5 min-w-5 rounded-full bg-slate-100 px-1 text-[10px] font-semibold text-slate-500">
                       +{extra}
                     </span>
                   )}
 
-                  <div
-                    className={`absolute left-0 ${positionClass} hidden group-hover:flex flex-col gap-1.5 z-30 p-2.5 bg-white text-slate-700 rounded-xl shadow-xl border border-slate-200 min-w-[200px] max-w-[280px] pointer-events-none whitespace-normal`}
-                  >
-                    <div className="text-xs font-semibold text-slate-400 uppercase tracking-wider">
-                      Assigned Project{list.length > 1 ? "s" : ""} (
-                      {list.length})
-                    </div>
-                    <div className="flex flex-wrap gap-1">
-                      {list.map((name, idx) => (
-                        <span
-                          key={idx}
-                          className="inline-flex items-center px-2 py-0.5 rounded-md text-xs font-medium bg-indigo-50 text-indigo-700 border border-indigo-200"
-                        >
-                          {name}
+                  {(extra > 0 || (list[0] || "").length > 20) && (
+                    <div
+                      className={`absolute right-0 ${positionClass} hidden group-hover:flex flex-col gap-1.5 z-40 p-3 bg-white text-slate-700 rounded-xl shadow-xl border border-slate-200 min-w-[220px] max-w-[300px] pointer-events-none whitespace-normal`}
+                    >
+                      <div className="text-[11px] font-bold text-slate-400 uppercase tracking-wider pb-1 border-b border-slate-100 flex items-center justify-between">
+                        <span>Assigned Projects</span>
+                        <span className="rounded-full bg-slate-100 px-1.5 py-0.5 text-[10px] font-semibold text-slate-600">
+                          {list.length}
                         </span>
-                      ))}
+                      </div>
+                      <div className="flex flex-wrap gap-1 mt-1">
+                        {list.map((name, idx) => (
+                          <span
+                            key={idx}
+                            className="inline-flex items-center px-2 py-1 rounded-md text-xs font-medium bg-indigo-50 text-indigo-700 border border-indigo-200 break-words max-w-full"
+                          >
+                            {name}
+                          </span>
+                        ))}
+                      </div>
                     </div>
-                  </div>
+                  )}
                 </div>
               );
             },

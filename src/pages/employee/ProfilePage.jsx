@@ -1,6 +1,7 @@
 import React, { useState, useEffect, useRef } from "react";
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
 import Button from "../../components/ui/Button";
+import UserAvatar from "../../components/ui/UserAvatar";
 import Dropdown from "../../components/ui/Dropdown";
 import { authApi, employeeApi, skillsApi } from "../../services/api";
 import {
@@ -295,18 +296,16 @@ const SkillsMultiSelect = ({ selected, onChange, options, isLoading }) => {
                   key={skill.id}
                   type="button"
                   onClick={() => toggle(skill.name)}
-                  className={`flex w-full items-center gap-3 px-4 py-2.5 text-left text-sm transition-colors ${
-                    isSelected
-                      ? "bg-emerald-50 font-medium text-emerald-800"
-                      : "text-slate-700 hover:bg-slate-50"
-                  }`}
+                  className={`flex w-full items-center gap-3 px-4 py-2.5 text-left text-sm transition-colors ${isSelected
+                    ? "bg-emerald-50 font-medium text-emerald-800"
+                    : "text-slate-700 hover:bg-slate-50"
+                    }`}
                 >
                   <div
-                    className={`flex h-5 w-5 shrink-0 items-center justify-center rounded-md border-2 transition-all ${
-                      isSelected
-                        ? "border-emerald-500 bg-emerald-500 text-white"
-                        : "border-slate-300 bg-white"
-                    }`}
+                    className={`flex h-5 w-5 shrink-0 items-center justify-center rounded-md border-2 transition-all ${isSelected
+                      ? "border-emerald-500 bg-emerald-500 text-white"
+                      : "border-slate-300 bg-white"
+                      }`}
                   >
                     {isSelected && <Check className="h-3 w-3" />}
                   </div>
@@ -408,7 +407,7 @@ const ProfilePage = () => {
     onError: (err) => {
       setSaveError(
         err?.response?.data?.detail ||
-          "Failed to save changes. Please try again.",
+        "Failed to save changes. Please try again.",
       );
     },
   });
@@ -526,17 +525,14 @@ const ProfilePage = () => {
                 className="hidden"
                 onChange={handleAvatarFile}
               />
-              {mergedProfile.avatarUrl ? (
-                <img
-                  src={mergedProfile.avatarUrl}
-                  alt={mergedProfile.name || "Profile"}
-                  className="h-20 w-20 rounded-3xl object-cover shadow-[0_16px_40px_rgba(5,150,105,0.24)]"
-                />
-              ) : (
-                <div className="flex h-20 w-20 items-center justify-center rounded-3xl bg-emerald-600 text-2xl font-semibold text-white shadow-[0_16px_40px_rgba(5,150,105,0.24)]">
-                  {(mergedProfile.name || "U").charAt(0)}
-                </div>
-              )}
+              <UserAvatar
+                src={mergedProfile.avatarUrl}
+                name={mergedProfile.name}
+                size="xl"
+                className="h-20 w-20 shadow-[0_16px_40px_rgba(5,150,105,0.24)] !rounded-3xl"
+                fallbackClassName="bg-emerald-600 text-white shadow-[0_16px_40px_rgba(5,150,105,0.24)] !rounded-3xl"
+                imgClassName="!rounded-3xl"
+              />
 
               {/* hover overlay to change picture */}
               <button

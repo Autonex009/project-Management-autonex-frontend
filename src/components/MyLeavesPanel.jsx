@@ -3,6 +3,7 @@ import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
 import Button from "./ui/Button";
 import DatePicker from "./ui/DatePicker";
 import { leaveApi, wfhApi } from "../services/api";
+import { logChange } from "../services/changeLogService";
 import Spinner from "./ui/LoadingSpinner";
 import {
   Calendar,
@@ -41,9 +42,11 @@ import {
   ANNUAL_LEAVE_QUOTA,
   INTERN_MONTHLY_PAID_QUOTA,
   isIntern,
-  normalizeLeaveType,
   validateConsecutiveLeaves,
+  recordLeaveApplication,
 } from "../utils/leaveTypes";
+import OverLimitHoverCard from "./ui/OverLimitHoverCard";
+
 import LeaveCalendar from "./LeaveCalendar";
 import ConfirmDialog from "./ui/ConfirmDialog";
 
@@ -263,7 +266,7 @@ const MyLeavesPanel = ({
 }) => {
   const queryClient = useQueryClient();
   const user = JSON.parse(localStorage.getItem("user") || "{}");
-  const employeeId = user.employee_id;
+  const employeeId = user.employee_id || user.id;
 
   const [activeTab, setActiveTab] = useState("My Leaves");
   const [showLeaveForm, setShowLeaveForm] = useState(false);
@@ -389,8 +392,29 @@ const MyLeavesPanel = ({
   }, [allLeaves, intern, currentYear, currentMonth]);
 
   const createLeaveMutation = useMutation({
-    mutationFn: (data) => leaveApi.create({ ...data, employee_id: employeeId }),
-    onSuccess: (data) => {
+    mutationFn: (data) =>
+      leaveApi.create({
+        ...data,
+        employee_id: employeeId,
+        created_at: new Date().toISOString(),
+        applied_on: format(new Date(), "yyyy-MM-dd"),
+      }),
+    onSuccess: (data, variables) => {
+      recordLeaveApplication({ ...variables, ...data });
+      logChange({
+        category: "Leaves",
+        action: "Applied for Leave",
+        actionType: "Applied",
+        entity: "Leave",
+        entityId: data?.id || data?.leave_id || "",
+        entityName: user?.name || "Employee",
+        details: [
+          { field: "Leave Type", from: "—", to: getLeaveTypeLabel(variables?.leave_type) },
+          { field: "Applied On", from: "—", to: new Date().toLocaleDateString() },
+          { field: "Dates", from: "—", to: `${variables?.start_date || ""} to ${variables?.end_date || ""}` },
+          { field: "Status", from: "—", to: "Pending Approval" },
+        ],
+      });
       queryClient.invalidateQueries({ queryKey: ["my-leaves"] });
       queryClient.invalidateQueries(["leave-calendar"]);
       setShowLeaveForm(false);
@@ -539,12 +563,17 @@ const MyLeavesPanel = ({
       return;
     }
 
-    createLeaveMutation.mutate({
+    const payload = {
       ...leaveForm,
+      employee_id: employeeId,
       is_half_day: isHalf,
       half_day_slot: isHalf ? leaveForm.leave_type : null,
       end_date: eDate,
-    });
+      created_at: new Date().toISOString(),
+      applied_on: format(new Date(), "yyyy-MM-dd"),
+    };
+    recordLeaveApplication(payload);
+    createLeaveMutation.mutate(payload);
   };
 
   const handleWfhSubmit = (e) => {
@@ -1155,10 +1184,7 @@ const MyLeavesPanel = ({
                                 {getLeaveTypeLabel(leave.leave_type)}
                               </p>
                               {leave.flagged && (
-                                <span className="inline-flex items-center gap-1 px-2 py-0.5 rounded-full text-[10px] font-semibold bg-orange-100 text-orange-700 border border-orange-200">
-                                  <AlertTriangle className="w-2.5 h-2.5" />
-                                  Exceeds monthly limit
-                                </span>
+                                <OverLimitHoverCard leave={leave} allLeaves={leaves} />
                               )}
                             </div>
                             <p className="text-xs text-slate-400">

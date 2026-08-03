@@ -27,11 +27,13 @@ import {
   getLeaveTypeLabel,
   getLeaveTypeBadgeClass,
   getWorkingDayCount,
+  resolveLeaveAppliedDate,
 } from "../../utils/leaveTypes";
 import LeaveCalendar from "../../components/LeaveCalendar";
 import EmployeeKPIPanel from "../../components/EmployeeKPIPanel";
 import Modal from "../../components/ui/Modal";
 import { formatDisplayName, getNameInitials } from "../../utils/displayName";
+import OverLimitHoverCard from "../../components/ui/OverLimitHoverCard";
 
 const TABS = ["Leave Requests", "Calendar", "WFH Requests", "Employee KPI"];
 
@@ -216,39 +218,18 @@ const PMLeavesPage = () => {
             {
               key: "employee_id",
               label: "Employee",
-              width: "w-[22%]",
+              width: "w-[20%]",
               render: (_, leave) => {
                 const emp = employees.find((e) => e.id === leave.employee_id);
                 const empName = formatDisplayName(emp?.name) || `#${leave.employee_id}`;
                 return (
-                  <div className="flex items-center gap-3 min-w-0">
-                    {emp?.avatar_url ? (
-                      <img
-                        src={emp.avatar_url}
-                        alt={empName}
-                        className="w-9 h-9 rounded-full object-cover flex-shrink-0 ring-1 ring-slate-200"
-                      />
-                    ) : (
-                      <div className="w-9 h-9 rounded-full flex items-center justify-center flex-shrink-0 bg-indigo-50 text-indigo-600 text-[13px] font-semibold ring-1 ring-slate-200">
-                        {getNameInitials(empName, 1)}
-                      </div>
-                    )}
-                    <div className="flex items-center min-w-0">
-                      <div className="flex flex-col min-w-0 pr-4">
-                        <span className="font-bold text-slate-800 truncate">
-                          {empName}
-                        </span>
-                        <span className="text-[11px] text-slate-400 truncate">
-                          {emp?.email || ""}
-                        </span>
-                      </div>
+                  <div className="min-w-0">
+                    <div className="flex items-center gap-2 min-w-0">
+                      <span className="font-semibold text-slate-800 truncate whitespace-nowrap">
+                        {empName}
+                      </span>
                       {leave.flagged && (
-                        <span
-                          title="Over limit"
-                          className="inline-flex items-center justify-center h-5 w-5 shrink-0 rounded-full bg-orange-100 text-orange-600 border border-orange-200 cursor-help ml-2"
-                        >
-                          <AlertTriangle className="w-3 h-3" />
-                        </span>
+                        <OverLimitHoverCard leave={leave} allLeaves={leaves} />
                       )}
                       {leave.approval_remark && (
                         <p className="text-xs text-slate-400 mt-0.5 truncate ml-2">
@@ -263,7 +244,7 @@ const PMLeavesPage = () => {
             {
               key: "leave_type",
               label: "Leave Type",
-              width: "w-[14%]",
+              width: "w-[12%]",
               render: (value) => (
                 <span
                   className={`inline-flex whitespace-nowrap px-2.5 py-1 rounded-full text-xs font-medium ${getLeaveTypeBadgeClass(value)}`}
@@ -277,7 +258,7 @@ const PMLeavesPage = () => {
             {
               key: "start_date",
               label: "Start Date",
-              width: "w-[12%]",
+              width: "w-[11%]",
               render: (value) => (
                 <span className="text-[13px] text-slate-700 whitespace-nowrap">
                   {format(parseISO(value), "MMM d, yyyy")}
@@ -287,7 +268,7 @@ const PMLeavesPage = () => {
             {
               key: "end_date",
               label: "End Date",
-              width: "w-[12%]",
+              width: "w-[11%]",
               render: (value) => (
                 <span className="text-[13px] text-slate-700 whitespace-nowrap">
                   {format(parseISO(value), "MMM d, yyyy")}
@@ -295,10 +276,28 @@ const PMLeavesPage = () => {
               ),
             },
             {
+              key: "applied_on",
+              label: "Applied On",
+              width: "w-[11%]",
+              render: (_, leave) => {
+                const rawApplied = resolveLeaveAppliedDate(leave);
+                if (!rawApplied) return <span className="text-[13px] text-slate-400">—</span>;
+                const d = new Date(
+                  rawApplied.includes("T") ? rawApplied : rawApplied + "T00:00:00"
+                );
+                if (isNaN(d.getTime())) return <span className="text-[13px] text-slate-400">—</span>;
+                return (
+                  <span className="text-[13px] text-slate-700 whitespace-nowrap">
+                    {format(d, "MMM d, yyyy")}
+                  </span>
+                );
+              },
+            },
+            {
               key: "leave_id",
               label: "Duration",
               align: "center",
-              width: "w-[13%]",
+              width: "w-[11%]",
               render: (_, leave) => {
                 const duration = getWorkingDayCount(
                   leave.start_date,
@@ -306,17 +305,17 @@ const PMLeavesPage = () => {
                   leave.is_half_day,
                 );
                 return (
-                  <span>
+                  <span className="whitespace-nowrap inline-flex items-center justify-center gap-1">
                     <span className="text-sm font-semibold text-slate-800">
                       {duration}
                     </span>
-                    <span className="text-xs text-slate-400 ml-1">
+                    <span className="text-xs text-slate-400">
                       {leave.is_half_day ? (
                         <>
                           day (
-                          {leave.half_day_slot === "first_half"
-                            ? "First Half"
-                            : "Second Half"}
+                          {leave.half_day_slot === "first_half" || leave.half_day_slot === "1st Half"
+                            ? "1st Half"
+                            : "2nd Half"}
                           )
                         </>
                       ) : duration === 1 ? (
@@ -333,14 +332,14 @@ const PMLeavesPage = () => {
               key: "status",
               label: "Status",
               align: "center",
-              width: "w-[12%]",
+              width: "w-[11%]",
               render: (value) => STATUS_BADGE[value] || STATUS_BADGE.pending,
             },
             {
               key: "_actions",
               label: "Actions",
               align: "right",
-              width: "w-[15%]",
+              width: "w-[13%]",
               render: (_, leave) => {
                 const isPending = !leave.status || leave.status === "pending";
                 const iconBtn =

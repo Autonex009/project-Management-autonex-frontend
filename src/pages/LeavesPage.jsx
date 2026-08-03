@@ -2,9 +2,11 @@ import { useState, useRef, useEffect } from "react";
 import { useSearchParams } from "react-router-dom";
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
 import { leaveApi, employeeApi, wfhApi } from "../services/api";
+import { logChange } from "../services/changeLogService";
 import Spinner from "../components/ui/LoadingSpinner";
 import Button from "../components/ui/Button";
 import DatePicker from "../components/ui/DatePicker";
+import UserAvatar from "../components/ui/UserAvatar";
 import {
   Plus,
   Calendar,
@@ -31,6 +33,8 @@ import {
   LEAVE_TYPE_OPTIONS,
   getWorkingDayCount,
   validateConsecutiveLeaves,
+  resolveLeaveAppliedDate,
+  recordLeaveApplication,
 } from "../utils/leaveTypes";
 import LeaveCalendar from "../components/LeaveCalendar";
 import ConfirmDialog from "../components/ui/ConfirmDialog";
@@ -39,6 +43,8 @@ import Dropdown from "../components/ui/Dropdown";
 import Table from "../components/ui/Table";
 import EmployeeKPIPanel from "../components/EmployeeKPIPanel";
 import Modal from "../components/ui/Modal";
+import OverLimitHoverCard from "../components/ui/OverLimitHoverCard";
+
 
 const TABS = ["Leave List", "Calendar", "WFH Requests", "Employee KPI"];
 
@@ -162,11 +168,23 @@ const LeavesPage = () => {
   // ── Leave mutations ──────────────────────────────────────────────
   const approveMutation = useMutation({
     mutationFn: ({ id, remark }) => leaveApi.approve(id, user.id, remark),
-    onSuccess: () => {
+    onSuccess: (res, variables) => {
       queryClient.invalidateQueries(["leaves"]);
       setRemarkModal(null);
       setRemark("");
       toast.success("Leave approved");
+      logChange({
+        category: "Leaves",
+        action: "Approved Leave Request",
+        actionType: "Approved",
+        entity: "Leave",
+        entityId: variables?.id || "",
+        entityName: "Employee Leave",
+        details: [
+          { field: "Leave Status", from: "Pending", to: "Approved" },
+          { field: "Remark", from: "—", to: variables?.remark || "Approved" },
+        ],
+      });
     },
     onError: (err) =>
       toast.error(err.response?.data?.detail || "Failed to approve leave"),
@@ -174,9 +192,18 @@ const LeavesPage = () => {
 
   const rejectMutation = useMutation({
     mutationFn: (id) => leaveApi.reject(id, user.id),
-    onSuccess: () => {
+    onSuccess: (_, id) => {
       queryClient.invalidateQueries(["leaves"]);
       toast.success("Leave rejected");
+      logChange({
+        category: "Leaves",
+        action: "Rejected Leave Request",
+        actionType: "Rejected",
+        entity: "Leave",
+        entityId: id,
+        entityName: "Employee Leave",
+        details: [{ field: "Leave Status", from: "Pending", to: "Rejected" }],
+      });
     },
     onError: (err) =>
       toast.error(err.response?.data?.detail || "Failed to reject leave"),
@@ -206,12 +233,32 @@ const LeavesPage = () => {
 
   const createMutation = useMutation({
     mutationFn: leaveApi.create,
-    onSuccess: () => {
+    onSuccess: (res, variables) => {
+      recordLeaveApplication({ ...variables, id: res?.id || res?.leave_id });
       queryClient.invalidateQueries(["leaves"]);
       setIsModalOpen(false);
       setSelectedLeaveType("");
       setFormEmployeeId("");
       toast.success("Leave record created successfully");
+
+      const targetEmp = employees.find(
+        (e) => String(e.id) === String(variables?.employee_id)
+      );
+
+      logChange({
+        category: "Leaves",
+        action: "Applied for Leave",
+        actionType: "Applied",
+        entity: "Leave",
+        entityId: res?.id || "",
+        entityName: targetEmp?.name || "Employee",
+        details: [
+          { field: "Leave Type", from: "—", to: variables?.leave_type || "Casual" },
+          { field: "Applied On", from: "—", to: new Date().toLocaleDateString() },
+          { field: "Dates", from: "—", to: `${variables?.start_date || ""} to ${variables?.end_date || ""}` },
+          { field: "Status", from: "—", to: "Pending Approval" },
+        ],
+      });
     },
     onError: (err) =>
       toast.error(
@@ -328,14 +375,18 @@ const LeavesPage = () => {
       return;
     }
 
-    createMutation.mutate({
+    const payload = {
       employee_id: parseInt(employeeId),
       start_date: startDate,
       end_date: endDate,
       leave_type: leaveType,
       is_half_day: isHalf,
       half_day_slot: isHalf ? leaveType : null,
-    });
+      created_at: new Date().toISOString(),
+      applied_on: format(new Date(), "yyyy-MM-dd"),
+    };
+    recordLeaveApplication(payload);
+    createMutation.mutate(payload);
   };
 
   const getEmployeeName = (id) =>
@@ -439,11 +490,10 @@ const LeavesPage = () => {
               <button
                 key={tab}
                 onClick={() => handleTabChange(tab)}
-                className={`inline-flex items-center gap-1.5 px-3.5 py-1.5 text-[13px] font-semibold rounded-md transition-all whitespace-nowrap ${
-                  isActive
-                    ? "bg-white text-slate-900 shadow-sm ring-1 ring-slate-200/70"
-                    : "text-slate-500 hover:text-slate-800"
-                }`}
+                className={`inline-flex items-center gap-1.5 px-3.5 py-1.5 text-[13px] font-semibold rounded-md transition-all whitespace-nowrap ${isActive
+                  ? "bg-white text-slate-900 shadow-sm ring-1 ring-slate-200/70"
+                  : "text-slate-500 hover:text-slate-800"
+                  }`}
               >
                 {tab === "WFH Requests" ? (
                   <>
@@ -603,37 +653,24 @@ const LeavesPage = () => {
             {
               key: "employee_id",
               label: "Employee",
-              width: "w-[22%]",
+              width: "w-[20%]",
               render: (_, leave) => {
-                const emp = employees.find(e => e.id === leave.employee_id);
+                const emp = employees.find((e) => e.id === leave.employee_id);
                 const empName = getEmployeeName(leave.employee_id);
                 return (
                   <div className="flex items-center gap-3 min-w-0">
-                    {emp?.avatar_url ? (
-                      <img
-                        src={emp.avatar_url}
-                        alt={empName}
-                        className="w-9 h-9 rounded-full object-cover flex-shrink-0 ring-1 ring-slate-200"
-                      />
-                    ) : (
-                      <div className="w-9 h-9 rounded-full flex items-center justify-center flex-shrink-0 bg-indigo-50 text-indigo-600 text-[13px] font-semibold ring-1 ring-slate-200">
-                        {getNameInitials(empName, 1)}
-                      </div>
-                    )}
-                    <div className="min-w-0">
-                      <div className="flex items-center gap-2 min-w-0">
-                        <span className="font-semibold text-slate-800 truncate">
-                          {empName}
-                        </span>
-                        {leave.flagged && (
-                          <span
-                            title="Over limit"
-                            className="inline-flex items-center justify-center h-5 w-5 shrink-0 rounded-full bg-orange-100 text-orange-600 border border-orange-200 cursor-help"
-                          >
-                            <AlertTriangle className="w-3 h-3" />
-                          </span>
-                        )}
-                      </div>
+                    <UserAvatar
+                      src={emp?.avatar_url}
+                      name={empName}
+                      size="sm"
+                    />
+                    <div className="flex items-center gap-2 min-w-0">
+                      <span className="font-semibold text-slate-800 truncate whitespace-nowrap">
+                        {empName}
+                      </span>
+                      {leave.flagged && (
+                        <OverLimitHoverCard leave={leave} allLeaves={leaves} />
+                      )}
                       {leave.approval_remark && (
                         <p className="text-xs text-slate-400 mt-0.5 truncate">
                           Remark: {leave.approval_remark}
@@ -647,7 +684,7 @@ const LeavesPage = () => {
             {
               key: "leave_type",
               label: "Leave Type",
-              width: "w-[14%]",
+              width: "w-[12%]",
               render: (value) => (
                 <span
                   className={`inline-flex whitespace-nowrap px-2.5 py-1 rounded-full text-xs font-medium ${getLeaveTypeBadgeClass(value)}`}
@@ -661,7 +698,7 @@ const LeavesPage = () => {
             {
               key: "start_date",
               label: "Start Date",
-              width: "w-[12%]",
+              width: "w-[11%]",
               render: (value) => (
                 <span className="text-[13px] text-slate-700 whitespace-nowrap">
                   {format(new Date(value + "T00:00:00"), "MMM d, yyyy")}
@@ -671,7 +708,7 @@ const LeavesPage = () => {
             {
               key: "end_date",
               label: "End Date",
-              width: "w-[12%]",
+              width: "w-[11%]",
               render: (value) => (
                 <span className="text-[13px] text-slate-700 whitespace-nowrap">
                   {format(new Date(value + "T00:00:00"), "MMM d, yyyy")}
@@ -679,10 +716,28 @@ const LeavesPage = () => {
               ),
             },
             {
+              key: "applied_on",
+              label: "Applied On",
+              width: "w-[11%]",
+              render: (_, leave) => {
+                const rawApplied = resolveLeaveAppliedDate(leave);
+                if (!rawApplied) return <span className="text-[13px] text-slate-400">—</span>;
+                const d = new Date(
+                  rawApplied.includes("T") ? rawApplied : rawApplied + "T00:00:00"
+                );
+                if (isNaN(d.getTime())) return <span className="text-[13px] text-slate-400">—</span>;
+                return (
+                  <span className="text-[13px] text-slate-700 whitespace-nowrap">
+                    {format(d, "MMM d, yyyy")}
+                  </span>
+                );
+              },
+            },
+            {
               key: "leave_id",
               label: "Duration",
               align: "center",
-              width: "w-[13%]",
+              width: "w-[11%]",
               render: (_, leave) => {
                 const duration = getWorkingDayCount(
                   leave.start_date,
@@ -690,17 +745,17 @@ const LeavesPage = () => {
                   leave.is_half_day,
                 );
                 return (
-                  <span>
+                  <span className="whitespace-nowrap inline-flex items-center justify-center gap-1">
                     <span className="text-sm font-semibold text-slate-800">
                       {duration}
                     </span>
-                    <span className="text-xs text-slate-400 ml-1">
+                    <span className="text-xs text-slate-400">
                       {leave.is_half_day ? (
                         <>
                           day (
-                          {leave.half_day_slot === "first_half"
-                            ? "First Half"
-                            : "Second Half"}
+                          {leave.half_day_slot === "first_half" || leave.half_day_slot === "1st Half"
+                            ? "1st Half"
+                            : "2nd Half"}
                           )
                         </>
                       ) : duration === 1 ? (
@@ -717,18 +772,18 @@ const LeavesPage = () => {
               key: "status",
               label: "Status",
               align: "center",
-              width: "w-[12%]",
+              width: "w-[11%]",
               render: (value) => STATUS_BADGE[value] || STATUS_BADGE.pending,
             },
             {
               key: "_actions",
               label: "Actions",
               align: "right",
-              width: "w-[15%]",
+              width: "w-[13%]",
               render: (_, leave) => {
                 const isPending = !leave.status || leave.status === "pending";
                 const btn =
-                  "inline-flex items-center gap-1 rounded-md border px-2 py-1 text-xs font-medium transition-colors disabled:opacity-50";
+                  "inline-flex items-center gap-1 rounded-md border px-2 h-8 text-xs font-medium transition-colors disabled:opacity-50";
                 const iconBtn =
                   "inline-flex items-center justify-center h-8 w-8 rounded-md border transition-colors disabled:opacity-50";
                 return (
@@ -1051,14 +1106,14 @@ const LeavesPage = () => {
               <div
                 className={
                   selectedLeaveType === "first_half" ||
-                  selectedLeaveType === "second_half"
+                    selectedLeaveType === "second_half"
                     ? "col-span-2"
                     : ""
                 }
               >
                 <label className="block text-sm font-medium text-gray-700 mb-1">
                   {selectedLeaveType === "first_half" ||
-                  selectedLeaveType === "second_half"
+                    selectedLeaveType === "second_half"
                     ? "Date"
                     : "Start Date"}{" "}
                   <span className="text-red-500">*</span>
@@ -1073,51 +1128,52 @@ const LeavesPage = () => {
                 selectedLeaveType === "first_half" ||
                 selectedLeaveType === "second_half"
               ) && (
-                <div>
-                  <label className="block text-sm font-medium text-gray-700 mb-1">
-                    End Date <span className="text-red-500">*</span>
-                  </label>
-                  <DatePicker
-                    type="date"
-                    name="end_date"
-                    required
-                  />
-                </div>
-              )}
+                  <div>
+                    <label className="block text-sm font-medium text-gray-700 mb-1">
+                      End Date <span className="text-red-500">*</span>
+                    </label>
+                    <input
+                      type="date"
+                      name="end_date"
+                      required
+                      className="input"
+                    />
+                  </div>
+                )}
             </div>
             {(selectedLeaveType === "first_half" ||
               selectedLeaveType === "second_half") && (
-              <div className="rounded-xl border border-indigo-150 bg-indigo-50/50 p-4 text-sm text-indigo-900 space-y-2">
-                <div className="flex items-center gap-1.5 font-semibold text-indigo-950">
-                  <Clock className="w-4 h-4 text-indigo-600" /> Half-day Leave
-                  Policy & Slots
-                </div>
-                <div className="grid grid-cols-1 sm:grid-cols-2 gap-3 text-xs">
-                  <div className="p-2.5 bg-white rounded-lg border border-indigo-100/80">
-                    <p className="font-semibold text-indigo-950">
-                      First Half-day Leave
-                    </p>
-                    <p className="text-slate-600 mt-0.5">
-                      🕒 Slot: 9:00 AM – 2:00 PM
-                    </p>
-                    <p className="text-slate-500 mt-1 font-medium italic">
-                      ⚠️ Apply at least one day in advance.
-                    </p>
+                <div className="rounded-xl border border-indigo-150 bg-indigo-50/50 p-4 text-sm text-indigo-900 space-y-2">
+                  <div className="flex items-center gap-1.5 font-semibold text-indigo-950">
+                    <Clock className="w-4 h-4 text-indigo-600" /> Half-day Leave
+                    Policy & Slots
                   </div>
-                  <div className="p-2.5 bg-white rounded-lg border border-indigo-100/80">
-                    <p className="font-semibold text-indigo-950">
-                      Second Half-day Leave
-                    </p>
-                    <p className="text-slate-600 mt-0.5">
-                      🕒 Slot: 2:00 PM – 7:00 PM
-                    </p>
-                    <p className="text-slate-500 mt-1 font-medium italic">
-                      ⚠️ Apply before 2:00 PM on the same day.
-                    </p>
+                  <div className="grid grid-cols-1 sm:grid-cols-2 gap-3 text-xs">
+                    <div className="p-2.5 bg-white rounded-lg border border-indigo-100/80">
+                      <p className="font-semibold text-indigo-950">
+                        First Half-day Leave
+                      </p>
+                      <p className="text-slate-600 mt-0.5">
+                        🕒 Slot: 9:00 AM – 2:00 PM
+                      </p>
+                      <p className="text-slate-500 mt-1 font-medium italic">
+                        ⚠️ Apply at least one day in advance.
+                      </p>
+                    </div>
+                    <div className="p-2.5 bg-white rounded-lg border border-indigo-100/80">
+                      <p className="font-semibold text-indigo-950">
+                        Second Half-day Leave
+                      </p>
+                      <p className="text-slate-600 mt-0.5">
+                        🕒 Slot: 2:00 PM – 7:00 PM
+                      </p>
+                      <p className="text-slate-500 mt-1 font-medium italic">
+                        ⚠️ Apply before 2:00 PM on the same day.
+                      </p>
+                    </div>
                   </div>
                 </div>
-              </div>
-            )}
+              )}
           </Modal.Body>
           <Modal.Footer>
             <Button
