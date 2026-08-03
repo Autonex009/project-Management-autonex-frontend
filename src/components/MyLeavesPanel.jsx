@@ -278,6 +278,7 @@ const MyLeavesPanel = ({
     reason: "",
     is_half_day: false,
     half_day_slot: "",
+    is_emergency: false,
   });
   const [wfhForm, setWfhForm] = useState({
     wfh_date: "",
@@ -292,6 +293,7 @@ const MyLeavesPanel = ({
     reason: "",
     is_half_day: false,
     half_day_slot: "",
+    is_emergency: false,
   });
   const [editingWfh, setEditingWfh] = useState(null);
   const [editWfhForm, setEditWfhForm] = useState({
@@ -598,6 +600,7 @@ const MyLeavesPanel = ({
       reason: leave.reason || "",
       is_half_day: leave.is_half_day || false,
       half_day_slot: leave.half_day_slot || "",
+      is_emergency: leave.is_emergency || false,
     });
     setShowLeaveForm(false);
   };
@@ -938,6 +941,27 @@ const MyLeavesPanel = ({
                     </div>
                   </div>
                 )}
+                <div className="md:col-span-2">
+                  <label className="flex items-start gap-2 cursor-pointer mt-2">
+                    <input
+                      type="checkbox"
+                      checked={leaveForm.is_emergency}
+                      onChange={(e) =>
+                        setLeaveForm({
+                          ...leaveForm,
+                          is_emergency: e.target.checked,
+                        })
+                      }
+                      className="mt-1 h-4 w-4 text-indigo-600 rounded border-slate-300 focus:ring-indigo-500"
+                    />
+                    <div>
+                      <span className="text-sm font-medium text-slate-700">Emergency Leave</span>
+                      <p className="text-xs text-slate-500">
+                        Check this if this is an emergency. Emergency leave will be flagged with a red dot on the leave page for managers.
+                      </p>
+                    </div>
+                  </label>
+                </div>
                 <div className="md:col-span-2 rounded-lg border border-amber-200 bg-amber-50 px-3 py-2 text-sm text-amber-800">
                   {RAZORPAY_NEGATIVE_BALANCE_NOTE}
                 </div>
@@ -1113,6 +1137,27 @@ const MyLeavesPanel = ({
                     </div>
                   </div>
                 )}
+                <div className="md:col-span-2">
+                  <label className="flex items-start gap-2 cursor-pointer mt-2">
+                    <input
+                      type="checkbox"
+                      checked={editForm.is_emergency}
+                      onChange={(e) =>
+                        setEditForm({
+                          ...editForm,
+                          is_emergency: e.target.checked,
+                        })
+                      }
+                      className="mt-1 h-4 w-4 text-indigo-600 rounded border-slate-300 focus:ring-indigo-500"
+                    />
+                    <div>
+                      <span className="text-sm font-medium text-slate-700">Emergency Leave</span>
+                      <p className="text-xs text-slate-500">
+                        Check this if this is an emergency. Emergency leave will be flagged with a red dot on the leave page for managers.
+                      </p>
+                    </div>
+                  </label>
+                </div>
                 <div className="md:col-span-2 rounded-lg border border-blue-100 bg-blue-50 px-3 py-2 text-sm text-blue-700">
                   Editing will reset the approval status back to{" "}
                   <strong>pending</strong> so your manager can re-review.
@@ -1185,6 +1230,12 @@ const MyLeavesPanel = ({
                               </p>
                               {leave.flagged && (
                                 <OverLimitHoverCard leave={leave} allLeaves={leaves} />
+                              )}
+                              {leave.is_emergency && (
+                                <span className="inline-flex items-center gap-1 px-2 py-0.5 rounded-full text-[10px] font-semibold bg-red-100 text-red-700 border border-red-200">
+                                  <span className="h-1.5 w-1.5 rounded-full bg-red-600"></span>
+                                  Emergency Leave
+                                </span>
                               )}
                             </div>
                             <p className="text-xs text-slate-400">
@@ -1446,9 +1497,21 @@ const MyLeavesPanel = ({
                         )}
                       </div>
                       <div>
-                        <p className="font-medium text-slate-800">
-                          Work From Home
-                        </p>
+                        <div className="flex items-center gap-2">
+                          <p className="font-medium text-slate-800">
+                            Work From Home
+                          </p>
+                          {w.flagged && (
+                            <div className="relative group flex items-center">
+                              <span className="inline-flex items-center justify-center h-4 w-4 rounded-full bg-orange-100 text-orange-600 border border-orange-200 cursor-help">
+                                <AlertTriangle className="w-2.5 h-2.5" />
+                              </span>
+                              <div className="absolute bottom-full left-1/2 -translate-x-1/2 mb-1 hidden group-hover:block px-2 py-1 bg-white text-slate-700 shadow border border-slate-100 text-xs rounded whitespace-nowrap z-50">
+                                Over limit
+                              </div>
+                            </div>
+                          )}
+                        </div>
                         <p className="text-xs text-slate-400">
                           {w.end_date && w.end_date !== w.wfh_date
                             ? `${format(new Date(w.wfh_date + "T00:00:00"), "MMM dd")} — ${format(new Date(w.end_date + "T00:00:00"), "MMM dd, yyyy")}`

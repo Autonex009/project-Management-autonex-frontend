@@ -168,6 +168,7 @@ const splitPendingByTiming = (rows, { startKey, endKey, nameOf }, todayStr) => {
       name: nameOf(row),
       meta: rangeLabel(from, to),
       from,
+      isEmergency: row.is_emergency,
     };
     if (from <= todayStr && to >= todayStr) today.push(person);
     else if (from > todayStr) future.push(person);
@@ -357,9 +358,14 @@ const Dashboard = () => {
 
   const leaveDesk = useMemo(() => {
     const pending = leaves.filter(isPending);
+    const todayPeople = Array.from(onLeaveTodayIds).map((id) => ({
+      id,
+      name: nameOf(id),
+    }));
     return {
       pendingCount: pending.length,
       todayCount: onLeaveTodayIds.size,
+      todayPeople,
       timing: splitPendingByTiming(
         pending,
         {
@@ -375,9 +381,15 @@ const Dashboard = () => {
 
   const wfhDesk = useMemo(() => {
     const pending = wfhRequests.filter(isPending);
+    const wfhTodayIds = getWfhTodayIds(wfhRequests, todayStr);
+    const todayPeople = Array.from(wfhTodayIds).map((id) => ({
+      id,
+      name: nameOf(id),
+    }));
     return {
       pendingCount: pending.length,
-      todayCount: getWfhTodayIds(wfhRequests, todayStr).size,
+      todayCount: wfhTodayIds.size,
+      todayPeople,
       timing: splitPendingByTiming(
         pending,
         {
@@ -684,6 +696,7 @@ const Dashboard = () => {
                     { value: leaveDesk.todayCount, label: "on leave" },
                   ],
                   tabs: timingTabs(leaveDesk.timing),
+                  todayPeople: leaveDesk.todayPeople,
                   emptyLabel: "Nothing pending for this period",
                   onClick: () => goFromKpi("/admin/leaves"),
                   onSelectPerson: (person) =>
@@ -705,6 +718,7 @@ const Dashboard = () => {
                     { value: wfhDesk.todayCount, label: "on WFH" },
                   ],
                   tabs: timingTabs(wfhDesk.timing),
+                  todayPeople: wfhDesk.todayPeople,
                   emptyLabel: "Nothing pending for this period",
                   onClick: () => goFromKpi("/admin/leaves?tab=WFH%20Requests"),
                   onSelectPerson: (person) =>
@@ -721,9 +735,10 @@ const Dashboard = () => {
             headerAction={
               <Button
                 variant="link"
+                className="!p-0 !text-[13px] flex items-center h-auto"
                 onClick={() => goFromKpi("/admin/sub-projects")}
               >
-                View all <ChevronRight className="w-4 h-4" />
+                View all <ChevronRight className="w-4 h-4 ml-0.5" />
               </Button>
             }
             loading={projectsLoading}

@@ -81,19 +81,19 @@ export const Table = ({
   return (
     <div className={outerClass}>
       {(title || headerAction) && (
-        <div className="flex items-center justify-between gap-3 px-5 py-4 border-b border-slate-100 ">
-          <div className="flex items-center gap-2 w-full">
-            {title && <h3 className="text-sm font-semibold text-slate-800 ">{title}</h3>}
+        <div className="flex items-center justify-between gap-2 px-4 py-3 border-b border-slate-100 lg:px-5 lg:py-3.5">
+          <div className="flex min-w-0 items-center gap-2">
+            {title && <h3 className="truncate text-[13px] font-semibold text-slate-800">{title}</h3>}
             {count != null && (
-              <span className="rounded-full border border-slate-200 px-2 py-0.5 text-[11px] font-medium text-slate-500 ">
+              <span className="shrink-0 rounded-full border border-slate-200 px-2 py-0.5 text-[10px] font-medium text-slate-500">
                 {count}
               </span>
             )}
             {!title && headerAction && (
-              <div className="flex-1">{headerAction}</div>
+              <div className="flex-1 flex items-center justify-end">{headerAction}</div>
             )}
           </div>
-          {title && headerAction && <div>{headerAction}</div>}
+          {title && headerAction && <div className="shrink-0 flex items-center whitespace-nowrap">{headerAction}</div>}
         </div>
       )}
       <div className="overflow-visible">

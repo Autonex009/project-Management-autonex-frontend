@@ -1,4 +1,4 @@
-import { useState, useMemo } from "react";
+import { useState, useMemo, useEffect } from "react";
 import {
   Search,
   ArrowUpDown,
@@ -54,6 +54,9 @@ const EmployeeKPIPanel = ({
   const [sortOrder, setSortOrder] = useState("desc"); // 'asc', 'desc'
   const [selectedMonth, setSelectedMonth] = useState("2026-06"); // Default to current workspace active month
   const [selectedType, setSelectedType] = useState("all"); // 'all', 'full-time', 'intern'
+
+  const [currentPage, setCurrentPage] = useState(1);
+  const PAGE_SIZE = 10;
 
   // Calculate month boundary dates
   const monthBoundary = useMemo(() => {
@@ -302,6 +305,20 @@ const EmployeeKPIPanel = ({
       });
   }, [employeeStats, searchQuery, sortBy, sortOrder, selectedType]);
 
+  // Reset page when filters change
+  useEffect(() => {
+    setCurrentPage(1);
+  }, [searchQuery, sortBy, sortOrder, selectedType, selectedMonth]);
+
+  const paginatedStats = useMemo(() => {
+    return sortedAndFilteredStats.slice(
+      (currentPage - 1) * PAGE_SIZE,
+      currentPage * PAGE_SIZE,
+    );
+  }, [sortedAndFilteredStats, currentPage]);
+
+  const totalPages = Math.ceil(sortedAndFilteredStats.length / PAGE_SIZE);
+
   const handleSort = (field) => {
     if (sortBy === field) {
       setSortOrder((prev) => (prev === "asc" ? "desc" : "asc"));
@@ -532,7 +549,7 @@ const EmployeeKPIPanel = ({
                   </td>
                 </tr>
               ) : (
-                sortedAndFilteredStats.map((stat) => (
+                paginatedStats.map((stat) => (
                   <tr
                     key={stat.employee.id}
                     onClick={() => setSelectedEmployeeId(stat.employee.id)}
@@ -652,6 +669,63 @@ const EmployeeKPIPanel = ({
             </tbody>
           </table>
         </div>
+
+        {totalPages > 1 && (
+          <div className="flex items-center justify-between px-4 py-3 border-t border-slate-100 bg-slate-50/50">
+            <p className="text-[13px] text-slate-500">
+              Showing {paginatedStats.length === 0 ? 0 : (currentPage - 1) * PAGE_SIZE + 1}–
+              {Math.min(currentPage * PAGE_SIZE, sortedAndFilteredStats.length)} of {sortedAndFilteredStats.length} items
+            </p>
+            <div className="flex items-center gap-1">
+              <button
+                onClick={() => setCurrentPage((p) => Math.max(1, p - 1))}
+                disabled={currentPage === 1}
+                className="h-8 px-2.5 text-[13px] rounded-md border border-slate-200 text-slate-600 hover:bg-white disabled:opacity-40 disabled:cursor-not-allowed transition-colors"
+              >
+                Previous
+              </button>
+              {Array.from({ length: totalPages }, (_, i) => i + 1)
+                .filter(
+                  (p) =>
+                    p === 1 || p === totalPages || Math.abs(p - currentPage) <= 1,
+                )
+                .reduce((acc, p, idx, arr) => {
+                  if (idx > 0 && p - arr[idx - 1] > 1) acc.push("...");
+                  acc.push(p);
+                  return acc;
+                }, [])
+                .map((p, idx) =>
+                  p === "..." ? (
+                    <span
+                      key={`ellipsis-${idx}`}
+                      className="px-1.5 text-slate-400 text-[13px]"
+                    >
+                      ...
+                    </span>
+                  ) : (
+                    <button
+                      key={`page-${p}`}
+                      onClick={() => setCurrentPage(p)}
+                      className={`h-8 min-w-[32px] px-1 text-[13px] rounded-md transition-colors ${
+                        currentPage === p
+                          ? "bg-indigo-600 text-white font-medium shadow-sm border border-transparent"
+                          : "text-slate-600 border border-transparent hover:bg-slate-100"
+                      }`}
+                    >
+                      {p}
+                    </button>
+                  ),
+                )}
+              <button
+                onClick={() => setCurrentPage((p) => Math.min(totalPages, p + 1))}
+                disabled={currentPage === totalPages}
+                className="h-8 px-2.5 text-[13px] rounded-md border border-slate-200 text-slate-600 hover:bg-white disabled:opacity-40 disabled:cursor-not-allowed transition-colors"
+              >
+                Next
+              </button>
+            </div>
+          </div>
+        )}
       </div>
 
       {/* Selected Employee Detailed Drawer */}

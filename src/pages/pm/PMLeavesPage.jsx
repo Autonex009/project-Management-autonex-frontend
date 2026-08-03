@@ -1,4 +1,4 @@
-import { useState } from "react";
+import { useState, useEffect } from "react";
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
 import {
   leaveApi,
@@ -17,6 +17,7 @@ import {
   XCircle,
   Clock,
   AlertTriangle,
+  Siren,
   Home,
   BarChart2,
 } from "lucide-react";
@@ -65,6 +66,12 @@ const PMLeavesPage = () => {
   const [activeTab, setActiveTab] = useState("Leave Requests");
   const [remarkModal, setRemarkModal] = useState(null);
   const [remark, setRemark] = useState("");
+  const [currentPage, setCurrentPage] = useState(1);
+  const PAGE_SIZE = 10;
+
+  useEffect(() => {
+    setCurrentPage(1);
+  }, [activeTab]);
 
   const { data: allLeaves = [], isLoading } = useQuery({
     queryKey: ["leaves"],
@@ -229,7 +236,15 @@ const PMLeavesPage = () => {
                         {empName}
                       </span>
                       {leave.flagged && (
-                        <OverLimitHoverCard leave={leave} allLeaves={leaves} />
+                        <OverLimitHoverCard leave={leave} allLeaves={allLeaves} />
+                      )}
+                      {leave.is_emergency && (
+                        <span
+                          title="Emergency"
+                          className="ml-2 inline-flex h-5 w-5 shrink-0 animate-pulse cursor-help items-center justify-center rounded-full border border-red-200 bg-red-100 text-red-600"
+                        >
+                          <Siren className="h-3 w-3" />
+                        </span>
                       )}
                       {leave.approval_remark && (
                         <p className="text-xs text-slate-400 mt-0.5 truncate ml-2">
@@ -374,6 +389,9 @@ const PMLeavesPage = () => {
             },
           ]}
           data={teamLeaves}
+          currentPage={currentPage}
+          pageSize={PAGE_SIZE}
+          onPageChange={setCurrentPage}
           emptyState={{
             title: "No leave requests",
             description: "No leave requests from your team",
@@ -413,13 +431,25 @@ const PMLeavesPage = () => {
                         {getNameInitials(empName, 1)}
                       </div>
                     )}
-                    <div className="flex flex-col min-w-0 pr-4">
-                      <span className="font-bold text-slate-800 truncate">
-                        {empName}
-                      </span>
-                      <span className="text-[11px] text-slate-400 truncate">
-                        {emp?.email || ""}
-                      </span>
+                    <div className="flex items-center min-w-0 pr-4 gap-2">
+                      <div className="flex flex-col min-w-0">
+                        <span className="font-bold text-slate-800 truncate">
+                          {empName}
+                        </span>
+                        <span className="text-[11px] text-slate-400 truncate">
+                          {emp?.email || ""}
+                        </span>
+                      </div>
+                      {req.flagged && (
+                        <div className="relative group flex items-center">
+                          <span className="inline-flex items-center justify-center h-5 w-5 shrink-0 rounded-full bg-orange-100 text-orange-600 border border-orange-200 cursor-help">
+                            <AlertTriangle className="w-3 h-3" />
+                          </span>
+                          <div className="absolute bottom-full left-1/2 -translate-x-1/2 mb-1 hidden group-hover:block px-2 py-1 bg-white text-slate-700 shadow border border-slate-100 text-xs rounded whitespace-nowrap z-50">
+                            Over limit
+                          </div>
+                        </div>
+                      )}
                     </div>
                   </div>
                 );
@@ -482,6 +512,9 @@ const PMLeavesPage = () => {
             },
           ]}
           data={teamWfh}
+          currentPage={currentPage}
+          pageSize={PAGE_SIZE}
+          onPageChange={setCurrentPage}
           emptyState={{
             title: "No WFH requests from your team",
             description: "WFH requests will appear here",

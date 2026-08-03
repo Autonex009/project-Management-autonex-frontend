@@ -13,6 +13,7 @@ import {
   CheckCircle2,
   Clock,
   AlertTriangle,
+  Siren,
   TrendingUp,
 } from "lucide-react";
 import { format, parseISO } from "date-fns";
@@ -261,8 +262,13 @@ const PMDashboard = () => {
                       className="flex items-center justify-between p-2.5 bg-amber-50 border border-amber-100 rounded-lg"
                     >
                       <div>
-                        <p className="text-sm font-medium text-slate-700">
-                          {formatDisplayName(emp?.name) || `Employee #${l.employee_id}`}
+                        <p className="text-sm font-medium flex items-center gap-1.5 text-slate-700">
+                          <span className="truncate">{formatDisplayName(emp?.name) || `Employee #${l.employee_id}`}</span>
+                          {l.is_emergency && (
+                            <span className="inline-flex items-center justify-center shrink-0 h-4 w-4 rounded-full bg-red-100 text-red-600 border border-red-200" title="Emergency leave">
+                              <Siren className="w-2.5 h-2.5" />
+                            </span>
+                          )}
                         </p>
                         <p className="text-xs text-slate-400 capitalize">
                           {l.leave_type}
@@ -297,8 +303,13 @@ const PMDashboard = () => {
                       className="flex items-center justify-between p-2.5 bg-slate-50 rounded-lg"
                     >
                       <div>
-                        <p className="text-sm font-medium text-slate-700">
-                          {formatDisplayName(emp?.name) || `Employee #${l.employee_id}`}
+                        <p className="text-sm font-medium flex items-center gap-1.5 text-slate-700">
+                          <span className="truncate">{formatDisplayName(emp?.name) || `Employee #${l.employee_id}`}</span>
+                          {l.is_emergency && (
+                            <span className="inline-flex items-center justify-center shrink-0 h-4 w-4 rounded-full bg-red-100 text-red-600 border border-red-200" title="Emergency leave">
+                              <Siren className="w-2.5 h-2.5" />
+                            </span>
+                          )}
                         </p>
                         <p className="text-xs text-slate-400 capitalize">
                           {l.leave_type}
