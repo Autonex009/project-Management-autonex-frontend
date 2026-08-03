@@ -2,6 +2,7 @@ import { useMemo, useState, useRef, useEffect } from "react";
 import { useParams, useNavigate } from "react-router-dom";
 import { useQuery } from "@tanstack/react-query";
 import { analyticsApi } from "../services/api";
+import { setPageDetailTitle } from "../utils/pageDetailTitle";
 import {
   MetricCard,
   Card,
@@ -29,7 +30,26 @@ import {
   CartesianGrid,
   Tooltip,
   Legend,
+  ReferenceLine,
 } from "recharts";
+
+// Build a "nice" Y axis: 4 even ticks that cover the data, and the middle tick
+// (mid) which we draw as a bold reference line. Scales per project — 6h when the
+// axis tops at 12, 10h at 20, etc.
+function niceAxis(values) {
+  const rawMax = Math.max(0, ...values);
+  if (rawMax <= 0) return { max: 4, ticks: [0, 1, 2, 3, 4], mid: 2 };
+  const target = rawMax / 4;
+  const exp = Math.pow(10, Math.floor(Math.log10(target)));
+  const f = target / exp;
+  const niceF = f <= 1 ? 1 : f <= 2 ? 2 : f <= 3 ? 3 : f <= 5 ? 5 : 10;
+  const step = niceF * exp;
+  return {
+    max: step * 4,
+    ticks: [0, step, step * 2, step * 3, step * 4],
+    mid: step * 2,
+  };
+}
 
 // Categorical palette (validated reference order — identity, fixed, never cycled)
 const SERIES = [
@@ -181,6 +201,16 @@ const ProjectAnalyticsPage = () => {
   });
 
   const annotators = data?.annotators || [];
+  // Feed the project name to the breadcrumb (replaces the generic "Analytics" crumb).
+  useEffect(() => {
+    if (data?.name) setPageDetailTitle(data.name);
+    return () => setPageDetailTitle(null);
+  }, [data?.name]);
+  // Y-axis + bold middle reference line for the platform-hours chart.
+  const hoursAxis = useMemo(
+    () => niceAxis((data?.daily || []).map((d) => d.platform_hours || 0)),
+    [data],
+  );
   // default selection: everyone
   const allEmails = annotators.map((a) => a.user_email);
   const activeSel = selected ?? allEmails;
@@ -244,9 +274,17 @@ const ProjectAnalyticsPage = () => {
     });
     return data.daily.map((d) => {
       const row = { date: d.date };
+      const active = [];
       activeSel.forEach((e) => {
-        row[e] = lookup[e]?.[d.date] ?? 0;
+        const v = lookup[e]?.[d.date] ?? 0;
+        row[e] = v;
+        if (v > 0) active.push(v);
       });
+      // Average across the annotators who actually worked that day (bold line).
+      row.__avg = active.length
+        ? Math.round((active.reduce((a, b) => a + b, 0) / active.length) * 100) /
+          100
+        : null;
       return row;
     });
   }, [data, annotators, activeSel]);
@@ -275,9 +313,16 @@ const ProjectAnalyticsPage = () => {
         </button>
         <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3">
           <div>
-            <h1 className="text-lg font-semibold text-slate-900">
-              {data.name}
-            </h1>
+            <div className="flex flex-wrap items-center gap-2">
+              <h1 className="text-lg font-semibold text-slate-900">
+                {data.name}
+              </h1>
+              {data.pm_names?.length > 0 && (
+                <span className="inline-flex items-center gap-1 rounded-full bg-indigo-50 px-2.5 py-0.5 text-xs font-medium text-indigo-700">
+                  PM: {data.pm_names.join(", ")}
+                </span>
+              )}
+            </div>
             <p className="text-slate-500 text-sm mt-1">
               {data.client ? `${data.client} · ` : ""}Autonex team · Encord platform activity ·{" "}
               {data.range.from} → {data.range.to}
@@ -390,6 +435,14 @@ const ProjectAnalyticsPage = () => {
                   tickLine={false}
                   width={40}
                   unit="h"
+                  domain={[0, hoursAxis.max]}
+                  ticks={hoursAxis.ticks}
+                />
+                {/* Bold middle reference line (half of the axis max). */}
+                <ReferenceLine
+                  y={hoursAxis.mid}
+                  stroke="#94a3b8"
+                  strokeWidth={1.5}
                 />
                 <Tooltip
                   labelFormatter={shortDate}
@@ -571,6 +624,18 @@ const ProjectAnalyticsPage = () => {
                         activeDot={{ r: 5 }}
                       />
                     ))}
+                    {/* Bold average line across the compared annotators. */}
+                    <Line
+                      type="monotone"
+                      dataKey="__avg"
+                      name="Average"
+                      stroke="#0f172a"
+                      strokeWidth={3.5}
+                      strokeDasharray="6 4"
+                      dot={false}
+                      activeDot={{ r: 5 }}
+                      connectNulls
+                    />
                   </LineChart>
                 </ResponsiveContainer>
               </div>
@@ -581,6 +646,10 @@ const ProjectAnalyticsPage = () => {
                   <div
                     className={`flex flex-wrap gap-x-4 gap-y-1.5 ${legendExpanded ? "" : "max-h-6 overflow-hidden"}`}
                   >
+                    <span className="inline-flex items-center gap-1.5 whitespace-nowrap text-xs font-semibold text-slate-800">
+                      <span className="h-0 w-4 shrink-0 border-t-2 border-dashed border-slate-900" />
+                      Average
+                    </span>
                     {activeSel.map((email) => {
                       const a = annotators.find((x) => x.user_email === email);
                       return (

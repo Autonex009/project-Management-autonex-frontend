@@ -12,6 +12,7 @@ import NotificationBell from "../components/NotificationBell";
 import PortalSwitcher from "../components/PortalSwitcher";
 import Breadcrumbs from "../components/ui/Breadcrumbs";
 import { useBreadcrumbTrail } from "../hooks/useBreadcrumbTrail";
+import { usePageDetailTitle } from "../utils/pageDetailTitle";
 import AdminSidebar from "./AdminSidebar";
 import ChatWidget from "../components/chat/ChatWidget";
 
@@ -43,7 +44,15 @@ const MAX_WIDTH = 400;
 const DEFAULT_WIDTH = 256;
 
 const AdminLayout = () => {
-  const breadcrumbTrail = useBreadcrumbTrail(resolveAdminCrumb);
+  const rawBreadcrumbTrail = useBreadcrumbTrail(resolveAdminCrumb);
+  const detailTitle = usePageDetailTitle();
+  // Replace a generic detail crumb (e.g. "Analytics") with the live page title
+  // (e.g. the project name) once the detail page has loaded it.
+  const breadcrumbTrail = detailTitle
+    ? rawBreadcrumbTrail.map((c) =>
+        c.key === "admin-analytics-detail" ? { ...c, name: detailTitle } : c,
+      )
+    : rawBreadcrumbTrail;
   const queryClient = useQueryClient();
   const [sidebarOpen, setSidebarOpen] = useState(false); // mobile drawer
   const [collapsed, setCollapsed] = useState(false); // desktop collapse

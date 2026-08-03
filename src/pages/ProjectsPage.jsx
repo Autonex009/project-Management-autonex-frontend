@@ -1137,6 +1137,8 @@ const ProjectsPage = () => {
   const [projectView, setProjectView] = useState(
     pageMemory.projectView || "active",
   ); // 'active' | 'archived' | 'development'
+  // "Autonex" quick filter — only projects staffed with ≥1 Autonex employee.
+  const [autonexOnly, setAutonexOnly] = useState(false);
   const [selectedPmIds, setSelectedPmIds] = useState([]);
   const [filtersOpen, setFiltersOpen] = useState(false);
   const filtersRef = useRef(null);
@@ -1883,6 +1885,17 @@ const ProjectsPage = () => {
         : !isArchivedStatus(project.project_status);
     })
     .filter((project) => {
+      // "Autonex" quick filter: only projects staffed with ≥1 Autonex employee
+      // (team composition = Autonex annotators + reviewers + QC).
+      if (!autonexOnly) return true;
+      return (
+        (project.autonex_annotators || 0) +
+          (project.autonex_reviewers || 0) +
+          (project.qc_count || 0) >
+        0
+      );
+    })
+    .filter((project) => {
       if (selectedOrganization === "all") return true;
 
       const parentProject = visibleMainProjects.find(
@@ -1936,6 +1949,7 @@ const ProjectsPage = () => {
     selectedPm,
     selectedStatus,
     projectView,
+    autonexOnly,
   ]);
 
   // Deep-link focus: jump to the page containing the target sub-project, scroll
@@ -2322,6 +2336,20 @@ const ProjectsPage = () => {
               </button>
             </span>
           )}
+
+          <button
+            type="button"
+            onClick={() => setAutonexOnly((v) => !v)}
+            title="Show only projects staffed with an Autonex employee"
+            className={`inline-flex items-center gap-2 rounded-lg border px-3 py-2 text-sm font-medium shadow-sm transition-colors ${
+              autonexOnly
+                ? "border-indigo-600 bg-indigo-600 text-white"
+                : "border-slate-200 bg-white text-slate-600 hover:bg-slate-50"
+            }`}
+          >
+            <Users className={`w-4 h-4 ${autonexOnly ? "text-white" : "text-slate-400"}`} />
+            Autonex
+          </button>
 
           <div className="relative" ref={filtersRef}>
             <button
@@ -3205,7 +3233,7 @@ const ProjectsPage = () => {
                       ["annotators_total", "Total Annotators"],
                       ["autonex_annotators", "Autonex Annotators"],
                       ["autonex_reviewers", "Autonex Reviewers"],
-                      ["qc_count", "QC"],
+                      ["qc_count", "Autonex QC"],
                     ].map(([field, label]) => (
                       <div key={field}>
                         <label className="block text-[11px] font-medium text-slate-500 mb-1 truncate">
