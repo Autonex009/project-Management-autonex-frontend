@@ -1,5 +1,5 @@
 import { useMemo, useState, useRef, useEffect } from "react";
-import { useParams, useNavigate } from "react-router-dom";
+import { useParams, useNavigate, useLocation } from "react-router-dom";
 import { useQuery } from "@tanstack/react-query";
 import { analyticsApi } from "../services/api";
 import { setPageDetailTitle } from "../utils/pageDetailTitle";
@@ -164,6 +164,8 @@ const buildGroups = (annotators) => {
 const ProjectAnalyticsPage = () => {
   const { mainProjectId } = useParams();
   const navigate = useNavigate();
+  const location = useLocation();
+  const basePath = location.pathname.startsWith("/pm") ? "/pm" : "/admin";
 
   const [rangeMode, setRangeMode] = useState("month");
   const [custom, setCustom] = useState({ from: "", to: "" });
@@ -306,7 +308,7 @@ const ProjectAnalyticsPage = () => {
     <div className="space-y-6">
       <div>
         <button
-          onClick={() => navigate("/admin/analytics")}
+          onClick={() => navigate(`${basePath}/analytics`)}
           className="inline-flex items-center gap-1 text-sm text-slate-500 hover:text-slate-700 mb-2"
         >
           <ChevronLeft className="w-4 h-4" /> Analytics

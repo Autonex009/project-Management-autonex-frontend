@@ -17,6 +17,7 @@ import {
   GraduationCap,
   Info,
   ClipboardList,
+  BarChart3,
 } from "lucide-react";
 
 const rowBase =
@@ -76,6 +77,7 @@ const EmployeeSidebar = ({
       },
       { to: `${prefix}/projects`, label: "Organizations", icon: Layers },
       { to: `${prefix}/sub-projects`, label: "Projects", icon: FolderKanban },
+      { to: `${prefix}/analytics`, label: "Analytics", icon: BarChart3 },
       { to: `${prefix}/allocations`, label: "Allocations", icon: UserCog },
       { to: `${prefix}/my-team`, label: "My Team", icon: Users },
       { to: `${prefix}/performance`, label: "Performance", icon: TrendingUp },

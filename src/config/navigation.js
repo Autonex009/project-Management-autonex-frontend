@@ -15,6 +15,8 @@ import {
   History,
 } from "lucide-react";
 
+// `roles`, when present, limits the item to those user roles. Omit it for items
+// everyone in the admin layout may open.
 export const navigation = [
   { name: "Dashboard", href: "/admin/dashboard", icon: LayoutDashboard },
   { name: "Projects", href: "/admin/sub-projects", icon: FolderKanban },
@@ -27,6 +29,8 @@ export const navigation = [
   { name: "Payroll", href: "/admin/payroll", icon: IndianRupee },
   { name: "Referrals", href: "/admin/referrals", icon: Users2 },
   { name: "Guidelines", href: "/admin/guidelines", icon: FileText },
-  { name: "Change Log", href: "/admin/change-log", icon: History },
+  // Admin-only: the audit log spans payroll, salary and employee actions org-wide,
+  // and the backend enforces the same restriction (see app/api/audit_logs.py).
+  { name: "Audit Log", href: "/admin/change-log", icon: History, roles: ["admin"] },
   { name: "Company Settings", href: "/admin/company-settings", icon: Settings },
 ];

@@ -217,6 +217,11 @@ function App() {
           >
             <Route index element={<Navigate to="/pm/dashboard" replace />} />
             <Route path="dashboard" element={<PMDashboard />} />
+            <Route path="analytics" element={<AnalyticsDashboard />} />
+            <Route
+              path="analytics/:mainProjectId"
+              element={<ProjectAnalyticsPage />}
+            />
             <Route path="projects" element={<ProjectsPage />} />
             <Route path="sub-projects" element={<SubProjectsPage />} />
             <Route path="allocations" element={<AllocationsPage />} />

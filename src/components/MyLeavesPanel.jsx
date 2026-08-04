@@ -3,7 +3,6 @@ import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
 import Button from "./ui/Button";
 import DatePicker from "./ui/DatePicker";
 import { leaveApi, wfhApi } from "../services/api";
-import { logChange } from "../services/changeLogService";
 import Spinner from "./ui/LoadingSpinner";
 import {
   Calendar,
@@ -404,20 +403,6 @@ const MyLeavesPanel = ({
       }),
     onSuccess: (data, variables) => {
       recordLeaveApplication({ ...variables, ...data });
-      logChange({
-        category: "Leaves",
-        action: "Applied for Leave",
-        actionType: "Applied",
-        entity: "Leave",
-        entityId: data?.id || data?.leave_id || "",
-        entityName: user?.name || "Employee",
-        details: [
-          { field: "Leave Type", from: "—", to: getLeaveTypeLabel(variables?.leave_type) },
-          { field: "Applied On", from: "—", to: new Date().toLocaleDateString() },
-          { field: "Dates", from: "—", to: `${variables?.start_date || ""} to ${variables?.end_date || ""}` },
-          { field: "Status", from: "—", to: "Pending Approval" },
-        ],
-      });
       queryClient.invalidateQueries({ queryKey: ["my-leaves"] });
       queryClient.invalidateQueries(["leave-calendar"]);
       setShowLeaveForm(false);
