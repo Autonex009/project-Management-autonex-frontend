@@ -503,14 +503,14 @@ function EmployeeConvertToFulltimeModal({
         </p>
         <div className="bg-indigo-50 border border-indigo-100 rounded-xl p-4 space-y-2.5">
           <div className="flex gap-2.5 text-xs text-indigo-850 leading-relaxed">
-            <span className="flex-shrink-0">ðŸ“</span>
+            <span className="flex-shrink-0">📝</span>
             <span>
-              This updates the existing record in place â€” all leave, payroll,
+              This updates the existing record in place — all leave, payroll,
               performance and other history is preserved.
             </span>
           </div>
           <div className="flex gap-2.5 text-xs text-indigo-850 leading-relaxed">
-            <span className="flex-shrink-0">ðŸï¸</span>
+            <span className="flex-shrink-0">💼</span>
             <span>Full-time leave entitlements will apply going forward.</span>
           </div>
         </div>
