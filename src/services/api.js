@@ -228,6 +228,21 @@ export const leaveApi = {
     api.get("/leaves/calendar", { params: { month } }).then((res) => res.data),
 };
 
+// === Audit Log API (admin only) ===
+// Read-only by design — entries are written server-side by the endpoint that
+// performed the action. There is no create/update/delete.
+export const auditLogApi = {
+  // params: { page, page_size, search, category, action_type, actor_id,
+  //           actor_role, subject_employee_id, entity_type, date_from, date_to }
+  getAll: (params) => api.get("/audit-logs", { params }).then((res) => res.data),
+  getStats: () => api.get("/audit-logs/stats").then((res) => res.data),
+  getFilters: () => api.get("/audit-logs/filters").then((res) => res.data),
+  getForEntity: (entityType, entityId) =>
+    api
+      .get(`/audit-logs/entity/${entityType}/${entityId}`)
+      .then((res) => res.data),
+};
+
 export const signupRequestApi = {
   // Step 1 — emails a link to the real signup form, proving the address works.
   requestEmailVerification: (email) =>

@@ -2,7 +2,6 @@ import { useState, useRef, useEffect } from "react";
 import { useSearchParams } from "react-router-dom";
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
 import { leaveApi, employeeApi, wfhApi } from "../services/api";
-import { logChange } from "../services/changeLogService";
 import Spinner from "../components/ui/LoadingSpinner";
 import Button from "../components/ui/Button";
 import DatePicker from "../components/ui/DatePicker";
@@ -205,18 +204,6 @@ const LeavesPage = () => {
       setRemarkModal(null);
       setRemark("");
       toast.success("Leave approved");
-      logChange({
-        category: "Leaves",
-        action: "Approved Leave Request",
-        actionType: "Approved",
-        entity: "Leave",
-        entityId: variables?.id || "",
-        entityName: "Employee Leave",
-        details: [
-          { field: "Leave Status", from: "Pending", to: "Approved" },
-          { field: "Remark", from: "—", to: variables?.remark || "Approved" },
-        ],
-      });
     },
     onError: (err) =>
       toast.error(err.response?.data?.detail || "Failed to approve leave"),
@@ -227,15 +214,6 @@ const LeavesPage = () => {
     onSuccess: (_, id) => {
       queryClient.invalidateQueries(["leaves"]);
       toast.success("Leave rejected");
-      logChange({
-        category: "Leaves",
-        action: "Rejected Leave Request",
-        actionType: "Rejected",
-        entity: "Leave",
-        entityId: id,
-        entityName: "Employee Leave",
-        details: [{ field: "Leave Status", from: "Pending", to: "Rejected" }],
-      });
     },
     onError: (err) =>
       toast.error(err.response?.data?.detail || "Failed to reject leave"),
@@ -273,24 +251,6 @@ const LeavesPage = () => {
       setFormEmployeeId("");
       toast.success("Leave record created successfully");
 
-      const targetEmp = employees.find(
-        (e) => String(e.id) === String(variables?.employee_id)
-      );
-
-      logChange({
-        category: "Leaves",
-        action: "Applied for Leave",
-        actionType: "Applied",
-        entity: "Leave",
-        entityId: res?.id || "",
-        entityName: targetEmp?.name || "Employee",
-        details: [
-          { field: "Leave Type", from: "—", to: variables?.leave_type || "Casual" },
-          { field: "Applied On", from: "—", to: new Date().toLocaleDateString() },
-          { field: "Dates", from: "—", to: `${variables?.start_date || ""} to ${variables?.end_date || ""}` },
-          { field: "Status", from: "—", to: "Pending Approval" },
-        ],
-      });
     },
     onError: (err) =>
       toast.error(
