@@ -9,7 +9,6 @@ import {
   parentProjectApi,
   leaveApi,
 } from "../services/api";
-import { logChange } from "../services/changeLogService";
 import {
   Plus,
   Edit,
@@ -1359,18 +1358,6 @@ const EmployeesPage = () => {
       queryClient.invalidateQueries(["skills"]); // Refresh skills in case new ones were added
       setIsModalOpen(false);
       toast.success("Employee created successfully");
-      logChange({
-        category: "Employees",
-        action: "Created New Employee",
-        actionType: "Created",
-        entity: "Employee",
-        entityId: res?.id || "",
-        entityName: variables?.name || res?.name || "New Employee",
-        details: [
-          { field: "Designation", from: "—", to: variables?.designation || "Annotator" },
-          { field: "Employee Type", from: "—", to: variables?.employee_type || "Intern" },
-        ],
-      });
     },
     onError: (err) => {
       toast.error(err.response?.data?.detail || "Failed to create employee");
@@ -1414,18 +1401,6 @@ const EmployeesPage = () => {
         toast.success("Employee updated successfully");
       }
 
-      logChange({
-        category: "Employees",
-        action: "Updated Employee Details",
-        actionType: "Updated",
-        entity: "Employee",
-        entityId: variables?.id || "",
-        entityName: variables?.data?.name || res?.name || "Employee",
-        details: [
-          { field: "Designation", from: "Previous", to: variables?.data?.designation || "Updated" },
-          { field: "Work Model", from: "Previous", to: variables?.data?.work_model || "Updated" },
-        ],
-      });
     },
     onError: (err) => {
       toast.error(err.response?.data?.detail || "Failed to update employee");
@@ -1450,15 +1425,6 @@ const EmployeesPage = () => {
       queryClient.invalidateQueries(["all-employees-kpis"]);
       queryClient.invalidateQueries(["allocations"]);
       toast.success("Employee archived and projects unassigned");
-      logChange({
-        category: "Employees",
-        action: "Archived Employee",
-        actionType: "Archived",
-        entity: "Employee",
-        entityId: id,
-        entityName: "Employee",
-        details: [{ field: "Status", from: "Active", to: "Archived" }],
-      });
     },
     onError: (err) => {
       toast.error(err.response?.data?.detail || "Failed to archive employee");
@@ -1472,15 +1438,6 @@ const EmployeesPage = () => {
       queryClient.invalidateQueries(["all-employees-kpis"]);
       queryClient.invalidateQueries(["allocations"]);
       toast.success("Employee restored successfully");
-      logChange({
-        category: "Employees",
-        action: "Restored Employee",
-        actionType: "Restored",
-        entity: "Employee",
-        entityId: id,
-        entityName: "Employee",
-        details: [{ field: "Status", from: "Archived", to: "Active" }],
-      });
     },
     onError: (err) => {
       toast.error(err.response?.data?.detail || "Failed to restore employee");
@@ -1494,18 +1451,6 @@ const EmployeesPage = () => {
       queryClient.invalidateQueries(["employees"]);
       queryClient.invalidateQueries(["all-employees-kpis"]);
       toast.success(`${formatDisplayName(emp?.name) || emp?.name || "Employee"} converted to Full-time`);
-      logChange({
-        category: "Employees",
-        action: "Promoted Employee to Full-time",
-        actionType: "Promoted",
-        entity: "Employee",
-        entityId: emp?.id || "",
-        entityName: emp?.name || "Employee",
-        details: [
-          { field: "Employee Type", from: emp?.previous_employee_type || "Intern", to: "Full-time" },
-          { field: "Promotion Date", from: "—", to: new Date().toLocaleDateString() },
-        ],
-      });
     },
     onError: (err) => {
       toast.error(err.response?.data?.detail || "Failed to convert employee");
