@@ -1,6 +1,7 @@
 import { useState, useEffect, useRef, useMemo } from "react";
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
 import { useLocation, useNavigate } from "react-router-dom";
+import UserAvatar from "../components/ui/UserAvatar";
 import {
   allocationApi,
   subProjectApi,
@@ -223,8 +224,8 @@ const AllocationsPage = () => {
   );
   const visibleAllocations = isPm
     ? allocations.filter((allocation) =>
-        visibleProjectIds.has(allocation.sub_project_id),
-      )
+      visibleProjectIds.has(allocation.sub_project_id),
+    )
     : allocations;
 
   const createMutation = useMutation({
@@ -683,22 +684,15 @@ const AllocationsPage = () => {
                         .join("")
                         .toUpperCase();
                       const gradient = getAvatarGradient(name);
-                      return hasImg ? (
-                        <img
+                      return (
+                        <UserAvatar
                           key={alloc.id}
                           src={emp.avatar_url}
-                          alt={name}
-                          title={name}
-                          className="w-8 h-8 rounded-full object-cover border-2 border-white shadow-sm shrink-0"
+                          name={name}
+                          size="sm"
+                          className="w-8 h-8 border-2 border-white shadow-xs shrink-0"
+                          fallbackClassName="w-8 h-8 text-[11px]"
                         />
-                      ) : (
-                        <div
-                          key={alloc.id}
-                          className={`w-8 h-8 rounded-full bg-gradient-to-br ${gradient} text-white flex items-center justify-center text-[10px] font-bold border-2 border-white shadow-sm shrink-0`}
-                          title={name}
-                        >
-                          {initials}
-                        </div>
                       );
                     })}
                     {ordered.length > 6 && (
@@ -1005,18 +999,16 @@ const AllocationsPage = () => {
                                     ? `${name} — archived, not counted towards manpower`
                                     : `${name}${alloc.total_daily_hours ? ` · ${alloc.total_daily_hours}h/day` : ""}`
                                 }
-                                className={`group inline-flex items-center gap-1.5 pl-1 pr-1 py-0.5 rounded-full shadow-sm transition-opacity ${
-                                  stale
+                                className={`group inline-flex items-center gap-1.5 pl-1 pr-1 py-0.5 rounded-full shadow-sm transition-opacity ${stale
                                     ? "border border-rose-300 bg-rose-50"
                                     : "border border-slate-200 bg-white"
-                                } ${isRemoving ? "opacity-50" : ""}`}
+                                  } ${isRemoving ? "opacity-50" : ""}`}
                               >
                                 <span
-                                  className={`w-5 h-5 rounded-full text-[10px] font-semibold flex items-center justify-center ${
-                                    stale
+                                  className={`w-5 h-5 rounded-full text-[10px] font-semibold flex items-center justify-center ${stale
                                       ? "bg-rose-200 text-rose-700"
                                       : "bg-indigo-500 text-white"
-                                  }`}
+                                    }`}
                                 >
                                   {stale ? (
                                     <UserX className="w-3 h-3" />
@@ -1025,11 +1017,10 @@ const AllocationsPage = () => {
                                   )}
                                 </span>
                                 <span
-                                  className={`text-xs max-w-[120px] truncate ${
-                                    stale
+                                  className={`text-xs max-w-[120px] truncate ${stale
                                       ? "font-medium text-rose-700"
                                       : "text-slate-700"
-                                  }`}
+                                    }`}
                                 >
                                   {name}
                                 </span>
@@ -1059,11 +1050,10 @@ const AllocationsPage = () => {
                                       },
                                     });
                                   }}
-                                  className={`ml-0.5 w-4 h-4 rounded-full flex items-center justify-center transition-colors disabled:cursor-not-allowed ${
-                                    stale
+                                  className={`ml-0.5 w-4 h-4 rounded-full flex items-center justify-center transition-colors disabled:cursor-not-allowed ${stale
                                       ? "text-rose-500 hover:text-white hover:bg-rose-500"
                                       : "text-slate-400 hover:text-white hover:bg-rose-500"
-                                  }`}
+                                    }`}
                                   title={`Remove ${name}`}
                                 >
                                   <X className="w-3 h-3" />
@@ -1101,12 +1091,12 @@ const AllocationsPage = () => {
                     >
                       <CheckSquare className="w-3.5 h-3.5" />
                       {selectedEmployees.length ===
-                      (filterTab === "unallocated"
-                        ? availableEmployees
-                        : filterTab === "allocated"
-                          ? allocatedEmployeesOther
-                          : [...availableEmployees, ...allocatedEmployeesOther]
-                      ).length
+                        (filterTab === "unallocated"
+                          ? availableEmployees
+                          : filterTab === "allocated"
+                            ? allocatedEmployeesOther
+                            : [...availableEmployees, ...allocatedEmployeesOther]
+                        ).length
                         ? "Deselect All"
                         : "Select All"}
                     </button>
@@ -1129,11 +1119,10 @@ const AllocationsPage = () => {
                           key={t.key}
                           type="button"
                           onClick={() => setFilterTab(t.key)}
-                          className={`px-3 py-1.5 text-[13px] font-semibold rounded-md transition-all whitespace-nowrap ${
-                            filterTab === t.key
+                          className={`px-3 py-1.5 text-[13px] font-semibold rounded-md transition-all whitespace-nowrap ${filterTab === t.key
                               ? "bg-white text-slate-900 shadow-sm ring-1 ring-slate-200/70"
                               : "text-slate-500 hover:text-slate-800"
-                          }`}
+                            }`}
                         >
                           {t.label}
                         </button>
@@ -1167,10 +1156,10 @@ const AllocationsPage = () => {
                     const q = employeeSearch.trim().toLowerCase();
                     const displayEmployees = q
                       ? allTabEmployees.filter(
-                          (emp) =>
-                            emp.name.toLowerCase().includes(q) ||
-                            (emp.email || "").toLowerCase().includes(q),
-                        )
+                        (emp) =>
+                          emp.name.toLowerCase().includes(q) ||
+                          (emp.email || "").toLowerCase().includes(q),
+                      )
                       : allTabEmployees;
 
                     if (displayEmployees.length === 0) {
@@ -1205,7 +1194,7 @@ const AllocationsPage = () => {
                                   type="checkbox"
                                   checked={isSelected}
                                   disabled={employee.alreadyInProject}
-                                  onChange={() => {}}
+                                  onChange={() => { }}
                                   className="rounded border-slate-300 text-blue-600 focus:ring-blue-500 disabled:opacity-40 shrink-0"
                                 />
                                 <span className="text-[13px] font-semibold text-slate-900 shrink-0">
@@ -1354,7 +1343,7 @@ const AllocationsPage = () => {
                                       newDist[t] =
                                         idx === 0
                                           ? totalDailyHours -
-                                            hoursPerRole * (newTags.length - 1)
+                                          hoursPerRole * (newTags.length - 1)
                                           : hoursPerRole;
                                     });
                                     setTimeDistribution(newDist);
@@ -1421,11 +1410,10 @@ const AllocationsPage = () => {
                           const isValid = totalAssigned === totalDailyHours;
                           return (
                             <div
-                              className={`mt-2 p-2 rounded text-sm ${
-                                isValid
+                              className={`mt-2 p-2 rounded text-sm ${isValid
                                   ? "bg-green-50 text-green-700 border border-green-200"
                                   : "bg-red-50 text-red-700 border border-red-200"
-                              }`}
+                                }`}
                             >
                               {isValid
                                 ? `âœ“ Hours correctly distributed: ${totalAssigned}/${totalDailyHours}`
@@ -1491,19 +1479,17 @@ const AllocationsPage = () => {
               return (
                 <div
                   key={alloc.id}
-                  className={`flex items-center justify-between p-4 border rounded-md ${
-                    stale
+                  className={`flex items-center justify-between p-4 border rounded-md ${stale
                       ? "border-rose-200 bg-rose-50"
                       : "border-gray-200 hover:bg-gray-50"
-                  }`}
+                    }`}
                 >
                   <div className="flex items-center gap-3">
                     <div
-                      className={`w-10 h-10 rounded-full flex items-center justify-center font-medium ${
-                        stale
+                      className={`w-10 h-10 rounded-full flex items-center justify-center font-medium ${stale
                           ? "bg-rose-200 text-rose-700"
                           : "bg-blue-500 text-white"
-                      }`}
+                        }`}
                     >
                       {stale ? (
                         <UserX className="w-4 h-4" />

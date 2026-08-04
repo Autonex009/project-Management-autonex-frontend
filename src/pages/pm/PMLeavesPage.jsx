@@ -1,4 +1,4 @@
-import { useState } from "react";
+import { useState, useEffect } from "react";
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
 import {
   leaveApi,
@@ -17,6 +17,7 @@ import {
   XCircle,
   Clock,
   AlertTriangle,
+  Siren,
   Home,
   BarChart2,
 } from "lucide-react";
@@ -27,11 +28,13 @@ import {
   getLeaveTypeLabel,
   getLeaveTypeBadgeClass,
   getWorkingDayCount,
+  resolveLeaveAppliedDate,
 } from "../../utils/leaveTypes";
 import LeaveCalendar from "../../components/LeaveCalendar";
 import EmployeeKPIPanel from "../../components/EmployeeKPIPanel";
 import Modal from "../../components/ui/Modal";
 import { formatDisplayName, getNameInitials } from "../../utils/displayName";
+import OverLimitHoverCard from "../../components/ui/OverLimitHoverCard";
 
 const TABS = ["Leave Requests", "Calendar", "WFH Requests", "Employee KPI"];
 
@@ -63,6 +66,12 @@ const PMLeavesPage = () => {
   const [activeTab, setActiveTab] = useState("Leave Requests");
   const [remarkModal, setRemarkModal] = useState(null);
   const [remark, setRemark] = useState("");
+  const [currentPage, setCurrentPage] = useState(1);
+  const PAGE_SIZE = 10;
+
+  useEffect(() => {
+    setCurrentPage(1);
+  }, [activeTab]);
 
   const { data: allLeaves = [], isLoading } = useQuery({
     queryKey: ["leaves"],
@@ -216,38 +225,25 @@ const PMLeavesPage = () => {
             {
               key: "employee_id",
               label: "Employee",
-              width: "w-[22%]",
+              width: "w-[20%]",
               render: (_, leave) => {
                 const emp = employees.find((e) => e.id === leave.employee_id);
                 const empName = formatDisplayName(emp?.name) || `#${leave.employee_id}`;
                 return (
-                  <div className="flex items-center gap-3 min-w-0">
-                    {emp?.avatar_url ? (
-                      <img
-                        src={emp.avatar_url}
-                        alt={empName}
-                        className="w-9 h-9 rounded-full object-cover flex-shrink-0 ring-1 ring-slate-200"
-                      />
-                    ) : (
-                      <div className="w-9 h-9 rounded-full flex items-center justify-center flex-shrink-0 bg-indigo-50 text-indigo-600 text-[13px] font-semibold ring-1 ring-slate-200">
-                        {getNameInitials(empName, 1)}
-                      </div>
-                    )}
-                    <div className="flex items-center min-w-0">
-                      <div className="flex flex-col min-w-0 pr-4">
-                        <span className="font-bold text-slate-800 truncate">
-                          {empName}
-                        </span>
-                        <span className="text-[11px] text-slate-400 truncate">
-                          {emp?.email || ""}
-                        </span>
-                      </div>
+                  <div className="min-w-0">
+                    <div className="flex items-center gap-2 min-w-0">
+                      <span className="font-semibold text-slate-800 truncate whitespace-nowrap">
+                        {empName}
+                      </span>
                       {leave.flagged && (
+                        <OverLimitHoverCard leave={leave} allLeaves={allLeaves} />
+                      )}
+                      {leave.is_emergency && (
                         <span
-                          title="Over limit"
-                          className="inline-flex items-center justify-center h-5 w-5 shrink-0 rounded-full bg-orange-100 text-orange-600 border border-orange-200 cursor-help ml-2"
+                          title="Emergency"
+                          className="ml-2 inline-flex h-5 w-5 shrink-0 animate-pulse cursor-help items-center justify-center rounded-full border border-red-200 bg-red-100 text-red-600"
                         >
-                          <AlertTriangle className="w-3 h-3" />
+                          <Siren className="h-3 w-3" />
                         </span>
                       )}
                       {leave.approval_remark && (
@@ -263,7 +259,7 @@ const PMLeavesPage = () => {
             {
               key: "leave_type",
               label: "Leave Type",
-              width: "w-[14%]",
+              width: "w-[12%]",
               render: (value) => (
                 <span
                   className={`inline-flex whitespace-nowrap px-2.5 py-1 rounded-full text-xs font-medium ${getLeaveTypeBadgeClass(value)}`}
@@ -277,7 +273,7 @@ const PMLeavesPage = () => {
             {
               key: "start_date",
               label: "Start Date",
-              width: "w-[12%]",
+              width: "w-[11%]",
               render: (value) => (
                 <span className="text-[13px] text-slate-700 whitespace-nowrap">
                   {format(parseISO(value), "MMM d, yyyy")}
@@ -287,7 +283,7 @@ const PMLeavesPage = () => {
             {
               key: "end_date",
               label: "End Date",
-              width: "w-[12%]",
+              width: "w-[11%]",
               render: (value) => (
                 <span className="text-[13px] text-slate-700 whitespace-nowrap">
                   {format(parseISO(value), "MMM d, yyyy")}
@@ -295,10 +291,28 @@ const PMLeavesPage = () => {
               ),
             },
             {
+              key: "applied_on",
+              label: "Applied On",
+              width: "w-[11%]",
+              render: (_, leave) => {
+                const rawApplied = resolveLeaveAppliedDate(leave);
+                if (!rawApplied) return <span className="text-[13px] text-slate-400">—</span>;
+                const d = new Date(
+                  rawApplied.includes("T") ? rawApplied : rawApplied + "T00:00:00"
+                );
+                if (isNaN(d.getTime())) return <span className="text-[13px] text-slate-400">—</span>;
+                return (
+                  <span className="text-[13px] text-slate-700 whitespace-nowrap">
+                    {format(d, "MMM d, yyyy")}
+                  </span>
+                );
+              },
+            },
+            {
               key: "leave_id",
               label: "Duration",
               align: "center",
-              width: "w-[13%]",
+              width: "w-[11%]",
               render: (_, leave) => {
                 const duration = getWorkingDayCount(
                   leave.start_date,
@@ -306,17 +320,17 @@ const PMLeavesPage = () => {
                   leave.is_half_day,
                 );
                 return (
-                  <span>
+                  <span className="whitespace-nowrap inline-flex items-center justify-center gap-1">
                     <span className="text-sm font-semibold text-slate-800">
                       {duration}
                     </span>
-                    <span className="text-xs text-slate-400 ml-1">
+                    <span className="text-xs text-slate-400">
                       {leave.is_half_day ? (
                         <>
                           day (
-                          {leave.half_day_slot === "first_half"
-                            ? "First Half"
-                            : "Second Half"}
+                          {leave.half_day_slot === "first_half" || leave.half_day_slot === "1st Half"
+                            ? "1st Half"
+                            : "2nd Half"}
                           )
                         </>
                       ) : duration === 1 ? (
@@ -333,14 +347,14 @@ const PMLeavesPage = () => {
               key: "status",
               label: "Status",
               align: "center",
-              width: "w-[12%]",
+              width: "w-[11%]",
               render: (value) => STATUS_BADGE[value] || STATUS_BADGE.pending,
             },
             {
               key: "_actions",
               label: "Actions",
               align: "right",
-              width: "w-[15%]",
+              width: "w-[13%]",
               render: (_, leave) => {
                 const isPending = !leave.status || leave.status === "pending";
                 const iconBtn =
@@ -375,6 +389,9 @@ const PMLeavesPage = () => {
             },
           ]}
           data={teamLeaves}
+          currentPage={currentPage}
+          pageSize={PAGE_SIZE}
+          onPageChange={setCurrentPage}
           emptyState={{
             title: "No leave requests",
             description: "No leave requests from your team",
@@ -414,13 +431,25 @@ const PMLeavesPage = () => {
                         {getNameInitials(empName, 1)}
                       </div>
                     )}
-                    <div className="flex flex-col min-w-0 pr-4">
-                      <span className="font-bold text-slate-800 truncate">
-                        {empName}
-                      </span>
-                      <span className="text-[11px] text-slate-400 truncate">
-                        {emp?.email || ""}
-                      </span>
+                    <div className="flex items-center min-w-0 pr-4 gap-2">
+                      <div className="flex flex-col min-w-0">
+                        <span className="font-bold text-slate-800 truncate">
+                          {empName}
+                        </span>
+                        <span className="text-[11px] text-slate-400 truncate">
+                          {emp?.email || ""}
+                        </span>
+                      </div>
+                      {req.flagged && (
+                        <div className="relative group flex items-center">
+                          <span className="inline-flex items-center justify-center h-5 w-5 shrink-0 rounded-full bg-orange-100 text-orange-600 border border-orange-200 cursor-help">
+                            <AlertTriangle className="w-3 h-3" />
+                          </span>
+                          <div className="absolute bottom-full left-1/2 -translate-x-1/2 mb-1 hidden group-hover:block px-2 py-1 bg-white text-slate-700 shadow border border-slate-100 text-xs rounded whitespace-nowrap z-50">
+                            Over limit
+                          </div>
+                        </div>
+                      )}
                     </div>
                   </div>
                 );
@@ -483,6 +512,9 @@ const PMLeavesPage = () => {
             },
           ]}
           data={teamWfh}
+          currentPage={currentPage}
+          pageSize={PAGE_SIZE}
+          onPageChange={setCurrentPage}
           emptyState={{
             title: "No WFH requests from your team",
             description: "WFH requests will appear here",

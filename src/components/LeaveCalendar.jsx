@@ -26,6 +26,7 @@ import {
   isNonWorkingDay,
   getNonWorkingDayLabel,
   RAZORPAY_NEGATIVE_BALANCE_NOTE,
+  recordLeaveApplication,
 } from "../utils/leaveTypes";
 
 // ─── Leave colour palette ───────────────────────────────────────────────────
@@ -418,7 +419,7 @@ export default function LeaveCalendar({ filterEmployeeIds = null }) {
 
   // Fetch user details to get employee_id for leave submission
   const user = JSON.parse(localStorage.getItem("user") || "{}");
-  const employeeId = user?.employee_id;
+  const employeeId = user?.employee_id || user?.id;
   const isEmployee = !!employeeId;
 
   // Range Selection & Form states
@@ -444,8 +445,15 @@ export default function LeaveCalendar({ filterEmployeeIds = null }) {
   });
 
   const createLeaveMutation = useMutation({
-    mutationFn: (data) => leaveApi.create({ ...data, employee_id: employeeId }),
-    onSuccess: (res) => {
+    mutationFn: (data) =>
+      leaveApi.create({
+        ...data,
+        employee_id: employeeId,
+        created_at: new Date().toISOString(),
+        applied_on: format(new Date(), "yyyy-MM-dd"),
+      }),
+    onSuccess: (res, variables) => {
+      recordLeaveApplication({ ...variables, ...res });
       queryClient.invalidateQueries({ queryKey: ["leave-calendar", monthStr] });
       queryClient.invalidateQueries({ queryKey: ["my-leaves", employeeId] });
       setSelectedStart(null);
@@ -697,12 +705,17 @@ export default function LeaveCalendar({ filterEmployeeIds = null }) {
         reason: reason,
       });
     } else {
-      createLeaveMutation.mutate({
+      const payload = {
+        employee_id: employeeId,
         leave_type: leaveType,
         start_date: selectedStart,
         end_date: selectedEnd,
         reason: reason,
-      });
+        created_at: new Date().toISOString(),
+        applied_on: format(new Date(), "yyyy-MM-dd"),
+      };
+      recordLeaveApplication(payload);
+      createLeaveMutation.mutate(payload);
     }
   };
 

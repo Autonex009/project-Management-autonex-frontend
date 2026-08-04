@@ -1137,6 +1137,8 @@ const ProjectsPage = () => {
   const [projectView, setProjectView] = useState(
     pageMemory.projectView || "active",
   ); // 'active' | 'archived' | 'development'
+  // "Autonex" quick filter — only projects staffed with ≥1 Autonex employee.
+  const [autonexOnly, setAutonexOnly] = useState(false);
   const [selectedPmIds, setSelectedPmIds] = useState([]);
   const [filtersOpen, setFiltersOpen] = useState(false);
   const filtersRef = useRef(null);
@@ -1159,6 +1161,15 @@ const ProjectsPage = () => {
     queryKey: ["employees"],
     queryFn: employeeApi.getAll,
   });
+
+  // Only active Program Managers (used in Add Project modal)
+  const pmEmployees = useMemo(() => {
+    return employees.filter(
+      (emp) =>
+        emp.status === "active" &&
+        (emp.designation || "").toLowerCase().includes("program manager")
+    );
+  }, [employees]);
 
   // Roster lookup — also the test for a stale allocation, since `GET /employees`
   // omits archived staff that `GET /allocations` still references.
@@ -1874,6 +1885,17 @@ const ProjectsPage = () => {
         : !isArchivedStatus(project.project_status);
     })
     .filter((project) => {
+      // "Autonex" quick filter: only projects staffed with ≥1 Autonex employee
+      // (team composition = Autonex annotators + reviewers + QC).
+      if (!autonexOnly) return true;
+      return (
+        (project.autonex_annotators || 0) +
+          (project.autonex_reviewers || 0) +
+          (project.qc_count || 0) >
+        0
+      );
+    })
+    .filter((project) => {
       if (selectedOrganization === "all") return true;
 
       const parentProject = visibleMainProjects.find(
@@ -1927,6 +1949,7 @@ const ProjectsPage = () => {
     selectedPm,
     selectedStatus,
     projectView,
+    autonexOnly,
   ]);
 
   // Deep-link focus: jump to the page containing the target sub-project, scroll
@@ -2119,49 +2142,51 @@ const ProjectsPage = () => {
       {/* Active / Archived / Development tabs — admin only. Archived = Completed /
  On Hold / Cancelled; Development = projects with the Developer type. */}
       {isAdmin && (
-        <div className="flex border-b border-slate-200">
-          {[
-            {
-              key: "active",
-              label: "Active Projects",
-              count: tabCounts.active,
-            },
-            { key: "archived", label: "Archived", count: tabCounts.archived },
-            {
-              key: "development",
-              label: "Development",
-              count: tabCounts.development,
-            },
-          ].map((t) => {
-            const isActive = projectView === t.key;
-            return (
-              <button
-                key={t.key}
-                onClick={() => {
-                  setProjectView(t.key);
-                  setSelectedStatus("all");
-                }}
-                className={`inline-flex items-center gap-2 px-4 py-2 text-sm font-semibold border-b-2 -mb-px transition-colors ${
-                  isActive
-                    ? "border-indigo-600 text-indigo-600"
-                    : "border-transparent text-slate-500 hover:text-slate-700"
-                }`}
-              >
-                {t.label}
-                {t.key !== "active" && (
-                  <span
-                    className={`inline-flex items-center justify-center h-5 min-w-[20px] px-1.5 rounded-full text-[11px] font-semibold ${
-                      isActive
-                        ? "bg-indigo-100 text-indigo-700"
-                        : "bg-slate-100 text-slate-500"
-                    }`}
-                  >
-                    {t.count}
-                  </span>
-                )}
-              </button>
-            );
-          })}
+        <div className="flex items-center justify-between border-b border-slate-200 pb-2">
+          <div className="flex items-center">
+            {[
+              {
+                key: "active",
+                label: "Active Projects",
+                count: tabCounts.active,
+              },
+              { key: "archived", label: "Archived", count: tabCounts.archived },
+              {
+                key: "development",
+                label: "Development",
+                count: tabCounts.development,
+              },
+            ].map((t) => {
+              const isActive = projectView === t.key;
+              return (
+                <button
+                  key={t.key}
+                  onClick={() => {
+                    setProjectView(t.key);
+                    setSelectedStatus("all");
+                  }}
+                  className={`inline-flex items-center gap-2 px-4 py-2 text-sm font-semibold border-b-2 -mb-px transition-colors ${
+                    isActive
+                      ? "border-indigo-600 text-indigo-600"
+                      : "border-transparent text-slate-500 hover:text-slate-700"
+                  }`}
+                >
+                  {t.label}
+                  {t.key !== "active" && (
+                    <span
+                      className={`inline-flex items-center justify-center h-5 min-w-[20px] px-1.5 rounded-full text-[11px] font-semibold ${
+                        isActive
+                          ? "bg-indigo-100 text-indigo-700"
+                          : "bg-slate-100 text-slate-500"
+                      }`}
+                    >
+                      {t.count}
+                    </span>
+                  )}
+                </button>
+              );
+            })}
+          </div>
         </div>
       )}
 
@@ -2312,6 +2337,20 @@ const ProjectsPage = () => {
             </span>
           )}
 
+          <button
+            type="button"
+            onClick={() => setAutonexOnly((v) => !v)}
+            title="Show only projects staffed with an Autonex employee"
+            className={`inline-flex items-center gap-2 rounded-lg border px-3 py-2 text-sm font-medium shadow-sm transition-colors ${
+              autonexOnly
+                ? "border-indigo-600 bg-indigo-600 text-white"
+                : "border-slate-200 bg-white text-slate-600 hover:bg-slate-50"
+            }`}
+          >
+            <Users className={`w-4 h-4 ${autonexOnly ? "text-white" : "text-slate-400"}`} />
+            Autonex
+          </button>
+
           <div className="relative" ref={filtersRef}>
             <button
               type="button"
@@ -2388,25 +2427,27 @@ const ProjectsPage = () => {
                     className="w-full"
                   />
                 </div>
-                <div>
-                  <label className="mb-1 block text-xs font-medium text-slate-500">
-                    Project Manager
-                  </label>
-                  <Dropdown
-                    value={selectedPm}
-                    onChange={setSelectedPm}
-                    searchable
-                    searchPlaceholder="Search managers..."
-                    options={[
-                      { value: "all", label: "All managers" },
-                      ...projectManagers.map((pm) => ({
-                        value: String(pm.id),
-                        label: pm.name,
-                      })),
-                    ]}
-                    className="w-full"
-                  />
-                </div>
+                {isAdmin && (
+                  <div>
+                    <label className="mb-1 block text-xs font-medium text-slate-500">
+                      Project Manager
+                    </label>
+                    <Dropdown
+                      value={selectedPm}
+                      onChange={setSelectedPm}
+                      searchable
+                      searchPlaceholder="Search managers..."
+                      options={[
+                        { value: "all", label: "All managers" },
+                        ...projectManagers.map((pm) => ({
+                          value: String(pm.id),
+                          label: pm.name,
+                        })),
+                      ]}
+                      className="w-full"
+                    />
+                  </div>
+                )}
                 {[selectedOrganization, selectedPm, selectedStatus].some(
                   (v) => v !== "all",
                 ) && (
@@ -2767,7 +2808,7 @@ const ProjectsPage = () => {
                   )}
                 </div>
                 <PmMultiSelect
-                  employees={employees}
+                  employees={pmEmployees}
                   value={selectedPmIds}
                   onChange={setSelectedPmIds}
                   isPm={isPm}
@@ -3192,7 +3233,7 @@ const ProjectsPage = () => {
                       ["annotators_total", "Total Annotators"],
                       ["autonex_annotators", "Autonex Annotators"],
                       ["autonex_reviewers", "Autonex Reviewers"],
-                      ["qc_count", "QC"],
+                      ["qc_count", "Autonex QC"],
                     ].map(([field, label]) => (
                       <div key={field}>
                         <label className="block text-[11px] font-medium text-slate-500 mb-1 truncate">
