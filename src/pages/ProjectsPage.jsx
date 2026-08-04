@@ -863,7 +863,7 @@ const ProjectCard = ({
               disabled={!hasEncord}
               onClick={(e) => {
                 stop(e);
-                navigate(`/admin/analytics/${project.id}`);
+                navigate(`${prefix}/analytics/${project.id}`);
               }}
               className={`inline-flex items-center gap-1.5 rounded-lg border px-3 py-1.5 text-xs font-medium transition-colors ${
                 hasEncord
