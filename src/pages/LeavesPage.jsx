@@ -137,6 +137,8 @@ const LeavesPage = () => {
   const PAGE_SIZE = 10;
   const [isModalOpen, setIsModalOpen] = useState(false);
   const [selectedLeaveType, setSelectedLeaveType] = useState("");
+  const [formStartDate, setFormStartDate] = useState("");
+  const [formEndDate, setFormEndDate] = useState("");
   // ?q= seeds the search box so a Dashboard card can deep-link straight to one
   // person's requests. It stays editable — clearing the box just clears it.
   const [searchQuery, setSearchQuery] = useState(queryParam || "");
@@ -249,6 +251,8 @@ const LeavesPage = () => {
       setIsModalOpen(false);
       setSelectedLeaveType("");
       setFormEmployeeId("");
+      setFormStartDate("");
+      setFormEndDate("");
       toast.success("Leave record created successfully");
 
     },
@@ -472,7 +476,7 @@ const LeavesPage = () => {
   };
 
   return (
-    <div className="space-y-4">
+    <div className="space-y-3">
       {/* Header */}
       <div>
         <h1 className="text-lg font-semibold text-slate-900">
@@ -683,11 +687,6 @@ const LeavesPage = () => {
                           />
                         )}
                       </div>
-                      {leave.approval_remark && (
-                        <p className="text-xs text-slate-400 mt-0.5 truncate">
-                          Remark: {leave.approval_remark}
-                        </p>
-                      )}
                     </div>
                   </div>
                 );
@@ -758,9 +757,11 @@ const LeavesPage = () => {
               render: (_, leave) => {
                 const rawApplied = resolveLeaveAppliedDate(leave);
                 if (!rawApplied) return <span className="text-[13px] text-slate-400">—</span>;
-                const d = new Date(
-                  rawApplied.includes("T") ? rawApplied : rawApplied + "T00:00:00"
-                );
+                // Extract YYYY-MM-DD from the ISO string to avoid UTC→local timezone shifts
+                const dateStr = String(rawApplied).slice(0, 10);
+                const [y, m, day] = dateStr.split("-").map(Number);
+                if (!y || !m || !day) return <span className="text-[13px] text-slate-400">—</span>;
+                const d = new Date(y, m - 1, day);
                 if (isNaN(d.getTime())) return <span className="text-[13px] text-slate-400">—</span>;
                 return (
                   <span className="text-[13px] text-slate-700 whitespace-nowrap">
@@ -1124,44 +1125,45 @@ const LeavesPage = () => {
                 placeholder="Select type"
               />
             </div>
-            <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
-              <div
-                className={
-                  selectedLeaveType === "first_half" ||
-                    selectedLeaveType === "second_half"
-                    ? "col-span-2"
-                    : ""
-                }
-              >
-                <label className="block text-sm font-medium text-gray-700 mb-1">
-                  {selectedLeaveType === "first_half" ||
-                    selectedLeaveType === "second_half"
-                    ? "Date"
-                    : "Start Date"}{" "}
-                  <span className="text-red-500">*</span>
-                </label>
-                <DatePicker
-                  type="date"
-                  name="start_date"
-                  required
-                />
-              </div>
-              {!(
-                selectedLeaveType === "first_half" ||
-                selectedLeaveType === "second_half"
-              ) && (
-                  <div>
-                    <label className="block text-sm font-medium text-gray-700 mb-1">
-                      End Date <span className="text-red-500">*</span>
-                    </label>
-                    <input
-                      type="date"
-                      name="end_date"
-                      required
-                      className="input"
-                    />
-                  </div>
-                )}
+            <div>
+              {selectedLeaveType === "first_half" ||
+              selectedLeaveType === "second_half" ? (
+                <div>
+                  <label className="block text-sm font-medium text-gray-700 mb-1">
+                    Date <span className="text-red-500">*</span>
+                  </label>
+                  <input type="hidden" name="start_date" value={formStartDate} />
+                  <input type="hidden" name="end_date" value={formStartDate} />
+                  <DatePicker
+                    type="date"
+                    value={formStartDate}
+                    onChange={(e) => {
+                      setFormStartDate(e.target.value);
+                      setFormEndDate(e.target.value);
+                    }}
+                    required
+                  />
+                </div>
+              ) : (
+                <div>
+                  <label className="block text-sm font-medium text-gray-700 mb-1">
+                    Leave Duration (Start & End Date) <span className="text-red-500">*</span>
+                  </label>
+                  <input type="hidden" name="start_date" value={formStartDate} />
+                  <input type="hidden" name="end_date" value={formEndDate} />
+                  <DatePicker
+                    type="range"
+                    startDate={formStartDate}
+                    endDate={formEndDate}
+                    onRangeChange={({ startDate, endDate }) => {
+                      setFormStartDate(startDate);
+                      setFormEndDate(endDate);
+                    }}
+                    placeholder="Click to select start and end dates from calendar"
+                    required
+                  />
+                </div>
+              )}
             </div>
             <div>
               <label className="block text-sm font-medium text-gray-700 mb-1">

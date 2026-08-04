@@ -21,6 +21,7 @@ import { payrollApi } from "../services/api";
 import { usePayrollStore } from "../store/usePayrollStore";
 import { Table } from "../components/ui/Table";
 import Dropdown from "../components/ui/Dropdown";
+import UserAvatar from "../components/ui/UserAvatar";
 import { formatDisplayName, getNameInitials } from "../utils/displayName";
 
 const SORT_OPTIONS = [
@@ -309,17 +310,12 @@ const PayTab = () => {
         const shortName = formatDisplayName(row.full_name) || row.full_name;
         return (
           <div className="flex items-center gap-3">
-            {row.avatar_url ? (
-              <img
-                src={row.avatar_url}
-                alt={shortName}
-                className="w-8 h-8 rounded-full object-cover flex-shrink-0"
-              />
-            ) : (
-              <div className="w-8 h-8 rounded-full flex items-center justify-center flex-shrink-0 bg-indigo-50 text-indigo-600 text-[13px] font-semibold">
-                {getNameInitials(row.full_name)}
-              </div>
-            )}
+            <UserAvatar
+              src={row.avatar_url}
+              name={shortName}
+              size="sm"
+              className="w-8 h-8"
+            />
             <div className="group relative min-w-0">
               <div 
                 className={`font-semibold truncate ${active ? "text-slate-800" : "text-slate-500"}`}

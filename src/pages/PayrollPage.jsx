@@ -29,6 +29,7 @@ import Table from "../components/ui/Table";
 import Modal from "../components/ui/Modal";
 import DatePicker from "../components/ui/DatePicker";
 import Dropdown from "../components/ui/Dropdown";
+import UserAvatar from "../components/ui/UserAvatar";
 import { formatDisplayName, getNameInitials } from "../utils/displayName";
 
 const LEAVE_LABELS = {
@@ -98,17 +99,12 @@ const getColumns = ({
       const shortName = formatDisplayName(row.employee_name) || row.employee_name;
       return (
         <div className="flex items-center gap-3">
-          {row.avatar_url ? (
-            <img
-              src={row.avatar_url}
-              alt={shortName}
-              className="w-8 h-8 rounded-full object-cover flex-shrink-0"
-            />
-          ) : (
-            <div className="w-8 h-8 rounded-full flex items-center justify-center flex-shrink-0 bg-indigo-50 text-indigo-600 text-[13px] font-semibold">
-              {getNameInitials(row.employee_name)}
-            </div>
-          )}
+          <UserAvatar
+            src={row.avatar_url}
+            name={shortName}
+            size="sm"
+            className="w-8 h-8"
+          />
           <div className="group relative min-w-0">
             <div className="font-semibold truncate text-slate-800">
               {shortName}

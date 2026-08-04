@@ -26,9 +26,9 @@ import {
   ClipboardList,
 } from "lucide-react";
 
-const MIN_WIDTH = 208;
+const MIN_WIDTH = 200;
 const MAX_WIDTH = 400;
-const DEFAULT_WIDTH = 256;
+const DEFAULT_WIDTH = 200;
 
 const EmployeeLayout = () => {
   const location = useLocation();
@@ -65,10 +65,13 @@ const EmployeeLayout = () => {
       localStorage.getItem("employee-sidebar-width"),
       10,
     );
-    if (!Number.isNaN(savedWidth)) {
+    if (!Number.isNaN(savedWidth) && savedWidth !== 256) {
       const clamped = Math.min(MAX_WIDTH, Math.max(MIN_WIDTH, savedWidth));
       widthRef.current = clamped;
       setWidth(clamped);
+    } else {
+      widthRef.current = DEFAULT_WIDTH;
+      setWidth(DEFAULT_WIDTH);
     }
   }, []);
 
@@ -151,7 +154,7 @@ const EmployeeLayout = () => {
   const handleLogout = () => {
     authApi
       .logout()
-      .catch(() => {})
+      .catch(() => { })
       .finally(() => {
         localStorage.removeItem("token");
         localStorage.removeItem("user");
@@ -165,32 +168,31 @@ const EmployeeLayout = () => {
 
   const navItems = isPm
     ? [
-        { to: `${prefix}/dashboard`, label: "Dashboard" },
-        { to: `${prefix}/projects`, label: "Organizations" },
-        { to: `${prefix}/sub-projects`, label: "Projects" },
-        { to: `${prefix}/analytics`, label: "Analytics" },
-        { to: `${prefix}/allocations`, label: "Allocations" },
-        { to: `${prefix}/my-team`, label: "My Team" },
-        { to: `${prefix}/performance`, label: "Performance" },
-        { to: `${prefix}/self-evaluation`, label: "Self Evaluation" },
-        { to: `${prefix}/leaves`, label: "Team Leaves" },
-        { to: `${prefix}/my-leaves`, label: "My Leaves" },
-        { to: `${prefix}/side-projects`, label: "Side Projects" },
-        { to: `${prefix}/guidelines`, label: "Guidelines" },
-        { to: `${prefix}/onboarding`, label: "My Onboarding" },
-        { to: `${prefix}/onboarding-mentor`, label: "Mentorship" },
-      ]
+      { to: `${prefix}/dashboard`, label: "Dashboard" },
+      { to: `${prefix}/projects`, label: "Organizations" },
+      { to: `${prefix}/sub-projects`, label: "Projects" },
+      { to: `${prefix}/allocations`, label: "Allocations" },
+      { to: `${prefix}/my-team`, label: "My Team" },
+      { to: `${prefix}/performance`, label: "Performance" },
+      { to: `${prefix}/self-evaluation`, label: "Self Evaluation" },
+      { to: `${prefix}/leaves`, label: "Team Leaves" },
+      { to: `${prefix}/my-leaves`, label: "My Leaves" },
+      { to: `${prefix}/side-projects`, label: "Side Projects" },
+      { to: `${prefix}/guidelines`, label: "Guidelines" },
+      { to: `${prefix}/onboarding`, label: "My Onboarding" },
+      { to: `${prefix}/onboarding-mentor`, label: "Mentorship" },
+    ]
     : [
-        { to: `${prefix}/dashboard`, label: "Dashboard" },
-        { to: `${prefix}/projects`, label: "My Projects" },
-        { to: `${prefix}/self-evaluation`, label: "Self Evaluation" },
-        { to: `${prefix}/leaves`, label: "Leaves" },
-        { to: `${prefix}/side-projects`, label: "Side Projects" },
-        { to: `${prefix}/guidelines`, label: "Guidelines" },
-        { to: `${prefix}/referrals`, label: "Referrals" },
-        { to: `${prefix}/company-info`, label: "Company Info" },
-        { to: `${prefix}/onboarding`, label: "Onboarding" },
-      ];
+      { to: `${prefix}/dashboard`, label: "Dashboard" },
+      { to: `${prefix}/projects`, label: "My Projects" },
+      { to: `${prefix}/self-evaluation`, label: "Self Evaluation" },
+      { to: `${prefix}/leaves`, label: "Leaves" },
+      { to: `${prefix}/side-projects`, label: "Side Projects" },
+      { to: `${prefix}/guidelines`, label: "Guidelines" },
+      { to: `${prefix}/referrals`, label: "Referrals" },
+      { to: `${prefix}/company-info`, label: "Company Info" },
+      { to: `${prefix}/onboarding`, label: "Onboarding" },
+    ];
 
   // Resolve the current route to a breadcrumb crumb (labels come from navItems,
   // which already differ for PM vs employee).
