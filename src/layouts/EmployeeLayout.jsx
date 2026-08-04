@@ -168,6 +168,7 @@ const EmployeeLayout = () => {
         { to: `${prefix}/dashboard`, label: "Dashboard" },
         { to: `${prefix}/projects`, label: "Organizations" },
         { to: `${prefix}/sub-projects`, label: "Projects" },
+        { to: `${prefix}/analytics`, label: "Analytics" },
         { to: `${prefix}/allocations`, label: "Allocations" },
         { to: `${prefix}/my-team`, label: "My Team" },
         { to: `${prefix}/performance`, label: "Performance" },
@@ -194,6 +195,8 @@ const EmployeeLayout = () => {
   // Resolve the current route to a breadcrumb crumb (labels come from navItems,
   // which already differ for PM vs employee).
   const resolveCrumb = (pathname) => {
+    if (pathname.startsWith("/pm/analytics/"))
+      return { name: "Analytics", key: "pm-analytics-detail", isDetail: true };
     const item = navItems.find((n) => n.to === pathname);
     if (item) return { name: item.label, key: pathname };
     if (/\/onboarding\/[^/]+$/.test(pathname))

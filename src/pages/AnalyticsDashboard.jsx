@@ -1,6 +1,6 @@
 import { useMemo, useState, useEffect } from "react";
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
-import { useNavigate } from "react-router-dom";
+import { useNavigate, useLocation } from "react-router-dom";
 import { analyticsApi } from "../services/api";
 import Table from "../components/ui/Table";
 import Button from "../components/ui/Button";
@@ -108,7 +108,9 @@ const sentimentStyle = (s) => {
 
 const AnalyticsDashboard = () => {
   const navigate = useNavigate();
+  const location = useLocation();
   const queryClient = useQueryClient();
+  const basePath = location.pathname.startsWith("/pm") ? "/pm" : "/admin";
 
   // One range control drives every Autonex KPI + the chart.
   const [range, setRange] = useState("30");
@@ -369,7 +371,7 @@ const AnalyticsDashboard = () => {
       <Table
         variant="untitled"
         loading={isLoading}
-        onRowClick={(row) => navigate(`/admin/analytics/${row.project_id}`)}
+        onRowClick={(row) => navigate(`${basePath}/analytics/${row.project_id}`)}
         columns={[
           {
             key: "name",
