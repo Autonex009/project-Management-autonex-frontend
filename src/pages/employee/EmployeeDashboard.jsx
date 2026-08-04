@@ -1,7 +1,7 @@
 import React, { useMemo, useState } from "react";
 import { useQuery } from "@tanstack/react-query";
 
-import { allocationApi, authApi, employeeApi, leaveApi, perfEvalApi, subProjectApi, wfhApi } from "../../services/api";
+import { allocationApi, analyticsApi, authApi, employeeApi, leaveApi, perfEvalApi, subProjectApi, wfhApi } from "../../services/api";
 
 import { AlertCircle, Award, Briefcase, Calendar, Check, ChevronDown, Clock, FolderKanban, Star, TrendingUp, Trophy } from "lucide-react";
 
@@ -195,11 +195,19 @@ const EmployeeDashboard = () => {
   );
   const currentAllocation = activeProjects[0];
 
-  const encordActivity = useMemo(() => {
-    if (!currentAllocation) return null;
-
-    return currentAllocation.project?.encord_activity || {};
-  }, [currentAllocation]);
+  // Encord platform activity for THIS employee — last 7 days, scoped to their
+  // current project. Served by /analytics/me/encord-activity (self-scoped), which
+  // resolves the signed-in user's Encord account via employees.encord_id.
+  const currentSubProjectId = currentAllocation?.project?.id;
+  const { data: encordActivity } = useQuery({
+    queryKey: ["my-encord-activity", employeeId, currentSubProjectId],
+    queryFn: () =>
+      analyticsApi.getMyEncordActivity({
+        days: 7,
+        sub_project_id: currentSubProjectId,
+      }),
+    enabled: !!employeeId,
+  });
 
 
   const pastProjects = useMemo(
@@ -574,7 +582,7 @@ const EmployeeDashboard = () => {
             </div>
 
             {/* Daily Hours Row */}
-            <div className="grid grid-cols-5 gap-1.5 mb-5">
+            <div className="grid grid-cols-7 gap-1.5 mb-5">
               {(encordActivity?.daily || []).map((item) => ({
                   day: format(parseISO(item.date), "EEE")[0],
                   hours: `${item.employee_hours}h`,

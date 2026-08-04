@@ -121,6 +121,14 @@ export const analyticsApi = {
   // Dashboard: most active Autonex user + project (this month)
   getAutonexOverview: () =>
     api.get("/analytics/autonex/overview").then((res) => res.data),
+  // Employee self-service: the signed-in user's own Encord hours/day (last N days),
+  // optionally scoped to their current sub-project (adds a per-day team average).
+  getMyEncordActivity: ({ days = 7, sub_project_id } = {}) =>
+    api
+      .get("/analytics/me/encord-activity", {
+        params: { days, ...(sub_project_id ? { sub_project_id } : {}) },
+      })
+      .then((res) => res.data),
   // Manual Encord pull (admin) — optional { date_from, date_to }
   runSync: (body) =>
     api.post("/encord/sync", body || {}).then((res) => res.data),
