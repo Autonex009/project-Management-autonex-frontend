@@ -354,9 +354,7 @@ export function recordLeaveApplication(data) {
 export function resolveLeaveAppliedDate(leave) {
   if (!leave) return null;
 
-  // Return the immutable creation timestamp from the API / DB.
-  // This value is set once when the leave is created and never changes
-  // regardless of approvals, rejections, or other status updates.
+  // 1. Return the ground-truth creation timestamp from the API / DB.
   const direct =
     leave.created_at ||
     leave.applied_on ||
@@ -370,7 +368,9 @@ export function resolveLeaveAppliedDate(leave) {
     leave.date_created ||
     leave.creation_date;
 
-  if (direct) return direct;
+  if (direct) {
+    return direct;
+  }
 
   const sDate = (leave.start_date || "").slice(0, 10);
   const eDate = (leave.end_date || sDate).slice(0, 10);
@@ -380,8 +380,6 @@ export function resolveLeaveAppliedDate(leave) {
   const keysToCheck = [
     targetId,
     empId && sDate ? `${empId}_${sDate}_${eDate}` : null,
-    sDate ? `${sDate}_${eDate}` : null,
-    sDate ? sDate : null,
   ].filter(Boolean);
 
   // 2. Memory cache check
@@ -403,13 +401,11 @@ export function resolveLeaveAppliedDate(leave) {
         }
       }
     }
-  } catch (e) {}
+  } catch (e) { }
 
-  // 4. Persistent Fallback for active leave records without backend timestamp
+  // 4. Fallback for leave records without backend timestamp: default to start_date
   if (sDate) {
-    const nowIso = new Date().toISOString();
-    recordLeaveApplication({ ...leave, created_at: nowIso });
-    return nowIso;
+    return sDate.includes("T") ? sDate : sDate + "T00:00:00";
   }
 
   return null;
