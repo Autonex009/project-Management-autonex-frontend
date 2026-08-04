@@ -408,35 +408,12 @@ export function resolveLeaveAppliedDate(leave) {
     }
   } catch (e) {}
 
-  // 4. Audit Change Log check (specifically Application logs)
-  try {
-    const logsRaw = localStorage.getItem("autonex_change_logs_v3");
-    if (logsRaw) {
-      const logs = JSON.parse(logsRaw);
-      const foundLog = logs.find((l) => {
-        if (l.category !== "Leaves") return false;
-        const actionStr = (l.action || l.actionType || "").toLowerCase();
-        const isAppLog = actionStr.includes("applied") || actionStr.includes("request") || actionStr.includes("create");
-        if (!isAppLog) return false;
+  // NOTE: a previous step here mined the browser's "autonex_change_logs_v3" key —
+  // the old client-side change log — for an applied-on timestamp. That log has been
+  // replaced by the server-side audit trail, so the key is never written anymore and
+  // reading it would only surface stale (originally mock) data.
 
-        if (targetId && (l.entityId === targetId || l.entityId === `leave-${targetId}`)) {
-          return true;
-        }
-        if (sDate && l.details && Array.isArray(l.details)) {
-          return l.details.some(
-            (d) => d.to && (d.to.includes(sDate) || (eDate && d.to.includes(eDate)))
-          );
-        }
-        return false;
-      });
-      if (foundLog && foundLog.timestamp) {
-        recordLeaveApplication({ ...leave, created_at: foundLog.timestamp });
-        return foundLog.timestamp;
-      }
-    }
-  } catch (e) {}
-
-  // 5. Persistent Fallback for active leave records without backend timestamp
+  // 4. Persistent Fallback for active leave records without backend timestamp
   if (sDate) {
     const nowIso = new Date().toISOString();
     recordLeaveApplication({ ...leave, created_at: nowIso });

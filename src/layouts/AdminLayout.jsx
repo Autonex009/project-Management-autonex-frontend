@@ -22,7 +22,7 @@ const ADMIN_ROUTE_LABELS = {
   "/admin/modules/new": "New Module",
   "/admin/onboarding-reports": "Progress Reports",
   "/admin/newly-onboarded": "Newly Onboarded",
-  "/admin/change-log": "Change Log",
+  "/admin/change-log": "Audit Log",
   "/admin/company-settings": "Company Settings",
 };
 

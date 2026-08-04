@@ -60,8 +60,12 @@ const AdminSidebar = ({
     (href !== "/admin/dashboard" && location.pathname.startsWith(href + "/"));
 
   // Company Settings moves to the bottom bar, so drop it from the main list.
+  // Items carrying `roles` are hidden from anyone outside that list — hiding the
+  // link only tidies the sidebar, the endpoints do the real enforcement.
   const platformItems = navigation.filter(
-    (item) => item.href !== COMPANY_SETTINGS_HREF,
+    (item) =>
+      item.href !== COMPANY_SETTINGS_HREF &&
+      (!item.roles || item.roles.includes(user?.role)),
   );
 
   const renderItem = (item) => {
