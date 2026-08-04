@@ -29,6 +29,7 @@ import {
 } from "../utils/dateValidation";
 import {
   getLeaveTypeLabel,
+  normalizeLeaveType,
   LEAVE_TYPE_OPTIONS,
   RAZORPAY_NEGATIVE_BALANCE_NOTE,
   FLOATER_DATES_2026,
@@ -1229,7 +1230,7 @@ const MyLeavesPanel = ({
                                 {getLeaveTypeLabel(leave.leave_type)}
                               </p>
                               {leave.flagged && (
-                                <OverLimitHoverCard leave={leave} allLeaves={leaves} />
+                                <OverLimitHoverCard leave={leave} allLeaves={allLeaves} />
                               )}
                               {leave.is_emergency && (
                                 <span className="inline-flex items-center gap-1 px-2 py-0.5 rounded-full text-[10px] font-semibold bg-red-100 text-red-700 border border-red-200">
