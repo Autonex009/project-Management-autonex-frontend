@@ -130,6 +130,24 @@ const EmployeeLayout = () => {
     staleTime: 5 * 60 * 1000,
   });
 
+  useEffect(() => {
+    if (account) {
+      const savedUser = localStorage.getItem("user");
+      if (savedUser) {
+        try {
+          const cachedUser = JSON.parse(savedUser);
+          if (cachedUser.employee_type !== account.employee_type) {
+            const updatedUser = { ...cachedUser, employee_type: account.employee_type };
+            localStorage.setItem("user", JSON.stringify(updatedUser));
+            window.location.reload();
+          }
+        } catch (e) {
+          console.error("Failed to sync localStorage user profile", e);
+        }
+      }
+    }
+  }, [account]);
+
   const handleLogout = () => {
     authApi
       .logout()
