@@ -121,6 +121,9 @@ export const analyticsApi = {
   // Dashboard: most active Autonex user + project (this month)
   getAutonexOverview: () =>
     api.get("/analytics/autonex/overview").then((res) => res.data),
+  // Admin leaderboard: rank team members by platform hours (range = 'month'|'week'|'day'|'custom')
+  getLeaderboard: (params) =>
+    api.get("/analytics/leaderboard", { params }).then((res) => res.data),
   // Employee self-service: the signed-in user's own Encord hours/day (last N days),
   // optionally scoped to their current sub-project (adds a per-day team average).
   getMyEncordActivity: ({ days = 7, sub_project_id } = {}) =>
