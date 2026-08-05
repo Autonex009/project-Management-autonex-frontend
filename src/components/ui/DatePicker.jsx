@@ -132,7 +132,7 @@ export default function DatePicker({
     if (!isOpen) {
       updatePosition();
     }
-  }, [isOpen, actualValue]);
+  }, [isOpen, actualValue];
 
   useEffect(() => {
     const handleClickOutside = (e) => {
