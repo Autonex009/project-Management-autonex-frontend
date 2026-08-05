@@ -41,7 +41,7 @@ const resolveAdminCrumb = (pathname) => {
 
 const MIN_WIDTH = 200;
 const MAX_WIDTH = 400;
-const DEFAULT_WIDTH = 220;
+const DEFAULT_WIDTH = MIN_WIDTH;
 
 const AdminLayout = () => {
   const rawBreadcrumbTrail = useBreadcrumbTrail(resolveAdminCrumb);
