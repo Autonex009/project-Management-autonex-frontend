@@ -1,552 +1,556 @@
-import React, { useState, useEffect } from "react";
+import React, { useState, useEffect, useMemo } from "react";
+import { useQuery } from "@tanstack/react-query";
 import {
-  History,
   Search,
-  Filter,
-  User,
-  Clock,
-  ArrowRight,
   RefreshCw,
-  SlidersHorizontal,
-  CheckCircle2,
-  AlertCircle,
-  FileSpreadsheet,
-  Layers,
-  Users,
-  FolderKanban,
-  Calendar,
-  Settings,
-  ShieldCheck,
-  UserPlus,
-  Trash2,
-  ChevronDown,
-  ChevronUp,
-  Info,
+  Clock,
+  User,
   Globe,
-  Tag,
+  ArrowRight,
 } from "lucide-react";
-import { getStoredLogs, clearLogs } from "../services/changeLogService";
+import { auditLogApi } from "../services/api";
 import Table from "../components/ui/Table";
-import UserAvatar from "../components/ui/UserAvatar";
+import DatePicker from "../components/ui/DatePicker";
+import Dropdown from "../components/ui/Dropdown";
+import { formatDisplayName } from "../utils/displayName";
+
+const PAGE_SIZE = 25;
+
+const TIME_FILTER_OPTIONS = [
+  { value: "all", label: "Filter by Time: All" },
+  { value: "today", label: "Filter by Time: Today" },
+  { value: "7d", label: "Filter by Time: Last 7 days" },
+  { value: "custom", label: "Filter by Time: Custom" },
+];
+
+const toISODate = (d) =>
+  `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, "0")}-${String(
+    d.getDate()
+  ).padStart(2, "0")}`;
 
 export default function ChangeLogPage() {
-  const [logs, setLogs] = useState([]);
-  const [searchQuery, setSearchQuery] = useState("");
-  const [selectedCategory, setSelectedCategory] = useState("All");
-  const [selectedActionType, setSelectedActionType] = useState("All");
-  const [expandedLogId, setExpandedLogId] = useState(null);
-  const [currentPage, setCurrentPage] = useState(1);
-  const PAGE_SIZE = 10;
+  const [page, setPage] = useState(1);
+  const [searchInput, setSearchInput] = useState("");
+  const [search, setSearch] = useState("");
+  const [category, setCategory] = useState("All");
+  const [actorRole, setActorRole] = useState("All");
+  const [timeFilter, setTimeFilter] = useState("all");
+  const [dateFrom, setDateFrom] = useState("");
+  const [dateTo, setDateTo] = useState("");
+  const [showCustomDateModal, setShowCustomDateModal] = useState(false);
+  const [expandedId, setExpandedId] = useState(null);
 
-  const loadLogs = () => {
-    setLogs(getStoredLogs());
+  // Debounce search
+  useEffect(() => {
+    const t = setTimeout(() => {
+      setSearch(searchInput);
+      setPage(1);
+    }, 350);
+    return () => clearTimeout(t);
+  }, [searchInput]);
+
+  // Handle time filter selection
+  const handleTimeFilterChange = (val) => {
+    setTimeFilter(val);
+    setPage(1);
+    setShowCustomDateModal(val === "custom");
+    const now = new Date();
+
+    if (val === "all") {
+      setDateFrom("");
+      setDateTo("");
+    } else if (val === "today") {
+      const todayStr = toISODate(now);
+      setDateFrom(todayStr);
+      setDateTo(todayStr);
+    } else if (val === "7d") {
+      const start = new Date(now.getFullYear(), now.getMonth(), now.getDate() - 6);
+      setDateFrom(toISODate(start));
+      setDateTo(toISODate(now));
+    }
   };
 
-  useEffect(() => {
-    loadLogs();
-    const handleUpdate = () => loadLogs();
-    window.addEventListener("autonex:changelog_updated", handleUpdate);
-    return () => window.removeEventListener("autonex:changelog_updated", handleUpdate);
-  }, []);
+  const filters = {
+    page,
+    page_size: PAGE_SIZE,
+    ...(search.trim() ? { search: search.trim() } : {}),
+    ...(category !== "All" ? { category } : {}),
+    ...(actorRole !== "All" ? { actor_role: actorRole.toLowerCase() } : {}),
+    ...(dateFrom ? { date_from: dateFrom } : {}),
+    ...(dateTo ? { date_to: dateTo } : {}),
+  };
 
-  // Filter logs based on search, category, actionType
-  const filteredLogs = logs.filter((log) => {
-    const matchesSearch =
-      !searchQuery.trim() ||
-      log.action.toLowerCase().includes(searchQuery.toLowerCase()) ||
-      log.entityName.toLowerCase().includes(searchQuery.toLowerCase()) ||
-      log.performer.name.toLowerCase().includes(searchQuery.toLowerCase()) ||
-      log.performer.email.toLowerCase().includes(searchQuery.toLowerCase()) ||
-      (log.details || []).some(
-        (d) =>
-          d.field.toLowerCase().includes(searchQuery.toLowerCase()) ||
-          String(d.from).toLowerCase().includes(searchQuery.toLowerCase()) ||
-          String(d.to).toLowerCase().includes(searchQuery.toLowerCase())
-      );
-
-    const matchesCategory =
-      selectedCategory === "All" ||
-      log.category.toLowerCase() === selectedCategory.toLowerCase();
-
-    const matchesActionType =
-      selectedActionType === "All" ||
-      log.actionType.toLowerCase() === selectedActionType.toLowerCase();
-
-    return matchesSearch && matchesCategory && matchesActionType;
+  const {
+    data: result,
+    isLoading,
+    isFetching,
+    refetch,
+  } = useQuery({
+    queryKey: ["audit-logs", filters],
+    queryFn: () => auditLogApi.getAll(filters),
+    placeholderData: (prev) => prev,
   });
 
-  // Calculate metrics
-  const totalLogsCount = logs.length;
-  const todayCount = logs.filter((l) => {
-    const d = new Date(l.timestamp);
-    const today = new Date();
-    return (
-      d.getDate() === today.getDate() &&
-      d.getMonth() === today.getMonth() &&
-      d.getFullYear() === today.getFullYear()
-    );
-  }).length;
-  const employeeEditsCount = logs.filter((l) => l.category === "Employees").length;
-  const projectEditsCount = logs.filter((l) => l.category === "Projects").length;
+  const { data: filterOptions } = useQuery({
+    queryKey: ["audit-log-filters"],
+    queryFn: auditLogApi.getFilters,
+  });
+
+  const logs = result?.items || [];
+  const total = result?.total ?? 0;
+  const totalPages = Math.ceil(total / PAGE_SIZE) || 1;
+
+  const categoryOptions = useMemo(
+    () => [
+      { value: "All", label: "All Categories" },
+      ...(filterOptions?.categories || []).map((c) => ({ value: c, label: c })),
+    ],
+    [filterOptions]
+  );
+
+  const roleOptions = useMemo(
+    () => [
+      { value: "All", label: "All Roles" },
+      { value: "Admin", label: "Admin" },
+      { value: "PM", label: "PM" },
+      { value: "Employee", label: "Employee" },
+      { value: "HR", label: "HR" },
+    ],
+    []
+  );
+
+  const CATEGORY_BADGES = {
+    leaves: "bg-amber-50 text-amber-700 border-amber-200/80",
+    wfh: "bg-cyan-50 text-cyan-700 border-cyan-200/80",
+    employees: "bg-indigo-50 text-indigo-700 border-indigo-200/80",
+    allocations: "bg-purple-50 text-purple-700 border-purple-200/80",
+    projects: "bg-blue-50 text-blue-700 border-blue-200/80",
+    access: "bg-teal-50 text-teal-700 border-teal-200/80",
+    guidelines: "bg-sky-50 text-sky-700 border-sky-200/80",
+    settings: "bg-slate-100 text-slate-700 border-slate-200/80",
+  };
+
+  const getCategoryBadgeClass = (cat) =>
+    CATEGORY_BADGES[(cat || "").toLowerCase()] ||
+    "bg-slate-100 text-slate-700 border-slate-200/80";
+
+  const cleanSummaryText = (summary, subjectName) => {
+    if (!summary) return "";
+    let s = summary;
+
+    // 1. Remove duplicate "leave leave" or "Leave leave"
+    s = s.replace(/leave\s+leave/gi, "leave");
+
+    // 2. Remove redundant subject name if it appears in the summary phrase
+    if (subjectName && typeof subjectName === "string" && subjectName.trim()) {
+      const rawName = subjectName.trim();
+      const formattedName = formatDisplayName(rawName) || rawName;
+      const escapeRegExp = (str) => str.replace(/[.*+?^${}()|[\]\\]/g, "\\$&");
+
+      const patterns = [
+        new RegExp(`\\s+for\\s+${escapeRegExp(rawName)}`, "gi"),
+        new RegExp(`\\s+for\\s+${escapeRegExp(formattedName)}`, "gi"),
+        new RegExp(`^Updated\\s+${escapeRegExp(rawName)}\\s+—\\s+`, "gi"),
+        new RegExp(`^Updated\\s+${escapeRegExp(formattedName)}\\s+—\\s+`, "gi"),
+        new RegExp(`^Uploaded a new profile picture for\\s+${escapeRegExp(rawName)}`, "gi"),
+        new RegExp(`^Uploaded a new profile picture for\\s+${escapeRegExp(formattedName)}`, "gi"),
+      ];
+
+      patterns.forEach((regex) => {
+        s = s.replace(regex, (match) => {
+          if (match.toLowerCase().startsWith("updated")) return "Updated ";
+          if (match.toLowerCase().startsWith("uploaded")) return "Uploaded profile picture";
+          return "";
+        });
+      });
+    }
+
+    // 3. Format YYYY-MM-DD date ranges: (2026-08-12 → 2026-08-13) -> (12 Aug – 13 Aug)
+    s = s.replace(/\((\d{4})-(\d{2})-(\d{2})\s*(?:→|->|\sto\s)\s*(\d{4})-(\d{2})-(\d{2})\)/g, (_, y1, m1, d1, y2, m2, d2) => {
+      const date1 = new Date(Number(y1), Number(m1) - 1, Number(d1));
+      const date2 = new Date(Number(y2), Number(m2) - 1, Number(d2));
+      const str1 = `${date1.getDate()} ${date1.toLocaleDateString("en-US", { month: "short" })}`;
+      const str2 = `${date2.getDate()} ${date2.toLocaleDateString("en-US", { month: "short" })}`;
+      return `(${str1} – ${str2})`;
+    });
+
+    // 4. Format single YYYY-MM-DD date: (2026-08-05) -> (5 Aug)
+    s = s.replace(/\((\d{4})-(\d{2})-(\d{2})\)/g, (_, y, m, d) => {
+      const date = new Date(Number(y), Number(m) - 1, Number(d));
+      return `(${date.getDate()} ${date.toLocaleDateString("en-US", { month: "short" })})`;
+    });
+
+    // 5. Remove trailing "was pending" or extra clutter
+    s = s.replace(/\s+was\s+pending$/gi, "");
+
+    return s.trim();
+  };
 
   const formatTimestamp = (isoString) => {
-    if (!isoString) return { dateStr: "—", timeStr: "—", relativeTime: "—", isoFull: "—" };
-    const date = new Date(isoString);
-    const now = new Date();
-    const diffMs = now - date;
-    const diffMins = Math.floor(diffMs / (1000 * 60));
-    const diffHours = Math.floor(diffMs / (1000 * 60 * 60));
-    const diffDays = Math.floor(diffMs / (1000 * 60 * 60 * 24));
+    if (!isoString)
+      return { dateStr: "—", timeStr: "—", relativeTime: "—", formattedShort: "—", formatted: "—", isoFull: "—" };
 
-    let relativeTime = "";
+    // If ISO string lacks timezone offset/designator, append Z to ensure UTC interpretation
+    const normalizedIso =
+      typeof isoString === "string" &&
+        !isoString.endsWith("Z") &&
+        !/[+-]\d{2}:\d{2}$/.test(isoString)
+        ? `${isoString}Z`
+        : isoString;
+
+    const date = new Date(normalizedIso);
+    if (isNaN(date.getTime()))
+      return { dateStr: isoString, timeStr: "", relativeTime: "", formattedShort: isoString, formatted: isoString, isoFull: isoString };
+
+    // Relative time
+    const diffMs = Math.max(0, Date.now() - date.getTime());
+    const diffMins = Math.floor(diffMs / 60000);
+    const diffHours = Math.floor(diffMs / 3600000);
+    const diffDays = Math.floor(diffMs / 86400000);
+    let relativeTime;
     if (diffMins < 1) relativeTime = "Just now";
     else if (diffMins < 60) relativeTime = `${diffMins}m ago`;
     else if (diffHours < 24) relativeTime = `${diffHours}h ago`;
     else relativeTime = `${diffDays}d ago`;
 
+    const day = date.getDate();
+    const month = date.toLocaleDateString("en-US", { month: "short" });
+    const year = date.getFullYear();
+    const timeStr24 = date.toLocaleTimeString("en-US", {
+      hour: "2-digit",
+      minute: "2-digit",
+      second: "2-digit",
+      hour12: false,
+    });
+    const timeStr12 = date.toLocaleTimeString("en-US", {
+      hour: "numeric",
+      minute: "2-digit",
+      hour12: true,
+    });
+
+    const dateStr = `${day} ${month}, ${year}`;
+    const formattedShort = `${day} ${month}, ${timeStr12}`;
+
     return {
-      dateStr: date.toLocaleDateString("en-US", {
-        month: "short",
-        day: "numeric",
-        year: "numeric",
-      }),
-      timeStr: date.toLocaleTimeString("en-US", {
-        hour: "2-digit",
-        minute: "2-digit",
-        second: "2-digit",
-      }),
+      dateStr,
+      timeStr: timeStr24,
       relativeTime,
-      isoFull: isoString,
+      formattedShort,
+      formatted: `${dateStr} ${timeStr24}`,
+      isoFull: date.toLocaleString(),
     };
   };
 
-  const getActionBadgeClass = (actionType) => {
-    const type = (actionType || "").toLowerCase();
-    if (type === "promoted" || type === "approved") {
-      return "bg-emerald-50 text-emerald-700 border-emerald-200";
-    }
-    if (type === "applied") {
-      return "bg-sky-50 text-sky-700 border-sky-200";
-    }
-    if (type === "created" || type === "added") {
-      return "bg-indigo-50 text-indigo-700 border-indigo-200";
-    }
-    if (type === "archived" || type === "deleted" || type === "rejected") {
-      return "bg-rose-50 text-rose-700 border-rose-200";
-    }
-    if (type === "restored") {
-      return "bg-amber-50 text-amber-700 border-amber-200";
-    }
-    return "bg-slate-100 text-slate-700 border-slate-200";
-  };
-
-  const getCategoryIcon = (category) => {
-    const cat = (category || "").toLowerCase();
-    if (cat === "employees") return <Users className="w-3.5 h-3.5 text-indigo-600" />;
-    if (cat === "projects") return <FolderKanban className="w-3.5 h-3.5 text-blue-600" />;
-    if (cat === "leaves") return <Calendar className="w-3.5 h-3.5 text-amber-600" />;
-    if (cat === "allocations") return <Layers className="w-3.5 h-3.5 text-purple-600" />;
-    return <Settings className="w-3.5 h-3.5 text-slate-600" />;
-  };
-
   return (
-    <div className="space-y-6 pb-12">
-      {/* Header Title Section */}
-      <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-4">
-        <div>
-          <div className="flex items-center gap-2.5">
-            <div className="p-2 rounded-xl bg-indigo-50 text-indigo-600 border border-indigo-100">
-              <History className="w-5 h-5" />
-            </div>
-            <div>
-              <h1 className="text-xl font-bold text-slate-900 tracking-tight">
-                Change Log
-              </h1>
-              <p className="text-xs text-slate-500 mt-0.5">
-                Precise audit trail and detailed change logs of all portal operations
-              </p>
-            </div>
-          </div>
-        </div>
-
-        <div className="flex items-center gap-2">
-          <button
-            type="button"
-            onClick={loadLogs}
-            className="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-lg border border-slate-200 bg-white text-xs font-semibold text-slate-700 hover:bg-slate-50 shadow-sm transition-all"
-          >
-            <RefreshCw className="w-3.5 h-3.5 text-slate-500" />
-            Refresh Log
-          </button>
-        </div>
+    <div className="bg-white min-h-screen p-6 space-y-6">
+      {/* Header section matching mockup */}
+      <div className="space-y-2 border-b border-slate-100 pb-4">
+        <h1 className="text-2xl font-bold text-slate-900 tracking-tight">
+          Audit Log
+        </h1>
+        <p className="text-sm text-slate-600 max-w-4xl leading-relaxed">
+          The audit log gives you a history of changes to your Confluence site. It can be very useful for tracking down things like permissions, global settings, or add-on changes.
+        </p>
       </div>
 
-      {/* Overview Stat Cards */}
-      <div className="grid grid-cols-2 sm:grid-cols-4 gap-3.5">
-        <div className="bg-white p-4 rounded-2xl border border-slate-200/80 shadow-sm flex items-center gap-3">
-          <div className="w-10 h-10 rounded-xl bg-indigo-50 border border-indigo-100 flex items-center justify-center flex-shrink-0">
-            <History className="w-5 h-5 text-indigo-600" />
-          </div>
-          <div>
-            <div className="text-lg font-bold text-slate-900 font-mono leading-none">
-              {totalLogsCount}
+      {/* Toolbar & Controls */}
+      <div className="space-y-4">
+        <div className="flex flex-wrap items-center justify-between gap-4">
+          <div className="flex flex-wrap items-center gap-3">
+            {/* Filter by keyword search box */}
+            <div className="relative">
+              <input
+                type="text"
+                value={searchInput}
+                onChange={(e) => setSearchInput(e.target.value)}
+                placeholder="Filter by keyword"
+                className="w-56 rounded-md border border-slate-300 bg-white px-3 py-1.5 text-sm text-slate-800 placeholder:text-slate-400 focus:border-blue-500 focus:outline-none focus:ring-1 focus:ring-blue-500"
+              />
+              <Search className="absolute right-2.5 top-2.5 h-4 w-4 text-slate-400 pointer-events-none" />
             </div>
-            <div className="text-[11px] font-semibold text-slate-500 mt-1">
-              Total Logged Changes
-            </div>
-          </div>
-        </div>
 
-        <div className="bg-white p-4 rounded-2xl border border-slate-200/80 shadow-sm flex items-center gap-3">
-          <div className="w-10 h-10 rounded-xl bg-emerald-50 border border-emerald-100 flex items-center justify-center flex-shrink-0">
-            <Clock className="w-5 h-5 text-emerald-600" />
-          </div>
-          <div>
-            <div className="text-lg font-bold text-emerald-700 font-mono leading-none">
-              {todayCount}
-            </div>
-            <div className="text-[11px] font-semibold text-slate-500 mt-1">
-              Today's Activity
-            </div>
-          </div>
-        </div>
+            {/* Filter by Time dropdown */}
+            <Dropdown
+              className="w-[215px] shrink-0"
+              options={TIME_FILTER_OPTIONS}
+              value={timeFilter}
+              onChange={handleTimeFilterChange}
+            />
 
-        <div className="bg-white p-4 rounded-2xl border border-slate-200/80 shadow-sm flex items-center gap-3">
-          <div className="w-10 h-10 rounded-xl bg-purple-50 border border-purple-100 flex items-center justify-center flex-shrink-0">
-            <Users className="w-5 h-5 text-purple-600" />
-          </div>
-          <div>
-            <div className="text-lg font-bold text-slate-900 font-mono leading-none">
-              {employeeEditsCount}
-            </div>
-            <div className="text-[11px] font-semibold text-slate-500 mt-1">
-              Employee Changes
-            </div>
-          </div>
-        </div>
+            {/* Custom date range selector inline to the right of Filter by Time */}
+            {showCustomDateModal && (
+              <div className="w-60 shrink-0">
+                <DatePicker
+                  type="range"
+                  startDate={dateFrom}
+                  endDate={dateTo}
+                  onRangeChange={({ startDate, endDate }) => {
+                    setDateFrom(startDate);
+                    setDateTo(endDate);
+                    setPage(1);
+                  }}
+                  placeholder="Select date range"
+                />
+              </div>
+            )}
 
-        <div className="bg-white p-4 rounded-2xl border border-slate-200/80 shadow-sm flex items-center gap-3">
-          <div className="w-10 h-10 rounded-xl bg-blue-50 border border-blue-100 flex items-center justify-center flex-shrink-0">
-            <FolderKanban className="w-5 h-5 text-blue-600" />
-          </div>
-          <div>
-            <div className="text-lg font-bold text-slate-900 font-mono leading-none">
-              {projectEditsCount}
-            </div>
-            <div className="text-[11px] font-semibold text-slate-500 mt-1">
-              Project Changes
-            </div>
-          </div>
-        </div>
-      </div>
-
-      {/* Toolbar & Filters */}
-      <div className="bg-white p-4 rounded-2xl border border-slate-200/80 shadow-sm space-y-3">
-        <div className="flex flex-col md:flex-row md:items-center md:justify-between gap-3">
-          {/* Search */}
-          <div className="relative flex-1 min-w-[240px]">
-            <Search className="w-4 h-4 absolute left-3 top-1/2 -translate-y-1/2 text-slate-400" />
-            <input
-              type="text"
-              value={searchQuery}
-              onChange={(e) => {
-                setSearchQuery(e.target.value);
-                setCurrentPage(1);
+            {/* Category filter */}
+            <Dropdown
+              className="w-44 shrink-0"
+              options={categoryOptions}
+              value={category}
+              onChange={(v) => {
+                setCategory(v);
+                setPage(1);
               }}
-              placeholder="Search by action, performer name, email, or entity..."
-              className="w-full pl-9 pr-4 py-2 bg-slate-50 border border-slate-200 rounded-xl text-xs text-slate-800 placeholder-slate-400 focus:outline-none focus:ring-2 focus:ring-indigo-500/20 focus:border-indigo-500 transition-all"
+            />
+
+            {/* Role filter */}
+            <Dropdown
+              className="w-36 shrink-0"
+              options={roleOptions}
+              value={actorRole}
+              onChange={(v) => {
+                setActorRole(v);
+                setPage(1);
+              }}
             />
           </div>
 
-          {/* Action Type Filter */}
-          <div className="flex items-center gap-2">
-            <span className="text-xs font-semibold text-slate-500 whitespace-nowrap">
-              Action:
-            </span>
-            <select
-              value={selectedActionType}
-              onChange={(e) => {
-                setSelectedActionType(e.target.value);
-                setCurrentPage(1);
-              }}
-              className="px-3 py-1.5 bg-slate-50 border border-slate-200 rounded-xl text-xs font-semibold text-slate-700 focus:outline-none focus:ring-2 focus:ring-indigo-500/20"
+          {/* Right Action buttons */}
+          <div className="flex items-center gap-4">
+            <button
+              type="button"
+              onClick={() => refetch()}
+              title="Refresh audit log"
+              className="inline-flex items-center gap-1.5 text-sm font-medium text-slate-700 hover:text-blue-600 transition-colors"
             >
-              <option value="All">All Actions</option>
-              <option value="Applied">Applied</option>
-              <option value="Approved">Approved</option>
-              <option value="Rejected">Rejected</option>
-              <option value="Promoted">Promoted</option>
-              <option value="Updated">Updated</option>
-              <option value="Created">Created</option>
-              <option value="Archived">Archived</option>
-              <option value="Restored">Restored</option>
-            </select>
+              <RefreshCw className={`h-4 w-4 text-slate-500 ${isFetching ? "animate-spin" : ""}`} />
+              Refresh
+            </button>
           </div>
-        </div>
-
-        {/* Category Pills */}
-        <div className="flex flex-wrap items-center gap-1.5 pt-2 border-t border-slate-100">
-          <span className="text-xs font-semibold text-slate-400 mr-1.5">
-            Category:
-          </span>
-          {["All", "Employees", "Projects", "Allocations", "Leaves", "System"].map((cat) => {
-            const isActive = selectedCategory.toLowerCase() === cat.toLowerCase();
-            return (
-              <button
-                key={cat}
-                type="button"
-                onClick={() => {
-                  setSelectedCategory(cat);
-                  setCurrentPage(1);
-                }}
-                className={`px-3 py-1 text-xs font-semibold rounded-lg transition-all border ${
-                  isActive
-                    ? "bg-indigo-600 text-white border-indigo-600 shadow-sm"
-                    : "bg-slate-50 text-slate-600 border-slate-200 hover:bg-slate-100"
-                }`}
-              >
-                {cat}
-              </button>
-            );
-          })}
         </div>
       </div>
 
-      {/* Change Log Audit Table with Expandable Precise Details */}
+      {/* Main Audit Log Table */}
       <Table
         variant="untitled"
-        expandedRowId={expandedLogId}
-        onRowClick={(row) => setExpandedLogId(expandedLogId === row.id ? null : row.id)}
+        loading={isLoading}
+        skeletonRows={8}
+        expandedRowId={expandedId}
+        onRowClick={(row) => setExpandedId(expandedId === row.id ? null : row.id)}
         renderExpandedRow={(row) => {
-          const formatted = formatTimestamp(row.timestamp);
-          const performer = row.performer || {};
+          const formatted = formatTimestamp(row.created_at);
+          const actor = row.actor || {};
+          const actorName = formatDisplayName(actor.name) || actor.name || "System";
+          const subject = formatDisplayName(row.subject_name) || row.subject_name;
+
           return (
-            <div className="p-4 bg-slate-50/90 border-t border-slate-200/80 space-y-4 text-xs">
-              <div className="flex flex-wrap items-center justify-between gap-2 pb-3 border-b border-slate-200">
-                <div className="flex items-center gap-2">
-                  <span className="font-mono text-[11px] font-bold text-slate-500 bg-slate-200/80 px-2 py-0.5 rounded">
-                    LOG ID: {row.id}
-                  </span>
-                  <span className="font-semibold text-slate-700">
-                    Category: <strong className="text-indigo-600">{row.category}</strong>
-                  </span>
-                </div>
-                <div className="text-slate-500 text-[11px] flex items-center gap-1.5">
-                  <Clock className="w-3.5 h-3.5 text-indigo-500" />
-                  <span>Exact Timestamp:</span>
-                  <strong className="text-slate-800 font-mono">{formatted.isoFull}</strong>
-                </div>
-              </div>
+            <div className="border-t border-slate-200/80 bg-slate-50/80 p-4 text-xs space-y-3">
+              {/* Streamlined Meta Summary Bar */}
+              <div className="flex flex-wrap items-center gap-x-4 gap-y-2 border-b border-slate-200/80 pb-3 text-xs text-slate-700">
+                {/* Log ID */}
+                <span className="font-mono text-[11px] font-bold text-slate-500 bg-slate-200/70 px-1.5 py-0.5 rounded">
+                  LOG #{row.id}
+                </span>
 
-              <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-                {/* Performer & Target Context */}
-                <div className="bg-white p-3 rounded-xl border border-slate-200 space-y-2">
-                  <div className="text-[11px] font-bold text-slate-400 uppercase tracking-wider flex items-center gap-1">
-                    <User className="w-3.5 h-3.5 text-indigo-500" /> Performer Metadata
-                  </div>
-                  <div className="space-y-1 text-slate-700">
-                    <div>
-                      <span className="text-slate-400">Name:</span>{" "}
-                      <strong className="text-slate-900">{performer.name || "System Admin"}</strong>
-                    </div>
-                    <div>
-                      <span className="text-slate-400">Email:</span>{" "}
-                      <span className="font-mono text-slate-800">{performer.email || "admin@autonex.ai"}</span>
-                    </div>
-                    <div>
-                      <span className="text-slate-400">Role:</span>{" "}
-                      <span className="px-2 py-0.5 rounded bg-indigo-50 text-indigo-700 font-semibold text-[11px]">
-                        {performer.role || "Admin"}
-                      </span>
-                    </div>
-                  </div>
+                <span className="text-slate-300">|</span>
+
+                {/* Timestamp shifted to left side */}
+                <div className="flex items-center gap-1.5 text-xs font-bold text-slate-900 font-mono">
+                  <Clock className="h-3.5 w-3.5 text-blue-600 shrink-0" />
+                  {formatted.isoFull}
                 </div>
 
-                {/* Target Entity Metadata */}
-                <div className="bg-white p-3 rounded-xl border border-slate-200 space-y-2">
-                  <div className="text-[11px] font-bold text-slate-400 uppercase tracking-wider flex items-center gap-1">
-                    <Tag className="w-3.5 h-3.5 text-indigo-500" /> Target Entity Metadata
-                  </div>
-                  <div className="space-y-1 text-slate-700">
-                    <div>
-                      <span className="text-slate-400">Target Type:</span>{" "}
-                      <strong className="text-slate-900">{row.entity}</strong>
-                    </div>
-                    <div>
-                      <span className="text-slate-400">Target Name:</span>{" "}
-                      <strong className="text-indigo-700">{row.entityName || "—"}</strong>
-                    </div>
-                    {row.entityId && (
-                      <div>
-                        <span className="text-slate-400">Target ID:</span>{" "}
-                        <span className="font-mono text-slate-600 bg-slate-100 px-1.5 py-0.5 rounded text-[11px]">
-                          {row.entityId}
+                <span className="text-slate-300">|</span>
+
+                {/* User & Email - crisp and high visibility */}
+                <div className="flex items-center gap-1.5">
+                  <span className="font-semibold text-slate-600">User:</span>
+                  <span className="font-bold text-slate-900">{actorName}</span>
+                  {actor.email && (
+                    <span className="text-slate-800 font-mono text-[11.5px] bg-slate-100/90 px-1.5 py-0.5 rounded border border-slate-200/80 font-medium">
+                      {actor.email}
+                    </span>
+                  )}
+                </div>
+
+                {/* Target - crisp and high visibility */}
+                {row.entity_type && (
+                  <>
+                    <span className="text-slate-300">|</span>
+                    <div className="flex items-center gap-1.5">
+                      <span className="font-semibold text-slate-600">Target:</span>
+                      <span className="font-bold text-slate-900 capitalize">{row.entity_type}</span>
+                      {row.entity_id != null && (
+                        <span className="font-mono text-[11.5px] font-bold text-slate-800 bg-slate-100/90 px-1.5 py-0.5 rounded border border-slate-200/80">
+                          #{row.entity_id}
                         </span>
-                      </div>
-                    )}
-                  </div>
-                </div>
-              </div>
-
-              {/* Complete Side-by-Side Field Diffs */}
-              <div className="bg-white p-3 rounded-xl border border-slate-200 space-y-2">
-                <div className="text-[11px] font-bold text-slate-400 uppercase tracking-wider flex items-center justify-between">
-                  <span>Exact Field-Level Diffs ({row.details?.length || 0} fields modified)</span>
-                  <span className="text-indigo-600 text-[11px] normal-case font-semibold">Click row to collapse</span>
-                </div>
-                {row.details && row.details.length > 0 ? (
-                  <div className="divide-y divide-slate-100">
-                    {row.details.map((d, idx) => (
-                      <div key={idx} className="py-2 grid grid-cols-1 sm:grid-cols-3 gap-2 items-center text-xs">
-                        <div className="font-bold text-slate-800">{d.field}</div>
-                        <div className="text-slate-400 line-through bg-slate-50 border border-slate-200/60 rounded px-2.5 py-1 font-mono text-[11.5px] truncate">
-                          {String(d.from ?? "—")}
-                        </div>
-                        <div className="flex items-center gap-1.5">
-                          <ArrowRight className="w-3.5 h-3.5 text-indigo-500 flex-shrink-0" />
-                          <span className="font-bold text-indigo-700 bg-indigo-50 border border-indigo-100 rounded px-2.5 py-1 font-mono text-[11.5px] truncate flex-1">
-                            {String(d.to ?? "—")}
-                          </span>
-                        </div>
-                      </div>
-                    ))}
-                  </div>
-                ) : (
-                  <div className="text-slate-400 italic py-1">No specific field modifications recorded.</div>
+                      )}
+                    </div>
+                  </>
                 )}
               </div>
+
+              {/* Concise Field Changes Table (rendered only when field details exist) */}
+              {row.details && row.details.length > 0 && (
+                <div className="space-y-1.5 pt-0.5">
+                  <div className="text-[10.5px] font-bold uppercase tracking-wider text-slate-500">
+                    Field Changes ({row.details.length})
+                  </div>
+
+                  <div className="overflow-x-auto rounded-md border border-slate-200 bg-white">
+                    <table className="w-full text-left text-[11.5px]">
+                      <thead>
+                        <tr className="border-b border-slate-200/80 bg-slate-100/60 text-[10px] font-bold uppercase tracking-wider text-slate-500">
+                          <th className="px-3 py-1.5 w-1/4 font-semibold">Field</th>
+                          <th className="px-3 py-1.5 w-1/3 font-semibold">Original Value</th>
+                          <th className="px-1 py-1.5 w-5 text-center"></th>
+                          <th className="px-3 py-1.5 w-1/3 font-semibold">New Value</th>
+                        </tr>
+                      </thead>
+                      <tbody className="divide-y divide-slate-100 font-mono text-[11.5px]">
+                        {row.details.map((d, idx) => (
+                          <tr key={idx} className="hover:bg-slate-50/70 transition-colors">
+                            <td className="px-3 py-1 font-sans font-medium text-slate-800">
+                              {d.field}
+                            </td>
+                            <td className="px-3 py-1 text-slate-400 truncate max-w-[180px]" title={String(d.from ?? "—")}>
+                              {String(d.from ?? "—")}
+                            </td>
+                            <td className="px-1 py-1 text-center text-blue-500">
+                              <ArrowRight className="h-3 w-3 inline-block" />
+                            </td>
+                            <td className="px-3 py-1 font-semibold text-blue-700 truncate max-w-[240px]" title={String(d.to ?? "—")}>
+                              {String(d.to ?? "—")}
+                            </td>
+                          </tr>
+                        ))}
+                      </tbody>
+                    </table>
+                  </div>
+                </div>
+              )}
             </div>
           );
         }}
         columns={[
           {
-            key: "timestamp",
-            label: "Time & Date",
-            width: "w-[18%]",
+            key: "created_at",
+            label: "Time",
+            width: "w-[16%]",
             render: (val) => {
-              const formatted = formatTimestamp(val);
+              const f = formatTimestamp(val);
               return (
-                <div className="min-w-0">
-                  <div className="text-[12.5px] font-bold text-slate-800 flex items-center gap-1.5">
-                    <Clock className="w-3.5 h-3.5 text-indigo-500 flex-shrink-0" />
-                    <span>{formatted.relativeTime}</span>
-                  </div>
-                  <div className="text-[11px] text-slate-400 mt-0.5 whitespace-nowrap">
-                    {formatted.dateStr} · {formatted.timeStr}
-                  </div>
+                <div className="text-slate-700 text-xs font-normal whitespace-nowrap" title={f.isoFull}>
+                  {f.formattedShort}
                 </div>
               );
             },
           },
           {
-            key: "performer",
-            label: "Performed By",
-            width: "w-[24%]",
-            render: (performer) => {
-              if (!performer) return <span className="text-xs text-slate-400">—</span>;
+            key: "actor",
+            label: "User",
+            width: "w-[15%]",
+            render: (actor) => {
+              const name = formatDisplayName(actor?.name) || actor?.name || "Administrator";
               return (
-                <div className="flex items-center gap-2.5 min-w-0">
-                  <UserAvatar src={performer.avatar_url} name={performer.name} size="sm" className="w-8 h-8" />
-                  <div className="min-w-0">
-                    <div className="text-[13px] font-semibold text-slate-900 truncate">
-                      {performer.name}
-                    </div>
-                    <div className="text-[11px] text-slate-400 truncate">
-                      {performer.role || "Admin"}
-                    </div>
-                  </div>
+                <div
+                  className="font-medium text-blue-600 hover:underline cursor-pointer text-xs truncate"
+                  title={`${name}${actor?.role ? ` (${actor.role})` : ""}`}
+                >
+                  {name}
                 </div>
               );
             },
           },
           {
-            key: "action",
-            label: "Action & Category",
-            width: "w-[25%]",
-            render: (action, row) => (
-              <div className="space-y-1">
-                <div className="flex items-center gap-1.5 flex-wrap">
-                  <span
-                    className={`inline-flex items-center px-2 py-0.5 rounded-md text-[11px] font-bold border ${getActionBadgeClass(
-                      row.actionType
-                    )}`}
-                  >
-                    {action}
-                  </span>
-                </div>
-                <div className="flex items-center gap-1 text-[11px] font-medium text-slate-500">
-                  {getCategoryIcon(row.category)}
-                  <span>{row.category}</span>
-                  {row.entityName && (
-                    <span className="text-slate-800 font-semibold truncate max-w-[140px] inline-block align-bottom">
-                      · {row.entityName}
-                    </span>
-                  )}
-                </div>
-              </div>
-            ),
+            key: "category",
+            label: "Event type",
+            width: "w-[14%]",
+            render: (val) => {
+              const catName = val ? val.charAt(0).toUpperCase() + val.slice(1) : "General";
+              const badgeStyle = getCategoryBadgeClass(val);
+              return (
+                <span
+                  className={`inline-block px-2 py-0.5 rounded text-[11px] font-semibold border ${badgeStyle} truncate max-w-[110px]`}
+                  title={catName}
+                >
+                  {catName}
+                </span>
+              );
+            },
           },
           {
-            key: "details",
-            label: "Change Details (Diff)",
-            width: "w-[28%]",
-            render: (details) => {
-              if (!details || details.length === 0) {
-                return <span className="text-xs text-slate-400 italic">No field diffs recorded</span>;
-              }
+            key: "summary",
+            label: "Change",
+            width: "w-[34%]",
+            render: (summary, row) => {
+              const cleaned = cleanSummaryText(summary || row.action, row.subject_name) || "Settings modified";
               return (
-                <div className="space-y-1 py-0.5">
-                  {details.slice(0, 2).map((d, idx) => (
-                    <div
-                      key={idx}
-                      className="flex items-center gap-2 text-xs bg-slate-50 border border-slate-100 rounded-lg px-2.5 py-1 flex-wrap"
-                    >
-                      <span className="font-semibold text-slate-700 min-w-[85px]">
-                        {d.field}:
-                      </span>
-                      <span className="text-slate-400 line-through bg-slate-100 px-1.5 py-0.5 rounded text-[11px] max-w-[100px] truncate">
-                        {String(d.from ?? "—")}
-                      </span>
-                      <ArrowRight className="w-3 h-3 text-indigo-500 flex-shrink-0" />
-                      <span className="font-semibold text-indigo-700 bg-indigo-50 border border-indigo-100 px-1.5 py-0.5 rounded text-[11px] max-w-[120px] truncate">
-                        {String(d.to ?? "—")}
-                      </span>
-                    </div>
-                  ))}
-                  {details.length > 2 && (
-                    <div className="text-[10.5px] font-semibold text-indigo-600 pt-0.5">
-                      +{details.length - 2} more fields (click row to view all)
-                    </div>
-                  )}
+                <div
+                  className="text-slate-800 text-xs font-normal leading-snug truncate pr-3"
+                  title={cleaned}
+                >
+                  {cleaned}
                 </div>
               );
             },
           },
           {
-            key: "expand",
-            label: "",
-            width: "w-[5%]",
-            align: "center",
+            key: "item_affected",
+            label: "Item affected",
+            width: "w-[13%]",
             render: (_, row) => {
-              const isExpanded = expandedLogId === row.id;
+              const subject = formatDisplayName(row.subject_name) || row.subject_name;
+              let text = "";
+              if (subject) {
+                text = subject;
+              } else if (row.entity_type) {
+                text = `${row.entity_type}${row.entity_id != null ? ` #${row.entity_id}` : ""}`;
+              }
+              if (!text) return <span className="text-slate-400 text-xs">—</span>;
+
+              return (
+                <span
+                  className="inline-block truncate max-w-[130px] px-2 py-0.5 rounded bg-slate-100/90 text-slate-700 font-medium text-[11.5px] border border-slate-200/60"
+                  title={text}
+                >
+                  {text}
+                </span>
+              );
+            },
+          },
+          {
+            key: "actions",
+            label: "Actions",
+            width: "w-[8%]",
+            align: "right",
+            render: (_, row) => {
+              const isExpanded = expandedId === row.id;
               return (
                 <button
                   type="button"
-                  className="p-1 rounded-lg text-slate-400 hover:text-indigo-600 hover:bg-indigo-50 transition-colors"
+                  onClick={(e) => {
+                    e.stopPropagation();
+                    setExpandedId(isExpanded ? null : row.id);
+                  }}
+                  className="text-blue-600 hover:text-blue-800 hover:underline text-xs font-medium whitespace-nowrap cursor-pointer"
                 >
-                  {isExpanded ? <ChevronUp className="w-4 h-4" /> : <ChevronDown className="w-4 h-4" />}
+                  {isExpanded ? "Hide details" : "Show more"}
                 </button>
               );
             },
           },
         ]}
-        data={filteredLogs}
-        currentPage={currentPage}
+        data={logs}
+        currentPage={page}
         pageSize={PAGE_SIZE}
-        onPageChange={setCurrentPage}
+        totalItems={total}
+        onPageChange={setPage}
         emptyState={{
-          title: "No audit logs found",
-          description: "Try clearing search keywords or selecting another category filter.",
+          title: "No audit log entries found",
+          description: "Try adjusting your search keywords, time range, or category filters.",
         }}
       />
     </div>

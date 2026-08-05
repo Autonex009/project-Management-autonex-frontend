@@ -39,6 +39,10 @@ const StatCard = ({
   // Tighter padding and type scale for dense KPI rows. Only the card chrome
   // changes — the popover is identical, so a compact card reads the same on hover.
   compact = false,
+  // Value on the same row as the icon and title instead of below it, which halves
+  // the card height. For rows of plain counts where the number needs no room to
+  // breathe — a card with a `delta`/`hint`/`label` still stacks those underneath.
+  inline = false,
   onClick,
 }) => {
   const iconTone = ICON_TONES[tone] || ICON_TONES.slate;
@@ -143,6 +147,45 @@ const StatCard = ({
 
   const interactive = hasBreakdown || onClick;
 
+  const iconTile = Icon && (
+    <span
+      className={`flex shrink-0 items-center justify-center bg-gradient-to-br ${iconTone} text-white shadow-sm ${
+        compact || inline ? "h-8 w-8 rounded-lg" : "h-9 w-9 rounded-xl"
+      }`}
+    >
+      <Icon className={compact || inline ? "h-4 w-4" : "h-[18px] w-[18px]"} />
+    </span>
+  );
+
+  const chevron = hasBreakdown && (
+    <ChevronDown
+      className={`ml-auto h-3.5 w-3.5 shrink-0 text-slate-300 transition-[transform,color] duration-150 group-hover:text-slate-400 ${
+        open ? "rotate-180 text-slate-400" : ""
+      }`}
+    />
+  );
+
+  const getValueFontSize = () => {
+    if (inline) return "text-[20px]";
+    const valStr = String(value ?? "");
+    if (valStr.length > 20) return "text-sm font-semibold";
+    if (valStr.length > 15) return "text-base font-semibold";
+    if (valStr.length > 10) return "text-lg font-bold";
+    return compact ? "text-[20px]" : "text-[24px]";
+  };
+
+  const valueRow = (
+    <div className="flex items-baseline gap-1 min-w-0 pb-0.5">
+      <span
+        className={`font-bold leading-normal tracking-tight text-slate-900 tabular-nums truncate ${getValueFontSize()}`}
+        title={typeof value === "string" ? value : undefined}
+      >
+        {value}
+      </span>
+      {unit && <span className="text-sm font-medium text-slate-400">{unit}</span>}
+    </div>
+  );
+
   return (
     <div
       ref={cardRef}
@@ -162,56 +205,52 @@ const StatCard = ({
       role={interactive ? "button" : undefined}
       tabIndex={interactive ? 0 : undefined}
       aria-expanded={hasBreakdown ? open : undefined}
-      className={`group relative rounded-xl border bg-white ${compact ? "px-3 py-2.5" : "p-3"} shadow-[0_1px_2px_rgba(0,0,0,0.03)] transition-colors focus:outline-none focus-visible:ring-2 focus-visible:ring-indigo-500/40 ${
+      className={`group relative rounded-xl border bg-white ${inline ? "px-3.5 py-3" : compact ? "px-3 py-2.5" : "p-3"} shadow-[0_1px_2px_rgba(0,0,0,0.03)] transition-colors focus:outline-none focus-visible:ring-2 focus-visible:ring-indigo-500/40 ${
         pinned ? "border-slate-300" : "border-slate-200 hover:border-slate-300"
       } ${interactive ? "cursor-pointer" : ""}`}
     >
-      <div className="flex items-center gap-2.5">
-        {Icon && (
-          <span
-            className={`flex shrink-0 items-center justify-center bg-gradient-to-br ${iconTone} text-white shadow-sm ${
-              compact ? "h-8 w-8 rounded-lg" : "h-9 w-9 rounded-xl"
-            }`}
+      {inline ? (
+        // Icon left, number over its caption on the right — the whole card is one
+        // horizontal band, so a row of these takes half the vertical space.
+        <div className="flex items-center gap-3">
+          {iconTile}
+          <div className="min-w-0">
+            {valueRow}
+            <p className="mt-1 truncate text-[12px] font-medium text-slate-500">
+              {title}
+            </p>
+          </div>
+          {chevron}
+        </div>
+      ) : (
+        <>
+          <div className="flex items-center gap-2.5">
+            {iconTile}
+            <span
+              className={`truncate font-medium text-slate-600 ${compact ? "text-[12px]" : "text-[13px]"}`}
+            >
+              {title}
+            </span>
+            {chevron}
+          </div>
+
+          {/* Mono, like the other micro-copy: short metric captions read as data,
+              not prose, and a fixed pitch keeps them aligned between sibling cards. */}
+          {label && (
+            <p
+              className={`font-mono font-medium text-slate-400 ${compact ? "mt-1.5 text-[11px]" : "mt-2.5 text-[12px]"}`}
+            >
+              {label}
+            </p>
+          )}
+
+          <div
+            className={label ? "mt-0.5" : compact ? "mt-1.5" : "mt-2"}
           >
-            <Icon className={compact ? "h-4 w-4" : "h-[18px] w-[18px]"} />
-          </span>
-        )}
-        <span
-          className={`truncate font-medium text-slate-600 ${compact ? "text-[12px]" : "text-[13px]"}`}
-        >
-          {title}
-        </span>
-        {hasBreakdown && (
-          <ChevronDown
-            className={`ml-auto h-3.5 w-3.5 shrink-0 text-slate-300 transition-[transform,color] duration-150 group-hover:text-slate-400 ${
-              open ? "rotate-180 text-slate-400" : ""
-            }`}
-          />
-        )}
-      </div>
-
-      {/* Mono, like the other micro-copy: short metric captions read as data,
-          not prose, and a fixed pitch keeps them aligned between sibling cards. */}
-      {label && (
-        <p
-          className={`font-mono font-medium text-slate-400 ${compact ? "mt-1.5 text-[11px]" : "mt-2.5 text-[12px]"}`}
-        >
-          {label}
-        </p>
+            {valueRow}
+          </div>
+        </>
       )}
-
-      <div
-        className={`${label ? "mt-0.5" : compact ? "mt-1.5" : "mt-2"} flex items-baseline gap-1`}
-      >
-        <span
-          className={`font-bold leading-none tracking-tight text-slate-900 tabular-nums ${compact ? "text-[26px]" : "text-[32px]"}`}
-        >
-          {value}
-        </span>
-        {unit && (
-          <span className="text-sm font-medium text-slate-400">{unit}</span>
-        )}
-      </div>
 
       {(delta || hint) && (
         <div

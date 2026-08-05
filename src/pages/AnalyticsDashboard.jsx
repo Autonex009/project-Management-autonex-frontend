@@ -1,9 +1,10 @@
 import { useMemo, useState, useEffect } from "react";
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
-import { useNavigate } from "react-router-dom";
+import { useNavigate, useLocation } from "react-router-dom";
 import { analyticsApi } from "../services/api";
 import Table from "../components/ui/Table";
 import Button from "../components/ui/Button";
+import DatePicker from "../components/ui/DatePicker";
 import {
   FolderKanban,
   Clock,
@@ -15,6 +16,7 @@ import {
   BarChart3,
   Layers,
   ChevronDown,
+  Calendar,
 } from "lucide-react";
 import {
   ResponsiveContainer,
@@ -32,6 +34,7 @@ const AUTONEX_RANGES = [
   { key: "1", label: "Last day" },
   { key: "7", label: "Last 7 days" },
   { key: "30", label: "Last 30 days" },
+  { key: "custom", label: "Custom Range" },
 ];
 
 const shortDate = (s) => {
@@ -108,11 +111,24 @@ const sentimentStyle = (s) => {
 
 const AnalyticsDashboard = () => {
   const navigate = useNavigate();
+  const location = useLocation();
   const queryClient = useQueryClient();
+  const basePath = location.pathname.startsWith("/pm") ? "/pm" : "/admin";
 
   // One range control drives every Autonex KPI + the chart.
   const [range, setRange] = useState("30");
+  const [dateFrom, setDateFrom] = useState("");
+  const [dateTo, setDateTo] = useState("");
   const rangeLabel = AUTONEX_RANGES.find((r) => r.key === range)?.label ?? "";
+
+  const queryParams = useMemo(() => {
+    const p = { range };
+    if (range === "custom" && dateFrom) {
+      p.date_from = dateFrom;
+      if (dateTo) p.date_to = dateTo;
+    }
+    return p;
+  }, [range, dateFrom, dateTo]);
 
   // The sync runs as a background job: the button starts it (returns a job id we
   // persist), and a later click polls that job's status instead of starting a new one.
@@ -124,16 +140,16 @@ const AnalyticsDashboard = () => {
   }, []);
 
   const { data: rows = [], isLoading } = useQuery({
-    queryKey: ["analytics-summary", range],
-    queryFn: () => analyticsApi.getSummary(range),
+    queryKey: ["analytics-summary", queryParams],
+    queryFn: () => analyticsApi.getSummary(queryParams),
     // Encord data is refreshed once a day by the scheduler, so there is nothing
     // to gain from background polling — refetch on mount/focus is enough.
     refetchOnWindowFocus: true,
   });
 
   const { data: autonex } = useQuery({
-    queryKey: ["autonex-kpis", range],
-    queryFn: () => analyticsApi.getAutonexKpis(range),
+    queryKey: ["autonex-kpis", queryParams],
+    queryFn: () => analyticsApi.getAutonexKpis(queryParams),
     refetchOnWindowFocus: true,
   });
   const k = autonex?.kpis;
@@ -252,6 +268,32 @@ const AnalyticsDashboard = () => {
         </div>
       </div>
 
+      {/* Custom Date Pickers (visible only when 'custom' range is selected) */}
+      {range === "custom" && (
+        <div className="flex flex-wrap items-center gap-4 rounded-xl border border-indigo-100 bg-indigo-50/50 p-4">
+          <div className="flex items-center gap-2 text-xs font-semibold text-indigo-900">
+            <Calendar className="h-4 w-4 text-indigo-600" />
+            Select Custom Range:
+          </div>
+          <div className="flex items-center gap-2">
+            <span className="text-xs text-slate-500">From:</span>
+            <DatePicker
+              value={dateFrom}
+              onChange={(e) => setDateFrom(e.target.value)}
+              placeholder="Start Date"
+            />
+          </div>
+          <div className="flex items-center gap-2">
+            <span className="text-xs text-slate-500">To:</span>
+            <DatePicker
+              value={dateTo}
+              onChange={(e) => setDateTo(e.target.value)}
+              placeholder="End Date"
+            />
+          </div>
+        </div>
+      )}
+
       {/* Unified Autonex KPIs — all driven by the selected range */}
       <div className="grid grid-cols-2 gap-3 sm:grid-cols-3 lg:grid-cols-7">
         <AutonexKpiCard
@@ -369,7 +411,7 @@ const AnalyticsDashboard = () => {
       <Table
         variant="untitled"
         loading={isLoading}
-        onRowClick={(row) => navigate(`/admin/analytics/${row.project_id}`)}
+        onRowClick={(row) => navigate(`${basePath}/analytics/${row.project_id}`)}
         columns={[
           {
             key: "name",

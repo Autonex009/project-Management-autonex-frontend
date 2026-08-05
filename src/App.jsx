@@ -38,6 +38,9 @@ const PerformanceReviewsPage = lazy(
 const AdminPerformancePage = lazy(
   () => import("./pages/admin/AdminPerformancePage"),
 );
+const LeaderboardPage = lazy(
+  () => import("./pages/admin/LeaderboardPage"),
+);
 const SelfEvaluationPage = lazy(
   () => import("./pages/employee/SelfEvaluationPage"),
 );
@@ -154,6 +157,7 @@ function App() {
             />
             <Route path="employees" element={<EmployeesPage />} />
             <Route path="change-log" element={<ChangeLogPage />} />
+            <Route path="leaderboard" element={<LeaderboardPage />} />
             <Route path="sub-projects" element={<SubProjectsPage />} />
             <Route path="allocations" element={<AllocationsPage />} />
             <Route path="leaves" element={<LeavesPage />} />
@@ -217,6 +221,11 @@ function App() {
           >
             <Route index element={<Navigate to="/pm/dashboard" replace />} />
             <Route path="dashboard" element={<PMDashboard />} />
+            <Route path="analytics" element={<AnalyticsDashboard />} />
+            <Route
+              path="analytics/:mainProjectId"
+              element={<ProjectAnalyticsPage />}
+            />
             <Route path="projects" element={<ProjectsPage />} />
             <Route path="sub-projects" element={<SubProjectsPage />} />
             <Route path="allocations" element={<AllocationsPage />} />

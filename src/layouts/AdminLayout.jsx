@@ -22,7 +22,7 @@ const ADMIN_ROUTE_LABELS = {
   "/admin/modules/new": "New Module",
   "/admin/onboarding-reports": "Progress Reports",
   "/admin/newly-onboarded": "Newly Onboarded",
-  "/admin/change-log": "Change Log",
+  "/admin/change-log": "Audit Log",
   "/admin/company-settings": "Company Settings",
 };
 
@@ -39,9 +39,9 @@ const resolveAdminCrumb = (pathname) => {
   return { name: "Dashboard", key: "/admin/dashboard" };
 };
 
-const MIN_WIDTH = 208;
+const MIN_WIDTH = 200;
 const MAX_WIDTH = 400;
-const DEFAULT_WIDTH = 256;
+const DEFAULT_WIDTH = 220;
 
 const AdminLayout = () => {
   const rawBreadcrumbTrail = useBreadcrumbTrail(resolveAdminCrumb);
@@ -79,10 +79,13 @@ const AdminLayout = () => {
       localStorage.getItem("admin-sidebar-width"),
       10,
     );
-    if (!Number.isNaN(savedWidth)) {
+    if (!Number.isNaN(savedWidth) && savedWidth !== 256) {
       const clamped = Math.min(MAX_WIDTH, Math.max(MIN_WIDTH, savedWidth));
       widthRef.current = clamped;
       setWidth(clamped);
+    } else {
+      widthRef.current = DEFAULT_WIDTH;
+      setWidth(DEFAULT_WIDTH);
     }
   }, []);
 
