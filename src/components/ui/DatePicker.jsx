@@ -50,12 +50,12 @@ export default function DatePicker({
 
   const [currentView, setCurrentView] = useState(parsedDate || new Date());
 
-  // Reset view when opening if value changed externally
+  // Reset view when opening or when value string changes externally
   useEffect(() => {
     if (isOpen && parsedDate) {
       setCurrentView(parsedDate);
     }
-  }, [isOpen, parsedDate]);
+  }, [isOpen, actualValue]);
 
   useEffect(() => {
     const handleClickOutside = (e) => {
