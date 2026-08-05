@@ -1451,6 +1451,19 @@ const EmployeesPage = () => {
       queryClient.invalidateQueries(["employees"]);
       queryClient.invalidateQueries(["all-employees-kpis"]);
       toast.success(`${formatDisplayName(emp?.name) || emp?.name || "Employee"} converted to Full-time`);
+      toast.success(`${formatDisplayName(emp.name || "Employee")} converted to Full-time`);
+      logChange({
+        category: "Employees",
+        action: "Promoted Employee to Full-time",
+        actionType: "Promoted",
+        entity: "Employee",
+        entityId: emp?.id || "",
+        entityName: emp?.name || "Employee",
+        details: [
+          { field: "Employee Type", from: emp?.previous_employee_type || "Intern", to: "Full-time" },
+          { field: "Promotion Date", from: "—", to: new Date().toLocaleDateString() },
+        ],
+      });
     },
     onError: (err) => {
       toast.error(err.response?.data?.detail || "Failed to convert employee");
@@ -2204,10 +2217,20 @@ const EmployeesPage = () => {
               const shortName = formatDisplayName(value) || value;
               return (
                 <div className="flex items-center gap-3">
-                  <UserAvatar src={row.avatar_url} name={shortName} size="md" />
+                  {row.avatar_url ? (
+                    <img
+                      src={row.avatar_url}
+                      alt={value}
+                      className="w-9 h-9 rounded-full object-cover flex-shrink-0 ring-1 ring-slate-200"
+                    />
+                  ) : (
+                    <div className="w-9 h-9 rounded-full flex items-center justify-center flex-shrink-0 bg-indigo-50 text-indigo-600 text-[13px] font-semibold ring-1 ring-slate-200">
+                      {String(value || "?")[0].toUpperCase()}
+                    </div>
+                  )}
                   <div className="group relative min-w-0">
                     <div className="text-[13.5px] font-semibold text-slate-900 truncate leading-tight">
-                      {shortName}
+                      {value}
                     </div>
                     <div
                       onClick={(e) => {
@@ -2222,18 +2245,16 @@ const EmployeesPage = () => {
                       <span className="pointer-events-none block truncate">{row.email}</span>
                     </div>
                     {/* Light hover card — full name + email */}
-                    {((value || "").length > 22 || (row.email || "").length > 25) && (
-                      <div
-                        className={`absolute left-0 ${positionClass} hidden group-hover:block z-40 p-2.5 bg-white rounded-xl shadow-xl border border-slate-200 min-w-[180px] max-w-[280px] pointer-events-none`}
-                      >
-                        <div className="text-[13px] font-semibold text-slate-800 break-words">
-                          {value}
-                        </div>
-                        <div className="text-[12px] text-slate-500 break-words mt-0.5">
-                          {row.email}
-                        </div>
+                    <div
+                      className={`absolute left-0 ${positionClass} hidden group-hover:block z-40 p-2.5 bg-white rounded-xl shadow-xl border border-slate-200 min-w-[180px] max-w-[280px] pointer-events-none`}
+                    >
+                      <div className="text-[13px] font-semibold text-slate-800 break-words">
+                        {value}
                       </div>
-                    )}
+                      <div className="text-[12px] text-slate-500 break-words mt-0.5">
+                        {row.email}
+                      </div>
+                    </div>
                   </div>
                 </div>
               );
