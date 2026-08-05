@@ -104,19 +104,25 @@ export const analyticsApi = {
     api
       .get(`/analytics/project/${mainProjectId}`, { params })
       .then((res) => res.data),
-  getSummary: (range) =>
+  getSummary: (params) =>
     api
-      .get("/analytics/summary", { params: range ? { range } : {} })
+      .get("/analytics/summary", {
+        params: typeof params === "object" ? params : params ? { range: params } : {},
+      })
       .then((res) => res.data),
-  // Autonex-only KPIs + daily graph for a project. range = '1' | '7' | '30'
-  getAutonexProjectKpis: (subProjectId, range) =>
+  // Autonex-only KPIs + daily graph for a project. range = '1' | '7' | '30' | 'custom'
+  getAutonexProjectKpis: (subProjectId, params) =>
     api
-      .get(`/analytics/autonex/project/${subProjectId}`, { params: { range } })
+      .get(`/analytics/autonex/project/${subProjectId}`, {
+        params: typeof params === "object" ? params : params ? { range: params } : {},
+      })
       .then((res) => res.data),
-  // Autonex-only KPIs + daily graph across ALL mapped projects. range = '1' | '7' | '30'
-  getAutonexKpis: (range) =>
+  // Autonex-only KPIs + daily graph across ALL mapped projects. range = '1' | '7' | '30' | 'custom'
+  getAutonexKpis: (params) =>
     api
-      .get("/analytics/autonex/kpis", { params: { range } })
+      .get("/analytics/autonex/kpis", {
+        params: typeof params === "object" ? params : params ? { range: params } : {},
+      })
       .then((res) => res.data),
   // Dashboard: most active Autonex user + project (this month)
   getAutonexOverview: () =>

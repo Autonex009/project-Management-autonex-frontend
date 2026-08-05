@@ -25,11 +25,24 @@ const RANGES = [
   { key: "custom", label: "Custom Range" },
 ];
 
+const METRIC_FILTERS = [
+  { key: "all", label: "All Hours" },
+  { key: "annotation", label: "Annotation Hours" },
+  { key: "review", label: "Review Hours" },
+];
+
 const LeaderboardPage = () => {
   const [range, setRange] = useState("month");
   const [dateFrom, setDateFrom] = useState("");
   const [dateTo, setDateTo] = useState("");
   const [searchQuery, setSearchQuery] = useState("");
+  const [metricFilter, setMetricFilter] = useState("all");
+  const [currentPage, setCurrentPage] = useState(1);
+
+  // Reset page to 1 when filters or range change
+  React.useEffect(() => {
+    setCurrentPage(1);
+  }, [range, dateFrom, dateTo, searchQuery, metricFilter]);
 
   // Build query params
   const params = useMemo(() => {
@@ -50,19 +63,46 @@ const LeaderboardPage = () => {
   const teamSummary = data?.team_summary || {};
   const allLeaderboard = data?.leaderboard || [];
 
-  // Filter by search query
+  // Filter and rank leaderboard by search query & metric filter
   const filteredLeaderboard = useMemo(() => {
-    if (!searchQuery.trim()) return allLeaderboard;
-    const q = searchQuery.toLowerCase();
-    return allLeaderboard.filter(
-      (item) =>
-        (item.employee_name || "").toLowerCase().includes(q) ||
-        (item.user_email || "").toLowerCase().includes(q) ||
-        (item.designation || "").toLowerCase().includes(q)
-    );
-  }, [allLeaderboard, searchQuery]);
+    let list = [...allLeaderboard];
 
-  const top3 = useMemo(() => allLeaderboard.slice(0, 3), [allLeaderboard]);
+    if (searchQuery.trim()) {
+      const q = searchQuery.toLowerCase();
+      list = list.filter(
+        (item) =>
+          (item.employee_name || "").toLowerCase().includes(q) ||
+          (item.user_email || "").toLowerCase().includes(q) ||
+          (item.designation || "").toLowerCase().includes(q)
+      );
+    }
+
+    if (metricFilter === "annotation") {
+      list = list
+        .filter((item) => (item.annotation_hours || 0) > 0)
+        .sort((a, b) => (b.annotation_hours || 0) - (a.annotation_hours || 0));
+    } else if (metricFilter === "review") {
+      list = list
+        .filter((item) => (item.review_hours || 0) > 0)
+        .sort((a, b) => (b.review_hours || 0) - (a.review_hours || 0));
+    } else {
+      list = list.sort((a, b) => (b.total_hours || 0) - (a.total_hours || 0));
+    }
+
+    return list.map((item, idx) => ({
+      ...item,
+      rank: idx + 1,
+    }));
+  }, [allLeaderboard, searchQuery, metricFilter]);
+
+  const top3 = useMemo(() => filteredLeaderboard.slice(0, 3), [filteredLeaderboard]);
+
+  const getPrimaryHours = (item) => {
+    if (!item) return "0h";
+    if (metricFilter === "annotation") return `${item.annotation_hours}h (Annotation)`;
+    if (metricFilter === "review") return `${item.review_hours}h (Review)`;
+    return `${item.total_hours}h`;
+  };
 
   return (
     <div className="space-y-6">
@@ -91,11 +131,10 @@ const LeaderboardPage = () => {
               key={r.key}
               type="button"
               onClick={() => setRange(r.key)}
-              className={`rounded-lg px-3 py-1.5 text-xs font-semibold transition-all ${
-                range === r.key
+              className={`rounded-lg px-3 py-1.5 text-xs font-semibold transition-all ${range === r.key
                   ? "bg-blue-600 text-white shadow-sm"
                   : "text-slate-600 hover:bg-slate-100 hover:text-slate-900"
-              }`}
+                }`}
             >
               {r.label}
             </button>
@@ -193,7 +232,7 @@ const LeaderboardPage = () => {
 
                 <div className="mt-4 w-full rounded-xl bg-white/80 p-3 ring-1 ring-amber-200/60">
                   <div className="text-xl font-extrabold text-amber-900">
-                    {top3[0].total_hours}h
+                    {getPrimaryHours(top3[0])}
                   </div>
                   <div className="text-[11px] font-semibold text-amber-700">
                     {top3[0].share_percentage}% of team total
@@ -231,7 +270,7 @@ const LeaderboardPage = () => {
 
                 <div className="mt-4 w-full rounded-xl bg-slate-50 p-3 ring-1 ring-slate-200/60">
                   <div className="text-xl font-extrabold text-slate-800">
-                    {top3[1].total_hours}h
+                    {getPrimaryHours(top3[1])}
                   </div>
                   <div className="text-[11px] font-semibold text-slate-600">
                     {top3[1].share_percentage}% of team total
@@ -269,7 +308,7 @@ const LeaderboardPage = () => {
 
                 <div className="mt-4 w-full rounded-xl bg-amber-50/40 p-3 ring-1 ring-amber-200/50">
                   <div className="text-xl font-extrabold text-amber-950">
-                    {top3[2].total_hours}h
+                    {getPrimaryHours(top3[2])}
                   </div>
                   <div className="text-[11px] font-semibold text-amber-800">
                     {top3[2].share_percentage}% of team total
@@ -287,9 +326,27 @@ const LeaderboardPage = () => {
       {/* Main Leaderboard Table */}
       <div className="space-y-4">
         <div className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
-          <h2 className="text-base font-bold text-slate-900">
-            Full Rankings
-          </h2>
+          <div className="flex flex-wrap items-center gap-3">
+            <h2 className="text-base font-bold text-slate-900">
+              Full Rankings
+            </h2>
+            <div className="flex items-center gap-1 rounded-xl border border-slate-200/80 bg-white p-1 shadow-sm">
+              {METRIC_FILTERS.map((m) => (
+                <button
+                  key={m.key}
+                  type="button"
+                  onClick={() => setMetricFilter(m.key)}
+                  className={`rounded-lg px-2.5 py-1 text-xs font-semibold transition-all ${
+                    metricFilter === m.key
+                      ? "bg-blue-600 text-white shadow-sm"
+                      : "text-slate-600 hover:bg-slate-100 hover:text-slate-900"
+                  }`}
+                >
+                  {m.label}
+                </button>
+              ))}
+            </div>
+          </div>
           <div className="relative w-full sm:w-72">
             <Search className="absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-slate-400" />
             <input
@@ -306,6 +363,9 @@ const LeaderboardPage = () => {
           variant="untitled"
           loading={isLoading}
           data={filteredLeaderboard}
+          currentPage={currentPage}
+          pageSize={10}
+          onPageChange={setCurrentPage}
           columns={[
             {
               key: "rank",
