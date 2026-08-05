@@ -509,6 +509,12 @@ const MyLeavesPanel = ({
     const sDate = leaveForm.start_date;
     const eDate = isHalf ? sDate : leaveForm.end_date;
 
+    const todayStr = format(new Date(), "yyyy-MM-dd");
+    if (!leaveForm.is_emergency && sDate < todayStr) {
+      toast.error("Leaves for past dates are not allowed unless marked as Emergency Leave.");
+      return;
+    }
+
     if (isHalf) {
       const timingErr = checkHalfDayTiming(sDate, leaveForm.leave_type);
       if (timingErr) {
@@ -566,12 +572,17 @@ const MyLeavesPanel = ({
 
   const handleWfhSubmit = (e) => {
     e.preventDefault();
+    const todayStr = format(new Date(), "yyyy-MM-dd");
     if (!wfhForm.reason || !wfhForm.reason.trim()) {
       toast.error("Please enter a reason for your WFH request.");
       return;
     }
     if (!wfhForm.wfh_date) {
       toast.error("Please select a date");
+      return;
+    }
+    if (wfhForm.wfh_date < todayStr) {
+      toast.error("WFH requests for past dates are not allowed.");
       return;
     }
     createWfhMutation.mutate({ ...wfhForm, end_date: wfhForm.wfh_date });
@@ -602,6 +613,12 @@ const MyLeavesPanel = ({
       editForm.leave_type === "second_half";
     const sDate = editForm.start_date;
     const eDate = isHalf ? sDate : editForm.end_date;
+
+    const todayStr = format(new Date(), "yyyy-MM-dd");
+    if (!editForm.is_emergency && sDate < todayStr) {
+      toast.error("Leaves for past dates are not allowed unless marked as Emergency Leave.");
+      return;
+    }
 
     if (isHalf) {
       const timingErr = checkHalfDayTiming(sDate, editForm.leave_type);
@@ -678,12 +695,17 @@ const MyLeavesPanel = ({
 
   const handleWfhEditSubmit = (e) => {
     e.preventDefault();
+    const todayStr = format(new Date(), "yyyy-MM-dd");
     if (!editWfhForm.reason || !editWfhForm.reason.trim()) {
       toast.error("Please enter a reason for your WFH request.");
       return;
     }
     if (!editWfhForm.wfh_date) {
       toast.error("Please select a date");
+      return;
+    }
+    if (editWfhForm.wfh_date < todayStr) {
+      toast.error("WFH requests for past dates are not allowed.");
       return;
     }
     updateWfhMutation.mutate({
@@ -819,6 +841,7 @@ const MyLeavesPanel = ({
                             </label>
                             <DatePicker
                               type="date"
+                              minDate={leaveForm.is_emergency ? undefined : format(new Date(), "yyyy-MM-dd")}
                               value={leaveForm.start_date}
                               onChange={(e) => {
                                 const sDate = e.target.value;
@@ -838,6 +861,7 @@ const MyLeavesPanel = ({
                             </label>
                             <DatePicker
                               type="range"
+                              minDate={leaveForm.is_emergency ? undefined : format(new Date(), "yyyy-MM-dd")}
                               startDate={leaveForm.start_date}
                               endDate={leaveForm.end_date}
                               onRangeChange={({ startDate, endDate }) => {
@@ -1013,6 +1037,7 @@ const MyLeavesPanel = ({
                             </label>
                             <DatePicker
                               type="date"
+                              minDate={editForm.is_emergency ? undefined : format(new Date(), "yyyy-MM-dd")}
                               value={editForm.start_date}
                               onChange={(e) => {
                                 const sDate = e.target.value;
@@ -1032,6 +1057,7 @@ const MyLeavesPanel = ({
                             </label>
                             <DatePicker
                               type="range"
+                              minDate={editForm.is_emergency ? undefined : format(new Date(), "yyyy-MM-dd")}
                               startDate={editForm.start_date}
                               endDate={editForm.end_date}
                               onRangeChange={({ startDate, endDate }) => {
@@ -1310,119 +1336,123 @@ const MyLeavesPanel = ({
 {
   activeTab === "Work From Home" && (
     <>
-      {/* New WFH request form */}
+      {/* New WFH request modal */}
       {showWfhForm && (
-        <div className="bg-white rounded-2xl border border-slate-200 shadow-sm p-6">
-          <div className="flex items-center justify-between mb-4">
-            <h3 className="font-semibold text-slate-800">
-              New WFH Request
-            </h3>
-            <button
-              onClick={() => setShowWfhForm(false)}
-              className="p-1 text-slate-400 hover:text-slate-600"
-            >
-              <X className="w-5 h-5" />
-            </button>
-          </div>
+        <Modal isOpen onClose={() => setShowWfhForm(false)}>
+          <Modal.Header onClose={() => setShowWfhForm(false)}>
+            <h2 className="text-xl font-semibold text-slate-900">
+              Request WFH
+            </h2>
+          </Modal.Header>
           <form
             onSubmit={handleWfhSubmit}
-            className="grid grid-cols-1 md:grid-cols-2 gap-4"
+            className="flex-1 flex flex-col min-h-0"
           >
-            <div>
-              <label className="block text-sm font-medium text-slate-700 mb-1">
-                Date
-              </label>
-              <DatePicker
-                type="date"
-                value={wfhForm.wfh_date}
-                onChange={(e) =>
-                  setWfhForm({ ...wfhForm, wfh_date: e.target.value })
-                }
-                required
-              />
-            </div>
-            <div className="md:col-span-2">
-              <label className="block text-sm font-medium text-slate-700 mb-1">
-                Reason
-              </label>
-              <input
-                type="text"
-                value={wfhForm.reason}
-                onChange={(e) =>
-                  setWfhForm({ ...wfhForm, reason: e.target.value })
-                }
-                className="w-full px-3 py-2 border border-slate-200 rounded-lg text-sm"
-                placeholder="Reason for WFH (required)"
-              />
-            </div>
-            <div className="md:col-span-2 flex justify-end">
+            <Modal.Body className="space-y-4">
+              <div>
+                <label className="block text-sm font-medium text-slate-700 mb-1">
+                  Date <span className="text-red-500">*</span>
+                </label>
+                <DatePicker
+                  type="date"
+                  accentColor="purple"
+                  minDate={format(new Date(), "yyyy-MM-dd")}
+                  value={wfhForm.wfh_date}
+                  onChange={(e) =>
+                    setWfhForm({ ...wfhForm, wfh_date: e.target.value })
+                  }
+                  required
+                />
+              </div>
+              <div>
+                <label className="block text-sm font-medium text-slate-700 mb-1">
+                  Reason <span className="text-red-500">*</span>
+                </label>
+                <textarea
+                  rows={3}
+                  value={wfhForm.reason}
+                  onChange={(e) =>
+                    setWfhForm({ ...wfhForm, reason: e.target.value })
+                  }
+                  className="w-full rounded-xl border border-slate-200 p-3 text-sm resize-none focus:outline-none focus:ring-2 focus:ring-purple-500 focus:border-transparent"
+                  placeholder="Reason for WFH (required)"
+                  required
+                />
+              </div>
+            </Modal.Body>
+            <Modal.Footer>
+              <Button
+                type="button"
+                variant="cancel"
+                onClick={() => setShowWfhForm(false)}
+              >
+                Cancel
+              </Button>
               <Button
                 type="submit"
-                className="bg-purple-600 hover:bg-purple-700"
+                className="bg-purple-600 hover:bg-purple-700 text-white"
                 disabled={createWfhMutation.isPending}
                 isLoading={createWfhMutation.isPending}
               >
                 {!createWfhMutation.isPending && "Submit WFH Request"}
               </Button>
-            </div>
+            </Modal.Footer>
           </form>
-        </div>
+        </Modal>
       )}
 
-      {/* Edit WFH form */}
+      {/* Edit WFH request modal */}
       {editingWfh && (
-        <div className="bg-white rounded-2xl border border-blue-200 shadow-sm p-6">
-          <div className="flex items-center justify-between mb-4">
-            <h3 className="font-semibold text-slate-800">
+        <Modal isOpen onClose={() => setEditingWfh(null)}>
+          <Modal.Header onClose={() => setEditingWfh(null)}>
+            <h2 className="text-xl font-semibold text-slate-900">
               Edit WFH Request
-            </h3>
-            <button
-              onClick={() => setEditingWfh(null)}
-              className="p-1 text-slate-400 hover:text-slate-600"
-            >
-              <X className="w-5 h-5" />
-            </button>
-          </div>
+            </h2>
+          </Modal.Header>
           <form
             onSubmit={handleWfhEditSubmit}
-            className="grid grid-cols-1 md:grid-cols-2 gap-4"
+            className="flex-1 flex flex-col min-h-0"
           >
-            <div>
-              <label className="block text-sm font-medium text-slate-700 mb-1">
-                Date
-              </label>
-              <input
-                type="date"
-                value={editWfhForm.wfh_date}
-                onChange={(e) =>
-                  setEditWfhForm({
-                    ...editWfhForm,
-                    wfh_date: e.target.value,
-                  })
-                }
-                className="w-full px-3 py-2 border border-slate-200 rounded-lg text-sm"
-                required
-              />
-            </div>
-            <div className="md:col-span-2">
-              <label className="block text-sm font-medium text-slate-700 mb-1">
-                Reason
-              </label>
-              <input
-                type="text"
-                value={editWfhForm.reason}
-                onChange={(e) =>
-                  setEditWfhForm({ ...editWfhForm, reason: e.target.value })
-                }
-                className="w-full px-3 py-2 border border-slate-200 rounded-lg text-sm"
-                placeholder="Reason for WFH (required)"
-              />
-            </div>
-            <div className="md:col-span-2 rounded-lg border border-blue-100 bg-blue-50 px-3 py-2 text-sm text-blue-700">
-              Editing will reset the approval status back to{" "}
-              <strong>pending</strong> so your manager can re-review.
-            </div>
-            <div className="md:col-span-2 flex justify-end gap-2">
+            <Modal.Body className="space-y-4">
+              <div>
+                <label className="block text-sm font-medium text-slate-700 mb-1">
+                  Date <span className="text-red-500">*</span>
+                </label>
+                <DatePicker
+                  type="date"
+                  accentColor="purple"
+                  minDate={format(new Date(), "yyyy-MM-dd")}
+                  value={editWfhForm.wfh_date}
+                  onChange={(e) =>
+                    setEditWfhForm({
+                      ...editWfhForm,
+                      wfh_date: e.target.value,
+                    })
+                  }
+                  required
+                />
+              </div>
+              <div>
+                <label className="block text-sm font-medium text-slate-700 mb-1">
+                  Reason <span className="text-red-500">*</span>
+                </label>
+                <textarea
+                  rows={3}
+                  value={editWfhForm.reason}
+                  onChange={(e) =>
+                    setEditWfhForm({ ...editWfhForm, reason: e.target.value })
+                  }
+                  className="w-full rounded-xl border border-slate-200 p-3 text-sm resize-none focus:outline-none focus:ring-2 focus:ring-indigo-500 focus:border-transparent"
+                  placeholder="Reason for WFH (required)"
+                  required
+                />
+              </div>
+              <div className="rounded-lg border border-blue-100 bg-blue-50 px-3 py-2 text-sm text-blue-700">
+                Editing will reset the approval status back to{" "}
+                <strong>pending</strong> so your manager can re-review.
+              </div>
+            </Modal.Body>
+            <Modal.Footer>
               <Button
                 type="button"
                 variant="cancel"
@@ -1438,9 +1468,9 @@ const MyLeavesPanel = ({
               >
                 {!updateWfhMutation.isPending && "Save Changes"}
               </Button>
-            </div>
+            </Modal.Footer>
           </form>
-        </div>
+        </Modal>
       )}
 
       {myWfh.length === 0 ? (
