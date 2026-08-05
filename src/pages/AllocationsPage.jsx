@@ -445,7 +445,7 @@ const AllocationsPage = () => {
 
   const getEmployeeName = (employeeId) => {
     const emp = employeeIndex.get(String(employeeId));
-    return emp ? emp.name : "";
+    return emp ? formatDisplayName(emp.name) : "";
   };
 
   const getProjectName = (projectId) => {

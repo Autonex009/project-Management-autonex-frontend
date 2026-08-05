@@ -11,6 +11,7 @@ import Button from "../../components/ui/Button";
 import { onboardingApi } from "../../services/api";
 import Table from "../../components/ui/Table";
 import SearchBar from "../../components/ui/SearchBar";
+import UserAvatar from "../../components/ui/UserAvatar";
 import { formatDisplayName } from "../../utils/displayName";
 
 export default function AdminReportsPage() {
@@ -143,51 +144,56 @@ export default function AdminReportsPage() {
     {
       key: "name",
       label: "Candidate",
-      render: (_, row) => (
-        <div className="flex items-center gap-3">
-          <div className="h-9 w-9 rounded-xl flex items-center justify-center text-white text-xs font-bold bg-indigo-600">
-            {row.name
-              ? row.name
-                  .split(" ")
-                  .map((n) => n[0])
-                  .join("")
-                  .toUpperCase()
-              : "C"}
+      width: "w-[30%]",
+      render: (_, row) => {
+        const displayName = formatDisplayName(row.name) || "Candidate";
+        return (
+          <div className="flex items-center gap-3 min-w-0 max-w-[240px]">
+            <UserAvatar name={displayName} src={row.avatarUrl || row.avatar_url} size="md" />
+            <div className="min-w-0 flex-1">
+              <p className="text-sm font-bold text-slate-800 truncate" title={displayName}>
+                {displayName}
+              </p>
+              <p className="text-xs text-slate-500 truncate" title={row.email}>
+                {row.email}
+              </p>
+            </div>
           </div>
-
-          <div>
-            <p className="text-sm font-bold text-slate-800">{formatDisplayName(row.name)}</p>
-
-            <p className="text-xs text-slate-500">{row.email}</p>
-          </div>
-        </div>
-      ),
+        );
+      },
     },
 
     {
       key: "department",
       label: "Department",
-      render: (_, row) => (
-        <span className="inline-flex bg-slate-100 text-slate-600 px-2.5 py-1 rounded-md text-xs font-bold uppercase tracking-wide border border-slate-200">
-          {row.department || "Annotator"}
-        </span>
-      ),
+      width: "w-[18%]",
+      render: (_, row) => {
+        const dept = row.department || "Annotator";
+        return (
+          <span
+            className="inline-block truncate max-w-[150px] bg-slate-100/90 text-slate-700 px-2.5 py-0.5 rounded-md text-[11.5px] font-medium border border-slate-200/70"
+            title={dept}
+          >
+            {dept}
+          </span>
+        );
+      },
     },
 
     {
       key: "overallProgress",
       label: "Progress",
       align: "center",
+      width: "w-[16%]",
       render: (value) => (
-        <div className="flex flex-col items-center gap-1">
-          <span className="font-bold">{value}%</span>
-
-          <div className="w-24 h-1.5 rounded-full overflow-hidden bg-slate-100">
+        <div className="flex items-center justify-center gap-2">
+          <span className="font-bold text-xs text-slate-800 w-9 text-right">{value}%</span>
+          <div className="w-20 h-1.5 rounded-full overflow-hidden bg-slate-100/80 shrink-0">
             <div
-              className="h-full rounded-full"
+              className="h-full rounded-full transition-all duration-300"
               style={{
                 width: `${value}%`,
-                background: value === 100 ? "#10B981" : "#1d3989",
+                background: value === 100 ? "#10B981" : "#4F46E5",
               }}
             />
           </div>
@@ -199,14 +205,15 @@ export default function AdminReportsPage() {
       key: "overallScore",
       label: "Quiz Score",
       align: "center",
+      width: "w-[14%]",
       render: (value) => (
         <span
-          className={`inline-flex items-center gap-1 text-sm font-bold px-3 py-1 rounded-full border ${
+          className={`inline-flex items-center justify-center text-xs font-bold px-2.5 py-0.5 rounded-full border ${
             value >= 70
-              ? "bg-green-50 text-green-700 border-green-100"
+              ? "bg-green-50 text-green-700 border-green-200/70"
               : value >= 40
-                ? "bg-amber-50 text-amber-700 border-amber-100"
-                : "bg-red-50 text-red-600 border-red-100"
+              ? "bg-amber-50 text-amber-700 border-amber-200/70"
+              : "bg-red-50 text-red-600 border-red-200/70"
           }`}
         >
           {value}%
@@ -218,20 +225,22 @@ export default function AdminReportsPage() {
       key: "marks",
       label: "Marks",
       align: "center",
-      render: (_, row) => (
-        <>
-          <span className="inline-flex items-center gap-1 text-sm font-bold bg-slate-100 text-slate-700 px-3 py-1 rounded-full border border-slate-200">
+      width: "w-[14%]",
+      render: (_, row) => {
+        const unattempted =
+          row.attemptedQuestions > 0 && row.attemptedQuestions < row.totalQuestions
+            ? row.totalQuestions - row.attemptedQuestions
+            : 0;
+
+        return (
+          <span
+            className="inline-flex items-center gap-1 text-xs font-bold bg-slate-100/90 text-slate-700 px-2.5 py-0.5 rounded-full border border-slate-200/80 cursor-default"
+            title={unattempted > 0 ? `${unattempted} unattempted questions` : undefined}
+          >
             {row.correctAnswers}/{row.totalQuestions}
           </span>
-
-          {row.attemptedQuestions > 0 &&
-            row.attemptedQuestions < row.totalQuestions && (
-              <p className="text-[11px] text-amber-600 mt-1 font-semibold">
-                {row.totalQuestions - row.attemptedQuestions} unattempted
-              </p>
-            )}
-        </>
-      ),
+        );
+      },
     },
   ];
 
