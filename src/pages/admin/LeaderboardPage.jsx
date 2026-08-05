@@ -77,22 +77,46 @@ const LeaderboardPage = () => {
       );
     }
 
+    const metricKey =
+      metricFilter === "annotation"
+        ? "annotation_hours"
+        : metricFilter === "review"
+        ? "review_hours"
+        : "total_hours";
+
     if (metricFilter === "annotation") {
-      list = list
-        .filter((item) => (item.annotation_hours || 0) > 0)
-        .sort((a, b) => (b.annotation_hours || 0) - (a.annotation_hours || 0));
+      list = list.filter((item) => (item.annotation_hours || 0) > 0);
     } else if (metricFilter === "review") {
-      list = list
-        .filter((item) => (item.review_hours || 0) > 0)
-        .sort((a, b) => (b.review_hours || 0) - (a.review_hours || 0));
-    } else {
-      list = list.sort((a, b) => (b.total_hours || 0) - (a.total_hours || 0));
+      list = list.filter((item) => (item.review_hours || 0) > 0);
     }
 
-    return list.map((item, idx) => ({
-      ...item,
-      rank: idx + 1,
-    }));
+    list.sort((a, b) => (b[metricKey] || 0) - (a[metricKey] || 0));
+
+    const maxHours = list[0] ? Number(list[0][metricKey]) || 0 : 0;
+    const totalMetricHours = list.reduce(
+      (sum, item) => sum + (Number(item[metricKey]) || 0),
+      0
+    );
+
+    return list.map((item, idx) => {
+      const hrs = Number(item[metricKey]) || 0;
+      const sharePct =
+        totalMetricHours > 0
+          ? Math.round((hrs / totalMetricHours) * 1000) / 10
+          : 0;
+      const barWidth =
+        maxHours > 0
+          ? Math.min(100, Math.max(4, Math.round((hrs / maxHours) * 100)))
+          : 0;
+
+      return {
+        ...item,
+        rank: idx + 1,
+        active_hours: hrs,
+        share_percentage: sharePct,
+        bar_width_pct: barWidth,
+      };
+    });
   }, [allLeaderboard, searchQuery, metricFilter]);
 
   const top3 = useMemo(() => filteredLeaderboard.slice(0, 3), [filteredLeaderboard]);
@@ -171,9 +195,14 @@ const LeaderboardPage = () => {
       {/* KPI Cards */}
       <div className="grid grid-cols-1 gap-4 sm:grid-cols-2 lg:grid-cols-4">
         <StatCard
+          compact
           icon={Award}
           title="Top Performer"
-          value={teamSummary.top_performer?.name || "—"}
+          value={
+            teamSummary.top_performer?.name
+              ? formatDisplayName(teamSummary.top_performer.name)
+              : "—"
+          }
           subText={
             teamSummary.top_performer
               ? `${teamSummary.top_performer.hours}h logged`
@@ -182,6 +211,7 @@ const LeaderboardPage = () => {
           tone="amber"
         />
         <StatCard
+          compact
           icon={Clock}
           title="Total Team Hours"
           value={`${teamSummary.total_hours ?? 0}h`}
@@ -189,6 +219,7 @@ const LeaderboardPage = () => {
           tone="sky"
         />
         <StatCard
+          compact
           icon={Users}
           title="Active Annotators"
           value={teamSummary.active_users ?? 0}
@@ -196,6 +227,7 @@ const LeaderboardPage = () => {
           tone="emerald"
         />
         <StatCard
+          compact
           icon={CheckCircle2}
           title="Tasks Completed"
           value={teamSummary.total_tasks ?? 0}
@@ -361,6 +393,7 @@ const LeaderboardPage = () => {
 
         <Table
           variant="untitled"
+          tableLayout="auto"
           loading={isLoading}
           data={filteredLeaderboard}
           currentPage={currentPage}
@@ -370,7 +403,7 @@ const LeaderboardPage = () => {
             {
               key: "rank",
               label: "Rank",
-              width: "w-16",
+              width: "w-14",
               align: "center",
               render: (value) => {
                 if (value === 1)
@@ -401,17 +434,18 @@ const LeaderboardPage = () => {
             {
               key: "employee_name",
               label: "Team Member",
+              width: "w-72",
               render: (_, row) => (
-                <div className="flex items-center gap-3">
+                <div className="flex items-center gap-3 min-w-[220px]">
                   <UserAvatar
                     name={row.employee_name || row.user_email}
                     size="sm"
                   />
-                  <div>
-                    <div className="font-semibold text-slate-900">
+                  <div className="min-w-0">
+                    <div className="font-semibold text-slate-900 truncate">
                       {row.employee_name || formatDisplayName(row.user_email)}
                     </div>
-                    <div className="text-xs text-slate-400">
+                    <div className="text-xs text-slate-400 truncate">
                       {row.user_email}
                     </div>
                   </div>
@@ -421,6 +455,7 @@ const LeaderboardPage = () => {
             {
               key: "designation",
               label: "Role",
+              width: "w-44",
               render: (v) => (
                 <span className="inline-flex items-center rounded-md bg-slate-100 px-2 py-1 text-xs font-medium text-slate-600">
                   {v || "Annotator / Reviewer"}
@@ -431,6 +466,7 @@ const LeaderboardPage = () => {
               key: "total_hours",
               label: "Platform Hours",
               align: "center",
+              width: "w-32",
               render: (v) => (
                 <span className="font-mono font-bold text-blue-600">{v}h</span>
               ),
@@ -439,6 +475,7 @@ const LeaderboardPage = () => {
               key: "annotation_hours",
               label: "Annotation",
               align: "center",
+              width: "w-28",
               render: (v) => (
                 <span className="font-mono text-slate-700">{v}h</span>
               ),
@@ -447,6 +484,7 @@ const LeaderboardPage = () => {
               key: "review_hours",
               label: "Review",
               align: "center",
+              width: "w-28",
               render: (v) => (
                 <span className="font-mono text-slate-700">{v}h</span>
               ),
@@ -455,6 +493,7 @@ const LeaderboardPage = () => {
               key: "tasks_submitted",
               label: "Tasks",
               align: "center",
+              width: "w-24",
               render: (v) => (
                 <span className="font-mono text-slate-700">{v}</span>
               ),
@@ -463,15 +502,16 @@ const LeaderboardPage = () => {
               key: "share_percentage",
               label: "Share of Total",
               align: "right",
-              render: (v) => (
+              width: "w-36",
+              render: (v, row) => (
                 <div className="flex items-center justify-end gap-2">
                   <div className="w-16 h-2 rounded-full bg-slate-100 overflow-hidden hidden sm:block">
                     <div
-                      className="h-full bg-blue-600 rounded-full"
-                      style={{ width: `${Math.min(100, v * 5)}%` }}
+                      className="h-full bg-blue-600 rounded-full transition-all duration-300"
+                      style={{ width: `${row.bar_width_pct ?? Math.min(100, (v || 0) * 5)}%` }}
                     />
                   </div>
-                  <span className="font-mono text-xs font-semibold text-slate-600">
+                  <span className="font-mono text-xs font-semibold text-slate-600 min-w-[36px] text-right">
                     {v}%
                   </span>
                 </div>
