@@ -193,8 +193,8 @@ export default function ChangeLogPage() {
     // If ISO string lacks timezone offset/designator, append Z to ensure UTC interpretation
     const normalizedIso =
       typeof isoString === "string" &&
-      !isoString.endsWith("Z") &&
-      !/[+-]\d{2}:\d{2}$/.test(isoString)
+        !isoString.endsWith("Z") &&
+        !/[+-]\d{2}:\d{2}$/.test(isoString)
         ? `${isoString}Z`
         : isoString;
 
@@ -243,35 +243,20 @@ export default function ChangeLogPage() {
 
   return (
     <div className="bg-white min-h-screen p-6 space-y-6">
+      {/* Header section matching mockup */}
+      <div className="space-y-2 border-b border-slate-100 pb-4">
+        <h1 className="text-2xl font-bold text-slate-900 tracking-tight">
+          Audit Log
+        </h1>
+        <p className="text-sm text-slate-600 max-w-4xl leading-relaxed">
+          The audit log gives you a history of changes to your Confluence site. It can be very useful for tracking down things like permissions, global settings, or add-on changes.
+        </p>
+      </div>
+
       {/* Toolbar & Controls */}
       <div className="space-y-4">
         <div className="flex flex-wrap items-center justify-between gap-4">
-          {/* Extreme Left: Role filter (Segmented Tab Table) */}
-          <div className="inline-flex items-center h-[34px] p-0.5 bg-slate-100/90 rounded-md border border-slate-300 text-xs font-medium shrink-0 gap-0.5">
-            {roleOptions.map((role) => {
-              const isSelected = actorRole === role.value;
-              return (
-                <button
-                  key={role.value}
-                  type="button"
-                  onClick={() => {
-                    setActorRole(role.value);
-                    setPage(1);
-                  }}
-                  className={`h-full px-2.5 flex items-center justify-center rounded text-xs transition-all duration-150 cursor-pointer ${
-                    isSelected
-                      ? "bg-white text-blue-600 font-bold shadow-xs border border-slate-200/80"
-                      : "text-slate-600 hover:text-slate-900 hover:bg-slate-200/50 font-medium"
-                  }`}
-                >
-                  {role.label}
-                </button>
-              );
-            })}
-          </div>
-
-          {/* Extreme Right: Search, Time, Category & Refresh */}
-          <div className="flex flex-wrap items-center gap-3 ml-auto">
+          <div className="flex flex-wrap items-center gap-3">
             {/* Filter by keyword search box */}
             <div className="relative">
               <input
@@ -320,12 +305,25 @@ export default function ChangeLogPage() {
               }}
             />
 
-            {/* Refresh button */}
+            {/* Role filter */}
+            <Dropdown
+              className="w-36 shrink-0"
+              options={roleOptions}
+              value={actorRole}
+              onChange={(v) => {
+                setActorRole(v);
+                setPage(1);
+              }}
+            />
+          </div>
+
+          {/* Right Action buttons */}
+          <div className="flex items-center gap-4">
             <button
               type="button"
               onClick={() => refetch()}
               title="Refresh audit log"
-              className="inline-flex items-center gap-1.5 text-sm font-medium text-slate-700 hover:text-blue-600 transition-colors ml-1"
+              className="inline-flex items-center gap-1.5 text-sm font-medium text-slate-700 hover:text-blue-600 transition-colors"
             >
               <RefreshCw className={`h-4 w-4 text-slate-500 ${isFetching ? "animate-spin" : ""}`} />
               Refresh
@@ -392,15 +390,6 @@ export default function ChangeLogPage() {
                     </div>
                   </>
                 )}
-
-                {/* IP Address */}
-                <span className="text-slate-300">|</span>
-                <div className="flex items-center gap-1.5">
-                  <span className="font-semibold text-slate-600">IP:</span>
-                  <span className="font-mono text-[11.5px] font-semibold text-slate-800 bg-slate-100/90 px-1.5 py-0.5 rounded border border-slate-200/80">
-                    {row.ip || "127.0.0.1"}
-                  </span>
-                </div>
               </div>
 
               {/* Concise Field Changes Table (rendered only when field details exist) */}
@@ -448,7 +437,7 @@ export default function ChangeLogPage() {
         columns={[
           {
             key: "created_at",
-            label: "Timestamp",
+            label: "Time",
             width: "w-[16%]",
             render: (val) => {
               const f = formatTimestamp(val);
@@ -461,7 +450,7 @@ export default function ChangeLogPage() {
           },
           {
             key: "actor",
-            label: "Performed By",
+            label: "User",
             width: "w-[15%]",
             render: (actor) => {
               const name = formatDisplayName(actor?.name) || actor?.name || "Administrator";
@@ -477,7 +466,7 @@ export default function ChangeLogPage() {
           },
           {
             key: "category",
-            label: "Module Category",
+            label: "Event type",
             width: "w-[14%]",
             render: (val) => {
               const catName = val ? val.charAt(0).toUpperCase() + val.slice(1) : "General";
@@ -494,7 +483,7 @@ export default function ChangeLogPage() {
           },
           {
             key: "summary",
-            label: "Action Summary",
+            label: "Change",
             width: "w-[34%]",
             render: (summary, row) => {
               const cleaned = cleanSummaryText(summary || row.action, row.subject_name) || "Settings modified";
@@ -510,7 +499,7 @@ export default function ChangeLogPage() {
           },
           {
             key: "item_affected",
-            label: "Target Record",
+            label: "Item affected",
             width: "w-[13%]",
             render: (_, row) => {
               const subject = formatDisplayName(row.subject_name) || row.subject_name;

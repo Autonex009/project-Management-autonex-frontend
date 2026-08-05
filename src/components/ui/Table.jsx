@@ -105,19 +105,17 @@ export const Table = ({
               {columns.map((col, cIdx) => (
                 <th
                   key={col.key}
-                  className={`${headPad} ${headTextSize} ${headWeight} ${headCase} whitespace-nowrap ${
-                    cIdx === 0
-                      ? "rounded-tl-2xl"
-                      : cIdx === columns.length - 1
-                        ? "rounded-tr-2xl"
-                        : ""
-                  } ${
-                    col.align === "center"
+                  className={`${headPad} ${headTextSize} ${headWeight} ${headCase} whitespace-nowrap ${cIdx === 0
+                    ? "rounded-tl-2xl"
+                    : cIdx === columns.length - 1
+                      ? "rounded-tr-2xl"
+                      : ""
+                    } ${col.align === "center"
                       ? "text-center"
                       : col.align === "right"
                         ? "text-right"
                         : "text-left"
-                  } ${col.width ? (col.width.startsWith("w-") ? col.width : `w-${col.width}`) : ""} ${col.sticky === "right" ? `sticky ${col.stickyOffset || "right-0"} bg-slate-50/80 shadow-[-8px_0_8px_-8px_rgba(0,0,0,0.1)]` : ""}`}
+                    } ${col.width ? (col.width.startsWith("w-") ? col.width : `w-${col.width}`) : ""} ${col.sticky === "right" ? `sticky ${col.stickyOffset || "right-0"} bg-slate-50/80 shadow-[-8px_0_8px_-8px_rgba(0,0,0,0.1)]` : ""}`}
                 >
                   {col.label}
                 </th>
@@ -132,13 +130,12 @@ export const Table = ({
                   {columns.map((col) => (
                     <td key={col.key} className={cellPad}>
                       <div
-                        className={`h-4 rounded ${shimmer} ${
-                          col.align === "center"
-                            ? "mx-auto w-2/3"
-                            : col.align === "right"
-                              ? "ml-auto w-1/2"
-                              : "w-3/4"
-                        }`}
+                        className={`h-4 rounded ${shimmer} ${col.align === "center"
+                          ? "mx-auto w-2/3"
+                          : col.align === "right"
+                            ? "ml-auto w-1/2"
+                            : "w-3/4"
+                          }`}
                       />
                     </td>
                   ))}
@@ -170,30 +167,26 @@ export const Table = ({
                       onClick={
                         onRowClick ? () => onRowClick(row, idx) : undefined
                       }
-                      className={`${rowBg} h-[52px] hover:bg-slate-50 transition-colors ${
-                        onRowClick ? "cursor-pointer" : ""
-                      } ${extraClass}`}
+                      className={`${rowBg} h-[52px] hover:bg-slate-50 transition-colors ${onRowClick ? "cursor-pointer" : ""
+                        } ${extraClass}`}
                     >
                       {columns.map((col, cIdx) => (
                         <td
                           key={col.key}
-                          className={`${cellPad} ${cellText} align-middle whitespace-nowrap ${
-                            isLast && cIdx === 0
-                              ? "rounded-bl-2xl"
-                              : isLast && cIdx === columns.length - 1
-                                ? "rounded-br-2xl"
-                                : ""
-                          } ${
-                            col.align === "center"
+                          className={`${cellPad} ${cellText} align-middle whitespace-nowrap ${isLast && cIdx === 0
+                            ? "rounded-bl-2xl"
+                            : isLast && cIdx === columns.length - 1
+                              ? "rounded-br-2xl"
+                              : ""
+                            } ${col.align === "center"
                               ? "text-center"
                               : col.align === "right"
                                 ? "text-right"
                                 : "text-left"
-                          } ${
-                            col.sticky === "right"
+                            } ${col.sticky === "right"
                               ? `sticky ${col.stickyOffset || "right-0"} ${rowBg} shadow-[-8px_0_8px_-8px_rgba(0,0,0,0.1)]`
                               : ""
-                          }`}
+                            }`}
                         >
                           {col.render
                             ? col.render(row[col.key], row, context)
@@ -253,11 +246,10 @@ export const Table = ({
                     <button
                       key={p}
                       onClick={() => onPageChange(p)}
-                      className={`h-8 min-w-8 px-2 text-[13px] rounded-lg border transition-colors ${
-                        currentPage === p
-                          ? "bg-indigo-600 border-indigo-600 text-white font-medium"
-                          : "border-slate-200 text-slate-600 hover:bg-slate-50 "
-                      }`}
+                      className={`h-8 min-w-8 px-2 text-[13px] rounded-lg border transition-colors ${currentPage === p
+                        ? "bg-indigo-600 border-indigo-600 text-white font-medium"
+                        : "border-slate-200 text-slate-600 hover:bg-slate-50 "
+                        }`}
                     >
                       {p}
                     </button>
