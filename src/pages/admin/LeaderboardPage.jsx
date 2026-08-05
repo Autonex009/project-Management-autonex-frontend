@@ -248,6 +248,7 @@ const LeaderboardPage = () => {
               <div className="flex flex-col items-center text-center">
                 <div className="relative mb-3">
                   <UserAvatar
+                    src={top3[0]?.avatar_url}
                     name={top3[0].employee_name || top3[0].user_email}
                     size="lg"
                   />
@@ -286,6 +287,7 @@ const LeaderboardPage = () => {
               <div className="flex flex-col items-center text-center">
                 <div className="relative mb-3">
                   <UserAvatar
+                    src={top3[1]?.avatar_url}
                     name={top3[1].employee_name || top3[1].user_email}
                     size="lg"
                   />
@@ -324,6 +326,7 @@ const LeaderboardPage = () => {
               <div className="flex flex-col items-center text-center">
                 <div className="relative mb-3">
                   <UserAvatar
+                    src={top3[2]?.avatar_url}
                     name={top3[2].employee_name || top3[2].user_email}
                     size="lg"
                   />
@@ -438,6 +441,7 @@ const LeaderboardPage = () => {
               render: (_, row) => (
                 <div className="flex items-center gap-3 min-w-[220px]">
                   <UserAvatar
+                    src={row.avatar_url}
                     name={row.employee_name || row.user_email}
                     size="sm"
                   />
