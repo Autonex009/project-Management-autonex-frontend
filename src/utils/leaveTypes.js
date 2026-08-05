@@ -413,11 +413,9 @@ export function resolveLeaveAppliedDate(leave) {
   // replaced by the server-side audit trail, so the key is never written anymore and
   // reading it would only surface stale (originally mock) data.
 
-  // 4. Persistent Fallback for active leave records without backend timestamp
+  // 4. Fallback for records without backend timestamp (use start_date)
   if (sDate) {
-    const nowIso = new Date().toISOString();
-    recordLeaveApplication({ ...leave, created_at: nowIso });
-    return nowIso;
+    return sDate;
   }
 
   return null;
