@@ -33,6 +33,7 @@ import {
 import LeaveCalendar from "../../components/LeaveCalendar";
 import EmployeeKPIPanel from "../../components/EmployeeKPIPanel";
 import Modal from "../../components/ui/Modal";
+import UserAvatar from "../../components/ui/UserAvatar";
 import { formatDisplayName, getNameInitials } from "../../utils/displayName";
 import OverLimitHoverCard from "../../components/ui/OverLimitHoverCard";
 
@@ -246,11 +247,6 @@ const PMLeavesPage = () => {
                           <Siren className="h-3 w-3" />
                         </span>
                       )}
-                      {leave.approval_remark && (
-                        <p className="text-xs text-slate-400 mt-0.5 truncate ml-2">
-                          Remark: {leave.approval_remark}
-                        </p>
-                      )}
                     </div>
                   </div>
                 );
@@ -297,9 +293,11 @@ const PMLeavesPage = () => {
               render: (_, leave) => {
                 const rawApplied = resolveLeaveAppliedDate(leave);
                 if (!rawApplied) return <span className="text-[13px] text-slate-400">—</span>;
-                const d = new Date(
-                  rawApplied.includes("T") ? rawApplied : rawApplied + "T00:00:00"
-                );
+                // Extract YYYY-MM-DD from the ISO string to avoid UTC→local timezone shifts
+                const dateStr = String(rawApplied).slice(0, 10);
+                const [y, m, day] = dateStr.split("-").map(Number);
+                if (!y || !m || !day) return <span className="text-[13px] text-slate-400">—</span>;
+                const d = new Date(y, m - 1, day);
                 if (isNaN(d.getTime())) return <span className="text-[13px] text-slate-400">—</span>;
                 return (
                   <span className="text-[13px] text-slate-700 whitespace-nowrap">
@@ -420,17 +418,11 @@ const PMLeavesPage = () => {
                 const empName = formatDisplayName(value) || `#${req.employee_id}`;
                 return (
                   <div className="flex items-center gap-3 min-w-0">
-                    {emp?.avatar_url ? (
-                      <img
-                        src={emp.avatar_url}
-                        alt={empName}
-                        className="w-9 h-9 rounded-full object-cover flex-shrink-0 ring-1 ring-slate-200"
-                      />
-                    ) : (
-                      <div className="w-9 h-9 rounded-full flex items-center justify-center flex-shrink-0 bg-indigo-50 text-indigo-600 text-[13px] font-semibold ring-1 ring-slate-200">
-                        {getNameInitials(empName, 1)}
-                      </div>
-                    )}
+                    <UserAvatar
+                      src={emp?.avatar_url}
+                      name={empName}
+                      size="sm"
+                    />
                     <div className="flex items-center min-w-0 pr-4 gap-2">
                       <div className="flex flex-col min-w-0">
                         <span className="font-bold text-slate-800 truncate">
