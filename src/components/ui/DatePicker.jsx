@@ -132,7 +132,9 @@ export default function DatePicker({
     if (!isOpen) {
       updatePosition();
     }
-  }, [isOpen, actualValue];
+    setIsOpen((prev) => !prev);
+  };
+
 
   useEffect(() => {
     const handleClickOutside = (e) => {
@@ -269,8 +271,8 @@ export default function DatePicker({
             {!rangeStart
               ? "Select start date"
               : !rangeEnd
-              ? "Select end date"
-              : "Range selected"}
+                ? "Select end date"
+                : "Range selected"}
           </div>
         )}
 
@@ -304,28 +306,26 @@ export default function DatePicker({
               dayEls.push(
                 <div
                   key={cloneDay.toISOString()}
-                  className={`flex justify-center py-0.5 ${
-                    inRange && !disabled ? "bg-red-100/70" : ""
-                  } ${rStart ? "rounded-l-full" : ""} ${rEnd ? "rounded-r-full" : ""}`}
+                  className={`flex justify-center py-0.5 ${inRange && !disabled ? "bg-red-100/70" : ""
+                    } ${rStart ? "rounded-l-full" : ""} ${rEnd ? "rounded-r-full" : ""}`}
                   onMouseEnter={() => type === "range" && setHoverDate(cloneDay)}
                 >
                   <button
                     type="button"
                     disabled={disabled}
                     onClick={() => handleSelectDate(cloneDay)}
-                    className={`w-8 h-8 flex items-center justify-center rounded-full text-[13px] transition-all focus:outline-none ${
-                      disabled
+                    className={`w-8 h-8 flex items-center justify-center rounded-full text-[13px] transition-all focus:outline-none ${disabled
                         ? "text-slate-300 cursor-not-allowed bg-transparent hover:bg-transparent"
                         : rStart || rEnd || isSelected
-                        ? "bg-red-700 text-white font-semibold shadow-md shadow-red-700/30"
-                        : inRange
-                        ? "text-red-900 font-semibold"
-                        : isToday
-                        ? "bg-red-50 text-red-700 font-semibold"
-                        : isCurrentMonth
-                        ? "text-slate-700 hover:bg-slate-100 hover:text-slate-900"
-                        : "text-slate-300 hover:bg-slate-50"
-                    }`}
+                          ? "bg-red-700 text-white font-semibold shadow-md shadow-red-700/30"
+                          : inRange
+                            ? "text-red-900 font-semibold"
+                            : isToday
+                              ? "bg-red-50 text-red-700 font-semibold"
+                              : isCurrentMonth
+                                ? "text-slate-700 hover:bg-slate-100 hover:text-slate-900"
+                                : "text-slate-300 hover:bg-slate-50"
+                      }`}
                   >
                     {format(cloneDay, "d")}
                   </button>
@@ -381,11 +381,10 @@ export default function DatePicker({
                 key={m}
                 type="button"
                 onClick={() => handleSelectMonth(i)}
-                className={`py-2 text-[13px] rounded-xl transition-all focus:outline-none ${
-                  isSelected
+                className={`py-2 text-[13px] rounded-xl transition-all focus:outline-none ${isSelected
                     ? "bg-red-700 text-white font-medium shadow-md shadow-red-700/25"
                     : "text-slate-600 hover:bg-slate-100 hover:text-slate-900"
-                }`}
+                  }`}
               >
                 {m}
               </button>
@@ -421,9 +420,9 @@ export default function DatePicker({
           value={
             type === "range"
               ? JSON.stringify({
-                  startDate: rangeStart ? format(rangeStart, "yyyy-MM-dd") : "",
-                  endDate: rangeEnd ? format(rangeEnd, "yyyy-MM-dd") : "",
-                })
+                startDate: rangeStart ? format(rangeStart, "yyyy-MM-dd") : "",
+                endDate: rangeEnd ? format(rangeEnd, "yyyy-MM-dd") : "",
+              })
               : actualValue || ""
           }
           required={required}
@@ -434,19 +433,17 @@ export default function DatePicker({
       <button
         type="button"
         onClick={handleToggleOpen}
-        className={`w-full h-9 pl-9 pr-3 rounded-lg border text-[13px] text-left transition-all shadow-sm focus:outline-none flex items-center justify-between ${
-          error
+        className={`w-full h-9 pl-9 pr-3 rounded-lg border text-[13px] text-left transition-all shadow-sm focus:outline-none flex items-center justify-between ${error
             ? "border-red-400 bg-red-50 text-red-700 focus:ring-4 focus:ring-red-500/10"
             : isOpen
-            ? "border-red-500 ring-4 ring-red-500/15 bg-white text-slate-900 font-medium"
-            : "border-slate-200 bg-white hover:border-slate-300 text-slate-700 hover:text-slate-900"
-        }`}
+              ? "border-red-500 ring-4 ring-red-500/15 bg-white text-slate-900 font-medium"
+              : "border-slate-200 bg-white hover:border-slate-300 text-slate-700 hover:text-slate-900"
+          }`}
         {...props}
       >
         <div
-          className={`absolute left-3 top-1/2 -translate-y-1/2 pointer-events-none transition-colors ${
-            isOpen ? "text-red-600" : "text-slate-400"
-          }`}
+          className={`absolute left-3 top-1/2 -translate-y-1/2 pointer-events-none transition-colors ${isOpen ? "text-red-600" : "text-slate-400"
+            }`}
         >
           <CalendarIcon className="w-4 h-4" />
         </div>
@@ -456,8 +453,8 @@ export default function DatePicker({
             (type === "range"
               ? "Select leave dates"
               : type === "month"
-              ? "Select month"
-              : "Select date")}
+                ? "Select month"
+                : "Select date")}
         </span>
       </button>
 
