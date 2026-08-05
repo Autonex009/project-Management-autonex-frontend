@@ -178,10 +178,23 @@ const LeavesPage = () => {
     (statusFilter !== "all" ? 1 : 0) + (todayOnly ? 1 : 0);
   const [remarkModal, setRemarkModal] = useState(null); // { leaveId }
   const [remark, setRemark] = useState("");
+  const [wfhRemarkModal, setWfhRemarkModal] = useState(null); // { wfhId, employeeName }
+  const [wfhRemark, setWfhRemark] = useState("");
   const [deleteTarget, setDeleteTarget] = useState(null);
   const [wfhDeleteConfirm, setWfhDeleteConfirm] = useState(null);
   const [formEmployeeId, setFormEmployeeId] = useState("");
   const user = JSON.parse(localStorage.getItem("user") || "{}");
+
+  // Quick-fill options for the flagged-WFH justification. The first is derived from
+  // the signed-in user's actual role rather than a generic "PM/Admin", so the stored
+  // remark stays truthful — it is kept as the approval's audit trail.
+  const approverLabel =
+    { admin: "Admin", pm: "PM", hr: "HR" }[user.role] || "Admin";
+  const WFH_REMARK_PRESETS = [
+    `Approved by ${approverLabel}`,
+    "Approved — business requirement",
+    "Approved — one-off exception",
+  ];
 
   const { data: leaves = [], isLoading } = useQuery({
     queryKey: ["leaves"],
@@ -274,10 +287,12 @@ const LeavesPage = () => {
 
   // ── WFH mutations ────────────────────────────────────────────────
   const wfhApproveMutation = useMutation({
-    mutationFn: (id) => wfhApi.approve(id, user.id),
+    mutationFn: ({ id, remark }) => wfhApi.approve(id, user.id, remark),
     onSuccess: () => {
       queryClient.invalidateQueries(["wfh"]);
       queryClient.invalidateQueries(["leave-calendar"]);
+      setWfhRemarkModal(null);
+      setWfhRemark("");
       toast.success("WFH approved");
     },
     onError: (err) =>
@@ -328,6 +343,16 @@ const LeavesPage = () => {
       setRemarkModal({ leaveId: leave.leave_id });
     } else {
       approveMutation.mutate({ id: leave.leave_id, remark: null });
+    }
+  };
+
+  // Mirrors handleApprove: the backend rejects a flagged WFH approval that carries no
+  // remark, so ask for one up front instead of letting the request 400.
+  const handleWfhApprove = (w) => {
+    if (w.flagged) {
+      setWfhRemarkModal({ wfhId: w.id, employeeName: w.employee_name });
+    } else {
+      wfhApproveMutation.mutate({ id: w.id, remark: null });
     }
   };
 
@@ -898,12 +923,21 @@ const LeavesPage = () => {
                 return (
                   <div className="flex items-center gap-3">
                     <UserAvatar src={emp?.avatar_url} name={empName} size="sm" />
-                    <div className="flex items-center gap-2 min-w-0">
-                      <span className="font-semibold text-slate-800 truncate whitespace-nowrap">
-                        {empName}
-                      </span>
-                      {w.flagged && (
-                        <FlagChip icon={AlertTriangle} label="Over limit" />
+                    <div className="min-w-0">
+                      <div className="flex items-center gap-2 min-w-0">
+                        <span className="font-semibold text-slate-800 truncate whitespace-nowrap">
+                          {empName}
+                        </span>
+                        {w.flagged && (
+                          <FlagChip icon={AlertTriangle} label="Over limit" />
+                        )}
+                      </div>
+                      {/* The remark is the justification for approving an over-limit
+                          request, so it belongs on the row rather than only in the DB. */}
+                      {w.remark && (
+                        <p className="text-xs text-slate-400 mt-0.5 truncate">
+                          Remark: {w.remark}
+                        </p>
                       )}
                     </div>
                   </div>
@@ -956,7 +990,7 @@ const LeavesPage = () => {
                         icon: CheckCircle,
                         tone: "success",
                         disabled: wfhApproveMutation.isPending,
-                        onClick: () => wfhApproveMutation.mutate(w.id),
+                        onClick: () => handleWfhApprove(w),
                       },
                       w.status === "pending" && {
                         label: "Reject",
@@ -1063,6 +1097,90 @@ const LeavesPage = () => {
               isLoading={approveMutation.isPending}
             >
               {!approveMutation.isPending && "Approve with Remark"}
+            </Button>
+          </Modal.Footer>
+        </Modal>
+      )}
+
+      {/* ── Flagged WFH remark modal ── */}
+      {wfhRemarkModal && (
+        <Modal
+          isOpen
+          onClose={() => {
+            setWfhRemarkModal(null);
+            setWfhRemark("");
+          }}
+          size="md"
+        >
+          <Modal.Body>
+            <div className="flex items-start gap-3 mb-4">
+              <div className="p-2 bg-orange-100 rounded-lg shrink-0">
+                <AlertTriangle className="w-5 h-5 text-orange-600" />
+              </div>
+              <div>
+                <h3 className="font-semibold text-slate-800">
+                  Justification Required
+                </h3>
+                <p className="text-sm text-slate-500 mt-1">
+                  {wfhRemarkModal.employeeName
+                    ? `${wfhRemarkModal.employeeName} has exceeded the WFH limit.`
+                    : "This request exceeds the WFH limit."}{" "}
+                  A justification remark is required to approve it.
+                </p>
+              </div>
+            </div>
+
+            {/* Quick-fill presets — click to use as-is, or edit afterwards. */}
+            <div className="flex flex-wrap items-center gap-1.5 mb-2">
+              <span className="text-[11px] font-semibold text-slate-400">
+                Quick fill:
+              </span>
+              {WFH_REMARK_PRESETS.map((preset) => (
+                <button
+                  key={preset}
+                  type="button"
+                  onClick={() => setWfhRemark(preset)}
+                  className={`px-2.5 py-1 rounded-lg border text-[11px] font-semibold transition-colors ${
+                    wfhRemark === preset
+                      ? "bg-indigo-600 text-white border-indigo-600"
+                      : "bg-slate-50 text-slate-600 border-slate-200 hover:bg-slate-100"
+                  }`}
+                >
+                  {preset}
+                </button>
+              ))}
+            </div>
+
+            <textarea
+              value={wfhRemark}
+              onChange={(e) => setWfhRemark(e.target.value)}
+              placeholder="Enter justification for approving this WFH request..."
+              className="w-full rounded-xl border border-slate-200 p-3 text-sm resize-none focus:outline-none focus:ring-2 focus:ring-indigo-500 focus:border-transparent"
+              rows={4}
+            />
+          </Modal.Body>
+          <Modal.Footer>
+            <Button
+              variant="cancel"
+              onClick={() => {
+                setWfhRemarkModal(null);
+                setWfhRemark("");
+              }}
+            >
+              Cancel
+            </Button>
+            <Button
+              variant="success"
+              onClick={() =>
+                wfhApproveMutation.mutate({
+                  id: wfhRemarkModal.wfhId,
+                  remark: wfhRemark,
+                })
+              }
+              disabled={!wfhRemark.trim() || wfhApproveMutation.isPending}
+              isLoading={wfhApproveMutation.isPending}
+            >
+              {!wfhApproveMutation.isPending && "Approve with Remark"}
             </Button>
           </Modal.Footer>
         </Modal>

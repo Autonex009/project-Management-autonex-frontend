@@ -84,7 +84,7 @@ export default function DatePicker({
     parsedDate || rangeStart || new Date()
   );
 
-  // Reset view when opening if value changed externally
+  // Reset view when opening or when value string changes externally
   useEffect(() => {
     if (isOpen) {
       if (parsedDate) setCurrentView(parsedDate);
@@ -132,8 +132,7 @@ export default function DatePicker({
     if (!isOpen) {
       updatePosition();
     }
-    setIsOpen((prev) => !prev);
-  };
+  }, [isOpen, actualValue]);
 
   useEffect(() => {
     const handleClickOutside = (e) => {
