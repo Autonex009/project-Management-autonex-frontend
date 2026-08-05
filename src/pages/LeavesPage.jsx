@@ -1222,6 +1222,8 @@ const LeavesPage = () => {
                 onChange={setFormEmployeeId}
                 placeholder="Select employee"
                 disabled={activeEmployees.length === 0}
+                searchable
+                searchPlaceholder="Search employee..."
               />
             </div>
             <div>
@@ -1254,6 +1256,7 @@ const LeavesPage = () => {
                   <input type="hidden" name="end_date" value={formStartDate} />
                   <DatePicker
                     type="date"
+                    accentColor="indigo"
                     value={formStartDate}
                     onChange={(e) => {
                       setFormStartDate(e.target.value);
@@ -1271,6 +1274,7 @@ const LeavesPage = () => {
                   <input type="hidden" name="end_date" value={formEndDate} />
                   <DatePicker
                     type="range"
+                    accentColor="indigo"
                     startDate={formStartDate}
                     endDate={formEndDate}
                     onRangeChange={({ startDate, endDate }) => {
