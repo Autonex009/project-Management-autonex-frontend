@@ -543,6 +543,7 @@ export default function LeaveCalendar({ filterEmployeeIds = null }) {
   const cells = [];
   for (let i = 0; i < firstDow; i++) cells.push(null);
   for (let d = 1; d <= daysInMonth; d++) cells.push(d);
+  while (cells.length % 7 !== 0) cells.push(null);
 
   const todayStr = `${today.getFullYear()}-${String(today.getMonth() + 1).padStart(2, "0")}-${String(today.getDate()).padStart(2, "0")}`;
 
@@ -762,13 +763,15 @@ export default function LeaveCalendar({ filterEmployeeIds = null }) {
       {/* ── Calendar container ── */}
       <div
         style={{
-          flex: "1 1 600px",
+          flex: "1 1 520px",
+          minWidth: "0",
+          width: "100%",
+          maxWidth: "100%",
           background: "#fff",
           borderRadius: "16px",
           border: "1px solid #e2e8f0",
           boxShadow: "0 4px 24px rgba(0,0,0,0.07)",
           overflow: "hidden",
-          maxWidth: "820px",
           margin: "0",
         }}
       >
@@ -777,7 +780,7 @@ export default function LeaveCalendar({ filterEmployeeIds = null }) {
           style={{
             background:
               "linear-gradient(135deg, #1e3a8a 0%, #2563eb 60%, #3b82f6 100%)",
-            padding: "16px 20px",
+            padding: "10px 16px",
             display: "flex",
             alignItems: "center",
             justifyContent: "space-between",
@@ -788,8 +791,8 @@ export default function LeaveCalendar({ filterEmployeeIds = null }) {
             style={{
               background: "rgba(255,255,255,0.15)",
               border: "none",
-              borderRadius: "8px",
-              padding: "6px 8px",
+              borderRadius: "6px",
+              padding: "4px 6px",
               cursor: "pointer",
               display: "flex",
               alignItems: "center",
@@ -803,15 +806,15 @@ export default function LeaveCalendar({ filterEmployeeIds = null }) {
               (e.currentTarget.style.background = "rgba(255,255,255,0.15)")
             }
           >
-            <ChevronLeft size={18} />
+            <ChevronLeft size={16} />
           </button>
 
-          <div style={{ display: "flex", alignItems: "center", gap: "8px" }}>
-            <Calendar size={16} color="rgba(255,255,255,0.8)" />
+          <div style={{ display: "flex", alignItems: "center", gap: "6px" }}>
+            <Calendar size={15} color="rgba(255,255,255,0.85)" />
             <h3
               style={{
                 margin: 0,
-                fontSize: "15px",
+                fontSize: "14px",
                 fontWeight: 700,
                 color: "#fff",
                 letterSpacing: "0.01em",
@@ -826,8 +829,8 @@ export default function LeaveCalendar({ filterEmployeeIds = null }) {
             style={{
               background: "rgba(255,255,255,0.15)",
               border: "none",
-              borderRadius: "8px",
-              padding: "6px 8px",
+              borderRadius: "6px",
+              padding: "4px 6px",
               cursor: "pointer",
               display: "flex",
               alignItems: "center",
@@ -841,7 +844,7 @@ export default function LeaveCalendar({ filterEmployeeIds = null }) {
               (e.currentTarget.style.background = "rgba(255,255,255,0.15)")
             }
           >
-            <ChevronRight size={18} />
+            <ChevronRight size={16} />
           </button>
         </div>
 
@@ -850,8 +853,8 @@ export default function LeaveCalendar({ filterEmployeeIds = null }) {
           style={{
             display: "flex",
             flexWrap: "wrap",
-            gap: "10px",
-            padding: "10px 16px",
+            gap: "8px 12px",
+            padding: "6px 14px",
             background: "#f8fafc",
             borderBottom: "1px solid #e2e8f0",
           }}
@@ -1025,13 +1028,16 @@ export default function LeaveCalendar({ filterEmployeeIds = null }) {
             </div>
           </div>
         ) : (
-          <div style={{ padding: "12px 10px 14px" }}>
+          <div style={{ padding: "8px 8px 10px" }}>
             {/* Day-name header */}
             <div
               style={{
                 display: "grid",
-                gridTemplateColumns: "repeat(7,1fr)",
+                gridTemplateColumns: "repeat(7, minmax(0, 1fr))",
                 marginBottom: "4px",
+                background: "#f8fafc",
+                borderRadius: "6px",
+                padding: "4px 0",
               }}
             >
               {DAY_NAMES.map((d, i) => (
@@ -1043,8 +1049,7 @@ export default function LeaveCalendar({ filterEmployeeIds = null }) {
                     fontWeight: 700,
                     letterSpacing: "0.04em",
                     textTransform: "uppercase",
-                    padding: "4px 0",
-                    color: i === 0 || i === 6 ? "#ef4444" : "#94a3b8",
+                    color: i === 0 || i === 6 ? "#ef4444" : "#64748b",
                   }}
                 >
                   {d}
@@ -1056,12 +1061,24 @@ export default function LeaveCalendar({ filterEmployeeIds = null }) {
             <div
               style={{
                 display: "grid",
-                gridTemplateColumns: "repeat(7,1fr)",
+                gridTemplateColumns: "repeat(7, minmax(0, 1fr))",
                 gap: "3px",
               }}
             >
               {cells.map((day, idx) => {
-                if (!day) return <div key={`empty-${idx}`} />;
+                if (!day) {
+                  return (
+                    <div
+                      key={`empty-${idx}`}
+                      style={{
+                        minHeight: "52px",
+                        borderRadius: "8px",
+                        border: "1px dashed #e2e8f0",
+                        background: "rgba(248, 250, 252, 0.5)",
+                      }}
+                    />
+                  );
+                }
 
                 const dateStr = `${year}-${String(month).padStart(2, "0")}-${String(day).padStart(2, "0")}`;
                 const events = eventsByDate[dateStr] || [];
@@ -1130,7 +1147,7 @@ export default function LeaveCalendar({ filterEmployeeIds = null }) {
                     }
                     onClick={() => handleDateClick(dateStr)}
                     style={{
-                      minHeight: "88px",
+                      minHeight: "52px",
                       borderRadius: "8px",
                       border: `1.5px solid ${cellBorder}`,
                       boxShadow:
@@ -1140,10 +1157,10 @@ export default function LeaveCalendar({ filterEmployeeIds = null }) {
                             ? `inset 0 0 0 1px ${activeSelectionTheme.rangeBorder}`
                             : "none",
                       background: cellBg,
-                      padding: "4px 4px 4px",
+                      padding: "4px 5px",
                       display: "flex",
                       flexDirection: "column",
-                      gap: "3px",
+                      gap: "2px",
                       transition:
                         "box-shadow 0.15s, transform 0.15s, border-color 0.15s",
                       cursor: isEmployee ? "pointer" : "default",
@@ -1224,14 +1241,14 @@ export default function LeaveCalendar({ filterEmployeeIds = null }) {
       {isEmployee && (
         <div
           style={{
-            flex: "1 1 380px",
-            minWidth: "340px",
-            maxWidth: "460px",
+            flex: "1 1 340px",
+            minWidth: "300px",
+            maxWidth: "420px",
             background: sidebarTheme.bg,
             borderRadius: "16px",
             border: `1px solid ${sidebarTheme.border}`,
             boxShadow: "0 4px 24px rgba(0,0,0,0.05)",
-            padding: "24px 20px",
+            padding: "16px 16px",
             display: "flex",
             flexDirection: "column",
           }}
@@ -1244,20 +1261,20 @@ export default function LeaveCalendar({ filterEmployeeIds = null }) {
                 alignItems: "center",
                 justifyContent: "center",
                 height: "100%",
-                minHeight: "280px",
+                minHeight: "200px",
                 textAlign: "center",
-                padding: "20px",
+                padding: "16px",
                 color: "#94a3b8",
               }}
             >
               <Calendar
-                size={48}
-                style={{ color: "#cbd5e1", marginBottom: "16px" }}
+                size={40}
+                style={{ color: "#cbd5e1", marginBottom: "12px" }}
               />
               <h4
                 style={{
-                  margin: "0 0 8px 0",
-                  fontSize: "15px",
+                  margin: "0 0 6px 0",
+                  fontSize: "14px",
                   fontWeight: 600,
                   color: "#475569",
                 }}
@@ -1267,9 +1284,9 @@ export default function LeaveCalendar({ filterEmployeeIds = null }) {
               <p
                 style={{
                   margin: 0,
-                  fontSize: "13px",
+                  fontSize: "12px",
                   color: "#64748b",
-                  lineHeight: 1.5,
+                  lineHeight: 1.4,
                 }}
               >
                 Click any date on the calendar to begin applying for a leave or
@@ -1287,12 +1304,12 @@ export default function LeaveCalendar({ filterEmployeeIds = null }) {
             >
               <h4
                 style={{
-                  margin: "0 0 16px 0",
-                  fontSize: "16px",
+                  margin: "0 0 10px 0",
+                  fontSize: "15px",
                   fontWeight: 700,
                   color: sidebarTheme.title,
                   borderBottom: `1px solid ${sidebarTheme.border}`,
-                  paddingBottom: "12px",
+                  paddingBottom: "8px",
                 }}
               >
                 Apply for Time Off
@@ -1304,8 +1321,8 @@ export default function LeaveCalendar({ filterEmployeeIds = null }) {
                   background: "#fff",
                   border: `1px dashed ${sidebarTheme.border}`,
                   borderRadius: "10px",
-                  padding: "12px",
-                  marginBottom: "16px",
+                  padding: "8px 10px",
+                  marginBottom: "10px",
                 }}
               >
                 <p
@@ -1352,14 +1369,14 @@ export default function LeaveCalendar({ filterEmployeeIds = null }) {
               </div>
 
               {/* Dropdown Type Select */}
-              <div style={{ marginBottom: "16px" }}>
+              <div style={{ marginBottom: "10px" }}>
                 <label
                   style={{
                     display: "block",
-                    fontSize: "13px",
+                    fontSize: "12px",
                     fontWeight: 600,
                     color: sidebarTheme.text,
-                    marginBottom: "6px",
+                    marginBottom: "4px",
                   }}
                 >
                   Leave Type
@@ -1375,14 +1392,14 @@ export default function LeaveCalendar({ filterEmployeeIds = null }) {
               </div>
 
               {/* Reason input */}
-              <div style={{ marginBottom: "16px" }}>
+              <div style={{ marginBottom: "10px" }}>
                 <label
                   style={{
                     display: "block",
-                    fontSize: "13px",
+                    fontSize: "12px",
                     fontWeight: 600,
                     color: sidebarTheme.text,
-                    marginBottom: "6px",
+                    marginBottom: "4px",
                   }}
                 >
                   Reason
@@ -1391,13 +1408,13 @@ export default function LeaveCalendar({ filterEmployeeIds = null }) {
                   value={reason}
                   onChange={(e) => setReason(e.target.value)}
                   placeholder="Enter reason for this request (required)..."
-                  rows={3}
+                  rows={2}
                   style={{
                     width: "100%",
-                    padding: "10px 12px",
+                    padding: "8px 10px",
                     border: `1px solid ${sidebarTheme.inputBorder}`,
                     borderRadius: "8px",
-                    fontSize: "14px",
+                    fontSize: "13px",
                     outline: "none",
                     resize: "none",
                   }}

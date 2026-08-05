@@ -332,8 +332,17 @@ export default function ChangeLogPage() {
   const formatTimestamp = (isoString) => {
     if (!isoString)
       return { dateStr: "—", timeStr: "—", relativeTime: "—", isoFull: "—" };
-    const date = new Date(isoString);
-    const diffMs = Date.now() - date.getTime();
+
+    // If ISO string lacks timezone offset/designator, append Z to ensure UTC interpretation
+    const normalizedIso =
+      typeof isoString === "string" &&
+      !isoString.endsWith("Z") &&
+      !/[+-]\d{2}:\d{2}$/.test(isoString)
+        ? `${isoString}Z`
+        : isoString;
+
+    const date = new Date(normalizedIso);
+    const diffMs = Math.max(0, Date.now() - date.getTime());
     const diffMins = Math.floor(diffMs / 60000);
     const diffHours = Math.floor(diffMs / 3600000);
     const diffDays = Math.floor(diffMs / 86400000);

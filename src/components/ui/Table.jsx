@@ -49,17 +49,17 @@ export const Table = ({
   const cellPad = isCompact
     ? "px-4 py-2"
     : isV1
-      ? "px-5 py-3.5"
-      : isUntitled
-        ? "px-4 py-2.5"
-        : "px-4 py-2.5";
-  const headPad = isCompact
-    ? "px-4 py-2.5"
-    : isV1
       ? "px-5 py-3"
       : isUntitled
-        ? "px-4 py-2.5"
-        : "px-4 py-2.5";
+        ? "px-4 py-1.5"
+        : "px-4 py-2";
+  const headPad = isCompact
+    ? "px-4 py-2"
+    : isV1
+      ? "px-5 py-2.5"
+      : isUntitled
+        ? "px-4 py-2"
+        : "px-4 py-2";
   const headTextSize = isCompact
     ? "text-[11px]"
     : airy
@@ -101,7 +101,7 @@ export const Table = ({
           <thead
             className={`${theadBg} ${allowOverflow && !title ? "rounded-t-2xl" : ""} border-b border-slate-100 `}
           >
-            <tr className="h-[44px]">
+            <tr className="h-[36px]">
               {columns.map((col, cIdx) => (
                 <th
                   key={col.key}
