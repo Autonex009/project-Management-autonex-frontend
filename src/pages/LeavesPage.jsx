@@ -137,6 +137,8 @@ const LeavesPage = () => {
   const PAGE_SIZE = 10;
   const [isModalOpen, setIsModalOpen] = useState(false);
   const [selectedLeaveType, setSelectedLeaveType] = useState("");
+  const [formStartDate, setFormStartDate] = useState("");
+  const [formEndDate, setFormEndDate] = useState("");
   // ?q= seeds the search box so a Dashboard card can deep-link straight to one
   // person's requests. It stays editable — clearing the box just clears it.
   const [searchQuery, setSearchQuery] = useState(queryParam || "");
@@ -176,10 +178,23 @@ const LeavesPage = () => {
     (statusFilter !== "all" ? 1 : 0) + (todayOnly ? 1 : 0);
   const [remarkModal, setRemarkModal] = useState(null); // { leaveId }
   const [remark, setRemark] = useState("");
+  const [wfhRemarkModal, setWfhRemarkModal] = useState(null); // { wfhId, employeeName }
+  const [wfhRemark, setWfhRemark] = useState("");
   const [deleteTarget, setDeleteTarget] = useState(null);
   const [wfhDeleteConfirm, setWfhDeleteConfirm] = useState(null);
   const [formEmployeeId, setFormEmployeeId] = useState("");
   const user = JSON.parse(localStorage.getItem("user") || "{}");
+
+  // Quick-fill options for the flagged-WFH justification. The first is derived from
+  // the signed-in user's actual role rather than a generic "PM/Admin", so the stored
+  // remark stays truthful — it is kept as the approval's audit trail.
+  const approverLabel =
+    { admin: "Admin", pm: "PM", hr: "HR" }[user.role] || "Admin";
+  const WFH_REMARK_PRESETS = [
+    `Approved by ${approverLabel}`,
+    "Approved — business requirement",
+    "Approved — one-off exception",
+  ];
 
   const { data: leaves = [], isLoading } = useQuery({
     queryKey: ["leaves"],
@@ -249,6 +264,8 @@ const LeavesPage = () => {
       setIsModalOpen(false);
       setSelectedLeaveType("");
       setFormEmployeeId("");
+      setFormStartDate("");
+      setFormEndDate("");
       toast.success("Leave record created successfully");
 
     },
@@ -270,10 +287,12 @@ const LeavesPage = () => {
 
   // ── WFH mutations ────────────────────────────────────────────────
   const wfhApproveMutation = useMutation({
-    mutationFn: (id) => wfhApi.approve(id, user.id),
+    mutationFn: ({ id, remark }) => wfhApi.approve(id, user.id, remark),
     onSuccess: () => {
       queryClient.invalidateQueries(["wfh"]);
       queryClient.invalidateQueries(["leave-calendar"]);
+      setWfhRemarkModal(null);
+      setWfhRemark("");
       toast.success("WFH approved");
     },
     onError: (err) =>
@@ -324,6 +343,16 @@ const LeavesPage = () => {
       setRemarkModal({ leaveId: leave.leave_id });
     } else {
       approveMutation.mutate({ id: leave.leave_id, remark: null });
+    }
+  };
+
+  // Mirrors handleApprove: the backend rejects a flagged WFH approval that carries no
+  // remark, so ask for one up front instead of letting the request 400.
+  const handleWfhApprove = (w) => {
+    if (w.flagged) {
+      setWfhRemarkModal({ wfhId: w.id, employeeName: w.employee_name });
+    } else {
+      wfhApproveMutation.mutate({ id: w.id, remark: null });
     }
   };
 
@@ -472,7 +501,7 @@ const LeavesPage = () => {
   };
 
   return (
-    <div className="space-y-4">
+    <div className="space-y-3">
       {/* Header */}
       <div>
         <h1 className="text-lg font-semibold text-slate-900">
@@ -683,11 +712,6 @@ const LeavesPage = () => {
                           />
                         )}
                       </div>
-                      {leave.approval_remark && (
-                        <p className="text-xs text-slate-400 mt-0.5 truncate">
-                          Remark: {leave.approval_remark}
-                        </p>
-                      )}
                     </div>
                   </div>
                 );
@@ -758,9 +782,11 @@ const LeavesPage = () => {
               render: (_, leave) => {
                 const rawApplied = resolveLeaveAppliedDate(leave);
                 if (!rawApplied) return <span className="text-[13px] text-slate-400">—</span>;
-                const d = new Date(
-                  rawApplied.includes("T") ? rawApplied : rawApplied + "T00:00:00"
-                );
+                // Extract YYYY-MM-DD from the ISO string to avoid UTC→local timezone shifts
+                const dateStr = String(rawApplied).slice(0, 10);
+                const [y, m, day] = dateStr.split("-").map(Number);
+                if (!y || !m || !day) return <span className="text-[13px] text-slate-400">—</span>;
+                const d = new Date(y, m - 1, day);
                 if (isNaN(d.getTime())) return <span className="text-[13px] text-slate-400">—</span>;
                 return (
                   <span className="text-[13px] text-slate-700 whitespace-nowrap">
@@ -897,12 +923,21 @@ const LeavesPage = () => {
                 return (
                   <div className="flex items-center gap-3">
                     <UserAvatar src={emp?.avatar_url} name={empName} size="sm" />
-                    <div className="flex items-center gap-2 min-w-0">
-                      <span className="font-semibold text-slate-800 truncate whitespace-nowrap">
-                        {empName}
-                      </span>
-                      {w.flagged && (
-                        <FlagChip icon={AlertTriangle} label="Over limit" />
+                    <div className="min-w-0">
+                      <div className="flex items-center gap-2 min-w-0">
+                        <span className="font-semibold text-slate-800 truncate whitespace-nowrap">
+                          {empName}
+                        </span>
+                        {w.flagged && (
+                          <FlagChip icon={AlertTriangle} label="Over limit" />
+                        )}
+                      </div>
+                      {/* The remark is the justification for approving an over-limit
+                          request, so it belongs on the row rather than only in the DB. */}
+                      {w.remark && (
+                        <p className="text-xs text-slate-400 mt-0.5 truncate">
+                          Remark: {w.remark}
+                        </p>
                       )}
                     </div>
                   </div>
@@ -955,7 +990,7 @@ const LeavesPage = () => {
                         icon: CheckCircle,
                         tone: "success",
                         disabled: wfhApproveMutation.isPending,
-                        onClick: () => wfhApproveMutation.mutate(w.id),
+                        onClick: () => handleWfhApprove(w),
                       },
                       w.status === "pending" && {
                         label: "Reject",
@@ -1067,6 +1102,90 @@ const LeavesPage = () => {
         </Modal>
       )}
 
+      {/* ── Flagged WFH remark modal ── */}
+      {wfhRemarkModal && (
+        <Modal
+          isOpen
+          onClose={() => {
+            setWfhRemarkModal(null);
+            setWfhRemark("");
+          }}
+          size="md"
+        >
+          <Modal.Body>
+            <div className="flex items-start gap-3 mb-4">
+              <div className="p-2 bg-orange-100 rounded-lg shrink-0">
+                <AlertTriangle className="w-5 h-5 text-orange-600" />
+              </div>
+              <div>
+                <h3 className="font-semibold text-slate-800">
+                  Justification Required
+                </h3>
+                <p className="text-sm text-slate-500 mt-1">
+                  {wfhRemarkModal.employeeName
+                    ? `${wfhRemarkModal.employeeName} has exceeded the WFH limit.`
+                    : "This request exceeds the WFH limit."}{" "}
+                  A justification remark is required to approve it.
+                </p>
+              </div>
+            </div>
+
+            {/* Quick-fill presets — click to use as-is, or edit afterwards. */}
+            <div className="flex flex-wrap items-center gap-1.5 mb-2">
+              <span className="text-[11px] font-semibold text-slate-400">
+                Quick fill:
+              </span>
+              {WFH_REMARK_PRESETS.map((preset) => (
+                <button
+                  key={preset}
+                  type="button"
+                  onClick={() => setWfhRemark(preset)}
+                  className={`px-2.5 py-1 rounded-lg border text-[11px] font-semibold transition-colors ${
+                    wfhRemark === preset
+                      ? "bg-indigo-600 text-white border-indigo-600"
+                      : "bg-slate-50 text-slate-600 border-slate-200 hover:bg-slate-100"
+                  }`}
+                >
+                  {preset}
+                </button>
+              ))}
+            </div>
+
+            <textarea
+              value={wfhRemark}
+              onChange={(e) => setWfhRemark(e.target.value)}
+              placeholder="Enter justification for approving this WFH request..."
+              className="w-full rounded-xl border border-slate-200 p-3 text-sm resize-none focus:outline-none focus:ring-2 focus:ring-indigo-500 focus:border-transparent"
+              rows={4}
+            />
+          </Modal.Body>
+          <Modal.Footer>
+            <Button
+              variant="cancel"
+              onClick={() => {
+                setWfhRemarkModal(null);
+                setWfhRemark("");
+              }}
+            >
+              Cancel
+            </Button>
+            <Button
+              variant="success"
+              onClick={() =>
+                wfhApproveMutation.mutate({
+                  id: wfhRemarkModal.wfhId,
+                  remark: wfhRemark,
+                })
+              }
+              disabled={!wfhRemark.trim() || wfhApproveMutation.isPending}
+              isLoading={wfhApproveMutation.isPending}
+            >
+              {!wfhApproveMutation.isPending && "Approve with Remark"}
+            </Button>
+          </Modal.Footer>
+        </Modal>
+      )}
+
       {/* ── Add Leave Modal ── */}
       <Modal
         isOpen={isModalOpen}
@@ -1103,6 +1222,8 @@ const LeavesPage = () => {
                 onChange={setFormEmployeeId}
                 placeholder="Select employee"
                 disabled={activeEmployees.length === 0}
+                searchable
+                searchPlaceholder="Search employee..."
               />
             </div>
             <div>
@@ -1124,44 +1245,47 @@ const LeavesPage = () => {
                 placeholder="Select type"
               />
             </div>
-            <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
-              <div
-                className={
-                  selectedLeaveType === "first_half" ||
-                    selectedLeaveType === "second_half"
-                    ? "col-span-2"
-                    : ""
-                }
-              >
-                <label className="block text-sm font-medium text-gray-700 mb-1">
-                  {selectedLeaveType === "first_half" ||
-                    selectedLeaveType === "second_half"
-                    ? "Date"
-                    : "Start Date"}{" "}
-                  <span className="text-red-500">*</span>
-                </label>
-                <DatePicker
-                  type="date"
-                  name="start_date"
-                  required
-                />
-              </div>
-              {!(
-                selectedLeaveType === "first_half" ||
-                selectedLeaveType === "second_half"
-              ) && (
-                  <div>
-                    <label className="block text-sm font-medium text-gray-700 mb-1">
-                      End Date <span className="text-red-500">*</span>
-                    </label>
-                    <input
-                      type="date"
-                      name="end_date"
-                      required
-                      className="input"
-                    />
-                  </div>
-                )}
+            <div>
+              {selectedLeaveType === "first_half" ||
+              selectedLeaveType === "second_half" ? (
+                <div>
+                  <label className="block text-sm font-medium text-gray-700 mb-1">
+                    Date <span className="text-red-500">*</span>
+                  </label>
+                  <input type="hidden" name="start_date" value={formStartDate} />
+                  <input type="hidden" name="end_date" value={formStartDate} />
+                  <DatePicker
+                    type="date"
+                    accentColor="indigo"
+                    value={formStartDate}
+                    onChange={(e) => {
+                      setFormStartDate(e.target.value);
+                      setFormEndDate(e.target.value);
+                    }}
+                    required
+                  />
+                </div>
+              ) : (
+                <div>
+                  <label className="block text-sm font-medium text-gray-700 mb-1">
+                    Leave Duration (Start & End Date) <span className="text-red-500">*</span>
+                  </label>
+                  <input type="hidden" name="start_date" value={formStartDate} />
+                  <input type="hidden" name="end_date" value={formEndDate} />
+                  <DatePicker
+                    type="range"
+                    accentColor="indigo"
+                    startDate={formStartDate}
+                    endDate={formEndDate}
+                    onRangeChange={({ startDate, endDate }) => {
+                      setFormStartDate(startDate);
+                      setFormEndDate(endDate);
+                    }}
+                    placeholder="Click to select start and end dates from calendar"
+                    required
+                  />
+                </div>
+              )}
             </div>
             <div>
               <label className="block text-sm font-medium text-gray-700 mb-1">

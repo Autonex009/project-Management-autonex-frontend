@@ -165,12 +165,20 @@ const StatCard = ({
     />
   );
 
+  const getValueFontSize = () => {
+    if (inline) return "text-[20px]";
+    const valStr = String(value ?? "");
+    if (valStr.length > 20) return "text-sm font-semibold";
+    if (valStr.length > 15) return "text-base font-semibold";
+    if (valStr.length > 10) return "text-lg font-bold";
+    return compact ? "text-[20px]" : "text-[24px]";
+  };
+
   const valueRow = (
-    <div className="flex items-baseline gap-1">
+    <div className="flex items-baseline gap-1 min-w-0 pb-0.5">
       <span
-        className={`font-bold leading-none tracking-tight text-slate-900 tabular-nums ${
-          inline ? "text-[22px]" : compact ? "text-[26px]" : "text-[32px]"
-        }`}
+        className={`font-bold leading-normal tracking-tight text-slate-900 tabular-nums truncate ${getValueFontSize()}`}
+        title={typeof value === "string" ? value : undefined}
       >
         {value}
       </span>

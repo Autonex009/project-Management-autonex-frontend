@@ -2,6 +2,7 @@ import { useMemo, useState } from "react";
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
 import Button from "./ui/Button";
 import DatePicker from "./ui/DatePicker";
+import Modal from "./ui/Modal";
 import { leaveApi, wfhApi } from "../services/api";
 import Spinner from "./ui/LoadingSpinner";
 import {
@@ -145,11 +146,10 @@ function FloaterDatePicker({
                 key={d.date}
                 type="button"
                 onClick={() => onChange({ target: { value: d.date } })}
-                className={`px-2 py-0.5 rounded text-xs font-medium transition-colors ${
-                  value === d.date
-                    ? "bg-amber-600 text-white"
-                    : "bg-white border border-amber-300 text-amber-800 hover:bg-amber-100"
-                }`}
+                className={`px-2 py-0.5 rounded text-xs font-medium transition-colors ${value === d.date
+                  ? "bg-amber-600 text-white"
+                  : "bg-white border border-amber-300 text-amber-800 hover:bg-amber-100"
+                  }`}
               >
                 {d.date.slice(5)} — {d.label}
               </button>
@@ -425,8 +425,8 @@ const MyLeavesPanel = ({
     onError: (err) =>
       toast.error(
         err?.response?.data?.detail?.[0]?.msg ||
-          err?.response?.data?.detail ||
-          "Failed to submit leave",
+        err?.response?.data?.detail ||
+        "Failed to submit leave",
       ),
   });
 
@@ -509,6 +509,12 @@ const MyLeavesPanel = ({
     const sDate = leaveForm.start_date;
     const eDate = isHalf ? sDate : leaveForm.end_date;
 
+    const todayStr = format(new Date(), "yyyy-MM-dd");
+    if (!leaveForm.is_emergency && sDate < todayStr) {
+      toast.error("Leaves for past dates are not allowed unless marked as Emergency Leave.");
+      return;
+    }
+
     if (isHalf) {
       const timingErr = checkHalfDayTiming(sDate, leaveForm.leave_type);
       if (timingErr) {
@@ -566,12 +572,17 @@ const MyLeavesPanel = ({
 
   const handleWfhSubmit = (e) => {
     e.preventDefault();
+    const todayStr = format(new Date(), "yyyy-MM-dd");
     if (!wfhForm.reason || !wfhForm.reason.trim()) {
       toast.error("Please enter a reason for your WFH request.");
       return;
     }
     if (!wfhForm.wfh_date) {
       toast.error("Please select a date");
+      return;
+    }
+    if (wfhForm.wfh_date < todayStr) {
+      toast.error("WFH requests for past dates are not allowed.");
       return;
     }
     createWfhMutation.mutate({ ...wfhForm, end_date: wfhForm.wfh_date });
@@ -602,6 +613,12 @@ const MyLeavesPanel = ({
       editForm.leave_type === "second_half";
     const sDate = editForm.start_date;
     const eDate = isHalf ? sDate : editForm.end_date;
+
+    const todayStr = format(new Date(), "yyyy-MM-dd");
+    if (!editForm.is_emergency && sDate < todayStr) {
+      toast.error("Leaves for past dates are not allowed unless marked as Emergency Leave.");
+      return;
+    }
 
     if (isHalf) {
       const timingErr = checkHalfDayTiming(sDate, editForm.leave_type);
@@ -678,12 +695,17 @@ const MyLeavesPanel = ({
 
   const handleWfhEditSubmit = (e) => {
     e.preventDefault();
+    const todayStr = format(new Date(), "yyyy-MM-dd");
     if (!editWfhForm.reason || !editWfhForm.reason.trim()) {
       toast.error("Please enter a reason for your WFH request.");
       return;
     }
     if (!editWfhForm.wfh_date) {
       toast.error("Please select a date");
+      return;
+    }
+    if (editWfhForm.wfh_date < todayStr) {
+      toast.error("WFH requests for past dates are not allowed.");
       return;
     }
     updateWfhMutation.mutate({
@@ -699,8 +721,8 @@ const MyLeavesPanel = ({
   const myEmployeeIdSet = employeeId ? new Set([employeeId]) : null;
 
   return (
-    <div className="space-y-6">
-      <div className="flex flex-col sm:flex-row items-start sm:items-center justify-between mb-8 gap-4">
+    <div className="space-y-3">
+      <div className="flex flex-col sm:flex-row items-start sm:items-center justify-between mb-3 gap-4">
         <div>
           <h1 className="text-lg font-semibold text-slate-900">{title}</h1>
           <p className="text-slate-500 text-[13px] mt-0.5">{subtitle}</p>
@@ -728,11 +750,10 @@ const MyLeavesPanel = ({
           <button
             key={tab}
             onClick={() => setActiveTab(tab)}
-            className={`px-3 py-1.5 text-[13px] font-semibold rounded-md transition-all whitespace-nowrap ${
-              activeTab === tab
-                ? "bg-white text-slate-900 shadow-sm ring-1 ring-slate-200/70"
-                : "text-slate-500 hover:text-slate-800"
-            }`}
+            className={`px-3 py-1.5 text-[13px] font-semibold rounded-md transition-all whitespace-nowrap ${activeTab === tab
+              ? "bg-white text-slate-900 shadow-sm ring-1 ring-slate-200/70"
+              : "text-slate-500 hover:text-slate-800"
+              }`}
           >
             {tab === "Work From Home" ? (
               <span className="flex items-center gap-1.5">
@@ -769,189 +790,189 @@ const MyLeavesPanel = ({
             ))}
           </div>
 
-          {/* New leave request form */}
+          {/* New leave request modal */}
           {showLeaveForm && (
-            <div className="bg-white rounded-2xl border border-slate-200 shadow-sm p-6">
-              <div className="flex items-center justify-between mb-4">
-                <h3 className="font-semibold text-slate-800">
-                  New Leave Request
-                </h3>
-                <button
-                  onClick={() => setShowLeaveForm(false)}
-                  className="p-1 text-slate-400 hover:text-slate-600"
-                >
-                  <X className="w-5 h-5" />
-                </button>
-              </div>
-              <form
-                onSubmit={handleLeaveSubmit}
-                className="grid grid-cols-1 md:grid-cols-2 gap-4"
-              >
-                <div>
-                  <label className="block text-sm font-medium text-slate-700 mb-1">
-                    Type
-                  </label>
-                  <Dropdown
-                    options={LEAVE_TYPE_OPTIONS}
-                    value={leaveForm.leave_type}
-                    onChange={(e) =>
-                      setLeaveForm({
-                        ...leaveForm,
-                        leave_type: e,
-                        start_date: "",
-                        end_date: "",
-                      })
-                    }
-                  />
-                </div>
-                <div>
-                  <label className="block text-sm font-medium text-slate-700 mb-1">
-                    Reason
-                  </label>
-                  <input
-                    type="text"
-                    value={leaveForm.reason}
-                    onChange={(e) =>
-                      setLeaveForm({ ...leaveForm, reason: e.target.value })
-                    }
-                    className="w-full px-3 py-2 border border-slate-200 rounded-lg text-sm"
-                    placeholder="Reason for leave (required)"
-                  />
-                </div>
-                {leaveForm.leave_type === "floater" ? (
-                  <FloaterDatePicker
-                    label="Floater Date"
-                    value={leaveForm.start_date}
-                    onChange={(e) =>
-                      setLeaveForm({
-                        ...leaveForm,
-                        start_date: e.target.value,
-                        end_date: e.target.value,
-                      })
-                    }
-                    required
-                  />
-                ) : (
-                  <>
-                    <div>
-                      <label className="block text-sm font-medium text-slate-700 mb-1">
-                        {leaveForm.leave_type === "first_half" ||
-                        leaveForm.leave_type === "second_half"
-                          ? "Date"
-                          : "Start Date"}
-                      </label>
-                      <DatePicker
-                        type="date"
-                        value={leaveForm.start_date}
-                        onChange={(e) => {
-                          const sDate = e.target.value;
-                          setLeaveForm((prev) => ({
-                            ...prev,
-                            start_date: sDate,
-                            end_date:
-                              prev.leave_type === "first_half" ||
-                              prev.leave_type === "second_half"
-                                ? sDate
-                                : prev.end_date,
-                          }));
-                        }}
-                        required
-                      />
-                    </div>
-                    {!(
-                      leaveForm.leave_type === "first_half" ||
-                      leaveForm.leave_type === "second_half"
-                    ) && (
-                      <div>
-                        <label className="block text-sm font-medium text-slate-700 mb-1">
-                          End Date
-                        </label>
-                        <DatePicker
-                          type="date"
-                          value={leaveForm.end_date}
-                          onChange={(e) =>
-                            setLeaveForm({
-                              ...leaveForm,
-                              end_date: e.target.value,
-                            })
-                          }
-                          required
-                        />
-                      </div>
-                    )}
-                    <DateRangeSummary
-                      startDate={leaveForm.start_date}
-                      endDate={
-                        leaveForm.leave_type === "first_half" ||
-                        leaveForm.leave_type === "second_half"
-                          ? leaveForm.start_date
-                          : leaveForm.end_date
-                      }
-                      isHalfDay={
-                        leaveForm.leave_type === "first_half" ||
-                        leaveForm.leave_type === "second_half"
-                      }
-                    />
-                  </>
-                )}
-                {(leaveForm.leave_type === "first_half" ||
-                  leaveForm.leave_type === "second_half") && (
-                  <div className="md:col-span-2 rounded-xl border border-indigo-150 bg-indigo-50/50 p-4 text-sm text-indigo-900 space-y-2">
-                    <div className="flex items-center gap-1.5 font-semibold text-indigo-950">
-                      <Clock className="w-4 h-4 text-indigo-600" /> Half-day
-                      Leave Policy & Slots
-                    </div>
-                    <div className="grid grid-cols-1 sm:grid-cols-2 gap-3 text-xs">
-                      <div className="p-2.5 bg-white rounded-lg border border-indigo-100/80">
-                        <p className="font-semibold text-indigo-950">
-                          First Half-day Leave
-                        </p>
-                        <p className="text-slate-600 mt-0.5">
-                          🕒 Slot: 9:00 AM – 2:00 PM
-                        </p>
-                        <p className="text-slate-500 mt-1 font-medium italic">
-                          ⚠️ Apply at least one day in advance.
-                        </p>
-                      </div>
-                      <div className="p-2.5 bg-white rounded-lg border border-indigo-100/80">
-                        <p className="font-semibold text-indigo-950">
-                          Second Half-day Leave
-                        </p>
-                        <p className="text-slate-600 mt-0.5">
-                          🕒 Slot: 2:00 PM – 7:00 PM
-                        </p>
-                        <p className="text-slate-500 mt-1 font-medium italic">
-                          ⚠️ Apply before 2:00 PM on the same day.
-                        </p>
-                      </div>
-                    </div>
-                  </div>
-                )}
-                <div className="md:col-span-2">
-                  <label className="flex items-start gap-2 cursor-pointer mt-2">
-                    <input
-                      type="checkbox"
-                      checked={leaveForm.is_emergency}
+            <Modal isOpen onClose={() => setShowLeaveForm(false)}>
+              <Modal.Header onClose={() => setShowLeaveForm(false)}>
+                <h2 className="text-xl font-semibold text-slate-900">
+                  Request Leave
+                </h2>
+              </Modal.Header>
+              <form onSubmit={handleLeaveSubmit} className="flex-1 flex flex-col min-h-0">
+                <Modal.Body className="space-y-4">
+                  <div>
+                    <label className="block text-sm font-medium text-slate-700 mb-1">
+                      Leave Type <span className="text-red-500">*</span>
+                    </label>
+                    <Dropdown
+                      options={LEAVE_TYPE_OPTIONS}
+                      value={leaveForm.leave_type}
                       onChange={(e) =>
                         setLeaveForm({
                           ...leaveForm,
-                          is_emergency: e.target.checked,
+                          leave_type: e,
+                          start_date: "",
+                          end_date: "",
                         })
                       }
-                      className="mt-1 h-4 w-4 text-indigo-600 rounded border-slate-300 focus:ring-indigo-500"
                     />
-                    <div>
-                      <span className="text-sm font-medium text-slate-700">Emergency Leave</span>
-                      <p className="text-xs text-slate-500">
-                        Check this if this is an emergency. Emergency leave will be flagged with a red dot on the leave page for managers.
-                      </p>
-                    </div>
-                  </label>
-                </div>
-                <div className="md:col-span-2 rounded-lg border border-amber-200 bg-amber-50 px-3 py-2 text-sm text-amber-800">
-                  {RAZORPAY_NEGATIVE_BALANCE_NOTE}
-                </div>
-                <div className="md:col-span-2 flex justify-end">
+                  </div>
+                  <div>
+                    {leaveForm.leave_type === "floater" ? (
+                      <FloaterDatePicker
+                        label="Floater Date"
+                        value={leaveForm.start_date}
+                        onChange={(e) =>
+                          setLeaveForm({
+                            ...leaveForm,
+                            start_date: e.target.value,
+                            end_date: e.target.value,
+                          })
+                        }
+                        required
+                      />
+                    ) : (
+                      <>
+                        {leaveForm.leave_type === "first_half" ||
+                          leaveForm.leave_type === "second_half" ? (
+                          <div>
+                            <label className="block text-sm font-medium text-slate-700 mb-1">
+                              Date <span className="text-red-500">*</span>
+                            </label>
+                            <DatePicker
+                              type="date"
+                              minDate={leaveForm.is_emergency ? undefined : format(new Date(), "yyyy-MM-dd")}
+                              value={leaveForm.start_date}
+                              onChange={(e) => {
+                                const sDate = e.target.value;
+                                setLeaveForm((prev) => ({
+                                  ...prev,
+                                  start_date: sDate,
+                                  end_date: sDate,
+                                }));
+                              }}
+                              required
+                            />
+                          </div>
+                        ) : (
+                          <div>
+                            <label className="block text-sm font-medium text-slate-700 mb-1">
+                              Leave Duration (Start & End Date) <span className="text-red-500">*</span>
+                            </label>
+                            <DatePicker
+                              type="range"
+                              minDate={leaveForm.is_emergency ? undefined : format(new Date(), "yyyy-MM-dd")}
+                              startDate={leaveForm.start_date}
+                              endDate={leaveForm.end_date}
+                              onRangeChange={({ startDate, endDate }) => {
+                                setLeaveForm((prev) => ({
+                                  ...prev,
+                                  start_date: startDate,
+                                  end_date: endDate,
+                                }));
+                              }}
+                              placeholder="Click to select start and end dates from calendar"
+                              required
+                            />
+                          </div>
+                        )}
+                        <DateRangeSummary
+                          startDate={leaveForm.start_date}
+                          endDate={
+                            leaveForm.leave_type === "first_half" ||
+                              leaveForm.leave_type === "second_half"
+                              ? leaveForm.start_date
+                              : leaveForm.end_date
+                          }
+                          isHalfDay={
+                            leaveForm.leave_type === "first_half" ||
+                            leaveForm.leave_type === "second_half"
+                          }
+                        />
+                      </>
+                    )}
+                  </div>
+                  <div>
+                    <label className="block text-sm font-medium text-slate-700 mb-1">
+                      Reason <span className="text-red-500">*</span>
+                    </label>
+                    <textarea
+                      rows={3}
+                      value={leaveForm.reason}
+                      onChange={(e) =>
+                        setLeaveForm({ ...leaveForm, reason: e.target.value })
+                      }
+                      className="w-full rounded-xl border border-slate-200 p-3 text-sm resize-none focus:outline-none focus:ring-2 focus:ring-indigo-500 focus:border-transparent"
+                      placeholder="Why is this leave being requested?"
+                      required
+                    />
+                  </div>
+                  {(leaveForm.leave_type === "first_half" ||
+                    leaveForm.leave_type === "second_half") && (
+                      <div className="rounded-xl border border-indigo-150 bg-indigo-50/50 p-4 text-sm text-indigo-900 space-y-2">
+                        <div className="flex items-center gap-1.5 font-semibold text-indigo-950">
+                          <Clock className="w-4 h-4 text-indigo-600" /> Half-day
+                          Leave Policy & Slots
+                        </div>
+                        <div className="grid grid-cols-1 sm:grid-cols-2 gap-3 text-xs">
+                          <div className="p-2.5 bg-white rounded-lg border border-indigo-100/80">
+                            <p className="font-semibold text-indigo-950">
+                              First Half-day Leave
+                            </p>
+                            <p className="text-slate-600 mt-0.5">
+                              🕒 Slot: 9:00 AM – 2:00 PM
+                            </p>
+                            <p className="text-slate-500 mt-1 font-medium italic">
+                              ⚠️ Apply at least one day in advance.
+                            </p>
+                          </div>
+                          <div className="p-2.5 bg-white rounded-lg border border-indigo-100/80">
+                            <p className="font-semibold text-indigo-950">
+                              Second Half-day Leave
+                            </p>
+                            <p className="text-slate-600 mt-0.5">
+                              🕒 Slot: 2:00 PM – 7:00 PM
+                            </p>
+                            <p className="text-slate-500 mt-1 font-medium italic">
+                              ⚠️ Apply before 2:00 PM on the same day.
+                            </p>
+                          </div>
+                        </div>
+                      </div>
+                    )}
+                  <div>
+                    <label className="flex items-start gap-2 cursor-pointer mt-2">
+                      <input
+                        type="checkbox"
+                        checked={leaveForm.is_emergency}
+                        onChange={(e) =>
+                          setLeaveForm({
+                            ...leaveForm,
+                            is_emergency: e.target.checked,
+                          })
+                        }
+                        className="mt-1 h-4 w-4 text-indigo-600 rounded border-slate-300 focus:ring-indigo-500"
+                      />
+                      <div>
+                        <span className="text-sm font-medium text-slate-700">Emergency Leave</span>
+                        <p className="text-xs text-slate-500">
+                          Check this if this is an emergency. Emergency leave will be flagged with a red dot on the leave page for managers.
+                        </p>
+                      </div>
+                    </label>
+                  </div>
+                  <div className="rounded-lg border border-amber-200 bg-amber-50 px-3 py-2 text-sm text-amber-800">
+                    {RAZORPAY_NEGATIVE_BALANCE_NOTE}
+                  </div>
+                </Modal.Body>
+                <Modal.Footer>
+                  <Button
+                    type="button"
+                    variant="cancel"
+                    onClick={() => setShowLeaveForm(false)}
+                  >
+                    Cancel
+                  </Button>
                   <Button
                     type="submit"
                     variant="success"
@@ -960,629 +981,635 @@ const MyLeavesPanel = ({
                   >
                     {!createLeaveMutation.isPending && "Apply Leave"}
                   </Button>
-                </div>
+                </Modal.Footer>
               </form>
-            </div>
+            </Modal>
           )}
 
-          {/* Edit leave form */}
+          {/* Edit leave request modal */}
           {editingLeave && (
-            <div className="bg-white rounded-2xl border border-blue-200 shadow-sm p-6">
-              <div className="flex items-center justify-between mb-4">
-                <h3 className="font-semibold text-slate-800">
+            <Modal isOpen onClose={() => setEditingLeave(null)}>
+              <Modal.Header onClose={() => setEditingLeave(null)}>
+                <h2 className="text-xl font-semibold text-slate-900">
                   Edit Leave Request
-                </h3>
-                <button
-                  onClick={() => setEditingLeave(null)}
-                  className="p-1 text-slate-400 hover:text-slate-600"
-                >
-                  <X className="w-5 h-5" />
-                </button>
-              </div>
-              <form
-                onSubmit={handleEditSubmit}
-                className="grid grid-cols-1 md:grid-cols-2 gap-4"
-              >
-                <div>
-                  <label className="block text-sm font-medium text-slate-700 mb-1">
-                    Type
-                  </label>
-                  <Dropdown
-                    options={LEAVE_TYPE_OPTIONS}
-                    value={editForm.leave_type}
-                    onChange={(e) =>
-                      setEditForm({
-                        ...editForm,
-                        leave_type: e,
-                        start_date: "",
-                        end_date: "",
-                      })
-                    }
-                  />
-                </div>
-                <div>
-                  <label className="block text-sm font-medium text-slate-700 mb-1">
-                    Reason
-                  </label>
-                  <input
-                    type="text"
-                    value={editForm.reason}
-                    onChange={(e) =>
-                      setEditForm({ ...editForm, reason: e.target.value })
-                    }
-                    className="w-full px-3 py-2 border border-slate-200 rounded-lg text-sm"
-                    placeholder="Reason for leave (required)"
-                  />
-                </div>
-                {editForm.leave_type === "floater" ? (
-                  <FloaterDatePicker
-                    label="Floater Date"
-                    value={editForm.start_date}
-                    onChange={(e) =>
-                      setEditForm({
-                        ...editForm,
-                        start_date: e.target.value,
-                        end_date: e.target.value,
-                      })
-                    }
-                    required
-                  />
-                ) : (
-                  <>
-                    <div>
-                      <label className="block text-sm font-medium text-slate-700 mb-1">
-                        {editForm.leave_type === "first_half" ||
-                        editForm.leave_type === "second_half"
-                          ? "Date"
-                          : "Start Date"}
-                      </label>
-                      <DatePicker
-                        type="date"
-                        value={editForm.start_date}
-                        onChange={(e) => {
-                          const sDate = e.target.value;
-                          setEditForm((prev) => ({
-                            ...prev,
-                            start_date: sDate,
-                            end_date:
-                              prev.leave_type === "first_half" ||
-                              prev.leave_type === "second_half"
-                                ? sDate
-                                : prev.end_date,
-                          }));
-                        }}
-                        required
-                      />
-                    </div>
-                    {!(
-                      editForm.leave_type === "first_half" ||
-                      editForm.leave_type === "second_half"
-                    ) && (
-                      <div>
-                        <label className="block text-sm font-medium text-slate-700 mb-1">
-                          End Date
-                        </label>
-                        <DatePicker
-                          type="date"
-                          value={editForm.end_date}
-                          onChange={(e) =>
-                            setEditForm({
-                              ...editForm,
-                              end_date: e.target.value,
-                            })
-                          }
-                          required
-                        />
-                      </div>
-                    )}
-                    <DateRangeSummary
-                      startDate={editForm.start_date}
-                      endDate={
-                        editForm.leave_type === "first_half" ||
-                        editForm.leave_type === "second_half"
-                          ? editForm.start_date
-                          : editForm.end_date
-                      }
-                      isHalfDay={
-                        editForm.leave_type === "first_half" ||
-                        editForm.leave_type === "second_half"
-                      }
-                    />
-                  </>
-                )}
-                {(editForm.leave_type === "first_half" ||
-                  editForm.leave_type === "second_half") && (
-                  <div className="md:col-span-2 rounded-xl border border-indigo-150 bg-indigo-50/50 p-4 text-sm text-indigo-900 space-y-2">
-                    <div className="flex items-center gap-1.5 font-semibold text-indigo-950">
-                      <Clock className="w-4 h-4 text-indigo-600" /> Half-day
-                      Leave Policy & Slots
-                    </div>
-                    <div className="grid grid-cols-1 sm:grid-cols-2 gap-3 text-xs">
-                      <div className="p-2.5 bg-white rounded-lg border border-indigo-100/80">
-                        <p className="font-semibold text-indigo-950">
-                          First Half-day Leave
-                        </p>
-                        <p className="text-slate-600 mt-0.5">
-                          🕒 Slot: 9:00 AM – 2:00 PM
-                        </p>
-                        <p className="text-slate-500 mt-1 font-medium italic">
-                          ⚠️ Apply at least one day in advance.
-                        </p>
-                      </div>
-                      <div className="p-2.5 bg-white rounded-lg border border-indigo-100/80">
-                        <p className="font-semibold text-indigo-950">
-                          Second Half-day Leave
-                        </p>
-                        <p className="text-slate-600 mt-0.5">
-                          🕒 Slot: 2:00 PM – 7:00 PM
-                        </p>
-                        <p className="text-slate-500 mt-1 font-medium italic">
-                          ⚠️ Apply before 2:00 PM on the same day.
-                        </p>
-                      </div>
-                    </div>
-                  </div>
-                )}
-                <div className="md:col-span-2">
-                  <label className="flex items-start gap-2 cursor-pointer mt-2">
-                    <input
-                      type="checkbox"
-                      checked={editForm.is_emergency}
+                </h2>
+              </Modal.Header>
+              <form onSubmit={handleEditSubmit} className="flex-1 flex flex-col min-h-0">
+                <Modal.Body className="space-y-4">
+                  <div>
+                    <label className="block text-sm font-medium text-slate-700 mb-1">
+                      Leave Type <span className="text-red-500">*</span>
+                    </label>
+                    <Dropdown
+                      options={LEAVE_TYPE_OPTIONS}
+                      value={editForm.leave_type}
                       onChange={(e) =>
                         setEditForm({
                           ...editForm,
-                          is_emergency: e.target.checked,
+                          leave_type: e,
+                          start_date: "",
+                          end_date: "",
                         })
                       }
-                      className="mt-1 h-4 w-4 text-indigo-600 rounded border-slate-300 focus:ring-indigo-500"
                     />
-                    <div>
-                      <span className="text-sm font-medium text-slate-700">Emergency Leave</span>
-                      <p className="text-xs text-slate-500">
-                        Check this if this is an emergency. Emergency leave will be flagged with a red dot on the leave page for managers.
+                  </div>
+                  <div>
+                    {editForm.leave_type === "floater" ? (
+                      <FloaterDatePicker
+                        label="Floater Date"
+                        value={editForm.start_date}
+                        onChange={(e) =>
+                          setEditForm({
+                            ...editForm,
+                            start_date: e.target.value,
+                            end_date: e.target.value,
+                          })
+                        }
+                        required
+                      />
+                    ) : (
+                      <>
+                        {editForm.leave_type === "first_half" ||
+                          editForm.leave_type === "second_half" ? (
+                          <div>
+                            <label className="block text-sm font-medium text-slate-700 mb-1">
+                              Date <span className="text-red-500">*</span>
+                            </label>
+                            <DatePicker
+                              type="date"
+                              minDate={editForm.is_emergency ? undefined : format(new Date(), "yyyy-MM-dd")}
+                              value={editForm.start_date}
+                              onChange={(e) => {
+                                const sDate = e.target.value;
+                                setEditForm((prev) => ({
+                                  ...prev,
+                                  start_date: sDate,
+                                  end_date: sDate,
+                                }));
+                              }}
+                              required
+                            />
+                          </div>
+                        ) : (
+                          <div>
+                            <label className="block text-sm font-medium text-slate-700 mb-1">
+                              Leave Duration (Start & End Date) <span className="text-red-500">*</span>
+                            </label>
+                            <DatePicker
+                              type="range"
+                              minDate={editForm.is_emergency ? undefined : format(new Date(), "yyyy-MM-dd")}
+                              startDate={editForm.start_date}
+                              endDate={editForm.end_date}
+                              onRangeChange={({ startDate, endDate }) => {
+                                setEditForm((prev) => ({
+                                  ...prev,
+                                  start_date: startDate,
+                                  end_date: endDate,
+                                }));
+                              }}
+                              placeholder="Click to select start and end dates from calendar"
+                              required
+                            />
+                          </div>
+                        )}
+                        <DateRangeSummary
+                          startDate={editForm.start_date}
+                          endDate={
+                            editForm.leave_type === "first_half" ||
+                              editForm.leave_type === "second_half"
+                              ? editForm.start_date
+                              : editForm.end_date
+                          }
+                          isHalfDay={
+                            editForm.leave_type === "first_half" ||
+                            editForm.leave_type === "second_half"
+                          }
+                        />
+                      </>
+                    )}
+                  </div>
+                  <div>
+                    <label className="block text-sm font-medium text-slate-700 mb-1">
+                      Reason <span className="text-red-500">*</span>
+                    </label>
+                    <textarea
+                      rows={3}
+                      value={editForm.reason}
+                      onChange={(e) =>
+                        setEditForm({ ...editForm, reason: e.target.value })
+                      }
+                      className="w-full rounded-xl border border-slate-200 p-3 text-sm resize-none focus:outline-none focus:ring-2 focus:ring-indigo-500 focus:border-transparent"
+                      placeholder="Reason for leave (required)"
+                      required
+                    />
+                  </div>
+                  {(editForm.leave_type === "first_half" ||
+                    editForm.leave_type === "second_half") && (
+                <div className="rounded-xl border border-indigo-150 bg-indigo-50/50 p-4 text-sm text-indigo-900 space-y-2">
+                  <div className="flex items-center gap-1.5 font-semibold text-indigo-950">
+                    <Clock className="w-4 h-4 text-indigo-600" /> Half-day
+                    Leave Policy & Slots
+                  </div>
+                  <div className="grid grid-cols-1 sm:grid-cols-2 gap-3 text-xs">
+                    <div className="p-2.5 bg-white rounded-lg border border-indigo-100/80">
+                      <p className="font-semibold text-indigo-950">
+                        First Half-day Leave
+                      </p>
+                      <p className="text-slate-600 mt-0.5">
+                        🕒 Slot: 9:00 AM – 2:00 PM
+                      </p>
+                      <p className="text-slate-500 mt-1 font-medium italic">
+                        ⚠️ Apply at least one day in advance.
                       </p>
                     </div>
-                  </label>
-                </div>
-                <div className="md:col-span-2 rounded-lg border border-blue-100 bg-blue-50 px-3 py-2 text-sm text-blue-700">
-                  Editing will reset the approval status back to{" "}
-                  <strong>pending</strong> so your manager can re-review.
-                </div>
-                <div className="md:col-span-2 flex justify-end gap-2">
-                  <Button
-                    type="button"
-                    variant="cancel"
-                    onClick={() => setEditingLeave(null)}
-                  >
-                    Cancel
-                  </Button>
-                  <Button
-                    type="submit"
-                    variant="blue"
-                    disabled={updateLeaveMutation.isPending}
-                    isLoading={updateLeaveMutation.isPending}
-                  >
-                    {!updateLeaveMutation.isPending && "Save Changes"}
-                  </Button>
-                </div>
-              </form>
-            </div>
-          )}
-
-          {isLoading ? (
-            <div className="text-center py-12 text-slate-400 animate-pulse">
-              Loading...
-            </div>
-          ) : allLeaves.length === 0 ? (
-            <div className="bg-white rounded-2xl border border-slate-200 p-12 text-center">
-              <Calendar className="w-12 h-12 text-slate-300 mx-auto mb-4" />
-              <p className="text-slate-500 font-medium">No leave records</p>
-              <p className="text-sm text-slate-400 mt-1">
-                Click "Request Leave" to submit a new request.
-              </p>
-            </div>
-          ) : (
-            <div className="space-y-3">
-              {allLeaves
-                .filter((leave) => leave.start_date && leave.end_date)
-                .map((leave) => {
-                  const status = leave.status || "pending";
-                  const modifiable = canModify(leave);
-                  const isEditing = editingLeave?.leave_id === leave.leave_id;
-                  return (
-                    <div
-                      key={leave.leave_id}
-                      className={`bg-white rounded-xl border shadow-sm p-4 transition-colors ${isEditing ? "border-blue-300" : "border-slate-200/60"}`}
-                    >
-                      <div className="flex items-center justify-between">
-                        <div className="flex items-center gap-4">
-                          <div
-                            className={`p-2 rounded-lg ${status === "approved" ? "bg-emerald-50" : status === "rejected" ? "bg-red-50" : "bg-amber-50"}`}
-                          >
-                            {status === "approved" && (
-                              <CheckCircle className="w-5 h-5 text-emerald-600" />
-                            )}
-                            {status === "rejected" && (
-                              <XCircle className="w-5 h-5 text-red-500" />
-                            )}
-                            {status === "pending" && (
-                              <Clock className="w-5 h-5 text-amber-600" />
-                            )}
-                          </div>
-                          <div>
-                            <div className="flex items-center gap-2">
-                              <p className="font-medium text-slate-800">
-                                {getLeaveTypeLabel(leave.leave_type)}
-                              </p>
-                              {leave.flagged && (
-                                <OverLimitHoverCard leave={leave} allLeaves={allLeaves} />
-                              )}
-                              {leave.is_emergency && (
-                                <span className="inline-flex items-center gap-1 px-2 py-0.5 rounded-full text-[10px] font-semibold bg-red-100 text-red-700 border border-red-200">
-                                  <span className="h-1.5 w-1.5 rounded-full bg-red-600"></span>
-                                  Emergency Leave
-                                </span>
-                              )}
-                            </div>
-                            <p className="text-xs text-slate-400">
-                              {leave.is_half_day ? (
-                                <>
-                                  {format(
-                                    parseISO(leave.start_date),
-                                    "MMM dd, yyyy",
-                                  )}{" "}
-                                  (0.5 day —{" "}
-                                  {leave.half_day_slot === "first_half"
-                                    ? "First Half"
-                                    : "Second Half"}
-                                  )
-                                </>
-                              ) : (
-                                <>
-                                  {format(parseISO(leave.start_date), "MMM dd")}{" "}
-                                  —{" "}
-                                  {format(
-                                    parseISO(leave.end_date),
-                                    "MMM dd, yyyy",
-                                  )}{" "}
-                                  (
-                                  {getWorkingDayCount(
-                                    leave.start_date,
-                                    leave.end_date,
-                                  )}{" "}
-                                  day
-                                  {getWorkingDayCount(
-                                    leave.start_date,
-                                    leave.end_date,
-                                  ) !== 1
-                                    ? "s"
-                                    : ""}
-                                  )
-                                </>
-                              )}
-                              {leave.reason && ` • ${leave.reason}`}
-                            </p>
-                            {leave.approval_remark && (
-                              <p className="text-xs text-slate-500 mt-0.5">
-                                Approval remark: {leave.approval_remark}
-                              </p>
-                            )}
-                          </div>
-                        </div>
-                        <div className="flex items-center gap-2">
-                          <span
-                            className={`px-2.5 py-0.5 rounded-full text-xs font-medium border capitalize ${STATUS_STYLES[status]}`}
-                          >
-                            {status}
-                          </span>
-                          {modifiable && (
-                            <>
-                              <button
-                                onClick={() =>
-                                  isEditing
-                                    ? setEditingLeave(null)
-                                    : handleEditOpen(leave)
-                                }
-                                className="p-1.5 rounded-lg text-slate-400 hover:bg-blue-50 hover:text-blue-600 transition-colors"
-                                title="Edit leave request"
-                              >
-                                <Pencil className="w-4 h-4" />
-                              </button>
-                              <button
-                                onClick={() => handleDelete(leave)}
-                                disabled={deleteLeaveMutation.isPending}
-                                className="p-1.5 rounded-lg text-slate-400 hover:bg-red-50 hover:text-red-500 transition-colors disabled:opacity-50"
-                                title="Delete leave request"
-                              >
-                                <Trash2 className="w-4 h-4" />
-                              </button>
-                            </>
-                          )}
-                        </div>
-                      </div>
-                    </div>
-                  );
-                })}
-            </div>
-          )}
-        </>
-      )}
-
-      {/* ── Calendar ── */}
-      {activeTab === "Calendar" && (
-        <LeaveCalendar filterEmployeeIds={myEmployeeIdSet} />
-      )}
-
-      {/* ── Work From Home ── */}
-      {activeTab === "Work From Home" && (
-        <>
-          {/* New WFH request form */}
-          {showWfhForm && (
-            <div className="bg-white rounded-2xl border border-slate-200 shadow-sm p-6">
-              <div className="flex items-center justify-between mb-4">
-                <h3 className="font-semibold text-slate-800">
-                  New WFH Request
-                </h3>
-                <button
-                  onClick={() => setShowWfhForm(false)}
-                  className="p-1 text-slate-400 hover:text-slate-600"
-                >
-                  <X className="w-5 h-5" />
-                </button>
-              </div>
-              <form
-                onSubmit={handleWfhSubmit}
-                className="grid grid-cols-1 md:grid-cols-2 gap-4"
-              >
-                <div>
-                  <label className="block text-sm font-medium text-slate-700 mb-1">
-                    Date
-                  </label>
-                  <DatePicker
-                    type="date"
-                    value={wfhForm.wfh_date}
-                    onChange={(e) =>
-                      setWfhForm({ ...wfhForm, wfh_date: e.target.value })
-                    }
-                    required
-                  />
-                </div>
-                <div className="md:col-span-2">
-                  <label className="block text-sm font-medium text-slate-700 mb-1">
-                    Reason
-                  </label>
-                  <input
-                    type="text"
-                    value={wfhForm.reason}
-                    onChange={(e) =>
-                      setWfhForm({ ...wfhForm, reason: e.target.value })
-                    }
-                    className="w-full px-3 py-2 border border-slate-200 rounded-lg text-sm"
-                    placeholder="Reason for WFH (required)"
-                  />
-                </div>
-                <div className="md:col-span-2 flex justify-end">
-                  <Button
-                    type="submit"
-                    className="bg-purple-600 hover:bg-purple-700"
-                    disabled={createWfhMutation.isPending}
-                    isLoading={createWfhMutation.isPending}
-                  >
-                    {!createWfhMutation.isPending && "Submit WFH Request"}
-                  </Button>
-                </div>
-              </form>
-            </div>
-          )}
-
-          {/* Edit WFH form */}
-          {editingWfh && (
-            <div className="bg-white rounded-2xl border border-blue-200 shadow-sm p-6">
-              <div className="flex items-center justify-between mb-4">
-                <h3 className="font-semibold text-slate-800">
-                  Edit WFH Request
-                </h3>
-                <button
-                  onClick={() => setEditingWfh(null)}
-                  className="p-1 text-slate-400 hover:text-slate-600"
-                >
-                  <X className="w-5 h-5" />
-                </button>
-              </div>
-              <form
-                onSubmit={handleWfhEditSubmit}
-                className="grid grid-cols-1 md:grid-cols-2 gap-4"
-              >
-                <div>
-                  <label className="block text-sm font-medium text-slate-700 mb-1">
-                    Date
-                  </label>
-                  <input
-                    type="date"
-                    value={editWfhForm.wfh_date}
-                    onChange={(e) =>
-                      setEditWfhForm({
-                        ...editWfhForm,
-                        wfh_date: e.target.value,
-                      })
-                    }
-                    className="w-full px-3 py-2 border border-slate-200 rounded-lg text-sm"
-                    required
-                  />
-                </div>
-                <div className="md:col-span-2">
-                  <label className="block text-sm font-medium text-slate-700 mb-1">
-                    Reason
-                  </label>
-                  <input
-                    type="text"
-                    value={editWfhForm.reason}
-                    onChange={(e) =>
-                      setEditWfhForm({ ...editWfhForm, reason: e.target.value })
-                    }
-                    className="w-full px-3 py-2 border border-slate-200 rounded-lg text-sm"
-                    placeholder="Reason for WFH (required)"
-                  />
-                </div>
-                <div className="md:col-span-2 rounded-lg border border-blue-100 bg-blue-50 px-3 py-2 text-sm text-blue-700">
-                  Editing will reset the approval status back to{" "}
-                  <strong>pending</strong> so your manager can re-review.
-                </div>
-                <div className="md:col-span-2 flex justify-end gap-2">
-                  <Button
-                    type="button"
-                    variant="cancel"
-                    onClick={() => setEditingWfh(null)}
-                  >
-                    Cancel
-                  </Button>
-                  <Button
-                    type="submit"
-                    variant="blue"
-                    disabled={updateWfhMutation.isPending}
-                    isLoading={updateWfhMutation.isPending}
-                  >
-                    {!updateWfhMutation.isPending && "Save Changes"}
-                  </Button>
-                </div>
-              </form>
-            </div>
-          )}
-
-          {myWfh.length === 0 ? (
-            <div className="bg-white rounded-2xl border border-slate-200 p-12 text-center">
-              <Home className="w-12 h-12 text-slate-300 mx-auto mb-4" />
-              <p className="text-slate-500 font-medium">No WFH requests</p>
-              <p className="text-sm text-slate-400 mt-1">
-                Click "Request WFH" to apply in advance.
-              </p>
-            </div>
-          ) : (
-            <div className="space-y-3">
-              {myWfh.map((w) => {
-                const status = w.status || "pending";
-                const modifiable = canModifyWfh(w);
-                const isEditing = editingWfh?.id === w.id;
-                return (
-                  <div
-                    key={w.id}
-                    className={`bg-white rounded-xl border shadow-sm p-4 flex items-center justify-between transition-colors ${isEditing ? "border-blue-300" : "border-slate-200/60"}`}
-                  >
-                    <div className="flex items-center gap-4">
-                      <div
-                        className={`p-2 rounded-lg ${status === "approved" ? "bg-purple-50" : status === "rejected" ? "bg-red-50" : "bg-amber-50"}`}
-                      >
-                        {status === "approved" && (
-                          <CheckCircle className="w-5 h-5 text-purple-600" />
-                        )}
-                        {status === "rejected" && (
-                          <XCircle className="w-5 h-5 text-red-500" />
-                        )}
-                        {status === "pending" && (
-                          <Clock className="w-5 h-5 text-amber-600" />
-                        )}
-                      </div>
-                      <div>
-                        <div className="flex items-center gap-2">
-                          <p className="font-medium text-slate-800">
-                            Work From Home
-                          </p>
-                          {w.flagged && (
-                            <div className="relative group flex items-center">
-                              <span className="inline-flex items-center justify-center h-4 w-4 rounded-full bg-orange-100 text-orange-600 border border-orange-200 cursor-help">
-                                <AlertTriangle className="w-2.5 h-2.5" />
-                              </span>
-                              <div className="absolute bottom-full left-1/2 -translate-x-1/2 mb-1 hidden group-hover:block px-2 py-1 bg-white text-slate-700 shadow border border-slate-100 text-xs rounded whitespace-nowrap z-50">
-                                Over limit
-                              </div>
-                            </div>
-                          )}
-                        </div>
-                        <p className="text-xs text-slate-400">
-                          {w.end_date && w.end_date !== w.wfh_date
-                            ? `${format(new Date(w.wfh_date + "T00:00:00"), "MMM dd")} — ${format(new Date(w.end_date + "T00:00:00"), "MMM dd, yyyy")}`
-                            : format(
-                                new Date(w.wfh_date + "T00:00:00"),
-                                "MMM dd, yyyy",
-                              )}
-                          {w.reason && ` • ${w.reason}`}
-                        </p>
-                        {w.remark && (
-                          <p className="text-xs text-slate-500 mt-0.5">
-                            Remark: {w.remark}
-                          </p>
-                        )}
-                      </div>
-                    </div>
-                    <div className="flex items-center gap-2">
-                      <span
-                        className={`px-2.5 py-0.5 rounded-full text-xs font-medium border capitalize ${STATUS_STYLES[status]}`}
-                      >
-                        {status}
-                      </span>
-                      {modifiable && (
-                        <>
-                          <button
-                            onClick={() =>
-                              isEditing
-                                ? setEditingWfh(null)
-                                : handleWfhEditOpen(w)
-                            }
-                            className="p-1.5 rounded-lg text-slate-400 hover:bg-blue-50 hover:text-blue-600 transition-colors"
-                            title="Edit WFH request"
-                          >
-                            <Pencil className="w-4 h-4" />
-                          </button>
-                          <button
-                            onClick={() => handleWfhDelete(w)}
-                            disabled={deleteWfhMutation.isPending}
-                            className="p-1.5 rounded-lg text-slate-400 hover:bg-red-50 hover:text-red-500 transition-colors disabled:opacity-50"
-                            title="Delete WFH request"
-                          >
-                            <Trash2 className="w-4 h-4" />
-                          </button>
-                        </>
-                      )}
+                    <div className="p-2.5 bg-white rounded-lg border border-indigo-100/80">
+                      <p className="font-semibold text-indigo-950">
+                        Second Half-day Leave
+                      </p>
+                      <p className="text-slate-600 mt-0.5">
+                        🕒 Slot: 2:00 PM – 7:00 PM
+                      </p>
+                      <p className="text-slate-500 mt-1 font-medium italic">
+                        ⚠️ Apply before 2:00 PM on the same day.
+                      </p>
                     </div>
                   </div>
-                );
-              })}
+                </div>
+              )}
+              <div>
+                <label className="flex items-start gap-2 cursor-pointer mt-2">
+                  <input
+                    type="checkbox"
+                    checked={editForm.is_emergency}
+                    onChange={(e) =>
+                      setEditForm({
+                        ...editForm,
+                        is_emergency: e.target.checked,
+                      })
+                    }
+                    className="mt-1 h-4 w-4 text-indigo-600 rounded border-slate-300 focus:ring-indigo-500"
+                  />
+                  <div>
+                    <span className="text-sm font-medium text-slate-700">Emergency Leave</span>
+                    <p className="text-xs text-slate-500">
+                      Check this if this is an emergency. Emergency leave will be flagged with a red dot on the leave page for managers.
+                    </p>
+                  </div>
+                </label>
+              </div>
+              <div className="rounded-lg border border-blue-100 bg-blue-50 px-3 py-2 text-sm text-blue-700">
+                Editing will reset the approval status back to{" "}
+                <strong>pending</strong> so your manager can re-review.
+              </div>
+            </Modal.Body>
+            <Modal.Footer>
+              <Button
+                type="button"
+                variant="cancel"
+                onClick={() => setEditingLeave(null)}
+              >
+                Cancel
+              </Button>
+              <Button
+                type="submit"
+                variant="blue"
+                disabled={updateLeaveMutation.isPending}
+                isLoading={updateLeaveMutation.isPending}
+              >
+                {!updateLeaveMutation.isPending && "Save Changes"}
+              </Button>
+            </Modal.Footer>
+          </form>
+    </Modal>
+  )
+}
+
+{
+  isLoading ? (
+    <div className="text-center py-12 text-slate-400 animate-pulse">
+      Loading...
+    </div>
+  ) : allLeaves.length === 0 ? (
+    <div className="bg-white rounded-2xl border border-slate-200 p-12 text-center">
+      <Calendar className="w-12 h-12 text-slate-300 mx-auto mb-4" />
+      <p className="text-slate-500 font-medium">No leave records</p>
+      <p className="text-sm text-slate-400 mt-1">
+        Click "Request Leave" to submit a new request.
+      </p>
+    </div>
+  ) : (
+    <div className="space-y-3">
+      {allLeaves
+        .filter((leave) => leave.start_date && leave.end_date)
+        .map((leave) => {
+          const status = leave.status || "pending";
+          const modifiable = canModify(leave);
+          const isEditing = editingLeave?.leave_id === leave.leave_id;
+          return (
+            <div
+              key={leave.leave_id}
+              className={`bg-white rounded-xl border shadow-sm p-4 transition-colors ${isEditing ? "border-blue-300" : "border-slate-200/60"}`}
+            >
+              <div className="flex items-center justify-between">
+                <div className="flex items-center gap-4">
+                  <div
+                    className={`p-2 rounded-lg ${status === "approved" ? "bg-emerald-50" : status === "rejected" ? "bg-red-50" : "bg-amber-50"}`}
+                  >
+                    {status === "approved" && (
+                      <CheckCircle className="w-5 h-5 text-emerald-600" />
+                    )}
+                    {status === "rejected" && (
+                      <XCircle className="w-5 h-5 text-red-500" />
+                    )}
+                    {status === "pending" && (
+                      <Clock className="w-5 h-5 text-amber-600" />
+                    )}
+                  </div>
+                  <div>
+                    <div className="flex items-center gap-2">
+                      <p className="font-medium text-slate-800">
+                        {getLeaveTypeLabel(leave.leave_type)}
+                      </p>
+                      {leave.flagged && (
+                        <OverLimitHoverCard leave={leave} allLeaves={leaves} />
+                      )}
+                      {leave.is_emergency && (
+                        <span className="inline-flex items-center gap-1 px-2 py-0.5 rounded-full text-[10px] font-semibold bg-red-100 text-red-700 border border-red-200">
+                          <span className="h-1.5 w-1.5 rounded-full bg-red-600"></span>
+                          Emergency Leave
+                        </span>
+                      )}
+                    </div>
+                    <p className="text-xs text-slate-400">
+                      {leave.is_half_day ? (
+                        <>
+                          {format(
+                            parseISO(leave.start_date),
+                            "MMM dd, yyyy",
+                          )}{" "}
+                          (0.5 day —{" "}
+                          {leave.half_day_slot === "first_half"
+                            ? "First Half"
+                            : "Second Half"}
+                          )
+                        </>
+                      ) : (
+                        <>
+                          {format(parseISO(leave.start_date), "MMM dd")}{" "}
+                          —{" "}
+                          {format(
+                            parseISO(leave.end_date),
+                            "MMM dd, yyyy",
+                          )}{" "}
+                          (
+                          {getWorkingDayCount(
+                            leave.start_date,
+                            leave.end_date,
+                          )}{" "}
+                          day
+                          {getWorkingDayCount(
+                            leave.start_date,
+                            leave.end_date,
+                          ) !== 1
+                            ? "s"
+                            : ""}
+                          )
+                        </>
+                      )}
+                      {leave.reason && ` • ${leave.reason}`}
+                    </p>
+                    {leave.approval_remark && (
+                      <p className="text-xs text-slate-500 mt-0.5">
+                        Approval remark: {leave.approval_remark}
+                      </p>
+                    )}
+                  </div>
+                </div>
+                <div className="flex items-center gap-2">
+                  <span
+                    className={`px-2.5 py-0.5 rounded-full text-xs font-medium border capitalize ${STATUS_STYLES[status]}`}
+                  >
+                    {status}
+                  </span>
+                  {modifiable && (
+                    <>
+                      <button
+                        onClick={() =>
+                          isEditing
+                            ? setEditingLeave(null)
+                            : handleEditOpen(leave)
+                        }
+                        className="p-1.5 rounded-lg text-slate-400 hover:bg-blue-50 hover:text-blue-600 transition-colors"
+                        title="Edit leave request"
+                      >
+                        <Pencil className="w-4 h-4" />
+                      </button>
+                      <button
+                        onClick={() => handleDelete(leave)}
+                        disabled={deleteLeaveMutation.isPending}
+                        className="p-1.5 rounded-lg text-slate-400 hover:bg-red-50 hover:text-red-500 transition-colors disabled:opacity-50"
+                        title="Delete leave request"
+                      >
+                        <Trash2 className="w-4 h-4" />
+                      </button>
+                    </>
+                  )}
+                </div>
+              </div>
             </div>
-          )}
+          );
+        })}
+    </div>
+  )
+}
         </>
       )}
-      {deleteTarget && (
-        <ConfirmDialog
-          isOpen={!!deleteTarget}
-          onClose={() => setDeleteTarget(null)}
-          onConfirm={() => {
-            if (deleteTarget) {
-              deleteLeaveMutation.mutate(deleteTarget.leave_id, {
-                onSuccess: () => setDeleteTarget(null),
-              });
-            }
-          }}
-          isPending={deleteLeaveMutation.isPending}
-          title="Delete Leave Request"
-          message={`Are you sure you want to delete this ${getLeaveTypeLabel(deleteTarget.leave_type)} request (${deleteTarget.start_date} — ${deleteTarget.end_date})?`}
-          variant="danger"
-          confirmText="Delete"
-        />
+
+{/* ── Calendar ── */ }
+{
+  activeTab === "Calendar" && (
+    <LeaveCalendar filterEmployeeIds={myEmployeeIdSet} />
+  )
+}
+
+{/* ── Work From Home ── */ }
+{
+  activeTab === "Work From Home" && (
+    <>
+      {/* New WFH request modal */}
+      {showWfhForm && (
+        <Modal isOpen onClose={() => setShowWfhForm(false)}>
+          <Modal.Header onClose={() => setShowWfhForm(false)}>
+            <h2 className="text-xl font-semibold text-slate-900">
+              Request WFH
+            </h2>
+          </Modal.Header>
+          <form
+            onSubmit={handleWfhSubmit}
+            className="flex-1 flex flex-col min-h-0"
+          >
+            <Modal.Body className="space-y-4">
+              <div>
+                <label className="block text-sm font-medium text-slate-700 mb-1">
+                  Date <span className="text-red-500">*</span>
+                </label>
+                <DatePicker
+                  type="date"
+                  accentColor="purple"
+                  minDate={format(new Date(), "yyyy-MM-dd")}
+                  value={wfhForm.wfh_date}
+                  onChange={(e) =>
+                    setWfhForm({ ...wfhForm, wfh_date: e.target.value })
+                  }
+                  required
+                />
+              </div>
+              <div>
+                <label className="block text-sm font-medium text-slate-700 mb-1">
+                  Reason <span className="text-red-500">*</span>
+                </label>
+                <textarea
+                  rows={3}
+                  value={wfhForm.reason}
+                  onChange={(e) =>
+                    setWfhForm({ ...wfhForm, reason: e.target.value })
+                  }
+                  className="w-full rounded-xl border border-slate-200 p-3 text-sm resize-none focus:outline-none focus:ring-2 focus:ring-purple-500 focus:border-transparent"
+                  placeholder="Reason for WFH (required)"
+                  required
+                />
+              </div>
+            </Modal.Body>
+            <Modal.Footer>
+              <Button
+                type="button"
+                variant="cancel"
+                onClick={() => setShowWfhForm(false)}
+              >
+                Cancel
+              </Button>
+              <Button
+                type="submit"
+                className="bg-purple-600 hover:bg-purple-700 text-white"
+                disabled={createWfhMutation.isPending}
+                isLoading={createWfhMutation.isPending}
+              >
+                {!createWfhMutation.isPending && "Submit WFH Request"}
+              </Button>
+            </Modal.Footer>
+          </form>
+        </Modal>
       )}
-      <ConfirmDialog
-        isOpen={wfhDeleteConfirm !== null}
-        onClose={() => setWfhDeleteConfirm(null)}
-        onConfirm={() => {
-          deleteWfhMutation.mutate(wfhDeleteConfirm.id);
-          setWfhDeleteConfirm(null);
-        }}
-        title="Delete WFH Request"
-        message={`Delete WFH request for ${wfhDeleteConfirm?.wfh_date}?`}
-        variant="danger"
-        confirmText="Delete"
-        isPending={deleteWfhMutation.isPending}
-      />
-    </div>
+
+      {/* Edit WFH request modal */}
+      {editingWfh && (
+        <Modal isOpen onClose={() => setEditingWfh(null)}>
+          <Modal.Header onClose={() => setEditingWfh(null)}>
+            <h2 className="text-xl font-semibold text-slate-900">
+              Edit WFH Request
+            </h2>
+          </Modal.Header>
+          <form
+            onSubmit={handleWfhEditSubmit}
+            className="flex-1 flex flex-col min-h-0"
+          >
+            <Modal.Body className="space-y-4">
+              <div>
+                <label className="block text-sm font-medium text-slate-700 mb-1">
+                  Date <span className="text-red-500">*</span>
+                </label>
+                <DatePicker
+                  type="date"
+                  accentColor="purple"
+                  minDate={format(new Date(), "yyyy-MM-dd")}
+                  value={editWfhForm.wfh_date}
+                  onChange={(e) =>
+                    setEditWfhForm({
+                      ...editWfhForm,
+                      wfh_date: e.target.value,
+                    })
+                  }
+                  required
+                />
+              </div>
+              <div>
+                <label className="block text-sm font-medium text-slate-700 mb-1">
+                  Reason <span className="text-red-500">*</span>
+                </label>
+                <textarea
+                  rows={3}
+                  value={editWfhForm.reason}
+                  onChange={(e) =>
+                    setEditWfhForm({ ...editWfhForm, reason: e.target.value })
+                  }
+                  className="w-full rounded-xl border border-slate-200 p-3 text-sm resize-none focus:outline-none focus:ring-2 focus:ring-indigo-500 focus:border-transparent"
+                  placeholder="Reason for WFH (required)"
+                  required
+                />
+              </div>
+              <div className="rounded-lg border border-blue-100 bg-blue-50 px-3 py-2 text-sm text-blue-700">
+                Editing will reset the approval status back to{" "}
+                <strong>pending</strong> so your manager can re-review.
+              </div>
+            </Modal.Body>
+            <Modal.Footer>
+              <Button
+                type="button"
+                variant="cancel"
+                onClick={() => setEditingWfh(null)}
+              >
+                Cancel
+              </Button>
+              <Button
+                type="submit"
+                variant="blue"
+                disabled={updateWfhMutation.isPending}
+                isLoading={updateWfhMutation.isPending}
+              >
+                {!updateWfhMutation.isPending && "Save Changes"}
+              </Button>
+            </Modal.Footer>
+          </form>
+        </Modal>
+      )}
+
+      {myWfh.length === 0 ? (
+        <div className="bg-white rounded-2xl border border-slate-200 p-12 text-center">
+          <Home className="w-12 h-12 text-slate-300 mx-auto mb-4" />
+          <p className="text-slate-500 font-medium">No WFH requests</p>
+          <p className="text-sm text-slate-400 mt-1">
+            Click "Request WFH" to apply in advance.
+          </p>
+        </div>
+      ) : (
+        <div className="space-y-3">
+          {myWfh.map((w) => {
+            const status = w.status || "pending";
+            const modifiable = canModifyWfh(w);
+            const isEditing = editingWfh?.id === w.id;
+            return (
+              <div
+                key={w.id}
+                className={`bg-white rounded-xl border shadow-sm p-4 flex items-center justify-between transition-colors ${isEditing ? "border-blue-300" : "border-slate-200/60"}`}
+              >
+                <div className="flex items-center gap-4">
+                  <div
+                    className={`p-2 rounded-lg ${status === "approved" ? "bg-purple-50" : status === "rejected" ? "bg-red-50" : "bg-amber-50"}`}
+                  >
+                    {status === "approved" && (
+                      <CheckCircle className="w-5 h-5 text-purple-600" />
+                    )}
+                    {status === "rejected" && (
+                      <XCircle className="w-5 h-5 text-red-500" />
+                    )}
+                    {status === "pending" && (
+                      <Clock className="w-5 h-5 text-amber-600" />
+                    )}
+                  </div>
+                  <div>
+                    <div className="flex items-center gap-2">
+                      <p className="font-medium text-slate-800">
+                        Work From Home
+                      </p>
+                      {w.flagged && (
+                        <div className="relative group flex items-center">
+                          <span className="inline-flex items-center justify-center h-4 w-4 rounded-full bg-orange-100 text-orange-600 border border-orange-200 cursor-help">
+                            <AlertTriangle className="w-2.5 h-2.5" />
+                          </span>
+                          <div className="absolute bottom-full left-1/2 -translate-x-1/2 mb-1 hidden group-hover:block px-2 py-1 bg-white text-slate-700 shadow border border-slate-100 text-xs rounded whitespace-nowrap z-50">
+                            Over limit
+                          </div>
+                        </div>
+                      )}
+                    </div>
+                    <p className="text-xs text-slate-400">
+                      {w.end_date && w.end_date !== w.wfh_date
+                        ? `${format(new Date(w.wfh_date + "T00:00:00"), "MMM dd")} — ${format(new Date(w.end_date + "T00:00:00"), "MMM dd, yyyy")}`
+                        : format(
+                          new Date(w.wfh_date + "T00:00:00"),
+                          "MMM dd, yyyy",
+                        )}
+                      {w.reason && ` • ${w.reason}`}
+                    </p>
+                    {w.remark && (
+                      <p className="text-xs text-slate-500 mt-0.5">
+                        Remark: {w.remark}
+                      </p>
+                    )}
+                  </div>
+                </div>
+                <div className="flex items-center gap-2">
+                  <span
+                    className={`px-2.5 py-0.5 rounded-full text-xs font-medium border capitalize ${STATUS_STYLES[status]}`}
+                  >
+                    {status}
+                  </span>
+                  {modifiable && (
+                    <>
+                      <button
+                        onClick={() =>
+                          isEditing
+                            ? setEditingWfh(null)
+                            : handleWfhEditOpen(w)
+                        }
+                        className="p-1.5 rounded-lg text-slate-400 hover:bg-blue-50 hover:text-blue-600 transition-colors"
+                        title="Edit WFH request"
+                      >
+                        <Pencil className="w-4 h-4" />
+                      </button>
+                      <button
+                        onClick={() => handleWfhDelete(w)}
+                        disabled={deleteWfhMutation.isPending}
+                        className="p-1.5 rounded-lg text-slate-400 hover:bg-red-50 hover:text-red-500 transition-colors disabled:opacity-50"
+                        title="Delete WFH request"
+                      >
+                        <Trash2 className="w-4 h-4" />
+                      </button>
+                    </>
+                  )}
+                </div>
+              </div>
+            );
+          })}
+        </div>
+      )}
+    </>
+  )
+}
+{
+  deleteTarget && (
+    <ConfirmDialog
+      isOpen={!!deleteTarget}
+      onClose={() => setDeleteTarget(null)}
+      onConfirm={() => {
+        if (deleteTarget) {
+          deleteLeaveMutation.mutate(deleteTarget.leave_id, {
+            onSuccess: () => setDeleteTarget(null),
+          });
+        }
+      }}
+      isPending={deleteLeaveMutation.isPending}
+      title="Delete Leave Request"
+      message={`Are you sure you want to delete this ${getLeaveTypeLabel(deleteTarget.leave_type)} request (${deleteTarget.start_date} — ${deleteTarget.end_date})?`}
+      variant="danger"
+      confirmText="Delete"
+    />
+  )
+}
+<ConfirmDialog
+  isOpen={wfhDeleteConfirm !== null}
+  onClose={() => setWfhDeleteConfirm(null)}
+  onConfirm={() => {
+    deleteWfhMutation.mutate(wfhDeleteConfirm.id);
+    setWfhDeleteConfirm(null);
+  }}
+  title="Delete WFH Request"
+  message={`Delete WFH request for ${wfhDeleteConfirm?.wfh_date}?`}
+  variant="danger"
+  confirmText="Delete"
+  isPending={deleteWfhMutation.isPending}
+/>
+    </div >
   );
 };
 

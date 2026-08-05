@@ -336,17 +336,11 @@ export function recordLeaveApplication(data) {
     const keysToSet = [];
     if (data.id) keysToSet.push(String(data.id));
     if (data.leave_id) keysToSet.push(String(data.leave_id));
-    if (sDate) {
-      if (empId) keysToSet.push(`${empId}_${sDate}_${eDate}`);
-      keysToSet.push(`${sDate}_${eDate}`);
-      keysToSet.push(sDate);
-    }
+    if (empId && sDate) keysToSet.push(`${empId}_${sDate}_${eDate}`);
 
     keysToSet.forEach((key) => {
-      if (key && !memoryAppliedMap.has(key)) {
+      if (key) {
         memoryAppliedMap.set(key, timestamp);
-      }
-      if (key && !map[key]) {
         map[key] = timestamp;
       }
     });
@@ -360,20 +354,23 @@ export function recordLeaveApplication(data) {
 export function resolveLeaveAppliedDate(leave) {
   if (!leave) return null;
 
-  // 1. Direct object properties from API (any casing / variations)
+  // 1. Return the ground-truth creation timestamp from the API / DB.
   const direct =
+    leave.created_at ||
     leave.applied_on ||
     leave.applied_at ||
-    leave.created_at ||
+    leave.createdAt ||
     leave.submitted_at ||
     leave.created_on ||
     leave.date_applied ||
     leave.appliedDate ||
-    leave.createdAt ||
     leave.submittedAt ||
     leave.date_created ||
     leave.creation_date;
-  if (direct) return direct;
+
+  if (direct) {
+    return direct;
+  }
 
   const sDate = (leave.start_date || "").slice(0, 10);
   const eDate = (leave.end_date || sDate).slice(0, 10);
@@ -383,8 +380,6 @@ export function resolveLeaveAppliedDate(leave) {
   const keysToCheck = [
     targetId,
     empId && sDate ? `${empId}_${sDate}_${eDate}` : null,
-    sDate ? `${sDate}_${eDate}` : null,
-    sDate ? sDate : null,
   ].filter(Boolean);
 
   // 2. Memory cache check
@@ -406,18 +401,11 @@ export function resolveLeaveAppliedDate(leave) {
         }
       }
     }
-  } catch (e) {}
+  } catch (e) { }
 
-  // NOTE: a previous step here mined the browser's "autonex_change_logs_v3" key —
-  // the old client-side change log — for an applied-on timestamp. That log has been
-  // replaced by the server-side audit trail, so the key is never written anymore and
-  // reading it would only surface stale (originally mock) data.
-
-  // 4. Persistent Fallback for active leave records without backend timestamp
+  // 4. Fallback for leave records without backend timestamp: default to start_date
   if (sDate) {
-    const nowIso = new Date().toISOString();
-    recordLeaveApplication({ ...leave, created_at: nowIso });
-    return nowIso;
+    return sDate.includes("T") ? sDate : sDate + "T00:00:00";
   }
 
   return null;

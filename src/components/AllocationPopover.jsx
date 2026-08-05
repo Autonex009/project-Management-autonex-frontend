@@ -66,6 +66,16 @@ const Avatar = ({ name, src, muted }) => {
       </div>
     );
   }
+  if (src) {
+    return (
+      <img
+        src={src}
+        alt={name}
+        title={name}
+        className="w-9 h-9 rounded-full object-cover shadow-sm ring-2 ring-white shrink-0"
+      />
+    );
+  }
   return (
     <UserAvatar
       src={src}
@@ -373,9 +383,11 @@ const AllocationPopover = ({
                   // Name a stale row from the archived roster first, then the
                   // name the allocations payload carries, then its employee id
                   // — anything that identifies WHICH row to delete.
-                  const name = isStale
-                    ? former?.name || staleAllocationName(alloc)
-                    : emp.name;
+                  const name = formatDisplayName(
+                    isStale
+                      ? former?.name || staleAllocationName(alloc)
+                      : emp.name
+                  );
                   const formerDetail =
                     former?.email || former?.designation || former?.role;
                   const role =
@@ -391,8 +403,8 @@ const AllocationPopover = ({
                     <li
                       key={key}
                       className={`flex items-center gap-3 px-3 py-2 transition-colors ${isStale
-                          ? "bg-rose-50/60 hover:bg-rose-50"
-                          : "hover:bg-slate-50"
+                        ? "bg-rose-50/60 hover:bg-rose-50"
+                        : "hover:bg-slate-50"
                         }`}
                     >
                       <Avatar
@@ -404,8 +416,8 @@ const AllocationPopover = ({
                         <div className="flex items-center gap-1.5 min-w-0">
                           <span
                             className={`text-sm truncate ${isStale
-                                ? "font-medium text-rose-700"
-                                : "font-medium text-slate-800"
+                              ? "font-medium text-rose-700"
+                              : "font-medium text-slate-800"
                               }`}
                           >
                             {name}

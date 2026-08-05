@@ -13,6 +13,7 @@ import {
   Star,
   BarChart3,
   History,
+  Trophy,
 } from "lucide-react";
 
 // `roles`, when present, limits the item to those user roles. Omit it for items
@@ -32,5 +33,6 @@ export const navigation = [
   // Admin-only: the audit log spans payroll, salary and employee actions org-wide,
   // and the backend enforces the same restriction (see app/api/audit_logs.py).
   { name: "Audit Log", href: "/admin/change-log", icon: History, roles: ["admin"] },
+  { name: "Leaderboard", href: "/admin/leaderboard", icon: Trophy, roles: ["admin"] },
   { name: "Company Settings", href: "/admin/company-settings", icon: Settings },
 ];

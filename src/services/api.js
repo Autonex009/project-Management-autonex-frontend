@@ -104,23 +104,40 @@ export const analyticsApi = {
     api
       .get(`/analytics/project/${mainProjectId}`, { params })
       .then((res) => res.data),
-  getSummary: (range) =>
+  getSummary: (params) =>
     api
-      .get("/analytics/summary", { params: range ? { range } : {} })
+      .get("/analytics/summary", {
+        params: typeof params === "object" ? params : params ? { range: params } : {},
+      })
       .then((res) => res.data),
-  // Autonex-only KPIs + daily graph for a project. range = '1' | '7' | '30'
-  getAutonexProjectKpis: (subProjectId, range) =>
+  // Autonex-only KPIs + daily graph for a project. range = '1' | '7' | '30' | 'custom'
+  getAutonexProjectKpis: (subProjectId, params) =>
     api
-      .get(`/analytics/autonex/project/${subProjectId}`, { params: { range } })
+      .get(`/analytics/autonex/project/${subProjectId}`, {
+        params: typeof params === "object" ? params : params ? { range: params } : {},
+      })
       .then((res) => res.data),
-  // Autonex-only KPIs + daily graph across ALL mapped projects. range = '1' | '7' | '30'
-  getAutonexKpis: (range) =>
+  // Autonex-only KPIs + daily graph across ALL mapped projects. range = '1' | '7' | '30' | 'custom'
+  getAutonexKpis: (params) =>
     api
-      .get("/analytics/autonex/kpis", { params: { range } })
+      .get("/analytics/autonex/kpis", {
+        params: typeof params === "object" ? params : params ? { range: params } : {},
+      })
       .then((res) => res.data),
   // Dashboard: most active Autonex user + project (this month)
   getAutonexOverview: () =>
     api.get("/analytics/autonex/overview").then((res) => res.data),
+  // Admin leaderboard: rank team members by platform hours (range = 'month'|'week'|'day'|'custom')
+  getLeaderboard: (params) =>
+    api.get("/analytics/leaderboard", { params }).then((res) => res.data),
+  // Employee self-service: the signed-in user's own Encord hours/day (last N days),
+  // optionally scoped to their current sub-project (adds a per-day team average).
+  getMyEncordActivity: ({ days = 7, sub_project_id } = {}) =>
+    api
+      .get("/analytics/me/encord-activity", {
+        params: { days, ...(sub_project_id ? { sub_project_id } : {}) },
+      })
+      .then((res) => res.data),
   // Manual Encord pull (admin) — optional { date_from, date_to }
   runSync: (body) =>
     api.post("/encord/sync", body || {}).then((res) => res.data),

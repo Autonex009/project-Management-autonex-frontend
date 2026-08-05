@@ -1,14 +1,15 @@
-import React, { useMemo, useState } from "react";
+import React, { useMemo, useState, useRef} from "react";
 import { useQuery } from "@tanstack/react-query";
 
-import { allocationApi, authApi, employeeApi, leaveApi, perfEvalApi, subProjectApi, wfhApi } from "../../services/api";
+import { allocationApi, analyticsApi, authApi, employeeApi, leaveApi, perfEvalApi, subProjectApi, wfhApi } from "../../services/api";
 
 import { AlertCircle, Award, Briefcase, Calendar, Check, ChevronDown, Clock, FolderKanban, Star, TrendingUp, Trophy } from "lucide-react";
 
-import { differenceInMonths, differenceInYears, format, parseISO } from "date-fns";
+// import { differenceInMonths, differenceInYears, format, parseISO } from "date-fns";
 
 import { ANNUAL_LEAVE_QUOTA, INTERN_MONTHLY_PAID_QUOTA, getWorkingDayCount, isIntern } from "../../utils/leaveTypes";
 
+import { differenceInCalendarDays, differenceInMonths, differenceInYears, format, parseISO, startOfMonth } from "date-fns";
 /* ── Helper: Extract Initials from Name ─────────────────────── */
 function getNameInitials(name) {
   if (!name) return "EM";
@@ -195,12 +196,85 @@ const EmployeeDashboard = () => {
   );
   const currentAllocation = activeProjects[0];
 
-  const encordActivity = useMemo(() => {
-    if (!currentAllocation) return null;
+  const currentMonthLabel = useMemo(() => format(new Date(), "MMMM yyyy"), []);
+  const daysElapsedInMonth = useMemo(
+    () => differenceInCalendarDays(new Date(), startOfMonth(new Date())) + 1,
+    []
+  );
 
-    return currentAllocation.project?.encord_activity || {};
-  }, [currentAllocation]);
+  // Encord platform activity for THIS employee — current month, scoped to their
+  // current project. Served by /analytics/me/encord-activity (self-scoped), which
+  // resolves the signed-in user's Encord account via employees.encord_id.
 
+  const currentSubProjectId = currentAllocation?.project?.id;
+  const { data: encordActivity } = useQuery({
+    queryKey: ["my-encord-activity", employeeId, currentSubProjectId, currentMonthLabel],
+    queryFn: () =>
+      analyticsApi.getMyEncordActivity({
+        days: daysElapsedInMonth,
+        sub_project_id: currentSubProjectId,
+      }),
+    enabled: !!employeeId,
+  });
+
+  const totalDailyHours = encordActivity?.total_hours ?? 0;
+  const dailyData = encordActivity?.daily || [];
+
+  const activityStats = useMemo(() => {
+    if (!dailyData.length) {
+      return { avgHours: 0, avgTeamHours: 0, deltaPct: 0, activeDays: 0 };
+    }
+    const empSum = dailyData.reduce((s, d) => s + (d.employee_hours || 0), 0);
+    const teamSum = dailyData.reduce((s, d) => s + (d.team_avg_hours || 0), 0);
+    const activeDays = dailyData.filter((d) => (d.employee_hours || 0) > 0).length;
+    const avgHours = empSum / dailyData.length;
+    const avgTeamHours = teamSum / dailyData.length;
+    const deltaPct = avgTeamHours > 0 ? Math.round(((avgHours - avgTeamHours) / avgTeamHours) * 100) : 0;
+    return { avgHours: Math.round(avgHours * 10) / 10, avgTeamHours: Math.round(avgTeamHours * 10) / 10, deltaPct, activeDays };
+  }, [dailyData]);
+
+  const CHART_W = 640;
+  const CHART_H = 160;
+
+  const chartMax = useMemo(() => {
+    if (!dailyData.length) return 10;
+    const maxVal = Math.max(...dailyData.map((d) => Math.max(d.employee_hours || 0, d.team_avg_hours || 0)));
+    return Math.max(6, Math.ceil(maxVal / 2) * 2);
+  }, [dailyData]);
+
+  const chartGeometry = useMemo(() => {
+    const stepX = dailyData.length > 1 ? CHART_W / (dailyData.length - 1) : 0;
+    const toY = (v) => CHART_H - (Math.min(v || 0, chartMax) / chartMax) * CHART_H;
+    const points = dailyData.map((d, i) => ({
+      x: i * stepX,
+      yEmp: toY(d.employee_hours),
+      yTeam: toY(d.team_avg_hours),
+      date: d.date,
+      employee_hours: d.employee_hours,
+      team_avg_hours: d.team_avg_hours,
+    }));
+    const empLine = points.map((p) => `${p.x},${p.yEmp}`).join(" ");
+    const teamLine = points.map((p) => `${p.x},${p.yTeam}`).join(" ");
+    const areaFill = points.length
+      ? `0,${CHART_H} ${empLine} ${points[points.length - 1].x},${CHART_H}`
+      : "";
+    return { points, empLine, teamLine, areaFill, stepX };
+  }, [dailyData, chartMax]);
+
+  const [hoverIndex, setHoverIndex] = useState(null);
+  const svgRef = useRef(null);
+
+  const handleChartMouseMove = (e) => {
+    if (!chartGeometry.points.length || !svgRef.current) return;
+    const rect = svgRef.current.getBoundingClientRect();
+    const relX = ((e.clientX - rect.left) / rect.width) * CHART_W;
+    const idx = Math.round(relX / (chartGeometry.stepX || 1));
+    setHoverIndex(Math.min(Math.max(idx, 0), chartGeometry.points.length - 1));
+  };
+
+  const handleChartMouseLeave = () => setHoverIndex(null);
+
+  const hoverPoint = hoverIndex !== null ? chartGeometry.points[hoverIndex] : null;
 
   const pastProjects = useMemo(
     () => myProjects.filter((p) => p.project?.project_status !== "active"),
@@ -226,46 +300,39 @@ const EmployeeDashboard = () => {
     };
   }, [activeProjects, profile.jobTitle]);
 
-  // ── Previous Project Logs Data
+  // ── Employee Allocated Projects (Current + Previous) ──
   const previousProjects = useMemo(() => {
-    if (pastProjects.length > 0) {
-      return pastProjects.slice(0, 2).map((item, idx) => ({
+    if (myProjects.length > 0) {
+      return myProjects.map((item, idx) => ({
         id: item.id || idx,
         name: item.project?.name || "Project",
-        role: (item.role_tags || []).join(", ") || "Developer",
-        subtitle: item.project?.client || "Roles - Rated",
-        date: item.active_end_date
-          ? format(parseISO(item.active_end_date), "MMMM dd, yyyy")
-          : "July 13, 2024",
+        role:
+          (item.role_tags || []).join(", ") ||
+          profile.jobTitle ||
+          "Developer",
+
+        subtitle:
+          item.project?.project_status === "active"
+            ? "Current Project"
+            : "Completed Project",
+
+        date: item.active_start_date
+          ? format(parseISO(item.active_start_date), "dd MMM yyyy")
+          : "-",
+
+        status: item.project?.project_status,
+
         iconBg:
-          idx % 2 === 0
+          item.project?.project_status === "active"
             ? "bg-emerald-50 text-emerald-600 border border-emerald-100"
-            : "bg-teal-50 text-teal-600 border border-teal-100",
+            : "bg-slate-100 text-slate-600 border border-slate-200",
+
         symbol: (item.project?.name || "P")[0].toUpperCase(),
       }));
     }
 
-    return [
-      {
-        id: 1,
-        name: "Quantum App",
-        role: "Senior Developer",
-        subtitle: "Roles - Rated",
-        date: "July 13, 2024",
-        iconBg: "bg-emerald-50 text-emerald-600 border border-emerald-100",
-        symbol: "Q",
-      },
-      {
-        id: 2,
-        name: "Phoenix Platform",
-        role: "UI Dev",
-        subtitle: "Date - Rated",
-        date: "June 17, 2024",
-        iconBg: "bg-teal-50 text-teal-600 border border-teal-100",
-        symbol: "P",
-      },
-    ];
-  }, [pastProjects]);
+    return [];
+  }, [myProjects, profile.jobTitle]);
 
   // ── Leaves & WFH Calculations for Logged-In User (Full-time vs Intern vs Contract)
   const employeeType = employee?.employee_type || localUser.employee_type || "Full-time";
@@ -382,16 +449,15 @@ const EmployeeDashboard = () => {
     };
   }, [allLeaves, myWfh, internOrContractor, currentYear, currentMonth, todayStr]);
 
-  // Total daily hours calculation
-  const totalDailyHours = encordActivity?.total_hours ?? 0;
   return (
-    <div className="w-full max-w-7xl mx-auto space-y-5 p-2 sm:p-5 bg-slate-50/50 min-h-screen text-slate-800 font-sans">
-      {/* ── Top Profile Header (Clean, Subtle White Card) ── */}
-      <div className="bg-white rounded-3xl p-5 sm:p-6 border border-slate-200/80 shadow-sm">
+    // <div className="w-full max-w-7xl mx-auto space-y-3 p-2 sm:p-3.5 bg-slate-50/50 min-h-screen text-slate-800 font-sans">
+    <div className="w-full max-w-7xl mx-auto space-y-3 p-2 sm:p-3.5 bg-slate-50/50 min-h-full text-slate-800 font-sans">
+      {/* ── Top Profile Header ── */}
+      <div className="bg-white rounded-3xl p-4 border border-slate-200/80 shadow-sm">
 
-        <div className="flex flex-col sm:flex-row items-start sm:items-center justify-between gap-4">
+        <div className="flex flex-col sm:flex-row items-start sm:items-center justify-between gap-3">
 
-          <div className="flex items-center gap-4 sm:gap-5">
+          <div className="flex items-center gap-4">
 
             {/* Display Picture with Initials Fallback */}
             <div className="relative flex-shrink-0">
@@ -400,10 +466,10 @@ const EmployeeDashboard = () => {
                   src={profile.avatarUrl}
                   alt={profile.name}
                   onError={() => setImgError(true)}
-                  className="w-16 h-16 sm:w-20 sm:h-20 rounded-2xl object-cover border border-slate-200 shadow-xs"
+                  className="w-14 h-14 sm:w-16 sm:h-16 rounded-2xl object-cover border border-slate-200 shadow-xs"
                 />
               ) : (
-                <div className="w-16 h-16 sm:w-20 sm:h-20 rounded-2xl bg-emerald-50 text-emerald-700 border border-emerald-200 font-extrabold text-xl sm:text-2xl flex items-center justify-center shadow-xs uppercase tracking-wider">
+                <div className="w-14 h-14 sm:w-16 sm:h-16 rounded-2xl bg-emerald-50 text-emerald-700 border border-emerald-200 font-extrabold text-lg sm:text-xl flex items-center justify-center shadow-xs uppercase tracking-wider">
                   {profile.initials}
                 </div>
               )}
@@ -413,15 +479,15 @@ const EmployeeDashboard = () => {
             </div>
 
             {/* Profile Information */}
-            <div className="space-y-1">
-              <h1 className="text-xl sm:text-2xl font-bold tracking-tight text-slate-900">
+            <div className="space-y-0.5">
+              <h1 className="text-lg sm:text-xl font-bold tracking-tight text-slate-900">
                 {profile.name}
               </h1>
               <p className="text-slate-500 text-xs sm:text-sm font-medium flex items-center gap-1.5">
                 <Briefcase className="w-3.5 h-3.5 text-slate-400" />
                 {profile.jobTitle}
               </p>
-              <div className="flex flex-wrap items-center gap-3 pt-1 text-xs text-slate-400">
+              <div className="flex flex-wrap items-center gap-3 pt-0.5 text-xs text-slate-400">
                 <span className="flex items-center gap-1">
                   <Calendar className="w-3.5 h-3.5 text-slate-400" />
                   Joined {profile.joiningDate}
@@ -457,12 +523,12 @@ const EmployeeDashboard = () => {
       </div>
 
       {/* ── Main Dashboard 3-Column Grid ───────────────────────── */}
-      <div className="grid grid-cols-1 lg:grid-cols-12 gap-5">
+      <div className="grid grid-cols-1 lg:grid-cols-12 gap-3">
         {/* LEFT COLUMN (4 cols) */}
-        <div className="lg:col-span-4 space-y-5">
+        <div className="lg:col-span-4 space-y-3">
           {/* Current Project Card */}
-          <div className="bg-white rounded-3xl p-5 border border-slate-200/80 shadow-sm hover:shadow-md transition-all duration-300">
-            <div className="flex items-center justify-between mb-3">
+          <div className="bg-white rounded-3xl p-3.5 border border-slate-200/80 shadow-sm hover:shadow-md transition-all duration-300">
+            <div className="flex items-center justify-between mb-2.5">
               <div className="flex items-center gap-2">
                 <div className="w-8 h-8 rounded-xl bg-emerald-50 text-emerald-600 border border-emerald-100 flex items-center justify-center">
                   <FolderKanban className="w-4 h-4" />
@@ -474,9 +540,9 @@ const EmployeeDashboard = () => {
               </span>
             </div>
             <h4 className="text-base font-bold text-slate-900">{currentProject.name}</h4>
-            <p className="text-xs text-slate-500 mb-4">{currentProject.role}</p>
+            <p className="text-xs text-slate-500 mb-2.5">{currentProject.role}</p>
         
-            <div className="space-y-2">
+            <div className="space-y-1.5">
               <div className="flex justify-between text-xs font-bold">
                 <span className="text-slate-500">Progress</span>
                 <span className="text-emerald-700">{currentProject.progress}%</span>
@@ -493,21 +559,21 @@ const EmployeeDashboard = () => {
           
           </div>
 
-          {/* Previous Project Logs */}
-          <div className="bg-white rounded-3xl p-5 border border-slate-200/80 shadow-sm hover:shadow-md transition-all duration-300">
-            <h3 className="font-bold text-slate-800 text-sm mb-4 flex items-center gap-2">
+          {/* Project Logs */}
+          <div className="bg-white rounded-3xl p-3.5 border border-slate-200/80 shadow-sm hover:shadow-md transition-all duration-300">
+            <h3 className="font-bold text-slate-800 text-sm mb-2.5 flex items-center gap-2">
               <span className="w-2 h-2 rounded-full bg-teal-500" />
-              Previous Project Logs
+              Project Logs
             </h3>
-            <div className="space-y-3">
+            <div className="space-y-1.5">
               {previousProjects.map((item) => (
                 <div
                   key={item.id}
-                  className="flex items-center justify-between p-3 rounded-2xl hover:bg-slate-50 transition-colors border border-transparent"
+                  className="flex items-center justify-between p-2 rounded-2xl hover:bg-slate-50 transition-colors border border-transparent"
                 >
-                  <div className="flex items-center gap-3">
+                  <div className="flex items-center gap-2.5">
                     <div
-                      className={`w-10 h-10 rounded-xl ${item.iconBg} flex items-center justify-center font-bold text-base shadow-xs`}
+                      className={`w-9 h-9 rounded-xl ${item.iconBg} flex items-center justify-center font-bold text-sm shadow-xs`}
                     >
                       {item.symbol}
                     </div>
@@ -518,8 +584,19 @@ const EmployeeDashboard = () => {
                   </div>
 
                   <div className="text-right">
-                    <p className="text-[11px] text-slate-400 font-medium">{item.subtitle}</p>
-                    <p className="text-xs font-semibold text-slate-700 mt-0.5">{item.date}</p>
+                    <span
+                      className={`inline-flex items-center rounded-full px-2 py-1 text-[10px] font-semibold ${
+                        item.status === "active"
+                          ? "bg-emerald-50 text-emerald-700"
+                          : "bg-slate-100 text-slate-600"
+                      }`}
+                    >
+                      {item.status === "active" ? "Active" : "Completed"}
+                    </span>
+
+                    <p className="text-[11px] text-slate-400 mt-1">
+                      {item.date}
+                    </p>
                   </div>
 
                 </div>
@@ -528,26 +605,26 @@ const EmployeeDashboard = () => {
           </div>
 
           {/* Performance & Notifications */}
-          <div className="bg-white rounded-3xl p-5 border border-slate-200/80 shadow-sm hover:shadow-md transition-all duration-300">
-            <h3 className="font-bold text-slate-800 text-sm mb-4 flex items-center gap-2">
+          <div className="bg-white rounded-3xl p-3.5 border border-slate-200/80 shadow-sm hover:shadow-md transition-all duration-300">
+            <h3 className="font-bold text-slate-800 text-sm mb-2.5 flex items-center gap-2">
               <AlertCircle className="w-4 h-4 text-emerald-600" />
               Performance & Notifications
             </h3>
-            <div className="grid grid-cols-2 gap-3">
-              <div className="p-3.5 bg-slate-50/80 rounded-2xl border border-slate-100">
+            <div className="grid grid-cols-2 gap-2.5">
+              <div className="p-2.5 bg-slate-50/80 rounded-2xl border border-slate-100">
                 <p className="text-[10px] font-bold uppercase tracking-[0.14em] text-slate-400">
                   Warnings Given
                 </p>
-                <p className="text-2xl font-extrabold text-slate-800 mt-1">
+                <p className="text-2xl font-extrabold text-slate-800 mt-0.5">
                   {employee?.warnings_count ?? 0}
                 </p>
               </div>
 
-              <div className="p-3.5 bg-slate-50/80 rounded-2xl border border-slate-100">
+              <div className="p-2.5 bg-slate-50/80 rounded-2xl border border-slate-100">
                 <p className="text-[10px] font-bold uppercase tracking-[0.14em] text-slate-400">
                   Complaints
                 </p>
-                <p className="text-2xl font-extrabold text-slate-800 mt-1">
+                <p className="text-2xl font-extrabold text-slate-800 mt-0.5">
                   {employee?.complaints_count ?? 0}
                 </p>
               </div>
@@ -558,90 +635,181 @@ const EmployeeDashboard = () => {
         </div>
 
         {/* MIDDLE COLUMN (4 cols) */}
-        <div className="lg:col-span-4 space-y-5">
+        <div className="lg:col-span-4 space-y-3">
           {/* Encord Platform Activity */}
-          <div className="bg-white rounded-3xl p-5 border border-slate-200/80 shadow-sm hover:shadow-md transition-all duration-300">
-            <div className="flex items-center justify-between mb-4">
-              <div className="flex items-center gap-2">
-                <div className="w-8 h-8 rounded-xl bg-teal-50 text-teal-600 border border-teal-100 flex items-center justify-center">
-                  <TrendingUp className="w-4 h-4" />
+          <div className="bg-white rounded-3xl border border-slate-200 shadow-sm overflow-hidden">
+
+            {/* Header */}
+            <div className="flex items-center justify-between px-3.5 py-2.5 border-b border-slate-100">
+              <div className="flex items-center gap-2.5">
+                <div className="w-8 h-8 rounded-xl bg-emerald-50 flex items-center justify-center">
+                  <TrendingUp className="w-4 h-4 text-emerald-600" />
                 </div>
-                <h3 className="font-bold text-slate-800 text-sm">Encord Platform Activity</h3>
+                <div>
+                  <h3 className="text-sm font-bold text-slate-800">Encord Platform Activity</h3>
+                  <p className="text-xs text-slate-400">{currentMonthLabel}</p>
+                </div>
               </div>
-              <span className="text-xs font-bold text-emerald-700 bg-emerald-50 border border-emerald-200/60 px-2.5 py-1 rounded-xl">
-                {totalDailyHours}h Total
-              </span>
+
+              <div className="text-right">
+                <p className="text-lg font-bold text-emerald-600">{totalDailyHours}h</p>
+                <p className="text-[11px] text-slate-400">Total Hours</p>
+              </div>
             </div>
 
-            {/* Daily Hours Row */}
-            <div className="grid grid-cols-5 gap-1.5 mb-5">
-              {(encordActivity?.daily || []).map((item) => ({
-                  day: format(parseISO(item.date), "EEE")[0],
-                  hours: `${item.employee_hours}h`,
-              })).map((item, idx) => (
-                <div
-                  key={idx}
-                  className="bg-slate-50 border border-slate-100 rounded-2xl p-2 text-center"
+            {/* Quick stat chips */}
+            <div className="grid grid-cols-3 gap-2 px-3.5 pt-2.5">
+              <div className="rounded-2xl bg-slate-50/80 border border-slate-100 px-2.5 py-1.5 text-center">
+                <p className="text-[9px] font-bold uppercase tracking-[0.1em] text-slate-400">Daily Avg</p>
+                <p className="text-sm font-extrabold text-slate-800 mt-0.5">{activityStats.avgHours}h</p>
+              </div>
+
+              <div className="rounded-2xl bg-slate-50/80 border border-slate-100 px-2.5 py-1.5 text-center">
+                <p className="text-[9px] font-bold uppercase tracking-[0.1em] text-slate-400">Active Days</p>
+                <p className="text-sm font-extrabold text-slate-800 mt-0.5">{activityStats.activeDays}</p>
+              </div>
+
+              <div className="rounded-2xl bg-slate-50/80 border border-slate-100 px-2.5 py-1.5 text-center">
+                <p className="text-[9px] font-bold uppercase tracking-[0.1em] text-slate-400">Vs Team Avg</p>
+                <p
+                  className={`text-sm font-extrabold mt-0.5 ${
+                    activityStats.deltaPct >= 0 ? "text-emerald-600" : "text-rose-500"
+                  }`}
                 >
-                  <p className="text-[11px] font-semibold text-slate-400">{item.day}</p>
-                  <p className="text-xs font-bold text-slate-800 mt-0.5">{item.hours}</p>
-                </div>
-              ))}
+                  {activityStats.deltaPct >= 0 ? "+" : ""}
+                  {activityStats.deltaPct}%
+                </p>
+              </div>
             </div>
 
-            {/* Dual Bar Chart */}
-            <div className="relative pt-2 pb-1">
-              <div className="flex items-end justify-between h-44 border-b border-slate-200/80 px-2">
-                <div className="absolute left-0 top-0 bottom-6 flex flex-col justify-between text-[10px] text-slate-400 font-mono">
-                  <span>10</span>
-                  <span>8</span>
-                  <span>6</span>
-                  <span>4</span>
-                  <span>2</span>
-                  <span>0</span>
+            {/* Chart */}
+            <div className="px-3.5 py-3">
+              {dailyData.length === 0 ? (
+                <div className="h-28 flex items-center justify-center text-xs text-slate-400 bg-slate-50/60 rounded-2xl border border-slate-100">
+                  No activity recorded yet this month
                 </div>
-
-                <div className="ml-6 w-full flex justify-around items-end h-full pt-4">
-                  {(encordActivity?.daily || []).map((item) => ({
-                    label: format(parseISO(item.date), "EEE")[0],
-                    primary: item.employee_hours,
-                    secondary: item.team_avg_hours,
-                })).map((d, i) => (
-                    <div key={i} className="flex flex-col items-center gap-1.5 group cursor-pointer">
-                      <div className="flex items-end gap-1.5 h-36">
-                        <div
-                          className="w-3.5 bg-emerald-600 rounded-t-sm transition-all duration-300 group-hover:bg-emerald-700 relative shadow-xs"
-                          style={{ height: `${(d.primary / 10) * 100}%` }}
-                        >
-                          <span className="opacity-0 group-hover:opacity-100 transition-opacity absolute -top-6 left-1/2 -translate-x-1/2 text-[9px] bg-slate-900 text-white px-1.5 py-0.5 rounded font-bold shadow-md">
-                            {d.primary}h
-                          </span>
-                        </div>
-                        <div
-                          className="w-3.5 bg-teal-500 rounded-t-sm transition-all duration-300 group-hover:bg-teal-600 relative shadow-xs"
-                          style={{ height: `${(d.secondary / 10) * 100}%` }}
-                        >
-                          <span className="opacity-0 group-hover:opacity-100 transition-opacity absolute -top-6 left-1/2 -translate-x-1/2 text-[9px] bg-slate-900 text-white px-1.5 py-0.5 rounded font-bold shadow-md">
-                            {d.secondary}h
-                          </span>
-                        </div>
-                      </div>
-                      <span className="text-[11px] font-semibold text-slate-500">{d.label}</span>
+              ) : (
+                <div className="relative border border-slate-100 rounded-2xl bg-slate-50 p-2.5">
+                  <div className="flex">
+                    {/* Y-axis labels */}
+                    <div className="flex flex-col justify-between h-28 pr-2 text-[10px] text-slate-400 shrink-0">
+                      {[chartMax, chartMax * 0.75, chartMax * 0.5, chartMax * 0.25, 0].map((n, i) => (
+                        <span key={i}>{Math.round(n)}h</span>
+                      ))}
                     </div>
-                  ))}
+
+                    <div className="relative flex-1">
+                      <svg
+                        ref={svgRef}
+                        viewBox={`0 0 ${CHART_W} ${CHART_H}`}
+                        preserveAspectRatio="none"
+                        className="w-full h-28 cursor-crosshair"
+                        onMouseMove={handleChartMouseMove}
+                        onMouseLeave={handleChartMouseLeave}
+                      >
+                        <defs>
+                          <linearGradient id="employeeFill" x1="0" y1="0" x2="0" y2="1">
+                            <stop offset="0%" stopColor="rgb(16 185 129)" stopOpacity="0.28" />
+                            <stop offset="100%" stopColor="rgb(16 185 129)" stopOpacity="0" />
+                          </linearGradient>
+                        </defs>
+
+                        {/* Gridlines */}
+                        {[0, 1, 2, 3, 4].map((i) => (
+                          <line
+                            key={i}
+                            x1="0"
+                            x2={CHART_W}
+                            y1={(CHART_H / 4) * i}
+                            y2={(CHART_H / 4) * i}
+                            stroke="rgb(226 232 240)"
+                            strokeDasharray="4 4"
+                          />
+                        ))}
+
+                        {/* Crosshair */}
+                        {hoverPoint && (
+                          <line
+                            x1={hoverPoint.x}
+                            x2={hoverPoint.x}
+                            y1="0"
+                            y2={CHART_H}
+                            stroke="rgb(148 163 184)"
+                            strokeWidth="1"
+                            strokeDasharray="3 3"
+                          />
+                        )}
+
+                        <polygon points={chartGeometry.areaFill} fill="url(#employeeFill)" />
+                        <polyline points={chartGeometry.teamLine} fill="none" stroke="rgb(148 163 184)" strokeWidth="2" />
+                        <polyline points={chartGeometry.empLine} fill="none" stroke="rgb(16 185 129)" strokeWidth="2.5" />
+
+                        {hoverPoint && (
+                          <>
+                            <circle cx={hoverPoint.x} cy={hoverPoint.yTeam} r="3.5" fill="rgb(148 163 184)" />
+                            <circle cx={hoverPoint.x} cy={hoverPoint.yEmp} r="4.5" fill="rgb(16 185 129)" stroke="white" strokeWidth="2" />
+                          </>
+                        )}
+                      </svg>
+
+                      {/* Floating tooltip */}
+                      {hoverPoint && (
+                        <div
+                          className="absolute -top-2 bg-slate-900 text-white text-[11px] rounded-lg px-2.5 py-1.5 pointer-events-none shadow-lg whitespace-nowrap z-10"
+                          style={{
+                            left: `${(hoverPoint.x / CHART_W) * 100}%`,
+                            transform:
+                              hoverPoint.x / CHART_W > 0.85
+                                ? "translate(-100%, -100%)"
+                                : hoverPoint.x / CHART_W < 0.15
+                                ? "translate(0%, -100%)"
+                                : "translate(-50%, -100%)",
+                          }}
+                        >
+                          <p className="font-bold">{format(parseISO(hoverPoint.date), "EEE, d MMM")}</p>
+                          <p className="text-emerald-400">You: {hoverPoint.employee_hours}h</p>
+                          <p className="text-slate-300">Team avg: {hoverPoint.team_avg_hours}h</p>
+                        </div>
+                      )}
+
+                      {/* X-axis labels — sparse to avoid clutter across a full month */}
+                      <div className="flex justify-between mt-1 text-[9px] text-slate-400 font-semibold">
+                        {chartGeometry.points.map((p, i) => {
+                          const showLabel =
+                            i === 0 ||
+                            i === chartGeometry.points.length - 1 ||
+                            i % Math.ceil(chartGeometry.points.length / 6) === 0;
+                          return (
+                            <span key={i} style={{ visibility: showLabel ? "visible" : "hidden" }}>
+                              {format(parseISO(p.date), "d")}
+                            </span>
+                          );
+                        })}
+                      </div>
+                    </div>
+                  </div>
+                </div>
+              )}
+
+              {/* Legend */}
+              <div className="flex justify-center gap-6 mt-2.5 text-xs">
+                <div className="flex items-center gap-2">
+                  <span className="w-3 h-3 rounded bg-emerald-500" />
+                  <span className="text-slate-600">Your Hours</span>
+                </div>
+                <div className="flex items-center gap-2">
+                  <span className="w-3 h-3 rounded bg-slate-300" />
+                  <span className="text-slate-600">Team Average</span>
                 </div>
               </div>
-
-              <p className="text-[10px] text-slate-400 text-center mt-2 font-medium">
-                Hours vs Date
-              </p>
             </div>
+
           </div>
 
           {/* Manager Feedback */}
 
-          <div className="bg-white rounded-3xl p-5 border border-slate-200/80 shadow-sm">
-            <div className="flex items-center justify-between mb-4">
+          <div className="bg-white rounded-3xl p-3.5 border border-slate-200/80 shadow-sm">
+            <div className="flex items-center justify-between mb-2.5">
               <h3 className="font-bold text-slate-800 text-sm">
                 Manager Feedback
               </h3>
@@ -656,7 +824,7 @@ const EmployeeDashboard = () => {
 
             {latestPmReview ? (
               <>
-                <div className="mb-3">
+                <div className="mb-1.5">
                   <p className="text-xs text-slate-500">
                     {latestPmReview.period}
                   </p>
@@ -675,7 +843,7 @@ const EmployeeDashboard = () => {
                     {latestPmReview.overall_comment.length > 150 && (
                       <button
                         onClick={() => setShowFullFeedback((v) => !v)}
-                        className="mt-3 text-xs font-semibold text-emerald-600"
+                        className="mt-2 text-xs font-semibold text-emerald-600"
                       >
                         {showFullFeedback ? "Show Less" : "Read More"}
                       </button>
@@ -697,25 +865,25 @@ const EmployeeDashboard = () => {
         </div>
 
         {/* RIGHT COLUMN (4 cols) */}
-        <div className="lg:col-span-4 space-y-5">
+        <div className="lg:col-span-4 space-y-3">
 
           {/* Leaves & WFH Info (Tailored for Full-time vs Intern vs Contract) */}
-          <div className="bg-white rounded-3xl p-5 border border-slate-200/80 shadow-sm hover:shadow-md transition-all duration-300">
-            <div className="flex items-center justify-between mb-4">
+          <div className="bg-white rounded-3xl p-3.5 border border-slate-200/80 shadow-sm hover:shadow-md transition-all duration-300">
+            <div className="flex items-center justify-between mb-2.5">
               <h3 className="font-bold text-slate-800 text-sm">Leaves & WFH Info</h3>
               <span className="text-[11px] font-semibold text-emerald-700 bg-emerald-50 px-2 py-0.5 rounded-md border border-emerald-100">
                 {leavesAndWfhStats.isInternOrContractor ? "Intern/Contract Rules" : "Full-time Rules"}
               </span>
             </div>
 
-            <div className="grid grid-cols-3 gap-3">
+            <div className="grid grid-cols-3 gap-2">
 
               {/* Earned Leave */}
-              <div className="p-2.5 bg-slate-50/70 rounded-2xl border border-slate-100">
+              <div className="p-2 bg-slate-50/70 rounded-2xl border border-slate-100">
                 <p className="text-[10px] font-bold uppercase tracking-[0.14em] text-slate-400 mb-1 truncate">
                   {leavesAndWfhStats.isInternOrContractor ? "Earned (Mo)" : "Earned (Yr)"}
                 </p>
-                <p className="text-2xl font-extrabold text-slate-800">
+                <p className="text-xl font-extrabold text-slate-800">
                   {leavesAndWfhStats.paidRemaining}
                 </p>
 
@@ -724,7 +892,7 @@ const EmployeeDashboard = () => {
                   {leavesAndWfhStats.isInternOrContractor ? " this month" : ` in ${currentYear}`}
                 </p> 
 
-                <div className="mt-2 h-1.5 rounded-full bg-slate-200 overflow-hidden">
+                <div className="mt-1.5 h-1.5 rounded-full bg-slate-200 overflow-hidden">
                   <div
                     className="h-full bg-emerald-500 rounded-full transition-all duration-300"
                     style={{
@@ -736,12 +904,12 @@ const EmployeeDashboard = () => {
               </div>
 
               {/* Sick Leave */}
-              <div className="p-2.5 bg-slate-50/70 rounded-2xl border border-slate-100">
+              <div className="p-2 bg-slate-50/70 rounded-2xl border border-slate-100">
                 <p className="text-[10px] font-bold uppercase tracking-[0.14em] text-slate-400 mb-1 truncate">
                   Sick Leave
                 </p>
 
-                <p className="text-2xl font-extrabold text-slate-800">
+                <p className="text-xl font-extrabold text-slate-800">
                   {leavesAndWfhStats.isInternOrContractor
                     ? "-"
                     : leavesAndWfhStats.casualRemaining}
@@ -753,7 +921,7 @@ const EmployeeDashboard = () => {
                     : `${leavesAndWfhStats.casualUsed} used in ${currentYear}`}
                 </p>
 
-                <div className="mt-2 h-1.5 rounded-full bg-slate-200 overflow-hidden">
+                <div className="mt-1.5 h-1.5 rounded-full bg-slate-200 overflow-hidden">
                   <div
                     className="h-full bg-rose-500 rounded-full transition-all duration-300"
                     style={{
@@ -766,12 +934,12 @@ const EmployeeDashboard = () => {
               </div>
 
               {/* WFH Days */}
-              <div className="p-2.5 bg-slate-50/70 rounded-2xl border border-slate-100">
+              <div className="p-2 bg-slate-50/70 rounded-2xl border border-slate-100">
                 <p className="text-[10px] font-bold uppercase tracking-[0.14em] text-slate-400 mb-1 truncate">
                   {leavesAndWfhStats.isInternOrContractor ? "WFH (Mo)" : "WFH Days"}
                 </p>
 
-                <p className="text-2xl font-extrabold text-slate-800">
+                <p className="text-xl font-extrabold text-slate-800">
                   {leavesAndWfhStats.wfhRemaining}
                 </p>
 
@@ -782,7 +950,7 @@ const EmployeeDashboard = () => {
                     : ` of ${leavesAndWfhStats.wfhQuota}`}
                 </p>
 
-                <div className="mt-2 h-1.5 rounded-full bg-slate-200 overflow-hidden">
+                <div className="mt-1.5 h-1.5 rounded-full bg-slate-200 overflow-hidden">
                   <div
                     className="h-full bg-teal-600 rounded-full transition-all duration-300"
                     style={{
@@ -798,21 +966,21 @@ const EmployeeDashboard = () => {
           </div>
 
           {/* Awards & Recognition */}
-          <div className="bg-white rounded-3xl p-5 border border-slate-200/80 shadow-sm hover:shadow-md transition-all duration-300">
-            <h3 className="font-bold text-slate-800 text-sm mb-4">Awards & Recognition</h3>
-            <div className="space-y-3">
-              <div className="flex items-center gap-3 p-2 rounded-2xl hover:bg-slate-50 transition-colors">
-                <div className="w-10 h-10 rounded-2xl text-amber-500 bg-amber-50 border border-amber-100 flex items-center justify-center shadow-xs shrink-0">
-                  <Award className="w-5 h-5" />
+          <div className="bg-white rounded-3xl p-3.5 border border-slate-200/80 shadow-sm hover:shadow-md transition-all duration-300">
+            <h3 className="font-bold text-slate-800 text-sm mb-2.5">Awards & Recognition</h3>
+            <div className="space-y-1.5">
+              <div className="flex items-center gap-2.5 p-1.5 rounded-2xl hover:bg-slate-50 transition-colors">
+                <div className="w-9 h-9 rounded-2xl text-amber-500 bg-amber-50 border border-amber-100 flex items-center justify-center shadow-xs shrink-0">
+                  <Award className="w-4.5 h-4.5" />
                 </div>
                 <div>
                   <h4 className="font-bold text-slate-800 text-xs">Best Performer of Month</h4>
                   <p className="text-[11px] text-slate-400 font-semibold">May 2024</p>
                 </div>
               </div>
-              <div className="flex items-center gap-3 p-2 rounded-2xl hover:bg-slate-50 transition-colors">
-                <div className="w-10 h-10 rounded-2xl text-emerald-600 bg-emerald-50 border border-emerald-100 flex items-center justify-center shadow-xs shrink-0">
-                  <Trophy className="w-5 h-5" />
+              <div className="flex items-center gap-2.5 p-1.5 rounded-2xl hover:bg-slate-50 transition-colors">
+                <div className="w-9 h-9 rounded-2xl text-emerald-600 bg-emerald-50 border border-emerald-100 flex items-center justify-center shadow-xs shrink-0">
+                  <Trophy className="w-4.5 h-4.5" />
                 </div>
                 <div>
                   <h4 className="font-bold text-slate-800 text-xs">
@@ -825,32 +993,32 @@ const EmployeeDashboard = () => {
           </div>
 
           {/* Leaderboard Ranking */}
-          <div className="bg-white rounded-3xl p-5 border border-slate-200/80 shadow-sm hover:shadow-md transition-all duration-300">
+          <div className="bg-white rounded-3xl p-3.5 border border-slate-200/80 shadow-sm hover:shadow-md transition-all duration-300">
             <h3 className="font-bold text-slate-800 text-sm">Leaderboard Ranking</h3>
-            <p className="text-[11px] text-slate-400 font-semibold mb-3.5">
+            <p className="text-[11px] text-slate-400 font-semibold mb-2">
               Global ranking (based on platform time)
             </p>
 
-            <div className="grid grid-cols-3 gap-2.5">
-              <div className="bg-slate-50/80 border border-slate-100 rounded-2xl p-3 text-center">
+            <div className="grid grid-cols-3 gap-2">
+              <div className="bg-slate-50/80 border border-slate-100 rounded-2xl p-2.5 text-center">
                 <p className="text-xs text-slate-500 font-semibold">Daily</p>
-                <div className="flex items-center justify-center gap-1 mt-1">
+                <div className="flex items-center justify-center gap-1 mt-0.5">
                   <span className="text-base font-extrabold text-slate-800">#5</span>
                   <span className="text-emerald-500 font-bold text-xs">↑</span>
                 </div>
               </div>
 
-              <div className="bg-slate-50/80 border border-slate-100 rounded-2xl p-3 text-center">
+              <div className="bg-slate-50/80 border border-slate-100 rounded-2xl p-2.5 text-center">
                 <p className="text-xs text-slate-500 font-semibold">Weekly</p>
-                <div className="flex items-center justify-center gap-1 mt-1">
+                <div className="flex items-center justify-center gap-1 mt-0.5">
                   <span className="text-base font-extrabold text-slate-800">#3</span>
                   <span className="text-emerald-500 font-bold text-xs">↑</span>
                 </div>
               </div>
 
-              <div className="bg-slate-50/80 border border-slate-100 rounded-2xl p-3 text-center">
+              <div className="bg-slate-50/80 border border-slate-100 rounded-2xl p-2.5 text-center">
                 <p className="text-xs text-slate-500 font-semibold">Monthly</p>
-                <div className="flex items-center justify-center gap-1 mt-1">
+                <div className="flex items-center justify-center gap-1 mt-0.5">
                   <span className="text-base font-extrabold text-slate-800">#7</span>
                   <span className="text-rose-500 font-bold text-xs">↓</span>
                 </div>
