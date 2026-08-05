@@ -1,265 +1,46 @@
-import React, { useState, useEffect, useMemo, useRef } from "react";
+import React, { useState, useEffect, useMemo } from "react";
 import { useQuery } from "@tanstack/react-query";
 import {
-  History,
-  User,
-  Clock,
+  Search,
   RefreshCw,
-  ArrowRight,
-  Undo2,
-  Users,
-  FolderKanban,
-  Calendar,
-  Settings,
-  Layers,
-  ChevronDown,
-  ChevronUp,
-  Tag,
+  Clock,
+  User,
   Globe,
-  ShieldCheck,
-  X,
-  Home,
-  FileText,
-  Briefcase,
-  Building2,
-  Wrench,
+  ArrowRight,
 } from "lucide-react";
 import { auditLogApi } from "../services/api";
 import Table from "../components/ui/Table";
-import UserAvatar from "../components/ui/UserAvatar";
 import DatePicker from "../components/ui/DatePicker";
-import SearchBar from "../components/ui/SearchBar";
 import Dropdown from "../components/ui/Dropdown";
-import Button from "../components/ui/Button";
-import StatCard from "../components/dashboard/StatCard";
 import { formatDisplayName } from "../utils/displayName";
 
 const PAGE_SIZE = 25;
 
-// Reversal actions get their own visual treatment — someone walking back a decision
-// is the entry an admin most needs to notice, and it should not read as a routine edit.
-// Keep in sync with REVERSAL_ACTIONS in app/api/audit_logs.py, which feeds the stat card.
-const REVERSAL_ACTIONS = new Set([
-  "leave.approval_revoked",
-  "leave.reject_undone",
-  "wfh.approval_revoked",
-  "wfh.reject_undone",
-  "signup_request.approval_revoked",
-  "signup_request.reject_undone",
-  "employee.restored",
-]);
-
-// One icon + colour per category, shared by the filter pills and the table cell so
-// a category is recognisable in both places without reading the label.
-// Keys must match the `category` values passed to audit_service.record on the
-// backend. Anything unmapped still renders — it just falls back to a generic cog.
-const CATEGORY_META = {
-  employees: { icon: Users, color: "text-indigo-600" },
-  projects: { icon: FolderKanban, color: "text-blue-600" },
-  leaves: { icon: Calendar, color: "text-amber-600" },
-  allocations: { icon: Layers, color: "text-purple-600" },
-  access: { icon: ShieldCheck, color: "text-teal-600" },
-  wfh: { icon: Home, color: "text-cyan-600" },
-  guidelines: { icon: FileText, color: "text-sky-600" },
-  "side projects": { icon: Briefcase, color: "text-violet-600" },
-  vendors: { icon: Building2, color: "text-orange-600" },
-  skills: { icon: Wrench, color: "text-lime-600" },
-  settings: { icon: Settings, color: "text-slate-600" },
-};
-
-const categoryMeta = (category) =>
-  CATEGORY_META[(category || "").toLowerCase()] || {
-    icon: Settings,
-    color: "text-slate-500",
-  };
-
-// "Who was acting?" is the first cut an admin makes, so it gets the segmented
-// control rather than a dropdown. Values match the lower-cased `actor_role`
-// snapshotted on each entry; "" means no filter.
-const ROLE_TABS = [
-  { value: "", label: "All" },
-  { value: "employee", label: "Employee" },
-  { value: "admin", label: "Admin" },
-  { value: "pm", label: "PM" },
-  { value: "hr", label: "HR" },
+const TIME_FILTER_OPTIONS = [
+  { value: "all", label: "Filter by Time: All" },
+  { value: "today", label: "Filter by Time: Today" },
+  { value: "7d", label: "Filter by Time: Last 7 days" },
+  { value: "custom", label: "Filter by Time: Custom" },
 ];
 
-// Local-time yyyy-MM-dd. toISOString() would shift the date by the UTC offset and
-// silently drop or add a day for anyone east/west of UTC.
 const toISODate = (d) =>
   `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, "0")}-${String(
     d.getDate()
   ).padStart(2, "0")}`;
-
-const shortDate = (iso) =>
-  iso
-    ? new Date(`${iso}T00:00:00`).toLocaleDateString("en-US", {
-        month: "short",
-        day: "numeric",
-      })
-    : "";
-
-// Date range as one compact control instead of two always-visible pickers: it keeps
-// the filter row on a single line next to the search box and the two dropdowns, and
-// the presets cover the ranges an admin actually asks for ("what happened today?").
-const RANGE_PRESETS = [
-  { label: "Today", days: 0 },
-  { label: "Last 7 days", days: 6 },
-  { label: "Last 30 days", days: 29 },
-  { label: "This month", monthToDate: true },
-];
-
-function DateRangeFilter({ from, to, onChange }) {
-  const [open, setOpen] = useState(false);
-  const ref = useRef(null);
-
-  useEffect(() => {
-    const handler = (e) => {
-      if (ref.current && !ref.current.contains(e.target)) setOpen(false);
-    };
-    document.addEventListener("mousedown", handler);
-    return () => document.removeEventListener("mousedown", handler);
-  }, []);
-
-  const active = Boolean(from || to);
-  const label = active
-    ? from && to
-      ? `${shortDate(from)} – ${shortDate(to)}`
-      : from
-        ? `From ${shortDate(from)}`
-        : `Until ${shortDate(to)}`
-    : "Any date";
-
-  const applyPreset = (preset) => {
-    const now = new Date();
-    const start = preset.monthToDate
-      ? new Date(now.getFullYear(), now.getMonth(), 1)
-      : new Date(now.getFullYear(), now.getMonth(), now.getDate() - preset.days);
-    onChange(toISODate(start), toISODate(now));
-    setOpen(false);
-  };
-
-  const isPresetActive = (preset) => {
-    if (!from || !to) return false;
-    const now = new Date();
-    const start = preset.monthToDate
-      ? new Date(now.getFullYear(), now.getMonth(), 1)
-      : new Date(now.getFullYear(), now.getMonth(), now.getDate() - preset.days);
-    return from === toISODate(start) && to === toISODate(now);
-  };
-
-  return (
-    <div ref={ref} className="relative shrink-0">
-      <button
-        type="button"
-        onClick={() => setOpen((o) => !o)}
-        className={`flex items-center gap-1.5 rounded-lg border px-3 py-1.5 text-sm transition-colors ${
-          active
-            ? "border-indigo-200 bg-indigo-50 font-medium text-indigo-700 hover:bg-indigo-100"
-            : "border-slate-200 bg-white text-slate-700 hover:border-slate-300 hover:bg-slate-50"
-        }`}
-      >
-        <Calendar
-          className={`h-3.5 w-3.5 ${active ? "text-indigo-500" : "text-slate-400"}`}
-        />
-        {label}
-        {active ? (
-          <X
-            className="h-3.5 w-3.5 text-indigo-400 hover:text-indigo-700"
-            onClick={(e) => {
-              e.stopPropagation();
-              onChange("", "");
-              setOpen(false);
-            }}
-          />
-        ) : (
-          <ChevronDown
-            className={`h-3.5 w-3.5 text-slate-400 transition-transform ${open ? "rotate-180" : ""}`}
-          />
-        )}
-      </button>
-
-      {open && (
-        <div className="absolute right-0 top-full z-[70] mt-1.5 w-[320px] rounded-xl border border-slate-200 bg-white p-3 shadow-[0_12px_40px_-12px_rgba(0,0,0,0.18)]">
-          <p className="font-mono text-[10px] font-semibold uppercase tracking-[0.06em] text-slate-400">
-            Quick ranges
-          </p>
-          <div className="mt-1.5 grid grid-cols-2 gap-1.5">
-            {RANGE_PRESETS.map((preset) => (
-              <button
-                key={preset.label}
-                type="button"
-                onClick={() => applyPreset(preset)}
-                className={`rounded-lg border px-2 py-1.5 text-[12px] font-medium transition-colors ${
-                  isPresetActive(preset)
-                    ? "border-indigo-200 bg-indigo-50 text-indigo-700"
-                    : "border-slate-200 bg-white text-slate-600 hover:bg-slate-50"
-                }`}
-              >
-                {preset.label}
-              </button>
-            ))}
-          </div>
-
-          <div className="mt-3 space-y-2 border-t border-slate-100 pt-3">
-            <div>
-              <label className="mb-1 block text-[11px] font-semibold text-slate-500">
-                From
-              </label>
-              <DatePicker
-                value={from || ""}
-                onChange={(e) => onChange(e.target.value, to)}
-                placeholder="Earliest entry"
-              />
-            </div>
-            <div>
-              <label className="mb-1 block text-[11px] font-semibold text-slate-500">
-                To
-              </label>
-              <DatePicker
-                value={to || ""}
-                onChange={(e) => onChange(from, e.target.value)}
-                placeholder="Latest entry"
-              />
-            </div>
-          </div>
-
-          <div className="mt-3 flex items-center justify-between border-t border-slate-100 pt-2.5">
-            <button
-              type="button"
-              onClick={() => onChange("", "")}
-              disabled={!active}
-              className="text-[12px] font-semibold text-slate-500 transition-colors hover:text-slate-800 disabled:opacity-40"
-            >
-              Clear range
-            </button>
-            <button
-              type="button"
-              onClick={() => setOpen(false)}
-              className="text-[12px] font-semibold text-indigo-600 transition-colors hover:text-indigo-700"
-            >
-              Done
-            </button>
-          </div>
-        </div>
-      )}
-    </div>
-  );
-}
 
 export default function ChangeLogPage() {
   const [page, setPage] = useState(1);
   const [searchInput, setSearchInput] = useState("");
   const [search, setSearch] = useState("");
   const [category, setCategory] = useState("All");
-  const [actionType, setActionType] = useState("All");
-  const [actorId, setActorId] = useState("");
-  const [actorRole, setActorRole] = useState("");
+  const [actorRole, setActorRole] = useState("All");
+  const [timeFilter, setTimeFilter] = useState("all");
   const [dateFrom, setDateFrom] = useState("");
   const [dateTo, setDateTo] = useState("");
+  const [showCustomDateModal, setShowCustomDateModal] = useState(false);
   const [expandedId, setExpandedId] = useState(null);
 
-  // Debounce the search box so typing doesn't fire a request per keystroke.
+  // Debounce search
   useEffect(() => {
     const t = setTimeout(() => {
       setSearch(searchInput);
@@ -268,14 +49,33 @@ export default function ChangeLogPage() {
     return () => clearTimeout(t);
   }, [searchInput]);
 
+  // Handle time filter selection
+  const handleTimeFilterChange = (val) => {
+    setTimeFilter(val);
+    setPage(1);
+    setShowCustomDateModal(val === "custom");
+    const now = new Date();
+
+    if (val === "all") {
+      setDateFrom("");
+      setDateTo("");
+    } else if (val === "today") {
+      const todayStr = toISODate(now);
+      setDateFrom(todayStr);
+      setDateTo(todayStr);
+    } else if (val === "7d") {
+      const start = new Date(now.getFullYear(), now.getMonth(), now.getDate() - 6);
+      setDateFrom(toISODate(start));
+      setDateTo(toISODate(now));
+    }
+  };
+
   const filters = {
     page,
     page_size: PAGE_SIZE,
     ...(search.trim() ? { search: search.trim() } : {}),
     ...(category !== "All" ? { category } : {}),
-    ...(actionType !== "All" ? { action_type: actionType } : {}),
-    ...(actorId ? { actor_id: Number(actorId) } : {}),
-    ...(actorRole ? { actor_role: actorRole } : {}),
+    ...(actorRole !== "All" ? { actor_role: actorRole.toLowerCase() } : {}),
     ...(dateFrom ? { date_from: dateFrom } : {}),
     ...(dateTo ? { date_to: dateTo } : {}),
   };
@@ -288,14 +88,7 @@ export default function ChangeLogPage() {
   } = useQuery({
     queryKey: ["audit-logs", filters],
     queryFn: () => auditLogApi.getAll(filters),
-    // Keep the previous page visible while the next one loads, so the table
-    // doesn't collapse to empty on every page change.
     placeholderData: (prev) => prev,
-  });
-
-  const { data: stats } = useQuery({
-    queryKey: ["audit-log-stats"],
-    queryFn: auditLogApi.getStats,
   });
 
   const { data: filterOptions } = useQuery({
@@ -305,33 +98,97 @@ export default function ChangeLogPage() {
 
   const logs = result?.items || [];
   const total = result?.total ?? 0;
+  const totalPages = Math.ceil(total / PAGE_SIZE) || 1;
 
-  const activeFilterCount = useMemo(
-    () =>
-      [search.trim(), category !== "All" ? category : "", actionType !== "All" ? actionType : "", actorId, dateFrom, dateTo].filter(
-        Boolean
-      ).length,
-    [search, category, actionType, actorId, dateFrom, dateTo]
+  const categoryOptions = useMemo(
+    () => [
+      { value: "All", label: "All Categories" },
+      ...(filterOptions?.categories || []).map((c) => ({ value: c, label: c })),
+    ],
+    [filterOptions]
   );
 
-  // The role tab is a separate axis from the filter cluster — it isn't part of
-  // "Clear N filters" — but an empty table caused by it still needs the narrowed copy.
-  const narrowed = activeFilterCount > 0 || Boolean(actorRole);
+  const roleOptions = useMemo(
+    () => [
+      { value: "All", label: "All Roles" },
+      { value: "Admin", label: "Admin" },
+      { value: "PM", label: "PM" },
+      { value: "Employee", label: "Employee" },
+      { value: "HR", label: "HR" },
+    ],
+    []
+  );
 
-  const clearFilters = () => {
-    setSearchInput("");
-    setSearch("");
-    setCategory("All");
-    setActionType("All");
-    setActorId("");
-    setDateFrom("");
-    setDateTo("");
-    setPage(1);
+  const CATEGORY_BADGES = {
+    leaves: "bg-amber-50 text-amber-700 border-amber-200/80",
+    wfh: "bg-cyan-50 text-cyan-700 border-cyan-200/80",
+    employees: "bg-indigo-50 text-indigo-700 border-indigo-200/80",
+    allocations: "bg-purple-50 text-purple-700 border-purple-200/80",
+    projects: "bg-blue-50 text-blue-700 border-blue-200/80",
+    access: "bg-teal-50 text-teal-700 border-teal-200/80",
+    guidelines: "bg-sky-50 text-sky-700 border-sky-200/80",
+    settings: "bg-slate-100 text-slate-700 border-slate-200/80",
+  };
+
+  const getCategoryBadgeClass = (cat) =>
+    CATEGORY_BADGES[(cat || "").toLowerCase()] ||
+    "bg-slate-100 text-slate-700 border-slate-200/80";
+
+  const cleanSummaryText = (summary, subjectName) => {
+    if (!summary) return "";
+    let s = summary;
+
+    // 1. Remove duplicate "leave leave" or "Leave leave"
+    s = s.replace(/leave\s+leave/gi, "leave");
+
+    // 2. Remove redundant subject name if it appears in the summary phrase
+    if (subjectName && typeof subjectName === "string" && subjectName.trim()) {
+      const rawName = subjectName.trim();
+      const formattedName = formatDisplayName(rawName) || rawName;
+      const escapeRegExp = (str) => str.replace(/[.*+?^${}()|[\]\\]/g, "\\$&");
+
+      const patterns = [
+        new RegExp(`\\s+for\\s+${escapeRegExp(rawName)}`, "gi"),
+        new RegExp(`\\s+for\\s+${escapeRegExp(formattedName)}`, "gi"),
+        new RegExp(`^Updated\\s+${escapeRegExp(rawName)}\\s+—\\s+`, "gi"),
+        new RegExp(`^Updated\\s+${escapeRegExp(formattedName)}\\s+—\\s+`, "gi"),
+        new RegExp(`^Uploaded a new profile picture for\\s+${escapeRegExp(rawName)}`, "gi"),
+        new RegExp(`^Uploaded a new profile picture for\\s+${escapeRegExp(formattedName)}`, "gi"),
+      ];
+
+      patterns.forEach((regex) => {
+        s = s.replace(regex, (match) => {
+          if (match.toLowerCase().startsWith("updated")) return "Updated ";
+          if (match.toLowerCase().startsWith("uploaded")) return "Uploaded profile picture";
+          return "";
+        });
+      });
+    }
+
+    // 3. Format YYYY-MM-DD date ranges: (2026-08-12 → 2026-08-13) -> (12 Aug – 13 Aug)
+    s = s.replace(/\((\d{4})-(\d{2})-(\d{2})\s*(?:→|->|\sto\s)\s*(\d{4})-(\d{2})-(\d{2})\)/g, (_, y1, m1, d1, y2, m2, d2) => {
+      const date1 = new Date(Number(y1), Number(m1) - 1, Number(d1));
+      const date2 = new Date(Number(y2), Number(m2) - 1, Number(d2));
+      const str1 = `${date1.getDate()} ${date1.toLocaleDateString("en-US", { month: "short" })}`;
+      const str2 = `${date2.getDate()} ${date2.toLocaleDateString("en-US", { month: "short" })}`;
+      return `(${str1} – ${str2})`;
+    });
+
+    // 4. Format single YYYY-MM-DD date: (2026-08-05) -> (5 Aug)
+    s = s.replace(/\((\d{4})-(\d{2})-(\d{2})\)/g, (_, y, m, d) => {
+      const date = new Date(Number(y), Number(m) - 1, Number(d));
+      return `(${date.getDate()} ${date.toLocaleDateString("en-US", { month: "short" })})`;
+    });
+
+    // 5. Remove trailing "was pending" or extra clutter
+    s = s.replace(/\s+was\s+pending$/gi, "");
+
+    return s.trim();
   };
 
   const formatTimestamp = (isoString) => {
     if (!isoString)
-      return { dateStr: "—", timeStr: "—", relativeTime: "—", isoFull: "—" };
+      return { dateStr: "—", timeStr: "—", relativeTime: "—", formattedShort: "—", formatted: "—", isoFull: "—" };
 
     // If ISO string lacks timezone offset/designator, append Z to ensure UTC interpretation
     const normalizedIso =
@@ -342,483 +199,359 @@ export default function ChangeLogPage() {
         : isoString;
 
     const date = new Date(normalizedIso);
+    if (isNaN(date.getTime()))
+      return { dateStr: isoString, timeStr: "", relativeTime: "", formattedShort: isoString, formatted: isoString, isoFull: isoString };
+
+    // Relative time
     const diffMs = Math.max(0, Date.now() - date.getTime());
     const diffMins = Math.floor(diffMs / 60000);
     const diffHours = Math.floor(diffMs / 3600000);
     const diffDays = Math.floor(diffMs / 86400000);
-
     let relativeTime;
     if (diffMins < 1) relativeTime = "Just now";
     else if (diffMins < 60) relativeTime = `${diffMins}m ago`;
     else if (diffHours < 24) relativeTime = `${diffHours}h ago`;
     else relativeTime = `${diffDays}d ago`;
 
+    const day = date.getDate();
+    const month = date.toLocaleDateString("en-US", { month: "short" });
+    const year = date.getFullYear();
+    const timeStr24 = date.toLocaleTimeString("en-US", {
+      hour: "2-digit",
+      minute: "2-digit",
+      second: "2-digit",
+      hour12: false,
+    });
+    const timeStr12 = date.toLocaleTimeString("en-US", {
+      hour: "numeric",
+      minute: "2-digit",
+      hour12: true,
+    });
+
+    const dateStr = `${day} ${month}, ${year}`;
+    const formattedShort = `${day} ${month}, ${timeStr12}`;
+
     return {
-      dateStr: date.toLocaleDateString("en-US", {
-        month: "short",
-        day: "numeric",
-        year: "numeric",
-      }),
-      timeStr: date.toLocaleTimeString("en-US", {
-        hour: "2-digit",
-        minute: "2-digit",
-        second: "2-digit",
-      }),
+      dateStr,
+      timeStr: timeStr24,
       relativeTime,
+      formattedShort,
+      formatted: `${dateStr} ${timeStr24}`,
       isoFull: date.toLocaleString(),
     };
   };
 
-  const getActionBadgeClass = (actionType) => {
-    const type = (actionType || "").toLowerCase();
-    if (type === "promoted" || type === "approved")
-      return "bg-emerald-50 text-emerald-700 border-emerald-200";
-    if (type === "applied") return "bg-sky-50 text-sky-700 border-sky-200";
-    if (type === "created" || type === "added")
-      return "bg-indigo-50 text-indigo-700 border-indigo-200";
-    if (type === "archived" || type === "deleted" || type === "rejected")
-      return "bg-rose-50 text-rose-700 border-rose-200";
-    if (type === "restored") return "bg-amber-50 text-amber-700 border-amber-200";
-    return "bg-slate-100 text-slate-700 border-slate-200";
-  };
-
-  const categoryOptions = useMemo(
-    () => [
-      { value: "All", label: "All categories" },
-      ...(filterOptions?.categories || []).map((c) => ({ value: c, label: c })),
-    ],
-    [filterOptions]
-  );
-
-  // The actor list is as long as the company, so this dropdown is searchable —
-  // scrolling to a name is the slow path when you already know who you're auditing.
-  const actorOptions = useMemo(
-    () => [
-      { value: "", label: "Anyone" },
-      ...(filterOptions?.actors || []).map((a) => ({
-        value: String(a.id),
-        label: `${formatDisplayName(a.name) || a.name} · ${a.role}`,
-      })),
-    ],
-    [filterOptions]
-  );
-
-  const actionOptions = useMemo(
-    () => [
-      { value: "All", label: "All actions" },
-      ...(filterOptions?.action_types || []).map((t) => ({
-        value: t,
-        label: t,
-      })),
-    ],
-    [filterOptions]
-  );
-
-  const categoryBreakdown = useMemo(
-    () =>
-      Object.entries(stats?.by_category || {}).map(([label, value]) => ({
-        label,
-        value,
-      })),
-    [stats]
-  );
-
   return (
-    <div className="space-y-3 pb-12">
-      {/* KPIs — one-line cards, since these are four plain counts and not the point
-          of the page; the table below is */}
-      <div className="grid grid-cols-2 gap-3 lg:grid-cols-4">
-        <StatCard
-          inline
-          title="Total Recorded"
-          value={stats?.total ?? "—"}
-          icon={History}
-          tone="indigo"
-          breakdown={categoryBreakdown}
-          breakdownFooter="By category"
-        />
-        <StatCard
-          inline
-          title="Today's Activity"
-          value={stats?.today ?? "—"}
-          icon={Clock}
-          tone="emerald"
-        />
-        <StatCard
-          inline
-          title="Reversals (7d)"
-          value={stats?.reversals_7d ?? "—"}
-          icon={Undo2}
-          tone="amber"
-        />
-        <StatCard
-          inline
-          title="Active Users (7d)"
-          value={stats?.active_actors_7d ?? "—"}
-          icon={Users}
-          tone="violet"
-        />
-      </div>
+    <div className="bg-white min-h-screen p-6 space-y-6">
+      {/* Toolbar & Controls */}
+      <div className="space-y-4">
+        <div className="flex flex-wrap items-center justify-between gap-4">
+          {/* Extreme Left: Role filter (Segmented Tab Table) */}
+          <div className="inline-flex items-center h-[34px] p-0.5 bg-slate-100/90 rounded-md border border-slate-300 text-xs font-medium shrink-0 gap-0.5">
+            {roleOptions.map((role) => {
+              const isSelected = actorRole === role.value;
+              return (
+                <button
+                  key={role.value}
+                  type="button"
+                  onClick={() => {
+                    setActorRole(role.value);
+                    setPage(1);
+                  }}
+                  className={`h-full px-2.5 flex items-center justify-center rounded text-xs transition-all duration-150 cursor-pointer ${
+                    isSelected
+                      ? "bg-white text-blue-600 font-bold shadow-xs border border-slate-200/80"
+                      : "text-slate-600 hover:text-slate-900 hover:bg-slate-200/50 font-medium"
+                  }`}
+                >
+                  {role.label}
+                </button>
+              );
+            })}
+          </div>
 
-      {/* Toolbar — role segment on the left · search / filters / refresh on the right */}
-      <div className="flex flex-wrap items-center justify-between gap-2">
-        <div className="inline-flex items-center overflow-x-auto rounded-lg border border-slate-200 bg-slate-50 p-0.5">
-          {ROLE_TABS.map((tab) => {
-            const isActive = actorRole === tab.value;
-            const count =
-              tab.value === "" ? stats?.total : stats?.by_actor_role?.[tab.value];
-            return (
-              <button
-                key={tab.value || "all"}
-                type="button"
-                onClick={() => {
-                  setActorRole(tab.value);
-                  setPage(1);
-                }}
-                className={`rounded-md px-3.5 py-1.5 text-[13px] font-semibold transition-all ${
-                  isActive
-                    ? "bg-white text-slate-900 shadow-sm ring-1 ring-slate-200/70"
-                    : "text-slate-500 hover:text-slate-800"
-                }`}
-              >
-                <span className="inline-flex items-center gap-1.5">
-                  {tab.label}
-                  {count != null && (
-                    <span
-                      className={`font-mono text-[11px] tabular-nums ${isActive ? "text-slate-400" : "text-slate-400"}`}
-                    >
-                      {count}
-                    </span>
-                  )}
-                </span>
-              </button>
-            );
-          })}
-        </div>
+          {/* Extreme Right: Search, Time, Category & Refresh */}
+          <div className="flex flex-wrap items-center gap-3 ml-auto">
+            {/* Filter by keyword search box */}
+            <div className="relative">
+              <input
+                type="text"
+                value={searchInput}
+                onChange={(e) => setSearchInput(e.target.value)}
+                placeholder="Filter by keyword"
+                className="w-56 rounded-md border border-slate-300 bg-white px-3 py-1.5 text-sm text-slate-800 placeholder:text-slate-400 focus:border-blue-500 focus:outline-none focus:ring-1 focus:ring-blue-500"
+              />
+              <Search className="absolute right-2.5 top-2.5 h-4 w-4 text-slate-400 pointer-events-none" />
+            </div>
 
-        <div className="flex flex-wrap items-center gap-2">
-          {activeFilterCount > 0 && (
+            {/* Filter by Time dropdown */}
+            <Dropdown
+              className="w-[215px] shrink-0"
+              options={TIME_FILTER_OPTIONS}
+              value={timeFilter}
+              onChange={handleTimeFilterChange}
+            />
+
+            {/* Custom date range selector inline to the right of Filter by Time */}
+            {showCustomDateModal && (
+              <div className="w-60 shrink-0">
+                <DatePicker
+                  type="range"
+                  startDate={dateFrom}
+                  endDate={dateTo}
+                  onRangeChange={({ startDate, endDate }) => {
+                    setDateFrom(startDate);
+                    setDateTo(endDate);
+                    setPage(1);
+                  }}
+                  placeholder="Select date range"
+                />
+              </div>
+            )}
+
+            {/* Category filter */}
+            <Dropdown
+              className="w-44 shrink-0"
+              options={categoryOptions}
+              value={category}
+              onChange={(v) => {
+                setCategory(v);
+                setPage(1);
+              }}
+            />
+
+            {/* Refresh button */}
             <button
               type="button"
-              onClick={clearFilters}
-              className="inline-flex shrink-0 items-center gap-1 rounded-lg px-2 py-1.5 text-[12px] font-semibold text-slate-500 transition-colors hover:bg-slate-100 hover:text-slate-800"
+              onClick={() => refetch()}
+              title="Refresh audit log"
+              className="inline-flex items-center gap-1.5 text-sm font-medium text-slate-700 hover:text-blue-600 transition-colors ml-1"
             >
-              <X className="h-3.5 w-3.5" />
-              Clear {activeFilterCount}
+              <RefreshCw className={`h-4 w-4 text-slate-500 ${isFetching ? "animate-spin" : ""}`} />
+              Refresh
             </button>
-          )}
-
-          <SearchBar
-            size="sm"
-            width="w-56"
-            clearable
-            value={searchInput}
-            onChange={setSearchInput}
-            placeholder="Search person, entity…"
-          />
-
-          {/* Actor filter — "what did this one person do?", narrower than the role tabs */}
-          <Dropdown
-            className="w-40 shrink-0"
-            options={actorOptions}
-            value={actorId}
-            onChange={(v) => {
-              setActorId(v);
-              setPage(1);
-            }}
-            placeholder="Anyone"
-            searchable
-            searchPlaceholder="Find a person…"
-          />
-
-          <Dropdown
-            className="w-40 shrink-0"
-            options={categoryOptions}
-            value={category}
-            onChange={(v) => {
-              setCategory(v);
-              setPage(1);
-            }}
-            placeholder="All categories"
-          />
-
-          <Dropdown
-            className="w-36 shrink-0"
-            options={actionOptions}
-            value={actionType}
-            onChange={(v) => {
-              setActionType(v);
-              setPage(1);
-            }}
-            placeholder="All actions"
-          />
-
-          <DateRangeFilter
-            from={dateFrom}
-            to={dateTo}
-            onChange={(from, to) => {
-              setDateFrom(from || "");
-              setDateTo(to || "");
-              setPage(1);
-            }}
-          />
-
-          <Button
-            variant="secondary"
-            size="icon"
-            onClick={() => refetch()}
-            title="Refresh"
-            aria-label="Refresh"
-            className="shrink-0 border border-slate-200"
-          >
-            <RefreshCw
-              className={`h-4 w-4 text-slate-500 ${isFetching ? "animate-spin" : ""}`}
-            />
-          </Button>
+          </div>
         </div>
       </div>
 
-      {/* Log table */}
+      {/* Main Audit Log Table */}
       <Table
         variant="untitled"
         loading={isLoading}
         skeletonRows={8}
         expandedRowId={expandedId}
         onRowClick={(row) => setExpandedId(expandedId === row.id ? null : row.id)}
-        rowClassName={(row) =>
-          REVERSAL_ACTIONS.has(row.action) ? "bg-amber-50/40" : ""
-        }
         renderExpandedRow={(row) => {
           const formatted = formatTimestamp(row.created_at);
           const actor = row.actor || {};
+          const actorName = formatDisplayName(actor.name) || actor.name || "System";
+          const subject = formatDisplayName(row.subject_name) || row.subject_name;
+
           return (
-            <div className="space-y-4 border-t border-slate-200/80 bg-slate-50/90 p-4 text-xs">
-              <div className="flex flex-wrap items-center justify-between gap-2 border-b border-slate-200 pb-3">
-                <div className="flex items-center gap-2">
-                  <span className="rounded bg-slate-200/80 px-2 py-0.5 font-mono text-[11px] font-bold text-slate-500">
-                    LOG #{row.id}
-                  </span>
-                  <span className="rounded border border-indigo-100 bg-indigo-50 px-2 py-0.5 font-mono text-[11px] font-semibold text-indigo-700">
-                    {row.action}
-                  </span>
-                </div>
-                <div className="flex items-center gap-1.5 text-[11px] text-slate-500">
-                  <Clock className="h-3.5 w-3.5 text-indigo-500" />
-                  <strong className="font-mono text-slate-800">{formatted.isoFull}</strong>
-                </div>
-              </div>
+            <div className="border-t border-slate-200/80 bg-slate-50/80 p-4 text-xs space-y-3">
+              {/* Streamlined Meta Summary Bar */}
+              <div className="flex flex-wrap items-center gap-x-4 gap-y-2 border-b border-slate-200/80 pb-3 text-xs text-slate-700">
+                {/* Log ID */}
+                <span className="font-mono text-[11px] font-bold text-slate-500 bg-slate-200/70 px-1.5 py-0.5 rounded">
+                  LOG #{row.id}
+                </span>
 
-              <div className="grid grid-cols-1 gap-4 md:grid-cols-2">
-                <div className="space-y-2 rounded-xl border border-slate-200 bg-white p-3">
-                  <div className="flex items-center gap-1 text-[11px] font-bold uppercase tracking-wider text-slate-400">
-                    <User className="h-3.5 w-3.5 text-indigo-500" /> Performed by
-                  </div>
-                  <div className="space-y-1 text-slate-700">
-                    <div>
-                      <span className="text-slate-400">Name:</span>{" "}
-                      <strong className="text-slate-900">
-                        {formatDisplayName(actor.name) || actor.name}
-                      </strong>
-                    </div>
-                    <div>
-                      <span className="text-slate-400">Email:</span>{" "}
-                      <span className="font-mono text-slate-800">{actor.email || "—"}</span>
-                    </div>
-                    <div>
-                      <span className="text-slate-400">Role at the time:</span>{" "}
-                      <span className="rounded bg-indigo-50 px-2 py-0.5 text-[11px] font-semibold text-indigo-700">
-                        {actor.role}
-                      </span>
-                    </div>
-                    {row.ip && (
-                      <div className="flex items-center gap-1.5">
-                        <Globe className="h-3 w-3 text-slate-400" />
-                        <span className="font-mono text-[11px] text-slate-600">{row.ip}</span>
-                      </div>
-                    )}
-                  </div>
+                <span className="text-slate-300">|</span>
+
+                {/* Timestamp shifted to left side */}
+                <div className="flex items-center gap-1.5 text-xs font-bold text-slate-900 font-mono">
+                  <Clock className="h-3.5 w-3.5 text-blue-600 shrink-0" />
+                  {formatted.isoFull}
                 </div>
 
-                <div className="space-y-2 rounded-xl border border-slate-200 bg-white p-3">
-                  <div className="flex items-center gap-1 text-[11px] font-bold uppercase tracking-wider text-slate-400">
-                    <Tag className="h-3.5 w-3.5 text-indigo-500" /> Target
-                  </div>
-                  <div className="space-y-1 text-slate-700">
-                    <div>
-                      <span className="text-slate-400">Type:</span>{" "}
-                      <strong className="text-slate-900">{row.entity_type}</strong>
+                <span className="text-slate-300">|</span>
+
+                {/* User & Email - crisp and high visibility */}
+                <div className="flex items-center gap-1.5">
+                  <span className="font-semibold text-slate-600">User:</span>
+                  <span className="font-bold text-slate-900">{actorName}</span>
+                  {actor.email && (
+                    <span className="text-slate-800 font-mono text-[11.5px] bg-slate-100/90 px-1.5 py-0.5 rounded border border-slate-200/80 font-medium">
+                      {actor.email}
+                    </span>
+                  )}
+                </div>
+
+                {/* Target - crisp and high visibility */}
+                {row.entity_type && (
+                  <>
+                    <span className="text-slate-300">|</span>
+                    <div className="flex items-center gap-1.5">
+                      <span className="font-semibold text-slate-600">Target:</span>
+                      <span className="font-bold text-slate-900 capitalize">{row.entity_type}</span>
                       {row.entity_id != null && (
-                        <span className="ml-1.5 rounded bg-slate-100 px-1.5 py-0.5 font-mono text-[11px] text-slate-500">
+                        <span className="font-mono text-[11.5px] font-bold text-slate-800 bg-slate-100/90 px-1.5 py-0.5 rounded border border-slate-200/80">
                           #{row.entity_id}
                         </span>
                       )}
                     </div>
-                    <div>
-                      <span className="text-slate-400">Affected person:</span>{" "}
-                      <strong className="text-indigo-700">
-                        {formatDisplayName(row.subject_name) || row.subject_name || "—"}
-                      </strong>
-                    </div>
-                  </div>
+                  </>
+                )}
+
+                {/* IP Address */}
+                <span className="text-slate-300">|</span>
+                <div className="flex items-center gap-1.5">
+                  <span className="font-semibold text-slate-600">IP:</span>
+                  <span className="font-mono text-[11.5px] font-semibold text-slate-800 bg-slate-100/90 px-1.5 py-0.5 rounded border border-slate-200/80">
+                    {row.ip || "127.0.0.1"}
+                  </span>
                 </div>
               </div>
 
-              <div className="space-y-2 rounded-xl border border-slate-200 bg-white p-3">
-                <div className="text-[11px] font-bold uppercase tracking-wider text-slate-400">
-                  Field changes ({row.details?.length || 0})
+              {/* Concise Field Changes Table (rendered only when field details exist) */}
+              {row.details && row.details.length > 0 && (
+                <div className="space-y-1.5 pt-0.5">
+                  <div className="text-[10.5px] font-bold uppercase tracking-wider text-slate-500">
+                    Field Changes ({row.details.length})
+                  </div>
+
+                  <div className="overflow-x-auto rounded-md border border-slate-200 bg-white">
+                    <table className="w-full text-left text-[11.5px]">
+                      <thead>
+                        <tr className="border-b border-slate-200/80 bg-slate-100/60 text-[10px] font-bold uppercase tracking-wider text-slate-500">
+                          <th className="px-3 py-1.5 w-1/4 font-semibold">Field</th>
+                          <th className="px-3 py-1.5 w-1/3 font-semibold">Original Value</th>
+                          <th className="px-1 py-1.5 w-5 text-center"></th>
+                          <th className="px-3 py-1.5 w-1/3 font-semibold">New Value</th>
+                        </tr>
+                      </thead>
+                      <tbody className="divide-y divide-slate-100 font-mono text-[11.5px]">
+                        {row.details.map((d, idx) => (
+                          <tr key={idx} className="hover:bg-slate-50/70 transition-colors">
+                            <td className="px-3 py-1 font-sans font-medium text-slate-800">
+                              {d.field}
+                            </td>
+                            <td className="px-3 py-1 text-slate-400 truncate max-w-[180px]" title={String(d.from ?? "—")}>
+                              {String(d.from ?? "—")}
+                            </td>
+                            <td className="px-1 py-1 text-center text-blue-500">
+                              <ArrowRight className="h-3 w-3 inline-block" />
+                            </td>
+                            <td className="px-3 py-1 font-semibold text-blue-700 truncate max-w-[240px]" title={String(d.to ?? "—")}>
+                              {String(d.to ?? "—")}
+                            </td>
+                          </tr>
+                        ))}
+                      </tbody>
+                    </table>
+                  </div>
                 </div>
-                {row.details && row.details.length > 0 ? (
-                  <div className="divide-y divide-slate-100">
-                    {row.details.map((d, idx) => (
-                      <div
-                        key={idx}
-                        className="grid grid-cols-1 items-center gap-2 py-2 text-xs sm:grid-cols-3"
-                      >
-                        <div className="font-bold text-slate-800">{d.field}</div>
-                        <div className="truncate rounded border border-slate-200/60 bg-slate-50 px-2.5 py-1 font-mono text-[11.5px] text-slate-400 line-through">
-                          {String(d.from ?? "—")}
-                        </div>
-                        <div className="flex items-center gap-1.5">
-                          <ArrowRight className="h-3.5 w-3.5 flex-shrink-0 text-indigo-500" />
-                          <span className="flex-1 truncate rounded border border-indigo-100 bg-indigo-50 px-2.5 py-1 font-mono text-[11.5px] font-bold text-indigo-700">
-                            {String(d.to ?? "—")}
-                          </span>
-                        </div>
-                      </div>
-                    ))}
-                  </div>
-                ) : (
-                  <div className="py-1 italic text-slate-400">
-                    No field-level changes recorded for this action.
-                  </div>
-                )}
-              </div>
+              )}
             </div>
           );
         }}
         columns={[
           {
             key: "created_at",
-            label: "When",
-            width: "w-[15%]",
+            label: "Timestamp",
+            width: "w-[16%]",
             render: (val) => {
               const f = formatTimestamp(val);
               return (
-                <div className="min-w-0">
-                  <div className="flex items-center gap-1.5 text-[12.5px] font-bold text-slate-800">
-                    <Clock className="h-3.5 w-3.5 flex-shrink-0 text-indigo-500" />
-                    <span>{f.relativeTime}</span>
-                  </div>
-                  <div className="mt-0.5 whitespace-nowrap text-[11px] text-slate-400">
-                    {f.dateStr} · {f.timeStr}
-                  </div>
+                <div className="text-slate-700 text-xs font-normal whitespace-nowrap" title={f.isoFull}>
+                  {f.formattedShort}
                 </div>
               );
             },
           },
           {
             key: "actor",
-            label: "Who",
-            width: "w-[20%]",
+            label: "Performed By",
+            width: "w-[15%]",
             render: (actor) => {
-              if (!actor) return <span className="text-xs text-slate-400">—</span>;
+              const name = formatDisplayName(actor?.name) || actor?.name || "Administrator";
               return (
-                <div className="flex min-w-0 items-center gap-2.5">
-                  <UserAvatar
-                    src={actor.avatar_url}
-                    name={actor.name}
-                    size="sm"
-                    className="h-8 w-8"
-                  />
-                  <div className="min-w-0">
-                    <div className="truncate text-[13px] font-semibold text-slate-900">
-                      {formatDisplayName(actor.name) || actor.name}
-                    </div>
-                    <div className="truncate text-[11px] text-slate-400">{actor.role}</div>
-                  </div>
+                <div
+                  className="font-medium text-blue-600 hover:underline cursor-pointer text-xs truncate"
+                  title={`${name}${actor?.role ? ` (${actor.role})` : ""}`}
+                >
+                  {name}
                 </div>
+              );
+            },
+          },
+          {
+            key: "category",
+            label: "Module Category",
+            width: "w-[14%]",
+            render: (val) => {
+              const catName = val ? val.charAt(0).toUpperCase() + val.slice(1) : "General";
+              const badgeStyle = getCategoryBadgeClass(val);
+              return (
+                <span
+                  className={`inline-block px-2 py-0.5 rounded text-[11px] font-semibold border ${badgeStyle} truncate max-w-[110px]`}
+                  title={catName}
+                >
+                  {catName}
+                </span>
               );
             },
           },
           {
             key: "summary",
-            label: "What happened",
-            width: "w-[42%]",
+            label: "Action Summary",
+            width: "w-[34%]",
             render: (summary, row) => {
-              const { icon: Icon, color } = categoryMeta(row.category);
+              const cleaned = cleanSummaryText(summary || row.action, row.subject_name) || "Settings modified";
               return (
-                <div className="min-w-0 space-y-1">
-                  <div className="flex flex-wrap items-center gap-1.5">
-                    <span
-                      className={`inline-flex items-center rounded-md border px-2 py-0.5 text-[11px] font-bold ${getActionBadgeClass(row.action_type)}`}
-                    >
-                      {REVERSAL_ACTIONS.has(row.action) && (
-                        <Undo2 className="mr-1 h-3 w-3" />
-                      )}
-                      {row.action_type}
-                    </span>
-                    <span className="flex items-center gap-1 text-[11px] font-medium text-slate-500">
-                      <Icon className={`h-3.5 w-3.5 ${color}`} />
-                      {row.category}
-                    </span>
-                  </div>
-                  <div className="text-[12.5px] leading-snug text-slate-700">
-                    {summary || (
-                      <span className="italic text-slate-400">No summary recorded</span>
-                    )}
-                  </div>
+                <div
+                  className="text-slate-800 text-xs font-normal leading-snug truncate pr-3"
+                  title={cleaned}
+                >
+                  {cleaned}
                 </div>
               );
             },
           },
           {
-            key: "details",
-            label: "Changes",
-            width: "w-[18%]",
-            render: (details) => {
-              if (!details || details.length === 0) {
-                return <span className="text-xs italic text-slate-400">—</span>;
+            key: "item_affected",
+            label: "Target Record",
+            width: "w-[13%]",
+            render: (_, row) => {
+              const subject = formatDisplayName(row.subject_name) || row.subject_name;
+              let text = "";
+              if (subject) {
+                text = subject;
+              } else if (row.entity_type) {
+                text = `${row.entity_type}${row.entity_id != null ? ` #${row.entity_id}` : ""}`;
               }
+              if (!text) return <span className="text-slate-400 text-xs">—</span>;
+
               return (
-                <div className="space-y-1 py-0.5">
-                  {details.slice(0, 2).map((d, idx) => (
-                    <div
-                      key={idx}
-                      className="flex flex-wrap items-center gap-1.5 rounded-lg border border-slate-100 bg-slate-50 px-2 py-1 text-[11px]"
-                    >
-                      <span className="font-semibold text-slate-700">{d.field}:</span>
-                      <span className="max-w-[70px] truncate text-slate-400 line-through">
-                        {String(d.from ?? "—")}
-                      </span>
-                      <ArrowRight className="h-3 w-3 flex-shrink-0 text-indigo-500" />
-                      <span className="max-w-[80px] truncate font-semibold text-indigo-700">
-                        {String(d.to ?? "—")}
-                      </span>
-                    </div>
-                  ))}
-                  {details.length > 2 && (
-                    <div className="text-[10.5px] font-semibold text-indigo-600">
-                      +{details.length - 2} more
-                    </div>
-                  )}
-                </div>
+                <span
+                  className="inline-block truncate max-w-[130px] px-2 py-0.5 rounded bg-slate-100/90 text-slate-700 font-medium text-[11.5px] border border-slate-200/60"
+                  title={text}
+                >
+                  {text}
+                </span>
               );
             },
           },
           {
-            key: "expand",
-            label: "",
-            width: "w-[5%]",
-            align: "center",
-            render: (_, row) => (
-              <span className="mx-auto flex h-6 w-6 items-center justify-center rounded-md text-slate-400 transition-colors hover:bg-slate-100">
-                {expandedId === row.id ? (
-                  <ChevronUp className="h-4 w-4 text-indigo-600" />
-                ) : (
-                  <ChevronDown className="h-4 w-4" />
-                )}
-              </span>
-            ),
+            key: "actions",
+            label: "Actions",
+            width: "w-[8%]",
+            align: "right",
+            render: (_, row) => {
+              const isExpanded = expandedId === row.id;
+              return (
+                <button
+                  type="button"
+                  onClick={(e) => {
+                    e.stopPropagation();
+                    setExpandedId(isExpanded ? null : row.id);
+                  }}
+                  className="text-blue-600 hover:text-blue-800 hover:underline text-xs font-medium whitespace-nowrap cursor-pointer"
+                >
+                  {isExpanded ? "Hide details" : "Show more"}
+                </button>
+              );
+            },
           },
         ]}
         data={logs}
@@ -827,10 +560,8 @@ export default function ChangeLogPage() {
         totalItems={total}
         onPageChange={setPage}
         emptyState={{
-          title: narrowed ? "No entries match these filters" : "No audit entries yet",
-          description: narrowed
-            ? "Try another role tab, a wider date range, or clearing a filter."
-            : "Entries appear here as soon as someone applies for, approves, or edits something.",
+          title: "No audit log entries found",
+          description: "Try adjusting your search keywords, time range, or category filters.",
         }}
       />
     </div>

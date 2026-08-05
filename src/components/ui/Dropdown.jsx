@@ -204,9 +204,9 @@ const Dropdown = ({
           disabled ? "opacity-50 cursor-not-allowed" : "cursor-pointer"
         }`}
       >
-        {displayValue}
+        <span className="truncate whitespace-nowrap">{displayValue}</span>
         <ChevronDown
-          className={`w-3.5 h-3.5 text-slate-400 transition-transform ${open ? "rotate-180" : ""}`}
+          className={`w-3.5 h-3.5 text-slate-400 transition-transform shrink-0 ${open ? "rotate-180" : ""}`}
         />
       </button>
       {open && !disabled && (

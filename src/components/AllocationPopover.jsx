@@ -383,9 +383,11 @@ const AllocationPopover = ({
                   // Name a stale row from the archived roster first, then the
                   // name the allocations payload carries, then its employee id
                   // — anything that identifies WHICH row to delete.
-                  const name = isStale
-                    ? former?.name || staleAllocationName(alloc)
-                    : emp.name;
+                  const name = formatDisplayName(
+                    isStale
+                      ? former?.name || staleAllocationName(alloc)
+                      : emp.name
+                  );
                   const formerDetail =
                     former?.email || former?.designation || former?.role;
                   const role =

@@ -18,7 +18,6 @@ import {
   ChevronUp,
   Users,
 } from "lucide-react";
-import { format, parseISO } from "date-fns";
 import { getNameInitials, formatDisplayName } from "../utils/displayName";
 import UserAvatar from "./ui/UserAvatar";
 import {
@@ -562,6 +561,7 @@ const EmployeeKPIPanel = ({
                           src={stat.employee.avatar_url}
                           name={formatDisplayName(stat.employee.name)}
                           size="md"
+                          className="flex-shrink-0"
                         />
 
                         <div className="min-w-0">
@@ -619,15 +619,14 @@ const EmployeeKPIPanel = ({
                     <td className="px-2 py-3 text-center">
                       <div className="flex flex-col items-center gap-1">
                         <span
-                          className={`text-base font-extrabold ${
-                            stat.reliabilityScore >= 90
-                              ? "text-emerald-600"
-                              : stat.reliabilityScore >= 75
-                                ? "text-indigo-600"
-                                : stat.reliabilityScore >= 50
-                                  ? "text-amber-500"
-                                  : "text-red-500"
-                          }`}
+                          className={`text-base font-extrabold ${stat.reliabilityScore >= 90
+                            ? "text-emerald-600"
+                            : stat.reliabilityScore >= 75
+                              ? "text-indigo-600"
+                              : stat.reliabilityScore >= 50
+                                ? "text-amber-500"
+                                : "text-red-500"
+                            }`}
                         >
                           {stat.reliabilityScore}%
                         </span>
@@ -701,11 +700,10 @@ const EmployeeKPIPanel = ({
                     <button
                       key={`page-${p}`}
                       onClick={() => setCurrentPage(p)}
-                      className={`h-8 min-w-[32px] px-1 text-[13px] rounded-md transition-colors ${
-                        currentPage === p
-                          ? "bg-indigo-600 text-white font-medium shadow-sm border border-transparent"
-                          : "text-slate-600 border border-transparent hover:bg-slate-100"
-                      }`}
+                      className={`h-8 min-w-[32px] px-1 text-[13px] rounded-md transition-colors ${currentPage === p
+                        ? "bg-indigo-600 text-white font-medium shadow-sm border border-transparent"
+                        : "text-slate-600 border border-transparent hover:bg-slate-100"
+                        }`}
                     >
                       {p}
                     </button>
@@ -776,8 +774,7 @@ const EmployeeKPIPanel = ({
                     <UserAvatar
                       src={employee.avatar_url}
                       name={formatDisplayName(employee.name)}
-                      size="lg"
-                      className="w-12 h-12"
+                      className="w-12 h-12 text-[16px] flex-shrink-0"
                     />
                     <div>
                       <h3 className="font-bold text-slate-800 text-lg leading-snug">
@@ -810,9 +807,9 @@ const EmployeeKPIPanel = ({
                         {selectedMonth === "all"
                           ? "All Time"
                           : format(
-                              parseISO(`${selectedMonth}-01`),
-                              "MMMM yyyy",
-                            )}
+                            parseISO(`${selectedMonth}-01`),
+                            "MMMM yyyy",
+                          )}
                         )
                       </p>
                       <p className="text-xs text-slate-500 mt-1">
@@ -821,15 +818,14 @@ const EmployeeKPIPanel = ({
                     </div>
                     <div className="flex items-center gap-3 bg-white border border-slate-100 shadow-sm rounded-xl px-4 py-2 self-start sm:self-auto shrink-0">
                       <span
-                        className={`text-2xl font-black ${
-                          reliabilityScore >= 90
-                            ? "text-emerald-500"
-                            : reliabilityScore >= 75
-                              ? "text-indigo-500"
-                              : reliabilityScore >= 50
-                                ? "text-amber-500"
-                                : "text-red-500"
-                        }`}
+                        className={`text-2xl font-black ${reliabilityScore >= 90
+                          ? "text-emerald-500"
+                          : reliabilityScore >= 75
+                            ? "text-indigo-500"
+                            : reliabilityScore >= 50
+                              ? "text-amber-500"
+                              : "text-red-500"
+                          }`}
                       >
                         {reliabilityScore}%
                       </span>
@@ -929,13 +925,12 @@ const EmployeeKPIPanel = ({
                             <div className="w-full bg-slate-100 h-2 rounded-full overflow-hidden">
                               <div
                                 style={{ width: `${percentage}%` }}
-                                className={`h-full rounded-full transition-all duration-550 ${
-                                  type === "paid"
-                                    ? "bg-indigo-600"
-                                    : type === "casual_sick"
-                                      ? "bg-emerald-600"
-                                      : "bg-amber-500"
-                                }`}
+                                className={`h-full rounded-full transition-all duration-550 ${type === "paid"
+                                  ? "bg-indigo-600"
+                                  : type === "casual_sick"
+                                    ? "bg-emerald-600"
+                                    : "bg-amber-500"
+                                  }`}
                               />
                             </div>
                           </div>
