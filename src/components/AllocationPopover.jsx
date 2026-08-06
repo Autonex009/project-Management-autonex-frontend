@@ -66,16 +66,6 @@ const Avatar = ({ name, src, muted }) => {
       </div>
     );
   }
-  if (src) {
-    return (
-      <img
-        src={src}
-        alt={name}
-        title={name}
-        className="w-9 h-9 rounded-full object-cover shadow-sm ring-2 ring-white shrink-0"
-      />
-    );
-  }
   return (
     <UserAvatar
       src={src}

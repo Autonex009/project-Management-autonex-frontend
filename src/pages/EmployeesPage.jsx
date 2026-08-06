@@ -2217,17 +2217,11 @@ const EmployeesPage = () => {
               const shortName = formatDisplayName(value) || value;
               return (
                 <div className="flex items-center gap-3">
-                  {row.avatar_url ? (
-                    <img
-                      src={row.avatar_url}
-                      alt={value}
-                      className="w-9 h-9 rounded-full object-cover flex-shrink-0 ring-1 ring-slate-200"
-                    />
-                  ) : (
-                    <div className="w-9 h-9 rounded-full flex items-center justify-center flex-shrink-0 bg-indigo-50 text-indigo-600 text-[13px] font-semibold ring-1 ring-slate-200">
-                      {String(value || "?")[0].toUpperCase()}
-                    </div>
-                  )}
+                  <UserAvatar
+                    src={row.avatar_url}
+                    name={value || "?"}
+                    size="md"
+                  />
                   <div className="group relative min-w-0">
                     <div className="text-[13.5px] font-semibold text-slate-900 truncate leading-tight">
                       {value}

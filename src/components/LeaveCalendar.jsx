@@ -328,18 +328,20 @@ function OverflowPopover({ dateStr, events }) {
       <button
         onClick={handleClick}
         style={{
-          fontSize: "10px",
+          position: "absolute",
+          bottom: "5px",
+          right: "5px",
+          fontSize: "9px",
           fontWeight: 700,
           color: "#4f46e5",
           background: "#e0e7ff",
           border: "none",
-          borderRadius: "6px",
-          padding: "2px 8px",
+          borderRadius: "4px",
+          padding: "1px 4px",
           cursor: "pointer",
           transition: "all 0.15s",
-          marginTop: "2px",
-          alignSelf: "center",
           boxShadow: "0 1px 2px rgba(0,0,0,0.05)",
+          zIndex: 2,
         }}
         onMouseOver={(e) => {
           e.currentTarget.style.background = "#c7d2fe";
@@ -1071,7 +1073,7 @@ export default function LeaveCalendar({ filterEmployeeIds = null }) {
                     <div
                       key={`empty-${idx}`}
                       style={{
-                        minHeight: "52px",
+                        height: "110px",
                         borderRadius: "8px",
                         border: "1px dashed #e2e8f0",
                         background: "rgba(248, 250, 252, 0.5)",
@@ -1147,7 +1149,7 @@ export default function LeaveCalendar({ filterEmployeeIds = null }) {
                     }
                     onClick={() => handleDateClick(dateStr)}
                     style={{
-                      minHeight: "52px",
+                      height: "110px",
                       borderRadius: "8px",
                       border: `1.5px solid ${cellBorder}`,
                       boxShadow:
@@ -1172,6 +1174,7 @@ export default function LeaveCalendar({ filterEmployeeIds = null }) {
                           ? `0 0 0 2.5px ${activeSelectionTheme.border}, 0 4px 12px rgba(0,0,0,0.12)`
                           : "0 2px 12px rgba(0,0,0,0.09)";
                       e.currentTarget.style.transform = "translateY(-1px)";
+                      e.currentTarget.style.zIndex = "10";
                     }}
                     onMouseOut={(e) => {
                       e.currentTarget.style.boxShadow =
@@ -1179,6 +1182,7 @@ export default function LeaveCalendar({ filterEmployeeIds = null }) {
                           ? `0 0 0 2.5px ${activeSelectionTheme.border}, 0 4px 12px rgba(0,0,0,0.08)`
                           : "none";
                       e.currentTarget.style.transform = "translateY(0)";
+                      e.currentTarget.style.zIndex = "";
                     }}
                   >
                     {/* Date number */}
