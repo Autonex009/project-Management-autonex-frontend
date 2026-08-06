@@ -40,14 +40,7 @@ const PMProjectsPage = () => {
 
   return (
     <div className="space-y-6">
-      <div className="flex flex-col sm:flex-row items-start sm:items-center justify-between mb-8 gap-4">
-        <div>
-          <h1 className="text-lg font-semibold text-slate-900">Projects</h1>
-          <p className="text-[13px] text-slate-500 mt-0.5">
-            Main projects owned by you as project manager
-          </p>
-        </div>
-      </div>
+
 
       {scopedProjects.length === 0 ? (
         <div className="bg-white rounded-2xl border border-slate-200 p-12 text-center">

@@ -280,16 +280,7 @@ const ParentProjectsPage = () => {
         </div>
       )}
 
-      {/* Header */}
-      <div className="flex justify-between items-center">
-        <div>
-          <h1 className="text-lg font-semibold bg-gradient-to-r from-slate-900 to-slate-700 bg-clip-text text-transparent">
-            Organizations
-          </h1>
-          <p className="mt-1 text-sm text-slate-500">
-            Manage organizations and long-term initiatives
-          </p>
-        </div>
+      <div className="flex justify-end items-center">
         <div className="flex items-center gap-3">
           <SearchBar
             placeholder="Search organizations..."

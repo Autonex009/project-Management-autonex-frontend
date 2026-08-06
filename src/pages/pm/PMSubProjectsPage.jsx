@@ -55,17 +55,7 @@ const PMSubProjectsPage = () => {
 
   return (
     <div className="space-y-6">
-      <div className="flex flex-col sm:flex-row items-start sm:items-center justify-between mb-8 gap-4">
-        <div>
-          <h1 className="text-lg font-semibold text-slate-900">
-            {currentProject
-              ? `Sub-Projects for ${currentProject.name}`
-              : "Sub-Projects"}
-          </h1>
-          <p className="text-sm text-slate-500">
-            Daily sheets belonging to your PM projects
-          </p>
-        </div>
+      <div className="flex justify-end mb-8 gap-4">
         <Link
           to="/pm/projects"
           className="inline-flex items-center gap-2 px-4 py-2.5 bg-white border border-slate-200 text-slate-700 font-medium text-sm rounded-xl shadow-sm hover:bg-slate-50 transition-colors"

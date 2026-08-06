@@ -34,16 +34,7 @@ const EmployeeGuidelinesPage = () => {
 
   return (
     <div className="space-y-6">
-      <div className="flex flex-col sm:flex-row items-start sm:items-center justify-between mb-8 gap-4">
-        <div>
-          <h1 className="text-lg font-semibold text-slate-900">
-            Project Guidelines
-          </h1>
-          <p className="text-[13px] text-slate-500 mt-0.5">
-            Guidelines for your allocated projects
-          </p>
-        </div>
-      </div>
+
 
       {isLoading ? (
         <div className="text-center py-12 text-slate-400 animate-pulse">

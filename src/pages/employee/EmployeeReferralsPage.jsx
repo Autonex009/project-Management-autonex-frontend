@@ -182,13 +182,7 @@ const EmployeeReferralsPage = () => {
   return (
     <div className="space-y-6">
       {/* Header */}
-      <div className="flex flex-col sm:flex-row items-start sm:items-center justify-between mb-8 gap-4">
-        <div>
-          <h1 className="text-lg font-semibold text-slate-900">My Referrals</h1>
-          <p className="text-slate-500 text-[13px] mt-0.5">
-            Refer talented people you know for open roles at Autonex.
-          </p>
-        </div>
+      <div className="flex justify-end mb-8 gap-4">
         <Button
           variant="success"
           onClick={() => {

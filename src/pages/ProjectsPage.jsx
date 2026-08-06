@@ -2121,20 +2121,7 @@ const ProjectsPage = () => {
 
   return (
     <div className="space-y-4">
-      <div className="flex flex-col md:flex-row md:items-center justify-between gap-4">
-        <div>
-          <h1 className="text-lg font-semibold text-slate-900">
-            {currentMainProject
-              ? `Projects for ${currentMainProject.name}`
-              : "All Projects"}
-          </h1>
-          <p className="text-slate-500 text-[13px] mt-0.5">
-            {currentMainProject
-              ? `Manage tasks and resource allocation for ${currentMainProject.name}`
-              : "Manage tasks and resource allocation across all projects"}
-          </p>
-        </div>
-      </div>
+
 
       {/* Active / Archived / Development tabs — admin only. Archived = Completed /
  On Hold / Cancelled; Development = projects with the Developer type. */}

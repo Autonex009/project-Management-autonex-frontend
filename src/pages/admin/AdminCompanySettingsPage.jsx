@@ -181,17 +181,7 @@ const AdminCompanySettingsPage = () => {
   return (
     <>
       <div className="space-y-6 max-w-4xl">
-        {/* Page Header */}
-        <div>
-          <h1 className="text-lg font-semibold text-slate-900 flex items-center gap-2">
-            <Settings className="w-6 h-6 text-indigo-500" />
-            Company Settings
-          </h1>
-          <p className="text-slate-500 text-sm mt-1">
-            Manage company-wide settings visible to all employees on the Company
-            Info page.
-          </p>
-        </div>
+
 
         {/* General Information Card */}
         <form
