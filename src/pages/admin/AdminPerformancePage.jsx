@@ -428,16 +428,7 @@ const AdminPerformancePage = () => {
 
   return (
     <div className="space-y-4">
-      {/* Header */}
-      <div>
-        <h1 className="text-lg font-semibold text-slate-900">
-          Performance Summary
-        </h1>
-        <p className="text-slate-500 text-[13px] mt-0.5">
-          Read-only summary of monthly reviews — PM ratings per employee,
-          project and month, plus bonus suggestions.
-        </p>
-      </div>
+
 
       {/* KPIs */}
       <div className="grid grid-cols-1 sm:grid-cols-3 gap-3">

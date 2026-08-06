@@ -140,16 +140,7 @@ const PerformanceReviewsPage = () => {
 
   return (
     <div className="space-y-4">
-      {/* Header */}
-      <div>
-        <h1 className="text-lg font-semibold text-slate-900">
-          Monthly Performance Reviews
-        </h1>
-        <p className="text-slate-500 text-[13px] mt-0.5">
-          Review your team's monthly self-ratings — approve or reject each
-          parameter, add your own rating, and suggest bonuses.
-        </p>
-      </div>
+
 
       {/* KPIs */}
       <div className="grid grid-cols-1 sm:grid-cols-3 gap-3">

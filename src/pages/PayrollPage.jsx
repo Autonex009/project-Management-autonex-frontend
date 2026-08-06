@@ -722,18 +722,7 @@ const PayrollPage = () => {
   return (
     <div className="space-y-6">
       {/* Header */}
-      <div className="flex items-center justify-between flex-wrap gap-4">
-        <div>
-          <h1 className="text-lg font-semibold text-slate-800">
-            Salary Calculation
-          </h1>
-          <p className="mt-1 text-sm text-slate-500">
-            {generated && preview
-              ? `${preview.working_days} working-day`
-              : "Working-day"}{" "}
-            payroll — review leaves, adjust deductions, export to Excel.
-          </p>
-        </div>
+      <div className="flex items-center justify-end flex-wrap gap-4">
         <div className="flex items-center gap-3">
           {isFinalized && (
             <div className="group relative">

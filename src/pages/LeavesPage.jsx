@@ -502,15 +502,7 @@ const LeavesPage = () => {
 
   return (
     <div className="space-y-3">
-      {/* Header */}
-      <div>
-        <h1 className="text-lg font-semibold text-slate-900">
-          Leave Management
-        </h1>
-        <p className="mt-0.5 text-[13px] text-slate-500">
-          Track employee leaves, WFH requests, and attendance
-        </p>
-      </div>
+
 
       {/* Tabs · Search · Add Leave */}
       <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3">

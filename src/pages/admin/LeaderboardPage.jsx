@@ -130,23 +130,7 @@ const LeaderboardPage = () => {
 
   return (
     <div className="space-y-6">
-      {/* Header Bar */}
-      <div className="flex flex-col gap-4 sm:flex-row sm:items-center sm:justify-between">
-        <div>
-          <div className="flex items-center gap-2.5">
-            <div className="flex h-10 w-10 items-center justify-center rounded-xl bg-amber-500/10 text-amber-600 ring-1 ring-amber-500/20">
-              <Trophy className="h-5 w-5" />
-            </div>
-            <div>
-              <h1 className="text-xl font-bold text-slate-900">
-                Team Leaderboard
-              </h1>
-              <p className="text-xs font-medium text-slate-500">
-                Autonex team activity & platform hours ranked by performance
-              </p>
-            </div>
-          </div>
-        </div>
+      <div className="flex justify-end">
 
         {/* Time Range Selector */}
         <div className="flex flex-wrap items-center gap-2 rounded-xl border border-slate-200/80 bg-white p-1.5 shadow-sm">
