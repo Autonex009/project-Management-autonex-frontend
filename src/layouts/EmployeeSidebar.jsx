@@ -47,6 +47,19 @@ const accentTheme = {
 const iconBtn =
   "w-9 h-9 flex items-center justify-center rounded-md border border-slate-200 text-slate-500 hover:text-slate-900 hover:bg-slate-100 transition-colors";
 
+// Role names are wire values, not labels: "team_lead" has to read as "Team Lead" and
+// "pm" as "PM", neither of which a plain capitalize would produce.
+const ROLE_LABELS = {
+  admin: "Admin",
+  hr: "HR",
+  pm: "PM",
+  team_lead: "Team Lead",
+  employee: "Employee",
+};
+
+const roleLabel = (role) =>
+  ROLE_LABELS[role] || (role ? role.replace(/_/g, " ") : "");
+
 const EmployeeSidebar = ({
   user = {},
   account,
@@ -198,7 +211,7 @@ const EmployeeSidebar = ({
             />
           </button>
           <div className="absolute bottom-full left-0 mb-2 bg-slate-900 text-white text-xs px-2.5 py-1.5 rounded-lg border border-slate-700 opacity-0 group-hover:opacity-100 transition-opacity duration-200 whitespace-nowrap pointer-events-none z-50 shadow-xl">
-            {account?.email || user?.email || ""} · capitalize(role)
+            {account?.email || user?.email || ""} · {roleLabel(role)}
           </div>
         </div>
 

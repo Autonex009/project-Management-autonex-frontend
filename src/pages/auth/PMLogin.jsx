@@ -67,10 +67,10 @@ const PMLogin = () => {
         <div className="w-full max-w-md rounded-[28px] border border-slate-200 bg-white/95 p-8 shadow-[0_25px_80px_rgba(15,23,42,0.12)] backdrop-blur">
           <div className="mb-8 text-center">
             <h2 className="text-2xl font-bold tracking-tight text-slate-900">
-              Project Manager Login
+              Project Manager &amp; Team Lead Login
             </h2>
             <p className="mt-2 text-sm text-slate-500">
-              Sign in to manage your projects
+              Sign in to manage or follow your projects
             </p>
           </div>
 
@@ -183,7 +183,7 @@ const PMLogin = () => {
         </div>
 
         <p className="mt-8 text-center text-xs text-slate-400">
-          © {new Date().getFullYear()} Autonex Inc. • PM Portal
+          © {new Date().getFullYear()} Autonex Inc. • PM &amp; Team Lead Portal
         </p>
       </div>
     </div>
