@@ -3,9 +3,7 @@ import { useQuery } from "@tanstack/react-query";
 
 import { allocationApi, analyticsApi, authApi, employeeApi, leaveApi, perfEvalApi, subProjectApi, wfhApi } from "../../services/api";
 
-import { AlertCircle, Award, Briefcase, Calendar, Check, ChevronDown, Clock, FolderKanban, Star, TrendingUp, Trophy } from "lucide-react";
-
-// import { differenceInMonths, differenceInYears, format, parseISO } from "date-fns";
+import { AlertCircle, Award, Briefcase, Calendar, CalendarDays, Check, ChevronDown, Sun, Clock, FolderKanban, Star, TrendingUp, Trophy } from "lucide-react";
 
 import { ANNUAL_LEAVE_QUOTA, INTERN_MONTHLY_PAID_QUOTA, getWorkingDayCount, isIntern } from "../../utils/leaveTypes";
 
@@ -105,6 +103,9 @@ const EmployeeDashboard = () => {
     queryFn: () => employeeApi.getOne(employeeId),
     enabled: !!employeeId,
   });
+  
+  const loggedInEncordId =
+    employee?.encord_id?.trim().toLowerCase() || "";
 
   // 4. Fetch allocated projects for this employee
   const { data: allocations = [] } = useQuery({
@@ -138,6 +139,80 @@ const EmployeeDashboard = () => {
     queryFn: () => perfEvalApi.getAll({ employee_id: employeeId }),
     enabled: !!employeeId,
   });
+
+  const leaderboardParams = {
+    range: "month",
+  };
+
+  const { data: leaderboardData } = useQuery({
+    queryKey: ["employee-dashboard-leaderboard"],
+    queryFn: () => analyticsApi.getLeaderboard(leaderboardParams),
+  });
+
+  const { data: dailyLeaderboard } = useQuery({
+    queryKey: ["leaderboard-day"],
+    queryFn: () => analyticsApi.getLeaderboard({ range: "day" }),
+  });
+
+  const { data: weeklyLeaderboard } = useQuery({
+    queryKey: ["leaderboard-week"],
+    queryFn: () => analyticsApi.getLeaderboard({ range: "week" }),
+  });
+
+  const { data: monthlyLeaderboard } = useQuery({
+    queryKey: ["leaderboard-month"],
+    queryFn: () => analyticsApi.getLeaderboard({ range: "month" }),
+  });
+
+  const myLeaderboard = useMemo(() => {
+    const leaderboard = leaderboardData?.leaderboard || [];
+
+    const ranked = [...leaderboard]
+      .sort((a, b) => (b.total_hours || 0) - (a.total_hours || 0))
+      .map((item, index) => ({
+        ...item,
+        rank: index + 1,
+      }));
+
+    const encordId = loggedInEncordId;
+
+    if (!encordId) return null;
+
+    return ranked.find(
+      (emp) =>
+        (emp.user_email || "").trim().toLowerCase() === encordId
+    );
+  }, [leaderboardData, account, localUser]);
+
+  const getEmployeeRank = (leaderboard) => {
+    if (!leaderboard?.leaderboard || !loggedInEncordId) return null;
+
+    const ranked = [...leaderboard.leaderboard].sort(
+      (a, b) => (b.total_hours || 0) - (a.total_hours || 0)
+    );
+
+    const index = ranked.findIndex(
+      (item) =>
+        (item.user_email || "").trim().toLowerCase() === loggedInEncordId
+    );
+
+    return index >= 0 ? index + 1 : null;
+  };
+
+  const dailyRank = useMemo(
+    () => getEmployeeRank(dailyLeaderboard),
+    [dailyLeaderboard, loggedInEncordId]
+  );
+
+  const weeklyRank = useMemo(
+    () => getEmployeeRank(weeklyLeaderboard),
+    [weeklyLeaderboard, loggedInEncordId]
+  );
+
+  const monthlyRank = useMemo(
+    () => getEmployeeRank(monthlyLeaderboard),
+    [monthlyLeaderboard, loggedInEncordId]
+  );
 
   // ── Extract Profile details
   const profile = useMemo(() => {
@@ -448,6 +523,10 @@ const EmployeeDashboard = () => {
       isInternOrContractor: internOrContractor,
     };
   }, [allLeaves, myWfh, internOrContractor, currentYear, currentMonth, todayStr]);
+ 
+  const leaderboardAvailable =
+  !!loggedInEncordId &&
+  (dailyRank !== null || weeklyRank !== null || monthlyRank !== null);
 
   return (
     // <div className="w-full max-w-7xl mx-auto space-y-3 p-2 sm:p-3.5 bg-slate-50/50 min-h-screen text-slate-800 font-sans">
@@ -994,38 +1073,56 @@ const EmployeeDashboard = () => {
 
           {/* Leaderboard Ranking */}
           <div className="bg-white rounded-3xl p-3.5 border border-slate-200/80 shadow-sm hover:shadow-md transition-all duration-300">
-            <h3 className="font-bold text-slate-800 text-sm">Leaderboard Ranking</h3>
-            <p className="text-[11px] text-slate-400 font-semibold mb-2">
+            <h3 className="font-bold text-slate-800 text-sm">
+              Leaderboard Ranking
+            </h3>
+
+            <p className="text-[11px] text-slate-400 font-medium mb-2.5">
               Global ranking (based on platform time)
             </p>
 
-            <div className="grid grid-cols-3 gap-2">
-              <div className="bg-slate-50/80 border border-slate-100 rounded-2xl p-2.5 text-center">
-                <p className="text-xs text-slate-500 font-semibold">Daily</p>
-                <div className="flex items-center justify-center gap-1 mt-0.5">
-                  <span className="text-base font-extrabold text-slate-800">#5</span>
-                  <span className="text-emerald-500 font-bold text-xs">↑</span>
+            {leaderboardAvailable ? (
+              <div className="grid grid-cols-3 gap-2">
+
+                <div className="rounded-xl border border-amber-200 bg-amber-50/70 px-2 py-2 text-center">
+                  <p className="text-[10px] font-semibold text-amber-700">
+                    Yesterday
+                  </p>
+                  <p className="text-lg font-black text-slate-900 mt-0.5">
+                    #{dailyRank}
+                  </p>
                 </div>
-              </div>
 
-              <div className="bg-slate-50/80 border border-slate-100 rounded-2xl p-2.5 text-center">
-                <p className="text-xs text-slate-500 font-semibold">Weekly</p>
-                <div className="flex items-center justify-center gap-1 mt-0.5">
-                  <span className="text-base font-extrabold text-slate-800">#3</span>
-                  <span className="text-emerald-500 font-bold text-xs">↑</span>
+                <div className="rounded-xl border border-emerald-200 bg-emerald-50/70 px-2 py-2 text-center">
+                  <p className="text-[10px] font-semibold text-emerald-700">
+                    Week
+                  </p>
+                  <p className="text-lg font-black text-slate-900 mt-0.5">
+                    #{weeklyRank}
+                  </p>
                 </div>
-              </div>
 
-              <div className="bg-slate-50/80 border border-slate-100 rounded-2xl p-2.5 text-center">
-                <p className="text-xs text-slate-500 font-semibold">Monthly</p>
-                <div className="flex items-center justify-center gap-1 mt-0.5">
-                  <span className="text-base font-extrabold text-slate-800">#7</span>
-                  <span className="text-rose-500 font-bold text-xs">↓</span>
+                <div className="rounded-xl border border-indigo-200 bg-indigo-50/70 px-2 py-2 text-center">
+                  <p className="text-[10px] font-semibold text-indigo-700">
+                    Month
+                  </p>
+                  <p className="text-lg font-black text-slate-900 mt-0.5">
+                    #{monthlyRank}
+                  </p>
                 </div>
+
               </div>
+            ) : (
+              <div className="rounded-2xl border border-dashed border-slate-200 bg-slate-50 py-5 px-4 text-center">
+                <p className="text-sm font-semibold text-slate-600">
+                  Ranking not available
+                </p>
 
-            </div>
-
+                <p className="text-xs text-slate-400 mt-1">
+                  Your Encord account is not linked or no leaderboard data is available yet.
+                </p>
+              </div>
+            )}
           </div>
 
         </div>
