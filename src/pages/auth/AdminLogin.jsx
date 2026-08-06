@@ -35,6 +35,7 @@ const AdminLogin = () => {
       localStorage.setItem("token", data.token);
       localStorage.setItem("user", JSON.stringify(data.user));
       localStorage.setItem("role", data.user.role);
+      localStorage.removeItem("admin-sidebar-width");
       toast.success("Signed in successfully");
       navigate(from, { replace: true });
     },

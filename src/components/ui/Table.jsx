@@ -156,54 +156,68 @@ export const Table = ({
                 </td>
               </tr>
             ) : (
-              paginatedData.map((row, idx) => {
-                const rowBg =
-                  isStriped && idx % 2 !== 0 ? "bg-slate-50/50 " : "bg-white ";
-                const extraClass = rowClassName ? rowClassName(row, idx) : "";
-                const isLast = idx === paginatedData.length - 1;
-                return (
-                  <React.Fragment key={getRowId(row) ?? idx}>
-                    <tr
-                      onClick={
-                        onRowClick ? () => onRowClick(row, idx) : undefined
-                      }
-                      className={`${rowBg} h-[52px] hover:bg-slate-50 transition-colors ${onRowClick ? "cursor-pointer" : ""
-                        } ${extraClass}`}
-                    >
-                      {columns.map((col, cIdx) => (
-                        <td
-                          key={col.key}
-                          className={`${cellPad} ${cellText} align-middle whitespace-nowrap ${isLast && cIdx === 0
-                            ? "rounded-bl-2xl"
-                            : isLast && cIdx === columns.length - 1
-                              ? "rounded-br-2xl"
-                              : ""
-                            } ${col.align === "center"
-                              ? "text-center"
-                              : col.align === "right"
-                                ? "text-right"
-                                : "text-left"
-                            } ${col.sticky === "right"
-                              ? `sticky ${col.stickyOffset || "right-0"} ${rowBg} shadow-[-8px_0_8px_-8px_rgba(0,0,0,0.1)]`
-                              : ""
-                            }`}
-                        >
-                          {col.render
-                            ? col.render(row[col.key], row, context)
-                            : (row[col.key] ?? "—")}
+              <>
+                {paginatedData.map((row, idx) => {
+                  const rowBg =
+                    isStriped && idx % 2 !== 0 ? "bg-slate-50/50 " : "bg-white ";
+                  const extraClass = rowClassName ? rowClassName(row, idx) : "";
+                  const isLast = idx === paginatedData.length - 1 && paginatedData.length === pageSize;
+                  return (
+                    <React.Fragment key={getRowId(row) ?? idx}>
+                      <tr
+                        onClick={
+                          onRowClick ? () => onRowClick(row, idx) : undefined
+                        }
+                        className={`${rowBg} h-[52px] hover:bg-slate-50 transition-colors ${onRowClick ? "cursor-pointer" : ""
+                          } ${extraClass}`}
+                      >
+                        {columns.map((col, cIdx) => (
+                          <td
+                            key={col.key}
+                            className={`${cellPad} ${cellText} align-middle whitespace-nowrap ${isLast && cIdx === 0
+                              ? "rounded-bl-2xl"
+                              : isLast && cIdx === columns.length - 1
+                                ? "rounded-br-2xl"
+                                : ""
+                              } ${col.align === "center"
+                                ? "text-center"
+                                : col.align === "right"
+                                  ? "text-right"
+                                  : "text-left"
+                              } ${col.sticky === "right"
+                                ? `sticky ${col.stickyOffset || "right-0"} ${rowBg} shadow-[-8px_0_8px_-8px_rgba(0,0,0,0.1)]`
+                                : ""
+                              }`}
+                          >
+                            {col.render
+                              ? col.render(row[col.key], row, context)
+                              : (row[col.key] ?? "—")}
+                          </td>
+                        ))}
+                      </tr>
+                      {renderExpandedRow && expandedRowId === getRowId(row) && (
+                        <tr>
+                          <td colSpan={columns.length} className="p-0">
+                            {renderExpandedRow(row)}
+                          </td>
+                        </tr>
+                      )}
+                    </React.Fragment>
+                  );
+                })}
+                {/* Filler rows to maintain a consistent table height across all pages */}
+                {paginatedData.length > 0 && paginatedData.length < pageSize && (
+                  Array.from({ length: pageSize - paginatedData.length }).map((_, fIdx) => (
+                    <tr key={`filler-${fIdx}`} className="h-[52px]">
+                      {columns.map((col) => (
+                        <td key={col.key} className={`${cellPad} ${cellText} align-middle whitespace-nowrap text-transparent pointer-events-none select-none`}>
+                          &nbsp;
                         </td>
                       ))}
                     </tr>
-                    {renderExpandedRow && expandedRowId === getRowId(row) && (
-                      <tr>
-                        <td colSpan={columns.length} className="p-0">
-                          {renderExpandedRow(row)}
-                        </td>
-                      </tr>
-                    )}
-                  </React.Fragment>
-                );
-              })
+                  ))
+                )}
+              </>
             )}
           </tbody>
         </table>

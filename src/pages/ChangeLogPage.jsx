@@ -13,6 +13,7 @@ import Table from "../components/ui/Table";
 import DatePicker from "../components/ui/DatePicker";
 import Dropdown from "../components/ui/Dropdown";
 import { formatDisplayName } from "../utils/displayName";
+import UserAvatar from "../components/ui/UserAvatar";
 
 const PAGE_SIZE = 25;
 
@@ -243,92 +244,90 @@ export default function ChangeLogPage() {
 
   return (
     <div className="bg-white min-h-screen p-6 space-y-6">
-      {/* Header section matching mockup */}
-      <div className="space-y-2 border-b border-slate-100 pb-4">
-        <h1 className="text-2xl font-bold text-slate-900 tracking-tight">
-          Audit Log
-        </h1>
-        <p className="text-sm text-slate-600 max-w-4xl leading-relaxed">
-          The audit log gives you a history of changes to your Confluence site. It can be very useful for tracking down things like permissions, global settings, or add-on changes.
-        </p>
-      </div>
 
       {/* Toolbar & Controls */}
-      <div className="space-y-4">
-        <div className="flex flex-wrap items-center justify-between gap-4">
-          <div className="flex flex-wrap items-center gap-3">
-            {/* Filter by keyword search box */}
-            <div className="relative">
-              <input
-                type="text"
-                value={searchInput}
-                onChange={(e) => setSearchInput(e.target.value)}
-                placeholder="Filter by keyword"
-                className="w-56 rounded-md border border-slate-300 bg-white px-3 py-1.5 text-sm text-slate-800 placeholder:text-slate-400 focus:border-blue-500 focus:outline-none focus:ring-1 focus:ring-blue-500"
+      <div className="flex flex-wrap items-center justify-between gap-3">
+
+        {/* LEFT: Role tabs */}
+        <div className="flex items-center gap-1 bg-slate-100/70 rounded-lg p-1 shrink-0">
+          {roleOptions.map(({ value, label }) => {
+            const isActive = actorRole === value;
+            return (
+              <button
+                key={value}
+                type="button"
+                onClick={() => { setActorRole(value); setPage(1); }}
+                className={`px-3 py-1 rounded-md text-sm font-medium transition-all whitespace-nowrap ${isActive
+                    ? "bg-white text-indigo-700 shadow-sm ring-1 ring-slate-200/80 font-semibold"
+                    : "text-slate-500 hover:text-slate-800 hover:bg-white/60"
+                  }`}
+              >
+                {label}
+              </button>
+            );
+          })}
+        </div>
+
+        {/* RIGHT: Search + filters + refresh */}
+        <div className="flex flex-wrap items-center gap-3">
+          {/* Filter by keyword search box */}
+          <div className="relative">
+            <input
+              type="text"
+              value={searchInput}
+              onChange={(e) => setSearchInput(e.target.value)}
+              placeholder="Filter by keyword"
+              className="w-56 rounded-md border border-slate-300 bg-white px-3 py-1.5 text-sm text-slate-800 placeholder:text-slate-400 focus:border-blue-500 focus:outline-none focus:ring-1 focus:ring-blue-500"
+            />
+            <Search className="absolute right-2.5 top-2.5 h-4 w-4 text-slate-400 pointer-events-none" />
+          </div>
+
+          {/* Filter by Time dropdown */}
+          <Dropdown
+            className="w-[215px] shrink-0"
+            options={TIME_FILTER_OPTIONS}
+            value={timeFilter}
+            onChange={handleTimeFilterChange}
+          />
+
+          {/* Custom date range selector */}
+          {showCustomDateModal && (
+            <div className="w-60 shrink-0">
+              <DatePicker
+                type="range"
+                startDate={dateFrom}
+                endDate={dateTo}
+                onRangeChange={({ startDate, endDate }) => {
+                  setDateFrom(startDate);
+                  setDateTo(endDate);
+                  setPage(1);
+                }}
+                placeholder="Select date range"
               />
-              <Search className="absolute right-2.5 top-2.5 h-4 w-4 text-slate-400 pointer-events-none" />
             </div>
+          )}
 
-            {/* Filter by Time dropdown */}
-            <Dropdown
-              className="w-[215px] shrink-0"
-              options={TIME_FILTER_OPTIONS}
-              value={timeFilter}
-              onChange={handleTimeFilterChange}
-            />
+          {/* Category filter */}
+          <Dropdown
+            className="w-44 shrink-0"
+            options={categoryOptions}
+            value={category}
+            onChange={(v) => {
+              setCategory(v);
+              setPage(1);
+            }}
+          />
 
-            {/* Custom date range selector inline to the right of Filter by Time */}
-            {showCustomDateModal && (
-              <div className="w-60 shrink-0">
-                <DatePicker
-                  type="range"
-                  startDate={dateFrom}
-                  endDate={dateTo}
-                  onRangeChange={({ startDate, endDate }) => {
-                    setDateFrom(startDate);
-                    setDateTo(endDate);
-                    setPage(1);
-                  }}
-                  placeholder="Select date range"
-                />
-              </div>
-            )}
-
-            {/* Category filter */}
-            <Dropdown
-              className="w-44 shrink-0"
-              options={categoryOptions}
-              value={category}
-              onChange={(v) => {
-                setCategory(v);
-                setPage(1);
-              }}
-            />
-
-            {/* Role filter */}
-            <Dropdown
-              className="w-36 shrink-0"
-              options={roleOptions}
-              value={actorRole}
-              onChange={(v) => {
-                setActorRole(v);
-                setPage(1);
-              }}
-            />
-          </div>
-
-          {/* Right Action buttons */}
-          <div className="flex items-center gap-4">
-            <button
-              type="button"
-              onClick={() => refetch()}
-              title="Refresh audit log"
-              className="inline-flex items-center gap-1.5 text-sm font-medium text-slate-700 hover:text-blue-600 transition-colors"
-            >
-              <RefreshCw className={`h-4 w-4 text-slate-500 ${isFetching ? "animate-spin" : ""}`} />
-              Refresh
-            </button>
-          </div>
+          {/* Refresh */}
+          <button
+            type="button"
+            onClick={() => refetch()}
+            title="Refresh audit log"
+            className="inline-flex items-center gap-1.5 text-sm font-medium text-slate-700 hover:text-blue-600 transition-colors"
+          >
+            <RefreshCw className={`h-4 w-4 text-slate-500 ${isFetching ? "animate-spin" : ""}`} />
+            Refresh
+          </button>
         </div>
       </div>
 
@@ -438,11 +437,11 @@ export default function ChangeLogPage() {
           {
             key: "created_at",
             label: "Time",
-            width: "w-[16%]",
+            width: "w-[12%]",
             render: (val) => {
               const f = formatTimestamp(val);
               return (
-                <div className="text-slate-700 text-xs font-normal whitespace-nowrap" title={f.isoFull}>
+                <div className="text-slate-700 text-[13px] font-normal whitespace-nowrap" title={f.isoFull}>
                   {f.formattedShort}
                 </div>
               );
@@ -451,15 +450,22 @@ export default function ChangeLogPage() {
           {
             key: "actor",
             label: "User",
-            width: "w-[15%]",
+            width: "w-[18%]",
             render: (actor) => {
               const name = formatDisplayName(actor?.name) || actor?.name || "Administrator";
               return (
                 <div
-                  className="font-medium text-blue-600 hover:underline cursor-pointer text-xs truncate"
+                  className="flex items-center gap-2 min-w-0"
                   title={`${name}${actor?.role ? ` (${actor.role})` : ""}`}
                 >
-                  {name}
+                  <UserAvatar
+                    src={actor?.avatar_url}
+                    name={name}
+                    size="sm"
+                  />
+                  <span className="font-bold text-slate-900 text-[13px] truncate">
+                    {name}
+                  </span>
                 </div>
               );
             },
@@ -467,13 +473,13 @@ export default function ChangeLogPage() {
           {
             key: "category",
             label: "Event type",
-            width: "w-[14%]",
+            width: "w-[10%]",
             render: (val) => {
               const catName = val ? val.charAt(0).toUpperCase() + val.slice(1) : "General";
               const badgeStyle = getCategoryBadgeClass(val);
               return (
                 <span
-                  className={`inline-block px-2 py-0.5 rounded text-[11px] font-semibold border ${badgeStyle} truncate max-w-[110px]`}
+                  className={`inline-block px-2 py-0.5 rounded text-[11.5px] font-semibold border ${badgeStyle} truncate max-w-[110px]`}
                   title={catName}
                 >
                   {catName}
@@ -484,12 +490,12 @@ export default function ChangeLogPage() {
           {
             key: "summary",
             label: "Change",
-            width: "w-[34%]",
+            width: "w-[36%]",
             render: (summary, row) => {
               const cleaned = cleanSummaryText(summary || row.action, row.subject_name) || "Settings modified";
               return (
                 <div
-                  className="text-slate-800 text-xs font-normal leading-snug truncate pr-3"
+                  className="text-slate-800 text-[13px] font-normal leading-snug truncate pr-3"
                   title={cleaned}
                 >
                   {cleaned}
@@ -509,7 +515,7 @@ export default function ChangeLogPage() {
               } else if (row.entity_type) {
                 text = `${row.entity_type}${row.entity_id != null ? ` #${row.entity_id}` : ""}`;
               }
-              if (!text) return <span className="text-slate-400 text-xs">—</span>;
+              if (!text) return <span className="text-slate-400 text-[13px]">—</span>;
 
               return (
                 <span
@@ -524,7 +530,7 @@ export default function ChangeLogPage() {
           {
             key: "actions",
             label: "Actions",
-            width: "w-[8%]",
+            width: "w-[11%]",
             align: "right",
             render: (_, row) => {
               const isExpanded = expandedId === row.id;
@@ -535,7 +541,7 @@ export default function ChangeLogPage() {
                     e.stopPropagation();
                     setExpandedId(isExpanded ? null : row.id);
                   }}
-                  className="text-blue-600 hover:text-blue-800 hover:underline text-xs font-medium whitespace-nowrap cursor-pointer"
+                  className="text-blue-600 hover:text-blue-800 hover:underline text-[13px] font-medium whitespace-nowrap cursor-pointer"
                 >
                   {isExpanded ? "Hide details" : "Show more"}
                 </button>

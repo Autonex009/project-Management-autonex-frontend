@@ -28,7 +28,7 @@ import {
 
 const MIN_WIDTH = 200;
 const MAX_WIDTH = 400;
-const DEFAULT_WIDTH = 200;
+const DEFAULT_WIDTH = MIN_WIDTH;
 
 const EmployeeLayout = () => {
   const location = useLocation();
