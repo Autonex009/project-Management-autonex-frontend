@@ -35,6 +35,53 @@ function parseDateInput(val, type = "date") {
   return null;
 }
 
+const ACCENT_STYLES = {
+  emerald: {
+    selected: "bg-emerald-600 text-white font-semibold shadow-md shadow-emerald-600/30",
+    inRangeBg: "bg-emerald-100/70",
+    inRangeText: "text-emerald-900",
+    today: "bg-emerald-50 text-emerald-700 font-semibold",
+    triggerOpen: "border-emerald-500 ring-4 ring-emerald-500/15 bg-white text-slate-900 font-medium",
+    iconOpen: "text-emerald-600",
+  },
+  purple: {
+    selected: "bg-purple-600 text-white font-semibold shadow-md shadow-purple-600/30",
+    inRangeBg: "bg-purple-100/70",
+    inRangeText: "text-purple-900",
+    today: "bg-purple-50 text-purple-700 font-semibold",
+    triggerOpen: "border-purple-500 ring-4 ring-purple-500/15 bg-white text-slate-900 font-medium",
+    iconOpen: "text-purple-600",
+  },
+  indigo: {
+    selected: "bg-indigo-600 text-white font-semibold shadow-md shadow-indigo-600/30",
+    inRangeBg: "bg-indigo-100/70",
+    inRangeText: "text-indigo-900",
+    today: "bg-indigo-50 text-indigo-700 font-semibold",
+    triggerOpen: "border-indigo-500 ring-4 ring-indigo-500/15 bg-white text-slate-900 font-medium",
+    iconOpen: "text-indigo-600",
+  },
+  blue: {
+    selected: "bg-blue-600 text-white font-semibold shadow-md shadow-blue-600/30",
+    inRangeBg: "bg-blue-100/70",
+    inRangeText: "text-blue-900",
+    today: "bg-blue-50 text-blue-700 font-semibold",
+    triggerOpen: "border-blue-500 ring-4 ring-blue-500/15 bg-white text-slate-900 font-medium",
+    iconOpen: "text-blue-600",
+  },
+  red: {
+    selected: "bg-red-700 text-white font-semibold shadow-md shadow-red-700/30",
+    inRangeBg: "bg-red-100/70",
+    inRangeText: "text-red-900",
+    today: "bg-red-50 text-red-700 font-semibold",
+    triggerOpen: "border-red-500 ring-4 ring-red-500/15 bg-white text-slate-900 font-medium",
+    iconOpen: "text-red-600",
+  },
+};
+ACCENT_STYLES.success = ACCENT_STYLES.emerald;
+ACCENT_STYLES.green = ACCENT_STYLES.emerald;
+ACCENT_STYLES.primary = ACCENT_STYLES.indigo;
+ACCENT_STYLES.wfh = ACCENT_STYLES.purple;
+
 export default function DatePicker({
   type = "date", // "date", "month", or "range"
   value,
@@ -49,8 +96,10 @@ export default function DatePicker({
   placeholder,
   name,
   required,
+  accentColor = "emerald",
   ...props
 }) {
+  const accent = ACCENT_STYLES[accentColor] || ACCENT_STYLES.emerald;
   const [isOpen, setIsOpen] = useState(false);
   const [internalValue, setInternalValue] = useState("");
   const containerRef = useRef(null);
@@ -306,7 +355,7 @@ export default function DatePicker({
               dayEls.push(
                 <div
                   key={cloneDay.toISOString()}
-                  className={`flex justify-center py-0.5 ${inRange && !disabled ? "bg-red-100/70" : ""
+                  className={`flex justify-center py-0.5 ${inRange && !disabled ? accent.inRangeBg : ""
                     } ${rStart ? "rounded-l-full" : ""} ${rEnd ? "rounded-r-full" : ""}`}
                   onMouseEnter={() => type === "range" && setHoverDate(cloneDay)}
                 >
@@ -317,11 +366,11 @@ export default function DatePicker({
                     className={`w-8 h-8 flex items-center justify-center rounded-full text-[13px] transition-all focus:outline-none ${disabled
                         ? "text-slate-300 cursor-not-allowed bg-transparent hover:bg-transparent"
                         : rStart || rEnd || isSelected
-                          ? "bg-red-700 text-white font-semibold shadow-md shadow-red-700/30"
+                          ? accent.selected
                           : inRange
-                            ? "text-red-900 font-semibold"
+                            ? accent.inRangeText
                             : isToday
-                              ? "bg-red-50 text-red-700 font-semibold"
+                              ? accent.today
                               : isCurrentMonth
                                 ? "text-slate-700 hover:bg-slate-100 hover:text-slate-900"
                                 : "text-slate-300 hover:bg-slate-50"
@@ -382,7 +431,7 @@ export default function DatePicker({
                 type="button"
                 onClick={() => handleSelectMonth(i)}
                 className={`py-2 text-[13px] rounded-xl transition-all focus:outline-none ${isSelected
-                    ? "bg-red-700 text-white font-medium shadow-md shadow-red-700/25"
+                    ? accent.selected
                     : "text-slate-600 hover:bg-slate-100 hover:text-slate-900"
                   }`}
               >
@@ -436,13 +485,13 @@ export default function DatePicker({
         className={`w-full h-9 pl-9 pr-3 rounded-lg border text-[13px] text-left transition-all shadow-sm focus:outline-none flex items-center justify-between ${error
             ? "border-red-400 bg-red-50 text-red-700 focus:ring-4 focus:ring-red-500/10"
             : isOpen
-              ? "border-red-500 ring-4 ring-red-500/15 bg-white text-slate-900 font-medium"
+              ? accent.triggerOpen
               : "border-slate-200 bg-white hover:border-slate-300 text-slate-700 hover:text-slate-900"
           }`}
         {...props}
       >
         <div
-          className={`absolute left-3 top-1/2 -translate-y-1/2 pointer-events-none transition-colors ${isOpen ? "text-red-600" : "text-slate-400"
+          className={`absolute left-3 top-1/2 -translate-y-1/2 pointer-events-none transition-colors ${isOpen ? accent.iconOpen : "text-slate-400"
             }`}
         >
           <CalendarIcon className="w-4 h-4" />
