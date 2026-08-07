@@ -3,6 +3,7 @@ import { Users, BookOpen, Award, CheckCircle, HelpCircle } from "lucide-react";
 import { onboardingApi } from "../../services/api";
 import Table from "../../components/ui/Table";
 import Spinner from "../../components/ui/LoadingSpinner";
+import UserAvatar from "../../components/ui/UserAvatar";
 
 const PMOnboardingDashboard = ({ embedded = false }) => {
   const [mentees, setMentees] = useState([]);
@@ -134,15 +135,14 @@ const PMOnboardingDashboard = ({ embedded = false }) => {
                   label: "Candidate",
                   render: (value, m) => (
                     <div className="flex items-center gap-3">
-                      <div className="h-9 w-9 rounded-full flex items-center justify-center text-white text-xs font-bold bg-gradient-to-br from-blue-600 to-cyan-500 shadow-sm uppercase flex-shrink-0">
-                        {value
-                          ? value
-                              .split(" ")
-                              .map((n) => n[0])
-                              .join("")
-                              .substring(0, 2)
-                          : "EM"}
-                      </div>
+                      {/* Profile picture; UserAvatar falls back to the same
+                          gradient initials when there is no avatar or it 404s. */}
+                      <UserAvatar
+                        src={m.avatarUrl}
+                        name={value || "EM"}
+                        size="h-9 w-9 text-xs"
+                        fallbackClassName="bg-gradient-to-br from-blue-600 to-cyan-500 !text-white font-bold shadow-sm"
+                      />
                       <div>
                         <p className="font-bold text-slate-800 text-sm">
                           {value}

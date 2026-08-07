@@ -445,11 +445,14 @@ const LeaderboardPage = () => {
                     name={row.employee_name || row.user_email}
                     size="sm"
                   />
+                  {/* Wraps rather than truncates — the Encord email is the only
+                      identifier an unlinked annotator has, so it must be readable
+                      in full however long it is. */}
                   <div className="min-w-0">
-                    <div className="font-semibold text-slate-900 truncate">
+                    <div className="font-semibold text-slate-900 break-words">
                       {row.employee_name || formatDisplayName(row.user_email)}
                     </div>
-                    <div className="text-xs text-slate-400 truncate">
+                    <div className="text-xs text-slate-400 break-words">
                       {row.user_email}
                     </div>
                   </div>
