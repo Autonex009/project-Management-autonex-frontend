@@ -99,32 +99,44 @@ export const manpowerEmployeeIds = ({
 /**
  * Required headcount as the UI must show it:
  *
- *     PMs + team leads + Autonex annotators + Autonex reviewers
+ *     annotators + reviewers + others [+ developers] + managers + leads
  *
- * `required` is the server's `required_manpower` (annotators + reviewers, see
- * `_autonex_headcount`); the managers and leads running the project are added
- * here because they are people on it too, and `manpowerEmployeeIds` already
- * counts them on the allocated side. Leaving them off one side only is what made
- * a project with 1 PM on it read 1/2.
+ * Computed from the project's own columns and the *live* manager/lead sets, rather
+ * than read from the stored `required_manpower`.
  *
- * PMs and leads are counted whether or not they hold an allocation, and the two
- * sets are disjoint — the pickers stop the same person being both on one project
- * — so nobody is counted twice. Anyone off the roster is skipped, since stale
- * rows must not inflate the requirement.
+ * The stored total is only refreshed when someone saves the project, so it goes
+ * stale the moment a designation changes or a lead is allocated — a project run by
+ * 5 managers and 3 leads showed 0 required simply because nobody had re-saved it.
+ * Deriving it here means the number is right without a migration or a re-save, and
+ * it cannot disagree with the names printed beside it.
+ *
+ * `team_lead_count` / `team_manager_count` are deliberately NOT read: they are a
+ * saved copy of the same two sets, and using both would count everyone twice.
+ *
+ * "Total Annotators" is excluded — it counts the vendor's people as well as ours,
+ * so it is informational rather than a headcount we staff.
  */
 export const totalRequiredManpower = ({
-  required = 0,
+  project,
   pmIds = [],
   leadIds = [],
   employeeIndex,
 } = {}) => {
+  const n = (value) => Number(value) || 0;
+  const roles =
+    n(project?.autonex_annotators) +
+    n(project?.autonex_reviewers) +
+    n(project?.others_count) +
+    n(project?.developers_count);
+
   const onRoster = (id) =>
     id != null && (!employeeIndex || employeeIndex.has(String(id)));
   const people = new Set();
   [...(pmIds || []), ...(leadIds || [])].forEach((id) => {
     if (onRoster(id)) people.add(String(id));
   });
-  return (required || 0) + people.size;
+
+  return roles + people.size;
 };
 
 /**

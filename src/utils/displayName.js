@@ -65,6 +65,27 @@ export const toShortName = (name) => {
 export const formatDisplayName = (name) => toShortName(toDisplayCase(name));
 
 /**
+ * The text a name should be SEARCHED against — the stored name AND the shortened
+ * label, lowercased.
+ *
+ * Both are needed, because neither contains the other:
+ *
+ *   stored "Vishwatej Babasaheb Sarang"  — typing the middle name only matches here
+ *   label  "Vishwatej Sarang"            — typing what is on screen only matches here
+ *
+ * Filtering on the label alone loses anyone searched for by their middle name;
+ * filtering on the stored name alone loses anyone searched for by the name the
+ * table actually shows them. Use this anywhere a query is matched against a
+ * person, and keep `formatDisplayName` for rendering.
+ */
+export const nameSearchText = (name) => {
+  const full = String(name ?? "").trim();
+  if (!full) return "";
+  const short = formatDisplayName(full);
+  return (short && short !== full ? `${full} ${short}` : full).toLowerCase();
+};
+
+/**
  * Initials for an avatar, from the same shortened form so the circle agrees with
  * the label beside it — "VS" for Vishwatej Sarang, not "VB".
  */

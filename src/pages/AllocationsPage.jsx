@@ -30,6 +30,7 @@ import toast from "react-hot-toast";
 import ConfirmDialog from "../components/ui/ConfirmDialog";
 import { getPmEmployeeId, getPmSubProjects } from "../utils/pmScope";
 import {
+  demotedToLeadIds,
   isProjectScopedRole,
   isTeamLeadAllocation,
   resolveProjectPmIds,
@@ -48,7 +49,7 @@ import Modal from "../components/ui/Modal";
 import AllocationPopover from "../components/AllocationPopover";
 import Dropdown from "../components/ui/Dropdown";
 import SearchBar from "../components/ui/SearchBar";
-import { formatDisplayName } from "../utils/displayName";
+import { formatDisplayName, nameSearchText } from "../utils/displayName";
 
 // Stable color palette for avatars based on the employee name
 const AVATAR_PALETTE = [
@@ -482,16 +483,26 @@ const AllocationsPage = () => {
   // manpowerEmployeeIds adds them to assigned, totalRequiredManpower adds them to required.
   // Both resolvers are shared with the Projects page — a near-copy here previously drifted
   // and the two screens reported different requirements for one project.
-  const resolvePmIds = (project) => resolveProjectPmIds(project, parentProjects);
+  const resolvePmIds = (project) =>
+    resolveProjectPmIds(project, parentProjects, employeeIndex);
 
-  const resolveLeadIds = (project) =>
-    allocations
+  const resolveLeadIds = (project) => {
+    const fromAllocations = allocations
       .filter(
         (a) =>
           a.sub_project_id === project?.id &&
           isTeamLeadAllocation(a, employeeIndex.get(String(a.employee_id))),
       )
       .map((a) => a.employee_id);
+    // Union with converted managers still sitting in the manager slot, deduped so someone
+    // who is both does not fill two manpower slots.
+    return [
+      ...new Set([
+        ...fromAllocations,
+        ...demotedToLeadIds(project, parentProjects, employeeIndex),
+      ]),
+    ];
+  };
 
   // One definition of a project's manpower for the create modal, its project
   // dropdown and the over-allocation guard. Each used to count it its own way —
@@ -516,8 +527,10 @@ const AllocationsPage = () => {
       leadIds,
       assignedIds,
       assigned: assignedIds.size,
+      // The stored figure as typed in Team Composition — leads and managers are
+      // part of it now, so they are no longer added from the allocations here.
       required: totalRequiredManpower({
-        required: project?.required_manpower || 0,
+        project,
         pmIds,
         leadIds,
         employeeIndex,
@@ -542,13 +555,18 @@ const AllocationsPage = () => {
         leadIds,
         employeeIndex,
       });
-      // Required = managers + leads + the requested annotators and reviewers, matching the
-      // Projects page. Counted unconditionally: the old version added only the managers who
-      // had no allocation yet, so allocating a project's own PM *lowered* its requirement.
-      const onRoster = (id) => employeeIndex.has(String(id));
-      const pmSlots = pmIds.filter(onRoster).length;
-      const leadSlots = leadIds.filter(onRoster).length;
-      const requestedManpower = project.required_manpower || 0;
+      // The "(N PM · N Lead)" annotation beside the requirement describes what the
+      // project ASKS for, so it reads the typed counts rather than who happens to be
+      // allocated — otherwise it would explain a number it is not part of.
+      const pmSlots = project.team_manager_count || 0;
+      const leadSlots = project.team_lead_count || 0;
+      // The role slots only — managers and leads are shown separately in the tooltip, and
+      // `required_manpower` already folds them in, so reusing it would state them twice.
+      const requestedManpower =
+        (Number(project.autonex_annotators) || 0) +
+        (Number(project.autonex_reviewers) || 0) +
+        (Number(project.others_count) || 0) +
+        (Number(project.developers_count) || 0);
       return {
         project,
         allocations,
@@ -559,7 +577,7 @@ const AllocationsPage = () => {
         pmSlots,
         leadSlots,
         requiredManpower: totalRequiredManpower({
-          required: requestedManpower,
+          project,
           pmIds,
           leadIds,
           employeeIndex,
@@ -577,7 +595,11 @@ const AllocationsPage = () => {
       ({ project, allocations: projectAllocs }) => {
         if (project.name.toLowerCase().includes(q)) return true;
         return projectAllocs.some((a) => {
-          const empName = getEmployeeName(a.employee_id).toLowerCase();
+          // The stored name as well as the shortened label — searching a middle
+          // name must still find its owner. See nameSearchText.
+          const empName = nameSearchText(
+            employeeIndex.get(String(a.employee_id))?.name,
+          );
           return empName.includes(q);
         });
       },
@@ -740,7 +762,7 @@ const AllocationsPage = () => {
                 className="text-[13px] font-medium text-slate-700 tabular-nums"
                 title={
                   row.pmSlots > 0 || row.leadSlots > 0
-                    ? `${row.requestedManpower} requested + ${row.pmSlots} PM + ${row.leadSlots} team lead`
+                    ? `${row.requestedManpower} role slot(s) + ${row.pmSlots} manager(s) + ${row.leadSlots} lead(s)`
                     : undefined
                 }
               >
@@ -792,6 +814,7 @@ const AllocationsPage = () => {
                     employees={employees}
                     formerEmployees={formerEmployees}
                     pmIds={row.pmIds}
+                    leadIds={row.leadIds}
                     onLeaveEmployeeIds={leaveEmployeeIds}
                     locationByEmployeeId={locationByEmployeeId}
                     triggerClassName="inline-flex items-center rounded-md focus:outline-none"
@@ -1045,10 +1068,14 @@ const AllocationsPage = () => {
                             return (
                               <div
                                 key={alloc.id}
+                                // Hover carries the FULL stored name; the chip
+                                // shows the shortened one. Built from `name`
+                                // before, which meant the middle name was
+                                // dropped in both places and unreachable.
                                 title={
                                   stale
-                                    ? `${name} — archived, not counted towards manpower`
-                                    : `${name}${alloc.total_daily_hours ? ` · ${alloc.total_daily_hours}h/day` : ""}`
+                                    ? `${rawName} — archived, not counted towards manpower`
+                                    : `${rawName}${alloc.total_daily_hours ? ` · ${alloc.total_daily_hours}h/day` : ""}`
                                 }
                                 className={`group inline-flex items-center gap-1.5 pl-1 pr-1 py-0.5 rounded-full shadow-sm transition-opacity ${stale
                                     ? "border border-rose-300 bg-rose-50"
@@ -1546,7 +1573,8 @@ const AllocationsPage = () => {
               // belonged to and flag it in red.
               const stale = !emp;
               const former = formerIndex.get(String(alloc.employee_id));
-              const name = formatDisplayName(stale ? staleName(alloc) : emp.name);
+              const rawName = stale ? staleName(alloc) : emp.name;
+              const name = formatDisplayName(rawName);
               return (
                 <div
                   key={alloc.id}
@@ -1571,6 +1599,7 @@ const AllocationsPage = () => {
                     <div>
                       <p
                         className={`font-medium ${stale ? "text-rose-700" : "text-gray-900"}`}
+                        title={rawName}
                       >
                         {name}
                         {stale && (
