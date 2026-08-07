@@ -91,6 +91,10 @@ const AllocationPopover = ({
   onLeaveEmployeeIds = new Set(),
   locationByEmployeeId,
   pmIds = [],
+  // Leads who hold no allocation row of their own. Without these the popover counted
+  // fewer people than the ratio it sits beside — the card said 7 while the badge said 6,
+  // the difference being a lead recorded on the project but not allocated to it.
+  leadIds = [],
 }) => {
   const [open, setOpen] = useState(false);
   const [position, setPosition] = useState({
@@ -134,23 +138,29 @@ const AllocationPopover = ({
       emp: employeeIndex.get(String(a.employee_id)),
       former: formerIndex.get(String(a.employee_id)),
       isPm: false,
+      isLead: false,
       isStale: isStaleAllocation(a, employeeIndex),
     }));
 
+    // Managers and leads who run the project without an allocation row. Someone already
+    // allocated is skipped — they are on the list once, as their allocation.
     const seen = new Set(filtered.map((a) => String(a.employee_id)));
-    (pmIds || []).forEach((id) => {
+    const addRunner = (id, kind) => {
       if (id == null || seen.has(String(id))) return;
       seen.add(String(id));
       const emp = employeeIndex.get(String(id));
       rows.push({
-        key: `pm-${id}`,
+        key: `${kind}-${id}`,
         alloc: null,
         emp,
         former: formerIndex.get(String(id)),
-        isPm: true,
+        isPm: kind === "pm",
+        isLead: kind === "lead",
         isStale: !emp,
       });
-    });
+    };
+    (pmIds || []).forEach((id) => addRunner(id, "pm"));
+    (leadIds || []).forEach((id) => addRunner(id, "lead"));
 
     // Somebody can hold two allocations on one project. Flag those rows, so a
     // list that is longer than the headcount beside it explains itself.
@@ -168,7 +178,7 @@ const AllocationPopover = ({
       ...rows.filter((r) => !r.isStale),
       ...rows.filter((r) => r.isStale),
     ];
-  }, [allocations, employeeIndex, formerIndex, project, pmIds]);
+  }, [allocations, employeeIndex, formerIndex, project, pmIds, leadIds]);
 
   const staleCount = list.filter((r) => r.isStale).length;
   // PEOPLE, not rows. This badge sits right next to the page's assigned/required
@@ -373,11 +383,10 @@ const AllocationPopover = ({
                   // Name a stale row from the archived roster first, then the
                   // name the allocations payload carries, then its employee id
                   // — anything that identifies WHICH row to delete.
-                  const name = formatDisplayName(
-                    isStale
-                      ? former?.name || staleAllocationName(alloc)
-                      : emp.name
-                  );
+                  const rawName = isStale
+                    ? former?.name || staleAllocationName(alloc)
+                    : emp.name;
+                  const name = formatDisplayName(rawName);
                   const formerDetail =
                     former?.email || former?.designation || former?.role;
                   const role =
@@ -405,6 +414,10 @@ const AllocationPopover = ({
                       <div className="flex-1 min-w-0">
                         <div className="flex items-center gap-1.5 min-w-0">
                           <span
+                            // Shortened for the row, full on hover — the popover
+                            // is narrow and a middle name is often what tells two
+                            // colleagues apart.
+                            title={rawName}
                             className={`text-sm truncate ${isStale
                               ? "font-medium text-rose-700"
                               : "font-medium text-slate-800"

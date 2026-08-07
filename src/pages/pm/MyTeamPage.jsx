@@ -278,7 +278,10 @@ const MyTeamPage = () => {
                   />
                   <div>
                     <div className="flex flex-wrap items-center gap-2">
-                      <h2 className="text-lg font-semibold text-slate-900">
+                      <h2
+                        className="text-lg font-semibold text-slate-900"
+                        title={member.name}
+                      >
                         {formatDisplayName(member.name)}
                       </h2>
                       <span

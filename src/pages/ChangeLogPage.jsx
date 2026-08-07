@@ -456,7 +456,7 @@ export default function ChangeLogPage() {
               return (
                 <div
                   className="flex items-center gap-2 min-w-0"
-                  title={`${name}${actor?.role ? ` (${actor.role})` : ""}`}
+                  title={`${actor?.name || name}${actor?.role ? ` (${actor.role})` : ""}`}
                 >
                   <UserAvatar
                     src={actor?.avatar_url}

@@ -49,7 +49,9 @@ import {
 } from "../utils/pmScope";
 import {
   TEAM_LEAD_TAG,
+  demotedToLeadIds,
   isProjectScopedRole,
+  resolveProjectPmIds,
   isTeamLeadAllocation,
   isTeamLeadDesignation,
 } from "../utils/roleAccess";
@@ -162,14 +164,22 @@ const PROJECT_TYPE_CATEGORIES = [
     subtypes: ["2D Bounding Box"],
   },
   {
-    key: "Developer",
+    key: "Development",
     subtypes: ["Coding"],
   },
 ];
 
+/** The label to show for a stored project-type category. */
+const typeLabel = (key) =>
+  PROJECT_TYPE_CATEGORIES.find((c) => c.key === key)?.key || key;
+
 // The project-type category that marks a project as a development/coding project.
 // Such projects are surfaced under the dedicated "Development" tab.
-const DEVELOPER_TYPE_KEY = "Developer";
+//
+// Stored rows were renamed "Developer" -> "Development" in place by
+// sync_daily_sheet_schema (backend/app/main.py), keeping each project's subtype —
+// so there is no second key to recognise here.
+const DEVELOPER_TYPE_KEY = "Development";
 const isDeveloperProject = (project) => {
   const t = project?.project_types;
   return !!(t && typeof t === "object" && t[DEVELOPER_TYPE_KEY]);
@@ -515,11 +525,17 @@ const CARD_ACCENTS = [
 ];
 
 // Truncated text that reveals its full value in a light (white) tooltip on hover.
-const TruncTip = ({ text, className = "" }) => (
+/** "Eknath Niraj Agrawal, Kisan Kumar Jena" -> "Eknath Agrawal, Kisan Jena". */
+const shortenNames = (names = []) =>
+  names.map((n) => formatDisplayName(n) || n).filter(Boolean).join(", ") || "—";
+
+// `title` lets the hover card carry something the label does not — for people,
+// the full stored name behind a first-and-last-only label.
+const TruncTip = ({ text, title, className = "" }) => (
   <div className="group/tip relative min-w-0">
     <div className={`truncate ${className}`}>{text}</div>
     <span className="pointer-events-none absolute left-0 top-full z-30 mt-1 hidden w-max max-w-[240px] whitespace-normal break-words rounded-lg border border-slate-200 bg-white px-2.5 py-1.5 text-[11px] font-medium text-slate-600 shadow-lg group-hover/tip:block">
-      {text}
+      {title || text}
     </span>
   </div>
 );
@@ -536,6 +552,9 @@ const ProjectCard = ({
   pmNames,
   teamLeadNames = [],
   pmIds = [],
+  // Passed straight through to the popover so its headcount matches the ratio printed on
+  // the card — a lead recorded on the project but holding no allocation belongs in both.
+  leadIds = [],
   onLeaveEmployeeIds,
   locationByEmployeeId,
   allocatedManpower,
@@ -701,16 +720,19 @@ const ProjectCard = ({
 
       {/* PM / Team lead / Type / Vendor */}
       <div className="grid grid-cols-2 gap-x-4 gap-y-3">
+        {/* Both carry stored names: shortened for the label, full in the hover. */}
         <CardField label="Project Manager">
           <TruncTip
-            text={pmNames.length ? pmNames.join(", ") : "—"}
+            text={shortenNames(pmNames)}
+            title={pmNames.join(", ")}
             className="text-sm font-semibold text-slate-800"
           />
         </CardField>
 
         <CardField label="Team lead">
           <TruncTip
-            text={teamLeadNames.length ? teamLeadNames.join(", ") : "—"}
+            text={shortenNames(teamLeadNames)}
+            title={teamLeadNames.join(", ")}
             className="text-sm font-semibold text-slate-800"
           />
         </CardField>
@@ -770,6 +792,7 @@ const ProjectCard = ({
               employees={employees}
               formerEmployees={formerEmployees}
               pmIds={pmIds}
+              leadIds={leadIds}
               onLeaveEmployeeIds={onLeaveEmployeeIds}
               locationByEmployeeId={locationByEmployeeId}
               onOpenAllocations={() =>
@@ -1231,6 +1254,10 @@ const ProjectsPage = () => {
   const [selectedSkills, setSelectedSkills] = useState([]);
   const [selectedVendors, setSelectedVendors] = useState([]);
   const [projectTypes, setProjectTypes] = useState({}); // { category: subtype }
+  // Drives the Developers headcount field in the Team Composition tab. Reads the
+  // live modal selection, not the saved project, so the field appears the moment
+  // Development is picked rather than after a save.
+  const isDevelopmentSelected = !!projectTypes[DEVELOPER_TYPE_KEY];
   const [activeTypeTab, setActiveTypeTab] = useState(
     PROJECT_TYPE_CATEGORIES[0].key,
   );
@@ -1804,12 +1831,29 @@ const ProjectsPage = () => {
       workforce_vendors: selectedVendors,
       autonex_annotators: num("autonex_annotators"),
       autonex_reviewers: num("autonex_reviewers"),
+      others_count: num("others_count"),
+      // Counted from who is actually selected, so the headcount cannot contradict the
+      // roster on the same screen.
+      team_lead_count: selectedTeamLeadIds.length,
+      team_manager_count: selectedPmIds.length,
+      // Zero unless Development is selected — the input is not rendered otherwise,
+      // so `num` reads nothing and the count is cleared rather than left stale
+      // from a project whose type changed.
+      developers_count: isDevelopmentSelected ? num("developers_count") : 0,
       // Assigned PMs / Employees
       assigned_employee_ids: selectedPmIds,
       pm_id: selectedPmIds[0] || null,
       // PMs and leads are added on top of this when the ratio is displayed
       // (see totalRequiredManpower) — they are not part of the stored figure.
-      required_manpower: num("autonex_annotators") + num("autonex_reviewers"),
+      // Recomputed server-side by _autonex_headcount; sent so the optimistic UI
+      // matches what comes back. Keep the two in step.
+      required_manpower:
+        num("autonex_annotators") +
+        num("autonex_reviewers") +
+        num("others_count") +
+        selectedTeamLeadIds.length +
+        selectedPmIds.length +
+        (isDevelopmentSelected ? num("developers_count") : 0),
       project_duration_weeks: durationWeeks,
       project_duration_days: durationDays,
       project_status: formData.get("project_status") || "active",
@@ -1919,27 +1963,17 @@ const ProjectsPage = () => {
     );
   };
 
-  const pmIdsOf = (mp) =>
-    mp?.program_manager_ids?.length
-      ? mp.program_manager_ids
-      : mp?.program_manager_id
-        ? [mp.program_manager_id]
-        : [];
-
   // A project's PMs are recorded on the project itself (`assigned_employee_ids`,
   // which only ever holds PM/admin ids) and fall back to the parent project's
   // managers. The card, the PM filter, the filter's option list, and the manpower
   // count must all resolve them through here — when the filter read only the
   // parent while the card read the project, filtering by a PM shown on screen
   // matched nothing.
-  const resolvePmIds = (project) => {
-    if (project?.assigned_employee_ids?.length)
-      return project.assigned_employee_ids;
-    if (project?.pm_id) return [project.pm_id];
-    return pmIdsOf(
-      visibleMainProjects.find((p) => p.id === project?.main_project_id),
-    );
-  };
+  // Shared with the Allocations page. Passing the roster lets it drop anyone since
+  // converted to Team Lead out of the manager list — they show under Team Lead instead,
+  // without waiting for someone to re-save the project.
+  const resolvePmIds = (project) =>
+    resolveProjectPmIds(project, visibleMainProjects, employeeIndex);
 
   // Manpower counts PEOPLE, not allocation rows, and a PM running the project
   // occupies a slot just like an annotator. Union by employee id so someone with
@@ -1948,8 +1982,15 @@ const ProjectsPage = () => {
   // Anyone off the roster is skipped: allocations outlive an archived employee,
   // and counting those ghosts reported projects as fully staffed by people who
   // had left.
+  // Allocation-tagged leads plus anyone still holding the manager seat whose designation
+  // says Team Lead. The second half matters: those people have no allocation row, so a
+  // lead set built from allocations alone named them on the card while leaving them out of
+  // the manpower count — the same project reporting two different teams.
   const getTeamLeadIds = (project) => [
-    ...(teamLeadIdsByProject.get(project?.id) || new Set()),
+    ...new Set([
+      ...(teamLeadIdsByProject.get(project?.id) || new Set()),
+      ...demotedToLeadIds(project, visibleMainProjects, employeeIndex),
+    ]),
   ];
 
   const getManpowerEmployeeIds = (project) =>
@@ -1963,14 +2004,16 @@ const ProjectsPage = () => {
   const getAllocatedManpower = (project) =>
     getManpowerEmployeeIds(project).size;
 
-  // Required counts those same PMs. The server computes required_manpower as
-  // annotators + reviewers + QC, so a project asking for 2 QC and run by 1 PM
-  // showed 1/2 with only the PM on it — the manager filled a slot the required
-  // side didn't know about.
-  // PMs + leads + the requested Autonex annotators and reviewers.
+  // Computed live rather than read from `required_manpower`.
+  //
+  // The stored total is only refreshed when someone saves the project, so it goes stale
+  // the moment a designation changes — a project run by 5 managers and 3 leads still read
+  // 0 required because it had not been re-saved since they were typed in. The role counts
+  // come from the columns; the manager and lead counts come from the same resolvers the
+  // card and the modal use, so all three agree without anyone re-saving anything.
   const getRequiredManpower = (project) =>
     totalRequiredManpower({
-      required: project?.required_manpower || 0,
+      project,
       pmIds: resolvePmIds(project),
       leadIds: getTeamLeadIds(project),
       employeeIndex,
@@ -1980,6 +2023,12 @@ const ProjectsPage = () => {
   // Every on-roster manager, not only the ones lacking an allocation: the requirement now
   // counts them unconditionally, so an "extra" count would disagree with the ratio it is
   // meant to explain.
+  // How many of the required slots each rank accounts for, shown beside the ratio on the
+  // card. Counted live from the same resolvers, never from the stored team_manager_count /
+  // team_lead_count columns: those are only refreshed when a project is saved, so on
+  // anything untouched since they read 0 and the breakdown silently disappeared — one card
+  // showed "2 (1 PM · 1 Lead)" while its neighbour showed a bare "2" with a manager and a
+  // lead named directly above it.
   const getPmSlots = (project) =>
     resolvePmIds(project).filter((id) => employeeIndex.has(String(id))).length;
 
@@ -2000,9 +2049,19 @@ const ProjectsPage = () => {
         seen.add(key);
         const emp = employeeIndex.get(key);
         if (!emp || !isTeamLeadAllocation(a, emp)) return;
-        const name = formatDisplayName(emp.name);
-        if (name) names.push(name);
+        // The stored name — the card shortens it for the label and keeps this
+        // for the hover. Formatting here would lose the middle name entirely.
+        if (emp.name) names.push(emp.name);
       });
+    // Plus anyone still holding the manager seat whose designation now says Team Lead, so
+    // a conversion shows up without the project having to be re-saved first.
+    demotedToLeadIds(project, visibleMainProjects, employeeIndex).forEach((id) => {
+      const key = String(id);
+      if (seen.has(key)) return;
+      seen.add(key);
+      const name = employeeIndex.get(key)?.name;
+      if (name) names.push(name);
+    });
     return names;
   };
 
@@ -2403,16 +2462,29 @@ const ProjectsPage = () => {
     // Read the project's own column rather than resolvePmIds — the resolved value can come
     // from the organisation, and writing that back would pin an inheriting project to those
     // people, which switches organisation-level inheritance off for it (see pmScope.js).
-    setSelectedPmIds(project.assigned_employee_ids || []);
-    setSelectedTeamLeadIds(
-      allocations
-        .filter(
-          (a) =>
-            a.sub_project_id === project.id &&
-            isTeamLeadAllocation(a, employeeIndex.get(String(a.employee_id))),
-        )
-        .map((a) => a.employee_id),
+    // Split the stored manager slot the same way the card does, so the modal cannot show a
+    // different set from the project it was opened on. Reading the column raw put converted
+    // managers in the Program Manager box and left Team Lead empty — and saving that would
+    // have written them straight back as managers.
+    const demoted = demotedToLeadIds(project, visibleMainProjects, employeeIndex);
+    const demotedSet = new Set(demoted.map(Number));
+    setSelectedPmIds(
+      (project.assigned_employee_ids || []).filter(
+        (id) => !demotedSet.has(Number(id)),
+      ),
     );
+    setSelectedTeamLeadIds([
+      ...new Set([
+        ...allocations
+          .filter(
+            (a) =>
+              a.sub_project_id === project.id &&
+              isTeamLeadAllocation(a, employeeIndex.get(String(a.employee_id))),
+          )
+          .map((a) => a.employee_id),
+        ...demoted,
+      ]),
+    ]);
     setIsModalOpen(true);
   };
 
@@ -2452,7 +2524,17 @@ const ProjectsPage = () => {
         project_status: cardDraft.project_status,
         autonex_annotators: ann,
         autonex_reviewers: rev,
-        required_manpower: ann + rev,
+        // The inline card only edits annotators and reviewers, so the rest of the
+        // composition has to be carried over. Sending `ann + rev` alone silently zeroed
+        // the others/leads/managers/developers a project asked for, dropping its required
+        // headcount every time somebody double-clicked a card.
+        required_manpower:
+          ann +
+          rev +
+          (project.others_count || 0) +
+          (project.team_lead_count || 0) +
+          (project.team_manager_count || 0) +
+          (project.developers_count || 0),
         estimated_time_per_task:
           cardDraft.annotation_minutes !== ""
             ? parseFloat(cardDraft.annotation_minutes) / 60
@@ -2959,7 +3041,7 @@ const ProjectsPage = () => {
 
                 const pmIds = resolvePmIds(project);
                 const pmNames = pmIds
-                  .map((id) => formatDisplayName(employees.find((e) => e.id === id)?.name))
+                  .map((id) => employees.find((e) => e.id === id)?.name)
                   .filter(Boolean);
 
                 const allocatedManpower = getAllocatedManpower(project);
@@ -2974,6 +3056,7 @@ const ProjectsPage = () => {
                     pmNames={pmNames}
                     teamLeadNames={getTeamLeadNames(project)}
                     pmIds={pmIds}
+                    leadIds={getTeamLeadIds(project)}
                     onLeaveEmployeeIds={leaveEmployeeIds}
                     locationByEmployeeId={locationByEmployeeId}
                     allocatedManpower={allocatedManpower}
@@ -3560,7 +3643,7 @@ const ProjectsPage = () => {
                           }}
                           className={`inline-flex items-center gap-1.5 rounded-lg px-3 py-1.5 text-xs font-medium transition-colors ${isActive ? "bg-indigo-600 text-white" : "border border-slate-200 bg-white text-slate-600 hover:bg-slate-50"}`}
                         >
-                          {cat.key}
+                          {cat.label || cat.key}
                           {chosen && (
                             <span
                               className={`rounded-full px-1.5 py-0.5 text-[10px] ${isActive ? "bg-white/20 text-white" : "bg-indigo-50 text-indigo-600"}`}
@@ -3578,7 +3661,7 @@ const ProjectsPage = () => {
                   ).map((cat) => (
                     <div key={cat.key} className="mt-3">
                       <label className="mb-1 block text-[11px] font-medium text-slate-500">
-                        {cat.key} — Subtype
+                        {cat.label || cat.key} — Subtype
                       </label>
                       <Dropdown
                         defaultOpen={typeTabTouched}
@@ -3607,7 +3690,10 @@ const ProjectsPage = () => {
                           key={cat}
                           className="inline-flex items-center gap-1 rounded-full bg-indigo-50 px-2.5 py-1 text-xs font-medium text-indigo-700"
                         >
-                          <span className="text-indigo-400">{cat}:</span> {sub}
+                          <span className="text-indigo-400">
+                            {typeLabel(cat)}:
+                          </span>{" "}
+                          {sub}
                           <button
                             type="button"
                             onClick={() =>
@@ -3684,7 +3770,14 @@ const ProjectsPage = () => {
                       ["annotators_total", "Total Annotators"],
                       ["autonex_annotators", "Autonex Annotators"],
                       ["autonex_reviewers", "Autonex Reviewers"],
-                    ].map(([field, label]) => (
+                      ["others_count", "Others"],
+                      // Only for development projects: they are staffed with
+                      // engineers, not annotators, so the field would be dead
+                      // weight on every other project type.
+                      isDevelopmentSelected && ["developers_count", "Developers"],
+                    ]
+                      .filter(Boolean)
+                      .map(([field, label]) => (
                       <div key={field}>
                         <label className="block text-[11px] font-medium text-slate-500 mb-1 truncate">
                           {label}
@@ -3702,11 +3795,35 @@ const ProjectsPage = () => {
                         />
                       </div>
                     ))}
+                    {/* Derived from the two pickers above rather than typed. They were
+                        editable numbers that could disagree with the people actually
+                        chosen — a project could name three leads and claim one. */}
+                    {[
+                      ["Team Managers", selectedPmIds.length],
+                      ["Team Leads", selectedTeamLeadIds.length],
+                    ].map(([label, value]) => (
+                      <div key={label}>
+                        <label className="mb-1 block truncate text-[11px] font-medium text-slate-500">
+                          {label}
+                        </label>
+                        <div
+                          className="input flex cursor-default items-center bg-slate-50 text-slate-500"
+                          title={`From the ${label === "Team Leads" ? "Team Lead" : "Program Manager"} field above`}
+                        >
+                          {value}
+                        </div>
+                      </div>
+                    ))}
                   </div>
 
+                  {/* Mirrors api/projects.py `_autonex_headcount`. "Total
+                      Annotators" is informational and deliberately not in the sum
+                      — it counts the vendor's people as well as ours. */}
                   <p className="mt-2 text-[11px] text-slate-400">
-                    Required headcount = Autonex Annotators + Autonex Reviewers
-                    + QC.
+                    Required headcount = Autonex Annotators + Autonex Reviewers +
+                    Others + Team Leads + Team Managers
+                    {isDevelopmentSelected ? " + Developers" : ""}. Leads and
+                    managers are counted from the fields above, not typed.
                   </p>
                 </div>
               </div>

@@ -310,7 +310,7 @@ const EmployeeLayout = () => {
         </main>
       </div>
 
-      {/* <ChatWidget /> */}
+      <ChatWidget />
     </div>
   );
 };

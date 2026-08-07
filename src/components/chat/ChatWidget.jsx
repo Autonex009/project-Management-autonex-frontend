@@ -9,6 +9,11 @@ import {
 } from "lucide-react";
 import ChatMessage from "./ChatMessage";
 import ConfirmationCard from "./ConfirmationCard";
+// Imported as a URL (Vite handles .svg natively; there is no SVGR plugin here).
+// The artwork is filled #000000, so `brightness-0 invert` repaints it white to
+// sit on the gradient — cheaper than editing the asset and it keeps the file
+// reusable anywhere the colour differs.
+import botIcon from "../icons/bot.svg";
 import {
   streamChat,
   confirmLeave,
@@ -77,6 +82,10 @@ const ROLE_THEMES = {
 
 const ChatWidget = ({ role: roleProp }) => {
   const [isOpen, setIsOpen] = useState(false);
+  // Launcher position: null = the default bottom-right anchor, set once dragged.
+  const [fabPos, setFabPos] = useState(null);
+  const [dragging, setDragging] = useState(false);
+  const dragState = useRef(null);
   const [messages, setMessages] = useState([]);
   const [input, setInput] = useState("");
   const [isLoading, setIsLoading] = useState(false);
@@ -265,26 +274,97 @@ const ChatWidget = ({ role: roleProp }) => {
     }
   };
 
+  // ── Draggable launcher ───────────────────────────────────────────
+  // Position stays null until the button is actually moved, so it keeps its
+  // bottom-6 right-6 anchor and survives a window resize; once dragged it
+  // becomes fixed left/top coordinates.
+  const startDrag = (e) => {
+    // Primary button / single touch only — a right-click should not pick it up.
+    if (e.button != null && e.button !== 0) return;
+    const rect = e.currentTarget.getBoundingClientRect();
+    dragState.current = {
+      dx: e.clientX - rect.left,
+      dy: e.clientY - rect.top,
+      width: rect.width,
+      height: rect.height,
+      moved: false,
+    };
+    e.currentTarget.setPointerCapture?.(e.pointerId);
+    setDragging(true);
+  };
+
+  useEffect(() => {
+    if (!dragging) return;
+
+    const onMove = (e) => {
+      const s = dragState.current;
+      if (!s) return;
+      // A few pixels of slop, so a click with a shaky hand still opens the chat
+      // instead of being swallowed as a drag.
+      if (!s.moved) s.moved = true;
+      const maxX = window.innerWidth - s.width - 8;
+      const maxY = window.innerHeight - s.height - 8;
+      setFabPos({
+        x: Math.min(Math.max(8, e.clientX - s.dx), Math.max(8, maxX)),
+        y: Math.min(Math.max(8, e.clientY - s.dy), Math.max(8, maxY)),
+      });
+    };
+    const onUp = () => setDragging(false);
+
+    window.addEventListener("pointermove", onMove);
+    window.addEventListener("pointerup", onUp);
+    window.addEventListener("pointercancel", onUp);
+    return () => {
+      window.removeEventListener("pointermove", onMove);
+      window.removeEventListener("pointerup", onUp);
+      window.removeEventListener("pointercancel", onUp);
+    };
+  }, [dragging]);
+
+  const handleFabClick = () => {
+    // Releasing after a drag fires a click too; opening the panel then would be
+    // an accident, so a moved pointer consumes the click.
+    if (dragState.current?.moved) {
+      dragState.current.moved = false;
+      return;
+    }
+    setIsOpen(true);
+  };
+
   return (
     <>
-      {/* Floating Chat Button */}
+      {/* Floating chat button — icon only, and draggable. */}
       {!isOpen && (
         <button
-          onClick={() => setIsOpen(true)}
+          onPointerDown={startDrag}
+          onClick={handleFabClick}
           id="chat-widget-trigger"
-          className="fixed bottom-6 right-6 z-50 group"
+          title="Ask Autonex AI"
+          aria-label="Ask Autonex AI"
+          className={`fixed z-50 group touch-none ${fabPos ? "" : "bottom-6 right-6"} ${
+            dragging ? "cursor-grabbing" : "cursor-grab"
+          }`}
+          style={
+            fabPos ? { left: fabPos.x, top: fabPos.y, bottom: "auto", right: "auto" } : undefined
+          }
         >
           <div className="relative">
-            {showPulse && (
+            {showPulse && !dragging && (
               <div
-                className={`absolute -inset-1 bg-gradient-to-r ${theme.fabPulse} rounded-2xl opacity-30 blur-lg animate-pulse`}
+                className={`absolute -inset-1 bg-gradient-to-r ${theme.fabPulse} rounded-full opacity-30 blur-lg animate-pulse`}
               />
             )}
             <div
-              className={`relative flex items-center gap-2.5 px-5 py-3.5 rounded-2xl bg-gradient-to-r ${theme.fab} text-white shadow-xl ${theme.fabShadow} transition-all duration-300 hover:scale-105 active:scale-95`}
+              className={`relative flex h-14 w-14 items-center justify-center rounded-full bg-gradient-to-r ${theme.fab} text-white shadow-xl ${theme.fabShadow} transition-transform duration-300 ${
+                dragging ? "scale-105" : "hover:scale-105 active:scale-95"
+              }`}
             >
-              <Sparkles className="w-5 h-5" />
-              <span className="font-semibold text-sm">Ask AI</span>
+              <img
+                src={botIcon}
+                alt=""
+                draggable={false}
+                className="h-7 w-7 select-none brightness-0 invert"
+              />
             </div>
           </div>
         </button>
