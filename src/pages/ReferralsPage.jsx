@@ -1,10 +1,11 @@
 import { useState } from "react";
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
-import { referralApi } from "../services/api";
+import { referralApi, employeeApi } from "../services/api";
 import Spinner from "../components/ui/LoadingSpinner";
 import Button from "../components/ui/Button";
 import toast from "react-hot-toast";
 import SearchBar from "../components/ui/SearchBar";
+import UserAvatar from "../components/ui/UserAvatar";
 import {
   Users2,
   Briefcase,
@@ -99,6 +100,16 @@ const ReferralsPage = () => {
     queryFn: () => referralApi.getAll(),
     refetchInterval: 60_000,
   });
+
+  // Only the REFERRER has a picture to show — they're an employee. Candidates are
+  // outside the company, and a referral stores nothing but their name, email,
+  // phone and LinkedIn, so their monogram is the most the data allows.
+  const { data: employees = [] } = useQuery({
+    queryKey: ["employees"],
+    queryFn: employeeApi.getAll,
+  });
+  const referrerAvatar = (referrerId) =>
+    employees.find((e) => e.id === referrerId)?.avatar_url;
 
   const statusMutation = useMutation({
     mutationFn: ({ id, status, note }) =>
@@ -286,8 +297,13 @@ const ReferralsPage = () => {
                             {ref.candidate_email}
                           </span>
                           {ref.referrer_name && (
-                            <span className="text-xs text-slate-400">
-                              Referred by{" "}
+                            <span className="flex items-center gap-1.5 text-xs text-slate-400">
+                              Referred by
+                              <UserAvatar
+                                src={referrerAvatar(ref.referrer_id)}
+                                name={ref.referrer_name}
+                                size="xs"
+                              />
                               <strong className="text-slate-600">
                                 {ref.referrer_name}
                               </strong>
@@ -336,13 +352,26 @@ const ReferralsPage = () => {
                           <p className="text-xs font-semibold text-slate-400 uppercase mb-1">
                             Referred By
                           </p>
-                          <p className="text-slate-700">
-                            {ref.referrer_name || "—"}
-                          </p>
-                          {ref.referrer_email && (
-                            <p className="text-xs text-slate-400 mt-0.5">
-                              {ref.referrer_email}
-                            </p>
+                          {ref.referrer_name ? (
+                            <div className="flex items-center gap-2.5">
+                              <UserAvatar
+                                src={referrerAvatar(ref.referrer_id)}
+                                name={ref.referrer_name}
+                                size="sm"
+                              />
+                              <div className="min-w-0">
+                                <p className="text-slate-700">
+                                  {ref.referrer_name}
+                                </p>
+                                {ref.referrer_email && (
+                                  <p className="text-xs text-slate-400 mt-0.5">
+                                    {ref.referrer_email}
+                                  </p>
+                                )}
+                              </div>
+                            </div>
+                          ) : (
+                            <p className="text-slate-700">—</p>
                           )}
                         </div>
                         <div>

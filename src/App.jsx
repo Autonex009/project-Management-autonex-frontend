@@ -210,11 +210,13 @@ function App() {
             <Route path="profile" element={<ProfilePage />} />
           </Route>
 
-          {/* Protected PM Routes */}
+          {/* Protected PM Routes. Team leads live here too: same pages, same
+              layout, view-only. The backend decides what they may act on
+              (services/project_scope.py). */}
           <Route
             path="/pm"
             element={
-              <ProtectedRoute allowedRoles={["pm", "hr"]}>
+              <ProtectedRoute allowedRoles={["pm", "hr", "team_lead"]}>
                 <EmployeeLayout />
               </ProtectedRoute>
             }

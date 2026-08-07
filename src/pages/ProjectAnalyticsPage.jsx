@@ -570,7 +570,11 @@ const ProjectAnalyticsPage = () => {
                                     backgroundColor: colorFor(a.user_email),
                                   }}
                                 />
-                                <span className="min-w-0 flex-1 truncate text-slate-700">
+                                {/* Wraps rather than truncates: an unlinked
+                                    annotator is identified only by their Encord
+                                    email, so an ellipsis can hide the one part
+                                    that tells them apart. */}
+                                <span className="min-w-0 flex-1 break-words text-slate-700">
                                   {a.employee_name || a.user_email}
                                 </span>
                                 <span className="shrink-0 tabular-nums text-slate-400">

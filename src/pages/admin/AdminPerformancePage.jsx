@@ -22,6 +22,7 @@ import EvaluationDetail from "../../components/perf/EvaluationDetail";
 import EvalReviewCard from "../../components/perf/EvalReviewCard";
 import StatCard from "../../components/dashboard/StatCard";
 import Table from "../../components/ui/Table";
+import UserAvatar from "../../components/ui/UserAvatar";
 import { formatDisplayName } from "../../utils/displayName";
 
 const isPm = (emp) =>
@@ -237,9 +238,11 @@ const AdminPerformancePage = () => {
       width: "w-[18%]",
       render: (_, ev) => (
         <div className="flex min-w-0 items-center gap-2.5">
-          <div className="flex h-8 w-8 shrink-0 items-center justify-center rounded-lg bg-gradient-to-br from-indigo-100 to-slate-100 text-[13px] font-bold text-indigo-700">
-            {(empName(ev.employee_id) || "?").charAt(0).toUpperCase()}
-          </div>
+          <UserAvatar
+            src={empById.get(ev.employee_id)?.avatar_url}
+            name={empName(ev.employee_id)}
+            size="w-8 h-8 text-[13px]"
+          />
           <span className="truncate font-medium text-slate-800">
             {empName(ev.employee_id)}
           </span>
@@ -365,9 +368,11 @@ const AdminPerformancePage = () => {
       width: "w-[20%]",
       render: (_, ev) => (
         <div className="flex min-w-0 items-center gap-2.5">
-          <div className="flex h-8 w-8 shrink-0 items-center justify-center rounded-lg bg-gradient-to-br from-amber-100 to-orange-50 text-[13px] font-bold text-amber-700">
-            {(empName(ev.employee_id) || "?").charAt(0).toUpperCase()}
-          </div>
+          <UserAvatar
+            src={empById.get(ev.employee_id)?.avatar_url}
+            name={empName(ev.employee_id)}
+            size="w-8 h-8 text-[13px]"
+          />
           <span className="truncate font-medium text-slate-800">
             {empName(ev.employee_id)}
           </span>

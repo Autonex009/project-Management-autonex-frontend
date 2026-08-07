@@ -78,6 +78,7 @@ const ProtectedRoute = ({ children, allowedRoles }) => {
       admin: "/admin/dashboard",
       hr: "/admin/dashboard", // HR lands in Admin; can switch to PM via the portal switcher
       pm: "/pm/dashboard",
+      team_lead: "/pm/dashboard", // same portal as a PM, view-only inside
       employee: "/employee/dashboard",
     };
     return <Navigate to={dashboardMap[role] || "/login/admin"} replace />;

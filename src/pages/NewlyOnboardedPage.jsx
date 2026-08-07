@@ -14,12 +14,14 @@ import {
   allocationApi,
   subProjectApi,
   parentProjectApi,
+  employeeApi,
 } from "../services/api";
 import SearchBar from "../components/ui/SearchBar";
+import UserAvatar from "../components/ui/UserAvatar";
 import AllocationModalV2 from "../components/AllocationModalV2";
 import CandidateAllocationsPopover from "../components/CandidateAllocationsPopover";
 import { getPmSubProjects, getPmEmployeeId } from "../utils/pmScope";
-import { formatDisplayName, getNameInitials } from "../utils/displayName";
+import { formatDisplayName } from "../utils/displayName";
 
 const scoreBadgeClass = (score) => {
   if (score >= 80) return "bg-emerald-50 text-emerald-700 border-emerald-100";
@@ -59,6 +61,17 @@ const NewlyOnboardedPage = ({ embedded = false }) => {
     queryKey: ["allocations"],
     queryFn: allocationApi.getAll,
   });
+  // The onboarding payload carries no photo, so the profile pictures come from
+  // the employee records — same source and same cache key the Employees page
+  // uses, joined on the employeeId each candidate row already carries.
+  const { data: employees = [] } = useQuery({
+    queryKey: ["employees"],
+    queryFn: employeeApi.getAll,
+  });
+  const avatarByEmployeeId = useMemo(
+    () => new Map(employees.map((e) => [e.id, e.avatar_url])),
+    [employees],
+  );
 
   const projectOptions = useMemo(() => {
     if (isPm) {
@@ -231,9 +244,11 @@ const NewlyOnboardedPage = ({ embedded = false }) => {
                       </td>
                       <td className="py-4 px-6">
                         <div className="flex items-center gap-3">
-                          <div className="h-9 w-9 rounded-full flex items-center justify-center text-white text-xs font-bold bg-gradient-to-br from-indigo-600 to-blue-500 shadow-sm uppercase">
-                            {getNameInitials(c.name, 2) || "EM"}
-                          </div>
+                          <UserAvatar
+                            src={avatarByEmployeeId.get(c.employeeId)}
+                            name={c.name}
+                            size="md"
+                          />
                           <div>
                             <p className="font-bold text-slate-800 text-sm">
                               {formatDisplayName(c.name)}

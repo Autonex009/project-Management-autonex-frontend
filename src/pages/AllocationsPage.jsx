@@ -30,8 +30,12 @@ import toast from "react-hot-toast";
 import ConfirmDialog from "../components/ui/ConfirmDialog";
 import { getPmEmployeeId, getPmSubProjects } from "../utils/pmScope";
 import {
+  isProjectScopedRole,
+  isTeamLeadAllocation,
+  resolveProjectPmIds,
+} from "../utils/roleAccess";
+import {
   buildEmployeeIndex,
-  extraPmIds,
   isArchived,
   isStaleAllocation,
   manpowerEmployeeIds,
@@ -66,6 +70,13 @@ const getAvatarGradient = (name) => {
   return AVATAR_PALETTE[Math.abs(hash) % AVATAR_PALETTE.length];
 };
 
+// Marks an allocation as the project's team lead. Stored inside role_tags because that
+// is already per-(employee, project) — a designation could not express "lead on this
+// project only", which is what lets a PM be lent to another project as a lead.
+// A lead may act on the project like its manager; what the hierarchy governs is whose own
+// requests they may decide (backend/app/services/project_scope.py).
+export const TEAM_LEAD_TAG = "Team Lead";
+
 // Role tag constants for time division
 const ROLE_TAGS = [
   "Yutori Verifier",
@@ -85,8 +96,11 @@ const AllocationsPage = () => {
   const hasHandledLocationProject = useRef(false);
   const user = JSON.parse(localStorage.getItem("user") || "{}");
   const role = localStorage.getItem("role") || "admin";
+  // See utils/roleAccess: isPm confers ownership, isScoped only narrows what is listed.
+  // Scoping on isPm alone would show a team lead every allocation in the organisation.
   const isPm = role === "pm";
-  const prefix = isPm ? "/pm" : "/admin";
+  const isScoped = isProjectScopedRole(role);
+  const prefix = isScoped ? "/pm" : "/admin";
   const pmEmployeeId = getPmEmployeeId(user);
   const [isModalOpen, setIsModalOpen] = useState(false);
   const [currentPage, setCurrentPage] = useState(1);
@@ -102,6 +116,7 @@ const AllocationsPage = () => {
 
   // Time division state
   const [selectedRoleTags, setSelectedRoleTags] = useState([]);
+  const [isTeamLead, setIsTeamLead] = useState(false);
   const [timeDistribution, setTimeDistribution] = useState({});
   const [totalDailyHours, setTotalDailyHours] = useState(8);
   const [employeeSearch, setEmployeeSearch] = useState("");
@@ -216,13 +231,13 @@ const AllocationsPage = () => {
 
   const isDataLoading =
     projectsLoading || employeesLoading || allocationsLoading;
-  const visibleProjects = isPm
+  const visibleProjects = isScoped
     ? getPmSubProjects(projects, parentProjects, pmEmployeeId, allocations)
     : projects;
   const visibleProjectIds = new Set(
     visibleProjects.map((project) => project.id),
   );
-  const visibleAllocations = isPm
+  const visibleAllocations = isScoped
     ? allocations.filter((allocation) =>
       visibleProjectIds.has(allocation.sub_project_id),
     )
@@ -252,6 +267,7 @@ const AllocationsPage = () => {
     setSelectedProject(null);
     setSelectedEmployees([]);
     setSelectedRoleTags([]);
+    setIsTeamLead(false);
     setTimeDistribution({});
     setTotalDailyHours(8);
     setFilterTab("all");
@@ -401,7 +417,12 @@ const AllocationsPage = () => {
         employee_id: emp.id,
         sub_project_id: selectedProject.id,
         total_daily_hours: totalDailyHours,
-        role_tags: selectedRoleTags.length > 0 ? selectedRoleTags : [],
+        // The team-lead marker rides along in role_tags but is deliberately kept out
+        // of selectedRoleTags: those tags split the working day between workstreams,
+        // and leading a project is a position rather than hours to divide.
+        role_tags: isTeamLead
+          ? [...selectedRoleTags, TEAM_LEAD_TAG]
+          : selectedRoleTags,
         time_distribution: selectedRoleTags.length > 0 ? timeDistribution : {},
         weekly_hours_allocated: emp.weekly_availability || 40,
         weekly_tasks_allocated: 0,
@@ -457,20 +478,20 @@ const AllocationsPage = () => {
     return visibleAllocations.filter((a) => a.sub_project_id === projectId);
   };
 
-  // A project's PMs occupy manpower slots, so they count on BOTH sides of the
-  // ratio: manpowerEmployeeIds adds them to assigned, totalRequiredManpower adds
-  // them to required. Same resolution order as ProjectsPage: the project's own PM
-  // ids win, else the main project's.
-  const resolvePmIds = (project) => {
-    if (project?.assigned_employee_ids?.length)
-      return project.assigned_employee_ids;
-    if (project?.pm_id) return [project.pm_id];
-    const parent = parentProjects.find(
-      (p) => p.id === project?.main_project_id,
-    );
-    if (parent?.program_manager_ids?.length) return parent.program_manager_ids;
-    return parent?.program_manager_id ? [parent.program_manager_id] : [];
-  };
+  // Managers and leads occupy manpower slots, so they count on BOTH sides of the ratio:
+  // manpowerEmployeeIds adds them to assigned, totalRequiredManpower adds them to required.
+  // Both resolvers are shared with the Projects page — a near-copy here previously drifted
+  // and the two screens reported different requirements for one project.
+  const resolvePmIds = (project) => resolveProjectPmIds(project, parentProjects);
+
+  const resolveLeadIds = (project) =>
+    allocations
+      .filter(
+        (a) =>
+          a.sub_project_id === project?.id &&
+          isTeamLeadAllocation(a, employeeIndex.get(String(a.employee_id))),
+      )
+      .map((a) => a.employee_id);
 
   // One definition of a project's manpower for the create modal, its project
   // dropdown and the over-allocation guard. Each used to count it its own way —
@@ -482,20 +503,23 @@ const AllocationsPage = () => {
       (a) => a.sub_project_id === project?.id,
     );
     const pmIds = resolvePmIds(project);
+    const leadIds = resolveLeadIds(project);
     const assignedIds = manpowerEmployeeIds({
       allocations: projectAllocs,
       pmIds,
+      leadIds,
       employeeIndex,
     });
     return {
       projectAllocs,
       pmIds,
+      leadIds,
       assignedIds,
       assigned: assignedIds.size,
       required: totalRequiredManpower({
         required: project?.required_manpower || 0,
-        allocations: projectAllocs,
         pmIds,
+        leadIds,
         employeeIndex,
       }),
     };
@@ -508,28 +532,38 @@ const AllocationsPage = () => {
         (a) => a.sub_project_id === project.id,
       );
       const pmIds = resolvePmIds(project);
-      // Count people, not allocation rows: a PM who is also allocated, or anyone
+      const leadIds = resolveLeadIds(project);
+      // Count people, not allocation rows: a manager who is also allocated, or anyone
       // holding two allocations here, must only fill one slot. People who have
       // left are excluded — a stale allocation staffs nothing.
       const filledIds = manpowerEmployeeIds({
         allocations,
         pmIds,
+        leadIds,
         employeeIndex,
       });
-      // ...and since those PMs count as assigned, they count as required too. The
-      // server's required_manpower is annotators + reviewers + QC only, so on its
-      // own it made a project staffed by its PM alone read 1/2, and a fully
-      // staffed one read 12/10.
-      const pmSlots = extraPmIds({ allocations, pmIds, employeeIndex }).size;
+      // Required = managers + leads + the requested annotators and reviewers, matching the
+      // Projects page. Counted unconditionally: the old version added only the managers who
+      // had no allocation yet, so allocating a project's own PM *lowered* its requirement.
+      const onRoster = (id) => employeeIndex.has(String(id));
+      const pmSlots = pmIds.filter(onRoster).length;
+      const leadSlots = leadIds.filter(onRoster).length;
       const requestedManpower = project.required_manpower || 0;
       return {
         project,
         allocations,
         pmIds,
+        leadIds,
         assignedManpower: filledIds.size,
         requestedManpower,
         pmSlots,
-        requiredManpower: requestedManpower + pmSlots,
+        leadSlots,
+        requiredManpower: totalRequiredManpower({
+          required: requestedManpower,
+          pmIds,
+          leadIds,
+          employeeIndex,
+        }),
       };
     })
     .filter((pa) => pa.allocations.length > 0 || pa.requiredManpower > 0);
@@ -619,29 +653,6 @@ const AllocationsPage = () => {
             ),
           },
           {
-            key: "requiredManpower",
-            label: "Required",
-            align: "left",
-            width: "w-[8%]",
-            render: (value, row) => (
-              <span
-                className="text-[13px] font-medium text-slate-700 tabular-nums"
-                title={
-                  row.pmSlots > 0
-                    ? `${row.requestedManpower} requested + ${row.pmSlots} program manager${row.pmSlots === 1 ? "" : "s"}`
-                    : undefined
-                }
-              >
-                {value}
-                {row.pmSlots > 0 && (
-                  <span className="ml-1 text-[11px] font-normal text-slate-400">
-                    ({row.pmSlots} PM)
-                  </span>
-                )}
-              </span>
-            ),
-          },
-          {
             key: "allocations",
             label: "Allocated Employees",
             width: "w-[30%]",
@@ -716,9 +727,42 @@ const AllocationsPage = () => {
               );
             },
           },
+          // Required sits immediately left of the current head-count it is read
+          // against, so the comparison is a glance sideways rather than across
+          // the avatar strip.
+          {
+            key: "requiredManpower",
+            label: "Required",
+            align: "left",
+            width: "w-[8%]",
+            render: (value, row) => (
+              <span
+                className="text-[13px] font-medium text-slate-700 tabular-nums"
+                title={
+                  row.pmSlots > 0 || row.leadSlots > 0
+                    ? `${row.requestedManpower} requested + ${row.pmSlots} PM + ${row.leadSlots} team lead`
+                    : undefined
+                }
+              >
+                {value}
+                {(row.pmSlots > 0 || row.leadSlots > 0) && (
+                  <span className="ml-1 text-[11px] font-normal text-slate-400">
+                    (
+                    {[
+                      row.pmSlots > 0 && `${row.pmSlots} PM`,
+                      row.leadSlots > 0 && `${row.leadSlots} Lead`,
+                    ]
+                      .filter(Boolean)
+                      .join(" · ")}
+                    )
+                  </span>
+                )}
+              </span>
+            ),
+          },
           {
             key: "_fill",
-            label: "Fill & Attendance",
+            label: "Current Team Status",
             width: "w-[28%]",
             render: (_, row) => {
               const project = row.project;
@@ -753,10 +797,17 @@ const AllocationsPage = () => {
                     triggerClassName="inline-flex items-center rounded-md focus:outline-none"
                     badgeContent={
                       <div className="flex items-center gap-3 cursor-pointer select-none">
+                        {/* The head-count on its own, not a ratio: Required is the
+                            column immediately to the left, so "15/15" repeated it
+                            and read ambiguously besides — allocated leads either
+                            way, but it is the larger number on an over-staffed
+                            project and the smaller one on a short-staffed one.
+                            Colour still carries whether the requirement is met. */}
                         <span
                           className={`text-[13px] font-semibold tabular-nums ${full ? "text-emerald-600" : "text-slate-700"}`}
+                          title={`${assigned} allocated of ${required} required`}
                         >
-                          {assigned}/{required}
+                          {assigned}
                         </span>
                         <span
                           className="inline-flex items-center gap-1 text-[12px] text-slate-500"
@@ -1368,6 +1419,26 @@ const AllocationsPage = () => {
                           </label>
                         ))}
                       </div>
+                    </div>
+
+                    {/* Team lead — separate from the role tags above because it takes
+                        no share of the working day. */}
+                    <div className="mb-4">
+                      <label className="flex items-start gap-2 cursor-pointer">
+                        <input
+                          type="checkbox"
+                          checked={isTeamLead}
+                          onChange={(e) => setIsTeamLead(e.target.checked)}
+                          className="mt-0.5"
+                        />
+                        <span className="text-sm text-gray-700">
+                          Team lead on this project
+                          <span className="block text-xs text-gray-500">
+                            Applies to this project only. Leads manage it like its PM;
+                            their own requests go to the PM or an admin.
+                          </span>
+                        </span>
+                      </label>
                     </div>
 
                     {/* Hours Distribution */}
