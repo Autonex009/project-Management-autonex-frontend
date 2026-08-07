@@ -1985,10 +1985,9 @@ const ProjectsPage = () => {
 
   // Team leads aren't recorded on the project (`assigned_employee_ids` only ever holds
   // PM/admin ids, and a lead placed there would outrank the project's other leads) —
-  // they're whoever is allocated to it and qualifies as a lead. Two ways to qualify, both
-  // needed: the "Team Lead" designation, or a "Team Lead" tag on this specific
-  // allocation, which is how a program manager lent here temporarily is recorded. A
-  // designation-only check would leave a borrowed PM showing no lead at all.
+  // they're whoever is allocated to it and qualifies as a lead: a "Team Lead" tag on the
+  // allocation, which is what the picker writes, or the "Team Lead" designation as a
+  // fallback for allocations made outside it.
   // Deduped by employee id so two allocations don't name the same person twice.
   const getTeamLeadNames = (project) => {
     const seen = new Set();
@@ -2149,8 +2148,8 @@ const ProjectsPage = () => {
   }, [visibleProjects, visibleMainProjects, employees]);
 
   // Employee ids leading each visible project, so the filter and the card agree. Built from
-  // allocations rather than a designation sweep, because a program manager on loan leads by
-  // virtue of a tagged allocation and would otherwise be missing from the list.
+  // allocations rather than a designation sweep: leadership is recorded per project, so a
+  // roster-wide sweep would list leads who do not lead this one.
   const teamLeadIdsByProject = useMemo(() => {
     const byProject = new Map();
     allocations.forEach((allocation) => {

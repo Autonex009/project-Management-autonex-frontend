@@ -105,11 +105,10 @@ export const isTeamLeadDesignation = (designation) =>
  *
  * Two ways to qualify, and both are needed:
  *
- * 1. **Designation** "Team Lead" — someone whose whole job is leading.
- * 2. **`role_tags` carrying "Team Lead"** on this specific allocation — which is the only
- *    way to express a *program manager* lent to another project as a temporary lead.
- *    Their designation stays "Program Manager", so a designation-only check would miss
- *    them entirely and the project would show no lead at all.
+ * 1. **`role_tags` carrying "Team Lead"** on this specific allocation — what the Team Lead
+ *    picker writes, and the only per-project record of leadership.
+ * 2. **Designation** "Team Lead" — a fallback, so allocations made before the tag existed,
+ *    or from the Allocations page, still resolve rather than showing no lead at all.
  *
  * Being a lead confers a manager's powers over that project. What it does not confer is
  * rank over other leads on it — see backend `app/services/project_scope.py`.

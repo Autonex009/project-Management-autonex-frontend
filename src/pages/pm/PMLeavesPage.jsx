@@ -69,6 +69,31 @@ const TABS = ["Leave Requests", "Calendar", "WFH Requests", "Employee KPI"];
 // (project_scope.can_manage_employee): a lead may not action a *peer lead's* request, and
 // nobody but an admin may action a manager's.
 
+/**
+ * Who decided this request, under the employee's name.
+ *
+ * Worth showing because it is not inferable: any manager *or lead* of any project the
+ * person is on may decide, so a lead sitting on two projects can be signed off by either
+ * project's PM. `approved_by_name` is resolved server-side — `approved_by` is a users.id,
+ * which the client has no way to turn into a name.
+ *
+ * Nothing is rendered while a request is still pending, or for older rows that predate the
+ * approver being recorded.
+ */
+const DecidedBy = ({ request }) => {
+  const status = (request?.status || "").toLowerCase();
+  if (status !== "approved" && status !== "rejected") return null;
+  if (!request.approved_by_name) return null;
+  return (
+    <p className="mt-0.5 truncate text-xs text-slate-400">
+      {status === "approved" ? "Approved" : "Rejected"} by{" "}
+      <span className="font-medium text-slate-500">
+        {formatDisplayName(request.approved_by_name)}
+      </span>
+    </p>
+  );
+};
+
 const PMLeavesPage = () => {
   const queryClient = useQueryClient();
   const user = JSON.parse(localStorage.getItem("user") || "{}");
@@ -678,6 +703,7 @@ const PMLeavesPage = () => {
                           />
                         )}
                       </div>
+                      <DecidedBy request={leave} />
                     </div>
                   </div>
                 );
@@ -912,6 +938,7 @@ const PMLeavesPage = () => {
                           <FlagChip icon={AlertTriangle} label="Over limit" />
                         )}
                       </div>
+                      <DecidedBy request={w} />
                       {/* The remark is the justification for approving an
                           over-limit request, so it belongs on the row rather
                           than only in the DB. */}

@@ -70,9 +70,9 @@ const getAvatarGradient = (name) => {
   return AVATAR_PALETTE[Math.abs(hash) % AVATAR_PALETTE.length];
 };
 
-// Marks an allocation as the project's team lead. Stored inside role_tags because that
-// is already per-(employee, project) — a designation could not express "lead on this
-// project only", which is what lets a PM be lent to another project as a lead.
+// Marks an allocation as the project's team lead. Stored inside role_tags because that is
+// already per-(employee, project): the same person can lead one project without leading
+// every project they are allocated to, which a designation cannot express.
 // A lead may act on the project like its manager; what the hierarchy governs is whose own
 // requests they may decide (backend/app/services/project_scope.py).
 export const TEAM_LEAD_TAG = "Team Lead";
