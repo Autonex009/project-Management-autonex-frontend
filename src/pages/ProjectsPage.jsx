@@ -472,11 +472,7 @@ const SlotBreakdown = ({ pmSlots = 0, leadSlots = 0 }) => {
   if (pmSlots <= 0 && leadSlots <= 0) return null;
   return (
     <span className="ml-1 text-[11px] font-normal text-slate-400">
-      (
-      {[pmSlots > 0 && `${pmSlots} PM`, leadSlots > 0 && `${leadSlots} Lead`]
-        .filter(Boolean)
-        .join(" · ")}
-      )
+      ({pmSlots || 0} PM &middot; {leadSlots || 0} Lead)
     </span>
   );
 };
@@ -791,8 +787,6 @@ const ProjectCard = ({
               allocations={allocations}
               employees={employees}
               formerEmployees={formerEmployees}
-              pmIds={pmIds}
-              leadIds={leadIds}
               onLeaveEmployeeIds={onLeaveEmployeeIds}
               locationByEmployeeId={locationByEmployeeId}
               onOpenAllocations={() =>

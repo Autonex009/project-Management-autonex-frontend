@@ -79,18 +79,22 @@ const STATUS_COLORS = {
 // Stored Encord IDs are trimmed here: a few carry leading whitespace from import.
 const matchesSearchTerm = (employee, term) => {
   if (!term) return true;
-  const fields = [
+  
+  // Split search term by spaces to match individual words
+  const searchParts = term.trim().split(/\s+/);
+  
+  // Combine all searchable fields into one big string
+  const fieldsText = [
     employee.name,
     employee.email,
     employee.designation,
     employee.encord_id,
-  ];
-  return fields.some((field) =>
-    String(field || "")
-      .trim()
-      .toLowerCase()
-      .includes(term),
-  );
+  ]
+    .map((field) => String(field || "").trim().toLowerCase())
+    .join(" ");
+
+  // Check if every word typed by the user exists somewhere in the employee's data
+  return searchParts.every((part) => fieldsText.includes(part));
 };
 
 function formatDateRange(start, end) {

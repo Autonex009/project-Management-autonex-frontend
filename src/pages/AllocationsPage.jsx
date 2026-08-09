@@ -555,11 +555,10 @@ const AllocationsPage = () => {
         leadIds,
         employeeIndex,
       });
-      // The "(N PM · N Lead)" annotation beside the requirement describes what the
-      // project ASKS for, so it reads the typed counts rather than who happens to be
-      // allocated — otherwise it would explain a number it is not part of.
-      const pmSlots = project.team_manager_count || 0;
-      const leadSlots = project.team_lead_count || 0;
+      // Compute dynamically from the assigned PMs and Leads, exactly like ProjectsPage does,
+      // because team_manager_count and team_lead_count can be stale if the project wasn't re-saved.
+      const pmSlots = pmIds.length;
+      const leadSlots = leadIds.length;
       // The role slots only — managers and leads are shown separately in the tooltip, and
       // `required_manpower` already folds them in, so reusing it would state them twice.
       const requestedManpower =
@@ -647,7 +646,7 @@ const AllocationsPage = () => {
           {
             key: "project",
             label: "Project",
-            width: "w-[26%]",
+            width: "w-[24%]",
             render: (project) => (
               <button
                 type="button"
@@ -677,35 +676,66 @@ const AllocationsPage = () => {
           {
             key: "allocations",
             label: "Allocated Employees",
-            width: "w-[30%]",
+            width: "w-[28%]",
             render: (projectAllocs, row) => {
               const project = row.project;
-              // Order the avatar stack so real profile photos fill the first 4
-              // slots: employees with a profile image come first. But once there
-              // are plenty of images (all of them, or more than 4), just show A→Z.
-              // Stale allocations are left out of the stack: it pictures who is
-              // staffing the project, and they are not. The popover still lists
-              // them so they can be found and removed.
-              const withEmp = projectAllocs
+              const pmIdSet = new Set((project?.assigned_employee_ids || []).map(String));
+              
+              const rawRows = projectAllocs
                 .filter((a) => !isStale(a))
                 .map((a) => {
                   const emp = employeeIndex.get(String(a.employee_id));
+                  const empIdStr = String(a.employee_id);
                   return {
                     alloc: a,
                     emp,
-                    name: formatDisplayName(emp.name) || "Unnamed",
-                    hasImg: !!emp.avatar_url,
+                    name: formatDisplayName(emp?.name) || "Unnamed",
+                    hasImg: !!emp?.avatar_url,
+                    isPm: pmIdSet.has(empIdStr) || (a.role_tags || []).includes("Manager"),
+                    isLead: (a.role_tags || []).includes("Team Lead")
                   };
                 });
-              const byName = (a, b) => a.name.localeCompare(b.name);
-              // Profile photos ALWAYS come first so the visible avatars are real
-              // images, never initials. Only when there are many photos (more
-              // than 5) do we order those photos A→Z.
-              const withImg = withEmp.filter((x) => x.hasImg);
-              const withoutImg = withEmp.filter((x) => !x.hasImg);
-              const orderedImg =
-                withImg.length > 5 ? [...withImg].sort(byName) : withImg;
-              const ordered = [...orderedImg, ...withoutImg];
+                
+              const allocatedEmpIds = new Set(rawRows.map(r => String(r.alloc.employee_id)));
+              
+              const allPmIds = new Set([...pmIdSet, ...(row.pmIds || [])]);
+              allPmIds.forEach((id) => {
+                if (!allocatedEmpIds.has(id) && employeeIndex.has(id)) {
+                  const emp = employeeIndex.get(id);
+                  rawRows.push({
+                    alloc: { employee_id: id, role_tags: ["Manager"] },
+                    emp,
+                    name: formatDisplayName(emp?.name) || "Unnamed",
+                    hasImg: !!emp?.avatar_url,
+                    isPm: true,
+                    isLead: false,
+                  });
+                  allocatedEmpIds.add(id);
+                }
+              });
+
+              (row.leadIds || []).forEach((id) => {
+                if (!allocatedEmpIds.has(id) && employeeIndex.has(id)) {
+                  const emp = employeeIndex.get(id);
+                  rawRows.push({
+                    alloc: { employee_id: id, role_tags: ["Team Lead"] },
+                    emp,
+                    name: formatDisplayName(emp?.name) || "Unnamed",
+                    hasImg: !!emp?.avatar_url,
+                    isPm: false,
+                    isLead: true,
+                  });
+                  allocatedEmpIds.add(id);
+                }
+              });
+
+              const ordered = rawRows.sort((a, b) => {
+                  if (a.isPm && !b.isPm) return -1;
+                  if (!a.isPm && b.isPm) return 1;
+                  if (a.isLead && !b.isLead) return -1;
+                  if (!a.isLead && b.isLead) return 1;
+                  return a.name.localeCompare(b.name);
+                });
               return (
                 <div className="flex items-center gap-2">
                   <div className="flex -space-x-1.5 overflow-hidden">
@@ -756,7 +786,7 @@ const AllocationsPage = () => {
             key: "requiredManpower",
             label: "Required",
             align: "left",
-            width: "w-[8%]",
+            width: "w-[12%]",
             render: (value, row) => (
               <span
                 className="text-[13px] font-medium text-slate-700 tabular-nums"
@@ -769,14 +799,7 @@ const AllocationsPage = () => {
                 {value}
                 {(row.pmSlots > 0 || row.leadSlots > 0) && (
                   <span className="ml-1 text-[11px] font-normal text-slate-400">
-                    (
-                    {[
-                      row.pmSlots > 0 && `${row.pmSlots} PM`,
-                      row.leadSlots > 0 && `${row.leadSlots} Lead`,
-                    ]
-                      .filter(Boolean)
-                      .join(" · ")}
-                    )
+                    ({row.pmSlots || 0} PM &middot; {row.leadSlots || 0} Lead)
                   </span>
                 )}
               </span>
@@ -785,12 +808,17 @@ const AllocationsPage = () => {
           {
             key: "_fill",
             label: "Current Team Status",
-            width: "w-[28%]",
+            width: "w-[26%]",
             render: (_, row) => {
               const project = row.project;
-              const assigned = row.assignedManpower ?? row.allocations.length;
+              const activeAllocations = row.allocations.filter((a) => !isStale(a));
+              const assigned = row.assignedManpower || 0;
               const required = row.requiredManpower || 0;
               const full = assigned >= required && required > 0;
+              
+              const allocPm = row.pmSlots || 0;
+              const allocLead = row.leadSlots || 0;
+              
               // Split allocated employees into on-leave / WFH / WFO for today.
               let onLeaveToday = 0,
                 wfhCount = 0,
@@ -813,24 +841,21 @@ const AllocationsPage = () => {
                     allocations={row.allocations}
                     employees={employees}
                     formerEmployees={formerEmployees}
-                    pmIds={row.pmIds}
-                    leadIds={row.leadIds}
                     onLeaveEmployeeIds={leaveEmployeeIds}
                     locationByEmployeeId={locationByEmployeeId}
                     triggerClassName="inline-flex items-center rounded-md focus:outline-none"
                     badgeContent={
                       <div className="flex items-center gap-3 cursor-pointer select-none">
-                        {/* The head-count on its own, not a ratio: Required is the
-                            column immediately to the left, so "15/15" repeated it
-                            and read ambiguously besides — allocated leads either
-                            way, but it is the larger number on an over-staffed
-                            project and the smaller one on a short-staffed one.
-                            Colour still carries whether the requirement is met. */}
                         <span
                           className={`text-[13px] font-semibold tabular-nums ${full ? "text-emerald-600" : "text-slate-700"}`}
                           title={`${assigned} allocated of ${required} required`}
                         >
                           {assigned}
+                          {(allocPm > 0 || allocLead > 0) && (
+                            <span className="ml-1 text-[11px] font-normal text-slate-400">
+                              ({allocPm || 0} PM &middot; {allocLead || 0} Lead)
+                            </span>
+                          )}
                         </span>
                         <span
                           className="inline-flex items-center gap-1 text-[12px] text-slate-500"
@@ -870,7 +895,7 @@ const AllocationsPage = () => {
             key: "_edit",
             label: "Actions",
             align: "right",
-            width: "w-[8%]",
+            width: "w-[10%]",
             render: (_, row) => (
               <button
                 onClick={() =>

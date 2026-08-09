@@ -132,50 +132,82 @@ const AllocationPopover = ({
           : true,
       )
       : [];
-    const rows = filtered.map((a) => ({
-      key: `alloc-${a.id}`,
-      alloc: a,
-      emp: employeeIndex.get(String(a.employee_id)),
-      former: formerIndex.get(String(a.employee_id)),
-      isPm: false,
-      isLead: false,
-      isStale: isStaleAllocation(a, employeeIndex),
-    }));
-
-    // Managers and leads who run the project without an allocation row. Someone already
-    // allocated is skipped — they are on the list once, as their allocation.
-    const seen = new Set(filtered.map((a) => String(a.employee_id)));
-    const addRunner = (id, kind) => {
-      if (id == null || seen.has(String(id))) return;
-      seen.add(String(id));
-      const emp = employeeIndex.get(String(id));
-      rows.push({
-        key: `${kind}-${id}`,
-        alloc: null,
-        emp,
-        former: formerIndex.get(String(id)),
-        isPm: kind === "pm",
-        isLead: kind === "lead",
-        isStale: !emp,
-      });
-    };
-    (pmIds || []).forEach((id) => addRunner(id, "pm"));
-    (leadIds || []).forEach((id) => addRunner(id, "lead"));
-
-    // Somebody can hold two allocations on one project. Flag those rows, so a
-    // list that is longer than the headcount beside it explains itself.
-    const idOf = (r) => String(r.alloc?.employee_id ?? r.emp?.id);
-    const timesListed = new Map();
-    rows.forEach((r) => {
-      if (r.isStale) return;
-      timesListed.set(idOf(r), (timesListed.get(idOf(r)) || 0) + 1);
+    const pmIdSet = new Set((project?.assigned_employee_ids || []).map(String));
+    const rows = filtered.map((a) => {
+      const empIdStr = String(a.employee_id);
+      return {
+        key: `alloc-${a.id}`,
+        alloc: a,
+        emp: employeeIndex.get(empIdStr),
+        former: formerIndex.get(empIdStr),
+        isPm: pmIdSet.has(empIdStr) || pmIds.includes(empIdStr) || (a.role_tags || []).includes("Manager"),
+        isLead: (a.role_tags || []).includes("Team Lead") || leadIds.includes(empIdStr),
+        isStale: isStaleAllocation(a, employeeIndex),
+      };
     });
+
+    const allocatedEmpIds = new Set(filtered.map(a => String(a.employee_id)));
+    
+    // Add PMs who don't have an allocation
+    const allPmIds = new Set([...pmIdSet, ...(pmIds || [])]);
+    allPmIds.forEach((id) => {
+      if (!allocatedEmpIds.has(id)) {
+        rows.push({
+          key: `pm-${id}`,
+          alloc: { employee_id: id, role_tags: ["Manager"] },
+          emp: employeeIndex.get(id),
+          former: formerIndex.get(id),
+          isPm: true,
+          isLead: false,
+          isStale: !employeeIndex.has(id),
+        });
+        allocatedEmpIds.add(id);
+      }
+    });
+
+    // Add Leads who don't have an allocation
+    (leadIds || []).forEach((id) => {
+      if (!allocatedEmpIds.has(id)) {
+        rows.push({
+          key: `lead-${id}`,
+          alloc: { employee_id: id, role_tags: ["Team Lead"] },
+          emp: employeeIndex.get(id),
+          former: formerIndex.get(id),
+          isPm: false,
+          isLead: true,
+          isStale: !employeeIndex.has(id),
+        });
+        allocatedEmpIds.add(id);
+      }
+    });
+
+    // Calculate how many allocations a person holds on this project
+    const rowsPerEmployeeId = {};
     rows.forEach((r) => {
-      r.rowsForPerson = r.isStale ? 1 : timesListed.get(idOf(r)) || 1;
+      const id = r.alloc?.employee_id;
+      if (id != null) {
+        rowsPerEmployeeId[id] = (rowsPerEmployeeId[id] || 0) + 1;
+      }
+    });
+    
+    rows.forEach((r) => {
+      const id = r.alloc?.employee_id;
+      r.rowsForPerson = id != null ? rowsPerEmployeeId[id] : 1;
+    });
+
+    const activeRows = rows.filter((r) => !r.isStale).sort((a, b) => {
+      // Sort PMs first
+      if (a.isPm && !b.isPm) return -1;
+      if (!a.isPm && b.isPm) return 1;
+      // Sort Leads second
+      if (a.isLead && !b.isLead) return -1;
+      if (!a.isLead && b.isLead) return 1;
+      // Alphabetical fallback
+      return a.emp?.name?.localeCompare(b.emp?.name);
     });
 
     return [
-      ...rows.filter((r) => !r.isStale),
+      ...activeRows,
       ...rows.filter((r) => r.isStale),
     ];
   }, [allocations, employeeIndex, formerIndex, project, pmIds, leadIds]);
