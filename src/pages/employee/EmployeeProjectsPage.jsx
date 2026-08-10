@@ -25,6 +25,7 @@ const EmployeeProjectsPage = () => {
     })
     .filter((a) => a.project);
 
+  console.log(myProjects);
   return (
     <div className="space-y-6">
 

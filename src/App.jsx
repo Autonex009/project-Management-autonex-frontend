@@ -199,6 +199,7 @@ function App() {
             />
             <Route path="dashboard" element={<EmployeeDashboard />} />
             <Route path="projects" element={<EmployeeProjectsPage />} />
+            <Route path="leaderboard" element={<LeaderboardPage />} />
             <Route path="leaves" element={<EmployeeLeavesPage />} />
             <Route path="self-evaluation" element={<SelfEvaluationPage />} />
             <Route path="side-projects" element={<SideProjectsPage />} />
@@ -210,11 +211,13 @@ function App() {
             <Route path="profile" element={<ProfilePage />} />
           </Route>
 
-          {/* Protected PM Routes */}
+          {/* Protected PM Routes. Team leads live here too: same pages, same
+              layout, view-only. The backend decides what they may act on
+              (services/project_scope.py). */}
           <Route
             path="/pm"
             element={
-              <ProtectedRoute allowedRoles={["pm", "hr"]}>
+              <ProtectedRoute allowedRoles={["pm", "hr", "team_lead"]}>
                 <EmployeeLayout />
               </ProtectedRoute>
             }
@@ -228,6 +231,7 @@ function App() {
             />
             <Route path="projects" element={<ProjectsPage />} />
             <Route path="sub-projects" element={<SubProjectsPage />} />
+            <Route path="leaderboard" element={<LeaderboardPage />} />
             <Route path="allocations" element={<AllocationsPage />} />
             <Route path="my-team" element={<MyTeamPage />} />
             <Route path="performance" element={<PerformanceReviewsPage />} />

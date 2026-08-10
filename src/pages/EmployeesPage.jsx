@@ -72,6 +72,31 @@ const STATUS_COLORS = {
   pending: "bg-amber-50 text-amber-700",
 };
 
+// One definition of "does this employee match what was typed", used both to filter
+// the loaded roster and to decide whether the term is unknown client-side and worth
+// asking the server about. Encord IDs are included because that is the only place
+// they can be searched — see the ``search`` param on GET /api/employees.
+// Stored Encord IDs are trimmed here: a few carry leading whitespace from import.
+const matchesSearchTerm = (employee, term) => {
+  if (!term) return true;
+  
+  // Split search term by spaces to match individual words
+  const searchParts = term.trim().split(/\s+/);
+  
+  // Combine all searchable fields into one big string
+  const fieldsText = [
+    employee.name,
+    employee.email,
+    employee.designation,
+    employee.encord_id,
+  ]
+    .map((field) => String(field || "").trim().toLowerCase())
+    .join(" ");
+
+  // Check if every word typed by the user exists somewhere in the employee's data
+  return searchParts.every((part) => fieldsText.includes(part));
+};
+
 function formatDateRange(start, end) {
   const s = new Date(start + "T00:00:00");
   const e = new Date(end + "T00:00:00");
@@ -526,11 +551,15 @@ function EmployeeConvertToFulltimeModal({
   );
 }
 
+// Order matters only for the dropdown. "Team Lead" grants the PM portal in read-only
+// form — the mapping that makes that happen lives in DESIGNATION_ROLE_MAP
+// (backend/app/api/employees.py) and DESIGNATION_ACCESS (backend/app/api/auth.py).
 const ALLOWED_DESIGNATIONS = [
   "Admin",
   "HR",
   "Annotator/ Reviewer",
   "Program Manager",
+  "Team Lead",
   "Developer",
 ];
 
@@ -1124,6 +1153,9 @@ const EmployeesPage = () => {
   const [restoreTarget, setRestoreTarget] = useState(null);
   const [convertToFulltimeTarget, setConvertToFulltimeTarget] = useState(null);
   const [searchQuery, setSearchQuery] = useState("");
+  // Only the server round-trip is debounced; the client-side filter runs on every
+  // keystroke off `searchQuery` so typing stays responsive.
+  const [debouncedSearch, setDebouncedSearch] = useState("");
   const [skillFilter, setSkillFilter] = useState("");
   const [designationFilter, setDesignationFilter] = useState([]);
   const [sortBy, setSortBy] = useState("");
@@ -1187,6 +1219,39 @@ const EmployeesPage = () => {
   });
 
   const allStaff = allEmployeesData.length > 0 ? allEmployeesData : employees;
+
+  useEffect(() => {
+    const timer = setTimeout(() => setDebouncedSearch(searchQuery), 400);
+    return () => clearTimeout(timer);
+  }, [searchQuery]);
+
+  // Client-first, server-second search. The loaded roster is checked before any
+  // request goes out; only a term that matches nobody here is worth asking the
+  // server about, which is the case that matters for Encord IDs — the ID may
+  // belong to someone outside the current view (archived, or a roster the client
+  // has not loaded). Both lists are consulted because `allStaff` spans archived
+  // employees while `employees` is the current tab's scope.
+  const serverSearchTerm = debouncedSearch.trim();
+  const clientKnowsTerm =
+    serverSearchTerm.length === 0 ||
+    (() => {
+      const term = serverSearchTerm.toLowerCase();
+      return (
+        employees.some((e) => matchesSearchTerm(e, term)) ||
+        allStaff.some((e) => matchesSearchTerm(e, term))
+      );
+    })();
+  // Two characters is the floor: shorter terms match half the roster and the
+  // answer would be useless even if the request were cheap.
+  const shouldSearchServer = serverSearchTerm.length >= 2 && !clientKnowsTerm;
+
+  const { data: serverMatches = [], isFetching: serverSearching } = useQuery({
+    queryKey: ["employees", "search", serverSearchTerm],
+    queryFn: () =>
+      employeeApi.getAll({ search: serverSearchTerm, include_archived: true }),
+    enabled: shouldSearchServer,
+    staleTime: 60_000,
+  });
 
   // employee id -> Set<project name>. Shared with the Dashboard via
   // utils/workforce so both pages credit program managers the same way — a PM
@@ -1569,11 +1634,10 @@ const EmployeesPage = () => {
     );
 
   const filteredEmployees = employees.filter((employee) => {
-    const matchesSearch =
-      employee.name.toLowerCase().includes(searchQuery.toLowerCase()) ||
-      employee.email.toLowerCase().includes(searchQuery.toLowerCase()) ||
-      (employee.designation &&
-        employee.designation.toLowerCase().includes(searchQuery.toLowerCase()));
+    const matchesSearch = matchesSearchTerm(
+      employee,
+      searchQuery.trim().toLowerCase(),
+    );
     const matchesSkill =
       !skillFilter ||
       (employee.skills && employee.skills.includes(skillFilter));
@@ -1655,10 +1719,19 @@ const EmployeesPage = () => {
     return arr;
   })();
 
+  // Server hits are shown only when the loaded roster genuinely had nothing —
+  // never merged into the client results, so the list stays one coherent answer.
+  // They deliberately bypass the chips and column filters: those describe the
+  // current view, and a row the view excludes is exactly what was searched for.
+  const usingServerResults =
+    shouldSearchServer && filteredEmployees.length === 0 && serverMatches.length > 0;
+  const displayedEmployees = usingServerResults ? serverMatches : sortedEmployees;
+
   useEffect(() => {
     setCurrentPage(1);
   }, [
     searchQuery,
+    usingServerResults,
     skillFilter,
     designationFilter,
     idleOnly,
@@ -2123,7 +2196,8 @@ const EmployeesPage = () => {
                   setSearchQuery(e.target.value);
                   setCurrentPage(1);
                 }}
-                placeholder="Search employees..."
+                placeholder="Search name, email or Encord ID..."
+                title="Searches the loaded roster first, then the server by Encord ID"
                 className="h-9 w-52 sm:w-64 pl-9 pr-9 rounded-lg border border-slate-200 bg-white text-[13px] text-slate-700 placeholder:text-slate-400 focus:outline-none focus:ring-2 focus:ring-indigo-100 focus:border-indigo-300 transition-all"
               />
               {searchQuery ? (
@@ -2161,6 +2235,23 @@ const EmployeesPage = () => {
           </div>
         </div>
 
+      {/* Server-search notice. Shown only when the rows below did not come from
+          the current view, so an archived person appearing is explained rather
+          than surprising. */}
+      {usingServerResults && (
+        <div className="mb-3 flex items-start gap-2 rounded-lg border border-indigo-100 bg-indigo-50/60 px-3 py-2 text-[12.5px] text-indigo-800">
+          <Search className="mt-0.5 h-3.5 w-3.5 flex-shrink-0" />
+          <span>
+            No match on this page — showing{" "}
+            <strong>{serverMatches.length}</strong>{" "}
+            {serverMatches.length === 1 ? "result" : "results"} found on the
+            server for &ldquo;{serverSearchTerm}&rdquo;, across the whole roster
+            including archived employees. Filters and chips do not apply to these
+            rows.
+          </span>
+        </div>
+      )}
+
       <Table
         variant="untitled"
         allowOverflow
@@ -2186,7 +2277,7 @@ const EmployeesPage = () => {
             ),
             width: "w-[19%]",
             render: (value, row) => {
-              const visibleRows = sortedEmployees.slice(
+              const visibleRows = displayedEmployees.slice(
                 (currentPage - 1) * PAGE_SIZE,
                 currentPage * PAGE_SIZE,
               );
@@ -2207,8 +2298,11 @@ const EmployeesPage = () => {
                     size="md"
                   />
                   <div className="group relative min-w-0">
-                    <div className="text-[13.5px] font-semibold text-slate-900 truncate leading-tight">
-                      {value}
+                    <div
+                      className="text-[13.5px] font-semibold text-slate-900 truncate leading-tight"
+                      title={value}
+                    >
+                      {shortName}
                     </div>
                     <div
                       onClick={(e) => {
@@ -2232,6 +2326,13 @@ const EmployeesPage = () => {
                       <div className="text-[12px] text-slate-500 break-words mt-0.5">
                         {row.email}
                       </div>
+                      {/* Encord ID is searchable, so it is worth being able to
+                          read the value a search matched on. */}
+                      {row.encord_id && (
+                        <div className="text-[11.5px] text-slate-400 break-words mt-1 pt-1 border-t border-slate-100">
+                          Encord: {String(row.encord_id).trim()}
+                        </div>
+                      )}
                     </div>
                   </div>
                 </div>
@@ -2282,7 +2383,7 @@ const EmployeesPage = () => {
                   glowClass = "drop-shadow-[0_0_6px_rgba(56,189,248,0.75)]";
               }
 
-              const visibleRows = sortedEmployees.slice(
+              const visibleRows = displayedEmployees.slice(
                 (currentPage - 1) * PAGE_SIZE,
                 currentPage * PAGE_SIZE,
               );
@@ -2360,7 +2461,7 @@ const EmployeesPage = () => {
                 );
               }
 
-              const visibleRows = sortedEmployees.slice(
+              const visibleRows = displayedEmployees.slice(
                 (currentPage - 1) * PAGE_SIZE,
                 currentPage * PAGE_SIZE,
               );
@@ -2372,9 +2473,14 @@ const EmployeesPage = () => {
               const extra = managers.length - 1;
 
               return (
-                <div className="group relative flex items-center gap-1 flex-nowrap whitespace-nowrap cursor-default">
+                <div
+                  className="group relative flex items-center gap-1 flex-nowrap whitespace-nowrap cursor-default"
+                  title={managers.join(", ")}
+                >
+                  {/* Shortened here, full in the hover card below — a manager's
+                      middle name is what tells two of them apart. */}
                   <span className="pointer-events-none text-[13px] font-medium text-slate-700 truncate max-w-[150px] inline-block">
-                    {managers[0]}
+                    {formatDisplayName(managers[0]) || managers[0]}
                   </span>
                   {extra > 0 && (
                     <span className="inline-flex items-center justify-center flex-shrink-0 h-4 min-w-4 rounded-full bg-slate-100 px-1 text-[10px] font-semibold text-slate-500">
@@ -2382,7 +2488,12 @@ const EmployeesPage = () => {
                     </span>
                   )}
 
-                  {(extra > 0 || (managers[0] || "").length > 18) && (
+                  {/* Also opens when the name was shortened, not just when it is
+                      long or there are several — otherwise the dropped middle
+                      name would be unreachable. */}
+                  {(extra > 0 ||
+                    (managers[0] || "").length > 18 ||
+                    formatDisplayName(managers[0]) !== managers[0]) && (
                     <div
                       className={`absolute left-0 ${positionClass} hidden group-hover:flex flex-col gap-1.5 z-30 p-2.5 bg-white text-slate-700 rounded-xl shadow-xl border border-slate-200 min-w-[180px] max-w-[260px] pointer-events-none`}
                     >
@@ -2416,7 +2527,7 @@ const EmployeesPage = () => {
                 return <span className="text-xs text-slate-400">—</span>;
               }
 
-              const visibleRows = sortedEmployees.slice(
+              const visibleRows = displayedEmployees.slice(
                 (currentPage - 1) * PAGE_SIZE,
                 currentPage * PAGE_SIZE,
               );
@@ -2483,7 +2594,7 @@ const EmployeesPage = () => {
                 );
               }
               const list = [...projects];
-              const visibleRows = sortedEmployees.slice(
+              const visibleRows = displayedEmployees.slice(
                 (currentPage - 1) * PAGE_SIZE,
                 currentPage * PAGE_SIZE,
               );
@@ -2537,7 +2648,7 @@ const EmployeesPage = () => {
             align: "center",
             width: "w-[6%]",
             render: (_, row) => {
-              const visibleRows = sortedEmployees.slice(
+              const visibleRows = displayedEmployees.slice(
                 (currentPage - 1) * PAGE_SIZE,
                 currentPage * PAGE_SIZE,
               );
@@ -2571,13 +2682,17 @@ const EmployeesPage = () => {
             },
           },
         ]}
-        data={sortedEmployees}
+        data={displayedEmployees}
         currentPage={currentPage}
         pageSize={PAGE_SIZE}
         onPageChange={setCurrentPage}
         emptyState={{
-          title: "No employees found",
-          description: "Try adjusting your search query",
+          title: serverSearching ? "Searching…" : "No employees found",
+          description: serverSearching
+            ? "Checking the full roster on the server for this ID"
+            : shouldSearchServer
+              ? "No name, email or Encord ID matches that, on this page or the server"
+              : "Try adjusting your search query",
         }}
       />
 

@@ -69,16 +69,17 @@ export const staleAllocationName = (alloc) =>
     : "Former employee");
 
 /**
- * Ids of the people a project's manpower is made of: everyone allocated plus
- * the PMs running it, deduped so a PM who is also allocated — or anyone holding
- * two allocations here — fills one slot, and narrowed to people still on the
- * roster so stale allocations don't inflate the count.
+ * Ids of the people a project's manpower is made of: everyone allocated, plus the
+ * managers and leads running it, deduped so anyone appearing twice — a manager who
+ * is also allocated, someone holding two allocations here — fills one slot, and
+ * narrowed to people still on the roster so stale allocations don't inflate it.
  *
  * Pass no index to skip the roster check.
  */
 export const manpowerEmployeeIds = ({
   allocations = [],
   pmIds = [],
+  leadIds = [],
   employeeIndex,
 } = {}) => {
   const onRoster = (id) => !employeeIndex || employeeIndex.has(String(id));
@@ -87,54 +88,56 @@ export const manpowerEmployeeIds = ({
     if (a?.employee_id != null && onRoster(a.employee_id))
       ids.add(String(a.employee_id));
   });
-  (pmIds || []).forEach((id) => {
+  // Leads normally arrive via their allocation above; listed explicitly so the two
+  // sides of the ratio cannot disagree if one ever lacks a row.
+  [...(pmIds || []), ...(leadIds || [])].forEach((id) => {
     if (id != null && onRoster(id)) ids.add(String(id));
   });
   return ids;
 };
 
 /**
- * The PMs who occupy a slot of their own: on the roster, and not already holding
- * an allocation here — counting one of those would be the same person twice.
- */
-export const extraPmIds = ({
-  allocations = [],
-  pmIds = [],
-  employeeIndex,
-} = {}) => {
-  const allocated = new Set(
-    allocations
-      .filter((a) => a?.employee_id != null)
-      .map((a) => String(a.employee_id)),
-  );
-  const ids = new Set();
-  (pmIds || []).forEach((id) => {
-    if (id == null) return;
-    const key = String(id);
-    if (allocated.has(key)) return;
-    if (employeeIndex && !employeeIndex.has(key)) return;
-    ids.add(key);
-  });
-  return ids;
-};
-
-/**
- * Required headcount as the UI must show it: the requested workers plus the PMs
- * running the project.
+ * Required headcount as the UI must show it:
  *
- * The server computes `required_manpower` as annotators + reviewers + QC (see
- * `_autonex_headcount`) — PMs excluded — while `manpowerEmployeeIds` counts PMs
- * as assigned. The two sides were measuring different things, so a project with
- * 2 QC slots and 1 PM read 1/2 when the PM alone was on it, and a fully staffed
- * project read 12/10. PMs now count on both sides.
+ *     annotators + reviewers + others [+ developers] + managers + leads
+ *
+ * Computed from the project's own columns and the *live* manager/lead sets, rather
+ * than read from the stored `required_manpower`.
+ *
+ * The stored total is only refreshed when someone saves the project, so it goes
+ * stale the moment a designation changes or a lead is allocated — a project run by
+ * 5 managers and 3 leads showed 0 required simply because nobody had re-saved it.
+ * Deriving it here means the number is right without a migration or a re-save, and
+ * it cannot disagree with the names printed beside it.
+ *
+ * `team_lead_count` / `team_manager_count` are deliberately NOT read: they are a
+ * saved copy of the same two sets, and using both would count everyone twice.
+ *
+ * "Total Annotators" is excluded — it counts the vendor's people as well as ours,
+ * so it is informational rather than a headcount we staff.
  */
 export const totalRequiredManpower = ({
-  required = 0,
-  allocations = [],
+  project,
   pmIds = [],
+  leadIds = [],
   employeeIndex,
-} = {}) =>
-  (required || 0) + extraPmIds({ allocations, pmIds, employeeIndex }).size;
+} = {}) => {
+  const n = (value) => Number(value) || 0;
+  const roles =
+    n(project?.autonex_annotators) +
+    n(project?.autonex_reviewers) +
+    n(project?.others_count) +
+    n(project?.developers_count);
+
+  const onRoster = (id) =>
+    id != null && (!employeeIndex || employeeIndex.has(String(id)));
+  const people = new Set();
+  [...(pmIds || []), ...(leadIds || [])].forEach((id) => {
+    if (onRoster(id)) people.add(String(id));
+  });
+
+  return roles + people.size;
+};
 
 /**
  * Ids of employees on leave today. Only APPROVED leave counts — a pending

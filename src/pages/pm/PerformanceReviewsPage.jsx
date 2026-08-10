@@ -8,6 +8,7 @@ import {
   perfEvalApi,
 } from "../../services/api";
 import { getPmEmployeeId, getPmSubProjects } from "../../utils/pmScope";
+import { canDecideForEmployee } from "../../utils/roleAccess";
 import {
   ChevronDown,
   ChevronUp,
@@ -19,9 +20,28 @@ import EvalReviewCard from "../../components/perf/EvalReviewCard";
 import StatCard from "../../components/dashboard/StatCard";
 import { formatDisplayName } from "../../utils/displayName";
 
-const ProjectPanel = ({ project, employees, evaluations, reviewerId }) => {
+const ProjectPanel = ({
+  project,
+  employees,
+  evaluations,
+  reviewerId,
+  viewerEmployeeId,
+  viewerRole,
+}) => {
   const [expanded, setExpanded] = useState(false);
-  const projectEvals = evaluations.filter((e) => e.project_id === project.id);
+  // Only the evaluations this viewer may actually review. The tiers match Team Leaves and the
+  // server (project_scope): your own goes to your manager, a manager's or HR's goes to an
+  // admin, and a peer lead's goes to their program manager. Matched on employee_id —
+  // `reviewerId` is a users.id and cannot be compared against it.
+  const projectEvals = evaluations.filter(
+    (e) =>
+      e.project_id === project.id &&
+      canDecideForEmployee({
+        viewerRole,
+        viewerEmployeeId,
+        employee: employees.find((emp) => emp.id === e.employee_id),
+      }),
+  );
   const pending = projectEvals.filter((e) => e.status === "submitted").length;
   const empName = (id) =>
     formatDisplayName(employees.find((e) => e.id === id)?.name) || `Employee #${id}`;
@@ -92,6 +112,9 @@ const ProjectPanel = ({ project, employees, evaluations, reviewerId }) => {
 
 const PerformanceReviewsPage = () => {
   const user = JSON.parse(localStorage.getItem("user") || "{}");
+  // Decides which tiers this viewer may review — a lead may not review a peer lead, and
+  // nobody below admin may review a manager (see utils/roleAccess).
+  const role = localStorage.getItem("role") || user.role || "pm";
   const pmEmployeeId = getPmEmployeeId(user);
 
   const { data: parentProjects = [] } = useQuery({
@@ -130,11 +153,19 @@ const PerformanceReviewsPage = () => {
     () => new Set(scopedProjects.map((p) => p.id)),
     [scopedProjects],
   );
-  const submissionsCount = evaluations.filter((e) =>
-    scopedIds.has(e.project_id),
-  ).length;
-  const pendingCount = evaluations.filter(
-    (e) => e.status === "submitted" && scopedIds.has(e.project_id),
+  // Same exclusion as the panels, so the headline counts match the rows beneath them.
+  const reviewable = evaluations.filter(
+    (e) =>
+      scopedIds.has(e.project_id) &&
+      canDecideForEmployee({
+        viewerRole: role,
+        viewerEmployeeId: pmEmployeeId,
+        employee: employees.find((emp) => emp.id === e.employee_id),
+      }),
+  );
+  const submissionsCount = reviewable.length;
+  const pendingCount = reviewable.filter(
+    (e) => e.status === "submitted",
   ).length;
   const isLoading = empLoading || evalLoading;
 
@@ -190,6 +221,8 @@ const PerformanceReviewsPage = () => {
               employees={employees}
               evaluations={evaluations}
               reviewerId={user.id}
+              viewerEmployeeId={pmEmployeeId}
+              viewerRole={role}
             />
           ))}
         </div>

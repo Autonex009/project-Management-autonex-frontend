@@ -1231,7 +1231,7 @@ const MyLeavesPanel = ({
                         {getLeaveTypeLabel(leave.leave_type)}
                       </p>
                       {leave.flagged && (
-                        <OverLimitHoverCard leave={leave} allLeaves={leaves} />
+                        <OverLimitHoverCard leave={leave} allLeaves={allLeaves} />
                       )}
                       {leave.is_emergency && (
                         <span className="inline-flex items-center gap-1 px-2 py-0.5 rounded-full text-[10px] font-semibold bg-red-100 text-red-700 border border-red-200">
@@ -1278,9 +1278,20 @@ const MyLeavesPanel = ({
                       )}
                       {leave.reason && ` • ${leave.reason}`}
                     </p>
-                    {leave.approval_remark && (
+                    {(leave.approval_remark || leave.approved_by_name) && (
                       <p className="text-xs text-slate-500 mt-0.5">
-                        Approval remark: {leave.approval_remark}
+                        {leave.approval_remark &&
+                          `Approval remark: ${leave.approval_remark}`}
+                        {/* Anyone managing a project this person is on can decide, so
+                            name the decider rather than leaving it to be guessed. */}
+                        {leave.approved_by_name && (
+                          <span className={leave.approval_remark ? "ml-1" : ""}>
+                            {leave.approval_remark ? "— " : ""}
+                            {status === "rejected"
+                              ? "Rejected"
+                              : "Actioned"} by {leave.approved_by_name}
+                          </span>
+                        )}
                       </p>
                     )}
                   </div>

@@ -48,13 +48,20 @@ import {
   getPmSubProjects,
 } from "../utils/pmScope";
 import {
+  TEAM_LEAD_TAG,
+  demotedToLeadIds,
+  isProjectScopedRole,
+  resolveProjectPmIds,
+  isTeamLeadAllocation,
+  isTeamLeadDesignation,
+} from "../utils/roleAccess";
+import {
   getEndDateValidationMessage,
   isEndDateBeforeStartDate,
 } from "../utils/dateValidation";
 import AllocationPopover from "../components/AllocationPopover";
 import {
   buildEmployeeIndex,
-  extraPmIds,
   manpowerEmployeeIds,
   totalRequiredManpower,
 } from "../utils/workforce";
@@ -157,14 +164,22 @@ const PROJECT_TYPE_CATEGORIES = [
     subtypes: ["2D Bounding Box"],
   },
   {
-    key: "Developer",
+    key: "Development",
     subtypes: ["Coding"],
   },
 ];
 
+/** The label to show for a stored project-type category. */
+const typeLabel = (key) =>
+  PROJECT_TYPE_CATEGORIES.find((c) => c.key === key)?.key || key;
+
 // The project-type category that marks a project as a development/coding project.
 // Such projects are surfaced under the dedicated "Development" tab.
-const DEVELOPER_TYPE_KEY = "Developer";
+//
+// Stored rows were renamed "Developer" -> "Development" in place by
+// sync_daily_sheet_schema (backend/app/main.py), keeping each project's subtype —
+// so there is no second key to recognise here.
+const DEVELOPER_TYPE_KEY = "Development";
 const isDeveloperProject = (project) => {
   const t = project?.project_types;
   return !!(t && typeof t === "object" && t[DEVELOPER_TYPE_KEY]);
@@ -450,6 +465,18 @@ const EmployeeMultiSelect = ({
   );
 };
 
+// "(2 PM · 1 Lead)" after a manpower count, or nothing when the project has
+// neither. Both the required and the current figure carry it, so they stay
+// comparable at a glance.
+const SlotBreakdown = ({ pmSlots = 0, leadSlots = 0 }) => {
+  if (pmSlots <= 0 && leadSlots <= 0) return null;
+  return (
+    <span className="ml-1 text-[11px] font-normal text-slate-400">
+      ({pmSlots || 0} PM &middot; {leadSlots || 0} Lead)
+    </span>
+  );
+};
+
 // Field label above a value/input inside the card (small uppercase caption).
 const CardField = ({ label, children, className = "" }) => (
   <div className={`min-w-0 ${className}`}>
@@ -463,48 +490,22 @@ const CardField = ({ label, children, className = "" }) => (
 const cardInputClass =
   "w-full rounded-md border border-slate-200 px-2 py-1 text-[13px] text-slate-800 focus:border-indigo-400 focus:outline-none focus:ring-2 focus:ring-indigo-100";
 
-// Status: label + a colored dot rendered inside a soft pill.
+// Status: label inside a soft pill. No leading dot — the pill is already
+// colour-coded, so the bullet repeated that in miniature and cost width the
+// project name needs.
 const STATUS_STYLE = {
-  active: {
-    label: "In Progress",
-    dot: "bg-indigo-500",
-    pill: "bg-indigo-50 text-indigo-700",
-  },
-  poc: {
-    label: "POC",
-    dot: "bg-purple-500",
-    pill: "bg-purple-50 text-purple-700",
-  },
-  completed: {
-    label: "Completed",
-    dot: "bg-emerald-500",
-    pill: "bg-emerald-50 text-emerald-700",
-  },
-  "on-hold": {
-    label: "On Hold",
-    dot: "bg-amber-500",
-    pill: "bg-amber-50 text-amber-700",
-  },
-  cancelled: {
-    label: "Cancelled",
-    dot: "bg-rose-500",
-    pill: "bg-rose-50 text-rose-700",
-  },
+  active: { label: "In Progress", pill: "bg-indigo-50 text-indigo-700" },
+  poc: { label: "POC", pill: "bg-purple-50 text-purple-700" },
+  completed: { label: "Completed", pill: "bg-emerald-50 text-emerald-700" },
+  "on-hold": { label: "On Hold", pill: "bg-amber-50 text-amber-700" },
+  cancelled: { label: "Cancelled", pill: "bg-rose-50 text-rose-700" },
 };
 
-// Client sentiment: friendly label + dot + pill colors.
+// Client sentiment: friendly label + pill colors.
 const SENTIMENT_STYLE = {
-  GOOD: {
-    label: "Good",
-    dot: "bg-emerald-500",
-    pill: "bg-emerald-50 text-emerald-700",
-  },
-  AVG: {
-    label: "Avg",
-    dot: "bg-amber-500",
-    pill: "bg-amber-50 text-amber-700",
-  },
-  Poor: { label: "Poor", dot: "bg-red-500", pill: "bg-red-50 text-red-600" },
+  GOOD: { label: "Good", pill: "bg-emerald-50 text-emerald-700" },
+  AVG: { label: "Avg", pill: "bg-amber-50 text-amber-700" },
+  Poor: { label: "Poor", pill: "bg-red-50 text-red-600" },
 };
 
 // Small title accent bar — a different gradient per project (picked by id).
@@ -520,30 +521,42 @@ const CARD_ACCENTS = [
 ];
 
 // Truncated text that reveals its full value in a light (white) tooltip on hover.
-const TruncTip = ({ text, className = "" }) => (
+/** "Eknath Niraj Agrawal, Kisan Kumar Jena" -> "Eknath Agrawal, Kisan Jena". */
+const shortenNames = (names = []) =>
+  names.map((n) => formatDisplayName(n) || n).filter(Boolean).join(", ") || "—";
+
+// `title` lets the hover card carry something the label does not — for people,
+// the full stored name behind a first-and-last-only label.
+const TruncTip = ({ text, title, className = "" }) => (
   <div className="group/tip relative min-w-0">
     <div className={`truncate ${className}`}>{text}</div>
     <span className="pointer-events-none absolute left-0 top-full z-30 mt-1 hidden w-max max-w-[240px] whitespace-normal break-words rounded-lg border border-slate-200 bg-white px-2.5 py-1.5 text-[11px] font-medium text-slate-600 shadow-lg group-hover/tip:block">
-      {text}
+      {title || text}
     </span>
   </div>
 );
 
-// A single project card. In "view" mode it shows the project at a glance; a
-// double-click flips it into inline "edit" mode where the common fields become
-// editable and Save / Cancel replace Copy / Delete.
+// A single project card. It shows the project at a glance; editing happens
+// through the pencil in the footer, which opens the full editor modal. The
+// inline "edit" mode below is kept for that state but is no longer triggered by
+// double-clicking the card — stray double-clicks put cards into edit by accident.
 const ProjectCard = ({
   id,
   highlighted,
   project,
   parentProject,
   pmNames,
+  teamLeadNames = [],
   pmIds = [],
+  // Passed straight through to the popover so its headcount matches the ratio printed on
+  // the card — a lead recorded on the project but holding no allocation belongs in both.
+  leadIds = [],
   onLeaveEmployeeIds,
   locationByEmployeeId,
   allocatedManpower,
   requiredManpower,
   pmSlots = 0,
+  leadSlots = 0,
   allocations,
   employees,
   formerEmployees,
@@ -573,7 +586,6 @@ const ProjectCard = ({
 
   const status = STATUS_STYLE[project.project_status] || {
     label: project.project_status,
-    dot: "bg-slate-400",
     pill: "bg-slate-100 text-slate-600",
   };
   const sentiment = SENTIMENT_STYLE[project.sentiment];
@@ -586,8 +598,7 @@ const ProjectCard = ({
   return (
     <div
       id={id}
-      onDoubleClick={() => !isEditing && onStartEdit()}
-      className={`group flex flex-col rounded-2xl border bg-white p-5 shadow-sm transition-all duration-200 ${isEditing
+      className={`group flex flex-col rounded-lg border bg-white p-5 shadow-sm transition-all duration-200 ${isEditing
           ? "border-indigo-300 ring-2 ring-indigo-100"
           : "border-slate-200 hover:shadow-md"
         } ${highlighted ? "ring-2 ring-indigo-400 ring-offset-2" : ""}`}
@@ -599,7 +610,12 @@ const ProjectCard = ({
           <span
             className={`mt-0.5 h-9 w-1.5 shrink-0 rounded-full bg-gradient-to-b ${accent}`}
           />
-          <div className="min-w-0 flex-1">
+          {/* Name + org reserve the height of a two-line name TOGETHER, not
+              individually. Reserving it on the name alone pushed the org down a
+              blank line on every single-line card; reserving it here keeps the
+              org tight under the name and still lands the divider — and every
+              row below it — at the same height across the row. */}
+          <div className="min-h-[3.9rem] min-w-0 flex-1">
             {isEditing ? (
               <input
                 value={draft.name}
@@ -617,36 +633,76 @@ const ProjectCard = ({
                 </span>
               </div>
             )}
-            <p className="mt-1 truncate text-xs text-slate-500">
+            <p className="mt-0.5 truncate text-[13px] font-medium text-slate-600">
               {parentProject?.client || "—"}
             </p>
           </div>
         </div>
 
+        {/* Project status, with the client sentiment badge sitting right of it */}
         <div className="flex shrink-0 flex-col items-end gap-1.5">
           {isEditing ? (
-            <div onClick={stop} className="w-36">
-              <Dropdown
-                value={draft.project_status}
-                onChange={(val) => onDraftChange("project_status", val)}
-                options={[
-                  { value: "active", label: "In Progress" },
-                  { value: "poc", label: "POC" },
-                  { value: "completed", label: "Completed" },
-                  { value: "on-hold", label: "On Hold" },
-                  { value: "cancelled", label: "Cancelled" },
-                ]}
-                className="w-full"
-                optionsClassName="w-full"
-              />
-            </div>
+            <>
+              <div onClick={stop} className="w-36">
+                <Dropdown
+                  value={draft.project_status}
+                  onChange={(val) => onDraftChange("project_status", val)}
+                  options={[
+                    { value: "active", label: "In Progress" },
+                    { value: "poc", label: "POC" },
+                    { value: "completed", label: "Completed" },
+                    { value: "on-hold", label: "On Hold" },
+                    { value: "cancelled", label: "Cancelled" },
+                  ]}
+                  className="w-full"
+                  optionsClassName="w-full"
+                />
+              </div>
+              <div className="flex gap-1" onClick={stop}>
+                {[
+                  ["GOOD", "Good"],
+                  ["AVG", "Avg"],
+                  ["Poor", "Poor"],
+                ].map(([val, label]) => {
+                  const on = draft.sentiment === val;
+                  const active =
+                    val === "GOOD"
+                      ? "bg-emerald-500 ring-emerald-500"
+                      : val === "AVG"
+                        ? "bg-amber-500 ring-amber-500"
+                        : "bg-red-500 ring-red-500";
+                  return (
+                    <button
+                      key={val}
+                      type="button"
+                      onClick={() => onDraftChange("sentiment", on ? "" : val)}
+                      className={`rounded px-1.5 py-0.5 text-[11px] font-semibold ring-1 ring-inset ${on
+                          ? `${active} text-white`
+                          : "bg-slate-50 text-slate-500 ring-slate-200 hover:bg-slate-100"
+                        }`}
+                    >
+                      {label}
+                    </button>
+                  );
+                })}
+              </div>
+            </>
           ) : (
-            <span
-              className={`inline-flex items-center gap-1.5 rounded-full px-2.5 py-1 text-xs font-medium ${status.pill}`}
-            >
-              <span className={`h-1.5 w-1.5 rounded-full ${status.dot}`} />
-              {status.label}
-            </span>
+            <div className="flex items-center gap-1.5">
+              <span
+                className={`inline-flex items-center rounded-full px-2.5 py-1 text-xs font-medium ${status.pill}`}
+              >
+                {status.label}
+              </span>
+              {sentiment && (
+                <span
+                  title="Client sentiment"
+                  className={`inline-flex items-center rounded-full px-2.5 py-1 text-xs font-semibold ${sentiment.pill}`}
+                >
+                  {sentiment.label}
+                </span>
+              )}
+            </div>
           )}
           {project.created_at && (
             <span className="text-right text-[11px] text-slate-400">
@@ -656,57 +712,25 @@ const ProjectCard = ({
         </div>
       </div>
 
-      <div className="my-4 border-t border-slate-100" />
+      <div className="my-3 border-t border-slate-100" />
 
-      {/* PM / Sentiment / Type / Vendor */}
+      {/* PM / Team lead / Type / Vendor */}
       <div className="grid grid-cols-2 gap-x-4 gap-y-3">
-        <CardField label="PM">
+        {/* Both carry stored names: shortened for the label, full in the hover. */}
+        <CardField label="Project Manager">
           <TruncTip
-            text={pmNames.length ? pmNames.join(", ") : "—"}
+            text={shortenNames(pmNames)}
+            title={pmNames.join(", ")}
             className="text-sm font-semibold text-slate-800"
           />
         </CardField>
 
-        <CardField label="Client sentiment">
-          {isEditing ? (
-            <div className="flex gap-1" onClick={stop}>
-              {[
-                ["GOOD", "Good"],
-                ["AVG", "Avg"],
-                ["Poor", "Poor"],
-              ].map(([val, label]) => {
-                const on = draft.sentiment === val;
-                const active =
-                  val === "GOOD"
-                    ? "bg-emerald-500 ring-emerald-500"
-                    : val === "AVG"
-                      ? "bg-amber-500 ring-amber-500"
-                      : "bg-red-500 ring-red-500";
-                return (
-                  <button
-                    key={val}
-                    type="button"
-                    onClick={() => onDraftChange("sentiment", on ? "" : val)}
-                    className={`rounded px-1.5 py-0.5 text-[11px] font-semibold ring-1 ring-inset ${on
-                        ? `${active} text-white`
-                        : "bg-slate-50 text-slate-500 ring-slate-200 hover:bg-slate-100"
-                      }`}
-                  >
-                    {label}
-                  </button>
-                );
-              })}
-            </div>
-          ) : sentiment ? (
-            <span
-              className={`inline-flex items-center gap-1.5 rounded-full px-2.5 py-1 text-xs font-semibold ${sentiment.pill}`}
-            >
-              <span className={`h-1.5 w-1.5 rounded-full ${sentiment.dot}`} />
-              {sentiment.label}
-            </span>
-          ) : (
-            <span className="text-sm font-medium text-slate-400">Not set</span>
-          )}
+        <CardField label="Team lead">
+          <TruncTip
+            text={shortenNames(teamLeadNames)}
+            title={teamLeadNames.join(", ")}
+            className="text-sm font-semibold text-slate-800"
+          />
         </CardField>
 
         <CardField label="Type">
@@ -734,125 +758,133 @@ const ProjectCard = ({
         </CardField>
       </div>
 
-      {/* Manpower — boxed stepper; the count keeps the hover popover (req 3) */}
-      <div className="mt-4 flex items-center justify-between rounded-xl bg-slate-50 px-3 py-2.5">
-        <span className="text-[10px] font-semibold uppercase tracking-wider text-slate-400">
-          Manpower
-        </span>
-        <div className="flex items-center rounded-lg border border-slate-200 bg-white">
-          <button
-            type="button"
-            title="Manage allocations"
-            aria-label="Manage allocations"
-            onClick={goToAllocations}
-            className="rounded-l-lg px-2.5 py-1.5 text-slate-500 hover:bg-slate-50"
-          >
-            <Minus className="h-3.5 w-3.5" />
-          </button>
-          <span className="h-5 w-px bg-slate-200" />
-          <AllocationPopover
-            project={project}
-            allocations={allocations}
-            employees={employees}
-            formerEmployees={formerEmployees}
-            pmIds={pmIds}
-            onLeaveEmployeeIds={onLeaveEmployeeIds}
-            locationByEmployeeId={locationByEmployeeId}
-            onOpenAllocations={() =>
-              navigate(`${prefix}/allocations`, {
-                state: { projectId: project.id },
-              })
-            }
-            triggerClassName="px-3 py-1.5 text-sm font-bold text-slate-800 tabular-nums hover:text-indigo-600 transition-colors cursor-pointer"
-            badgeContent={
-              // The PM count is spelled out because required now includes it —
-              // otherwise "1/3" on a project asking for 2 workers looks wrong.
-              <span className="inline-flex items-baseline gap-1">
-                <span>
-                  {allocatedManpower} / {requiredManpower}
+      {/* Delivery figures — how the project is staffed and how long a task
+          takes. Boxed as one block so they read apart from the identity fields
+          above (who runs it, what it is, who supplies it), and paired down the
+          rows: required beside current, annotators beside reviewers, their two
+          per-task times beside each other.
+
+          This replaced a boxed "10 / 12" ratio, which made the reader work out
+          which side was which and framed a derived, read-only figure as though
+          it were editable. */}
+      <div className="mt-3.5 mb-4 rounded-md bg-slate-50/40 p-3.5 ring-1 ring-slate-200">
+        <div className="grid grid-cols-2 gap-x-4 gap-y-3">
+          <CardField label="Manpower required">
+            {/* Both counts spell out their manager and lead slots, because the
+                requirement includes them — otherwise 2 against a project asking
+                for one reviewer reads as wrong. */}
+            <p className="text-sm font-semibold text-slate-800 tabular-nums">
+              {requiredManpower}
+              <SlotBreakdown pmSlots={pmSlots} leadSlots={leadSlots} />
+            </p>
+          </CardField>
+
+          <CardField label="Manpower current">
+            {/* Hovering the count opens the roster popover — who is on the
+                project, and the way through to Allocations. */}
+            <AllocationPopover
+              project={project}
+              allocations={allocations}
+              employees={employees}
+              formerEmployees={formerEmployees}
+              onLeaveEmployeeIds={onLeaveEmployeeIds}
+              locationByEmployeeId={locationByEmployeeId}
+              onOpenAllocations={() =>
+                navigate(`${prefix}/allocations`, {
+                  state: { projectId: project.id },
+                })
+              }
+              triggerClassName="text-sm font-semibold tabular-nums hover:text-indigo-600 transition-colors cursor-pointer"
+              badgeContent={
+                <span
+                  className={
+                    allocatedManpower >= requiredManpower &&
+                    requiredManpower > 0
+                      ? "text-emerald-600"
+                      : "text-slate-800"
+                  }
+                >
+                  {allocatedManpower}
+                  <SlotBreakdown pmSlots={pmSlots} leadSlots={leadSlots} />
                 </span>
-                {pmSlots > 0 && (
-                  <span className="text-[11px] font-normal text-slate-400">
-                    ({pmSlots} PM)
-                  </span>
-                )}
-              </span>
-            }
-          />
-          <span className="h-5 w-px bg-slate-200" />
-          <button
-            type="button"
-            title="Allocate employees"
-            aria-label="Allocate employees"
-            onClick={goToAllocations}
-            className="rounded-r-lg px-2.5 py-1.5 text-indigo-600 hover:bg-indigo-50"
-          >
-            <Plus className="h-3.5 w-3.5" />
-          </button>
+              }
+            />
+          </CardField>
+
+          {[
+            ["Annotators", "autonex_annotators"],
+            ["Reviewers", "autonex_reviewers"],
+          ].map(([label, field]) => (
+            <CardField key={field} label={label}>
+              {isEditing ? (
+                <input
+                  type="number"
+                  min="0"
+                  value={draft[field]}
+                  onChange={(e) => onDraftChange(field, e.target.value)}
+                  onClick={stop}
+                  onWheel={(e) => e.target.blur()}
+                  className={cardInputClass}
+                />
+              ) : (
+                <p className="text-sm font-semibold text-slate-800 tabular-nums">
+                  {project[field] ?? 0}
+                </p>
+              )}
+            </CardField>
+          ))}
+
+          {/* Both times are stored in hours and shown in minutes — the figures
+              people quote are "30 min a task", not "0.5 h". */}
+          {[
+            [
+              "Annotation time / task",
+              "annotation_minutes",
+              project.estimated_time_per_task,
+            ],
+            [
+              "Review time / task",
+              "review_minutes",
+              project.review_time_per_task,
+            ],
+          ].map(([label, draftKey, hours]) => (
+            <CardField key={draftKey} label={label}>
+              {isEditing ? (
+                <div className="flex items-center gap-1" onClick={stop}>
+                  <input
+                    type="number"
+                    min="0"
+                    step="0.1"
+                    value={draft[draftKey]}
+                    onChange={(e) => onDraftChange(draftKey, e.target.value)}
+                    onWheel={(e) => e.target.blur()}
+                    className={cardInputClass}
+                  />
+                  <span className="text-[11px] text-slate-400">min</span>
+                </div>
+              ) : (
+                <p className="text-sm font-semibold text-slate-800 tabular-nums">
+                  {hours ? (
+                    <>
+                      {Math.round(hours * 60)}{" "}
+                      <span className="text-[11px] font-medium text-slate-400">
+                        min
+                      </span>
+                    </>
+                  ) : (
+                    "—"
+                  )}
+                </p>
+              )}
+            </CardField>
+          ))}
         </div>
       </div>
 
-      {/* Team counts + annotation time */}
-      <div className="mt-4 grid grid-cols-2 gap-x-4 gap-y-3">
-        {[
-          ["Annotators", "autonex_annotators"],
-          ["Quality checker", "qc_count"],
-          ["Reviewers", "autonex_reviewers"],
-        ].map(([label, field]) => (
-          <CardField key={field} label={label}>
-            {isEditing ? (
-              <input
-                type="number"
-                min="0"
-                value={draft[field]}
-                onChange={(e) => onDraftChange(field, e.target.value)}
-                onClick={stop}
-                onWheel={(e) => e.target.blur()}
-                className={cardInputClass}
-              />
-            ) : (
-              <p className="text-sm font-bold text-slate-800 tabular-nums">
-                {project[field] ?? 0}
-              </p>
-            )}
-          </CardField>
-        ))}
-
-        <CardField label="Annotation time / task">
-          {isEditing ? (
-            <div className="flex items-center gap-1" onClick={stop}>
-              <input
-                type="number"
-                min="0"
-                step="0.1"
-                value={draft.annotation_minutes}
-                onChange={(e) =>
-                  onDraftChange("annotation_minutes", e.target.value)
-                }
-                onWheel={(e) => e.target.blur()}
-                className={cardInputClass}
-              />
-              <span className="text-[11px] text-slate-400">min</span>
-            </div>
-          ) : (
-            <p className="text-sm font-bold text-slate-800">
-              {project.estimated_time_per_task ? (
-                <>
-                  {Math.round(project.estimated_time_per_task * 60)}{" "}
-                  <span className="text-[11px] font-medium text-slate-400">
-                    min
-                  </span>
-                </>
-              ) : (
-                "—"
-              )}
-            </p>
-          )}
-        </CardField>
-      </div>
-
-      {/* Footer */}
-      <div className="mt-5 flex items-center justify-between border-t border-slate-100 pt-4">
+      {/* Footer — mt-auto pins it to the bottom edge. Cards in a row stretch to
+          the tallest, and any slack belongs in one place at the bottom rather
+          than opening a gap above the actions on every short card. */}
+      <div className="mt-auto flex items-center justify-between border-t border-slate-100 pt-3.5">
         <div className="flex items-center gap-2">
           {/* Analytics */}
           <div className="group/an relative inline-block">
@@ -982,29 +1014,131 @@ const ProjectCard = ({
               </button>
             </>
           ) : (
+            // A missing handler means the viewer may not perform that action, so the
+            // control is omitted rather than rendered inert — a button that silently does
+            // nothing reads as a bug.
             <>
-              <button
-                type="button"
-                onClick={onAdvanced}
-                title="Edit"
-                aria-label="Edit"
-                className="rounded-lg p-1.5 text-slate-400 hover:bg-indigo-50 hover:text-indigo-600"
-              >
-                <Edit className="h-4 w-4" />
-              </button>
-              <button
-                type="button"
-                onClick={onDelete}
-                title="Delete"
-                aria-label="Delete"
-                className="rounded-lg p-1.5 text-slate-400 hover:bg-red-50 hover:text-red-600"
-              >
-                <Trash2 className="h-4 w-4" />
-              </button>
+              {onAdvanced && (
+                <button
+                  type="button"
+                  onClick={onAdvanced}
+                  title="Edit"
+                  aria-label="Edit"
+                  className="rounded-lg p-1.5 text-slate-400 hover:bg-indigo-50 hover:text-indigo-600"
+                >
+                  <Edit className="h-4 w-4" />
+                </button>
+              )}
+              {onDelete && (
+                <button
+                  type="button"
+                  onClick={onDelete}
+                  title="Delete"
+                  aria-label="Delete"
+                  className="rounded-lg p-1.5 text-slate-400 hover:bg-red-50 hover:text-red-600"
+                >
+                  <Trash2 className="h-4 w-4" />
+                </button>
+              )}
             </>
           )}
         </div>
       </div>
+    </div>
+  );
+};
+
+// Team-lead multi-select. Same shape as PmMultiSelect, but there is no "primary" — a lead
+// list has no head — and anyone already chosen as the project's manager is filtered out,
+// since the same person should not hold both seats on one project.
+//
+// Offers Team Leads only; adding another *manager* is done through the Program Manager
+// picker. Selections become allocations tagged "Team Lead" and never enter
+// `assigned_employee_ids`, so a lead does not gain rank over the project's other leads.
+const TeamLeadMultiSelect = ({
+  employees,
+  value,
+  onChange,
+  excludeIds = [],
+  // A lead cannot drop themselves from a project they are creating: the server allocates
+  // the creator regardless, so allowing it would show a state that does not survive a save.
+  lockedId = null,
+}) => {
+  const [open, setOpen] = useState(false);
+  const [search, setSearch] = useState("");
+  const ref = useRef(null);
+
+  useEffect(() => {
+    const handler = (e) => {
+      if (ref.current && !ref.current.contains(e.target)) setOpen(false);
+    };
+    document.addEventListener("mousedown", handler);
+    return () => document.removeEventListener("mousedown", handler);
+  }, []);
+
+  const q = search.trim().toLowerCase();
+  const excluded = new Set(excludeIds.map(Number));
+  const list = employees
+    .filter((e) => e.status === "active" && !excluded.has(Number(e.id)))
+    .filter((e) => !q || (e.name || "").toLowerCase().includes(q));
+
+  const toggle = (id) => {
+    if (value.includes(id)) {
+      if (lockedId != null && Number(id) === Number(lockedId)) return;
+      onChange(value.filter((v) => v !== id));
+    } else {
+      onChange([...value, id]);
+    }
+  };
+
+  return (
+    <div ref={ref} className="relative">
+      <div className="flex w-full items-center gap-1.5 rounded-lg border border-slate-200 bg-white px-3 py-1.5 text-sm transition-colors hover:border-slate-300">
+        <input
+          type="text"
+          value={search}
+          placeholder={value.length ? "Add another" : "Add team lead"}
+          onChange={(e) => {
+            setSearch(e.target.value);
+            setOpen(true);
+          }}
+          onFocus={() => setOpen(true)}
+          className="min-w-0 flex-1 bg-transparent text-slate-700 outline-none placeholder:text-slate-400"
+        />
+        <ChevronDown
+          className={`h-3.5 w-3.5 shrink-0 text-slate-400 transition-transform ${open ? "rotate-180" : ""}`}
+        />
+      </div>
+      {open && (
+        <div className="absolute left-0 top-full z-[9999] mt-1 max-h-64 w-full overflow-y-auto rounded-xl border border-slate-200 bg-white py-1 shadow-lg">
+          {list.length ? (
+            list.map((emp) => {
+              const selected = value.includes(emp.id);
+              return (
+                <button
+                  key={emp.id}
+                  type="button"
+                  onClick={() => toggle(emp.id)}
+                  className={`flex w-full items-center gap-2 px-3 py-1.5 text-left text-sm transition-colors ${selected ? "bg-emerald-50 font-medium text-emerald-700" : "text-slate-700 hover:bg-slate-50"}`}
+                >
+                  <span className="flex w-4 shrink-0 justify-center">
+                    {selected && (
+                      <Check className="h-3.5 w-3.5 text-emerald-600" />
+                    )}
+                  </span>
+                  <span className="flex-1 truncate">
+                    {formatDisplayName(emp.name)}
+                  </span>
+                </button>
+              );
+            })
+          ) : (
+            <div className="px-3 py-2 text-sm text-slate-400">
+              No matches found
+            </div>
+          )}
+        </div>
+      )}
     </div>
   );
 };
@@ -1099,9 +1233,14 @@ const ProjectsPage = () => {
   const navigate = useNavigate();
   const user = JSON.parse(localStorage.getItem("user") || "{}");
   const role = localStorage.getItem("role") || "admin";
+  // `isPm` means "owns projects" — it drives self-assignment as a project's manager, so a
+  // team lead must never satisfy it. `isScoped` means "sees only their own projects", which
+  // both roles do. Scoping with isPm alone would show a team lead every project in the org.
   const isPm = role === "pm";
+  const isTeamLeadRole = role === "team_lead";
+  const isScoped = isProjectScopedRole(role);
   const isAdmin = role === "admin";
-  const prefix = isPm ? "/pm" : "/admin";
+  const prefix = isScoped ? "/pm" : "/admin";
   const pmEmployeeId = getPmEmployeeId(user);
   const [isModalOpen, setIsModalOpen] = useState(false);
   const [editingProject, setEditingProject] = useState(null);
@@ -1109,6 +1248,10 @@ const ProjectsPage = () => {
   const [selectedSkills, setSelectedSkills] = useState([]);
   const [selectedVendors, setSelectedVendors] = useState([]);
   const [projectTypes, setProjectTypes] = useState({}); // { category: subtype }
+  // Drives the Developers headcount field in the Team Composition tab. Reads the
+  // live modal selection, not the saved project, so the field appears the moment
+  // Development is picked rather than after a save.
+  const isDevelopmentSelected = !!projectTypes[DEVELOPER_TYPE_KEY];
   const [activeTypeTab, setActiveTypeTab] = useState(
     PROJECT_TYPE_CATEGORIES[0].key,
   );
@@ -1128,6 +1271,9 @@ const ProjectsPage = () => {
     pageMemory.selectedOrganization || "all",
   );
   const [selectedPm, setSelectedPm] = useState(pageMemory.selectedPm || "all");
+  const [selectedTeamLead, setSelectedTeamLead] = useState(
+    pageMemory.selectedTeamLead || "all",
+  );
   const [selectedStatus, setSelectedStatus] = useState(
     pageMemory.selectedStatus || "all",
   );
@@ -1137,6 +1283,10 @@ const ProjectsPage = () => {
   // "Autonex" quick filter — only projects staffed with ≥1 Autonex employee.
   const [autonexOnly, setAutonexOnly] = useState(false);
   const [selectedPmIds, setSelectedPmIds] = useState([]);
+  // Team leads chosen in the modal. Saved as allocations tagged "Team Lead" after the
+  // project itself is saved — deliberately NOT merged into `assigned_employee_ids`, which
+  // is the PM set and would grant them the approval rights the role exists to withhold.
+  const [selectedTeamLeadIds, setSelectedTeamLeadIds] = useState([]);
   const [filtersOpen, setFiltersOpen] = useState(false);
   const filtersRef = useRef(null);
   // Inline (double-click) card editing + per-card docs popover
@@ -1165,6 +1315,19 @@ const ProjectsPage = () => {
       (emp) =>
         emp.status === "active" &&
         (emp.designation || "").toLowerCase().includes("program manager")
+    );
+  }, [employees]);
+
+  // Each picker offers exactly its own designation: Team Leads here, Program Managers in
+  // pmEmployees above. Needing an extra manager on a project is now served by adding a
+  // co-manager to that list rather than by borrowing one as a lead.
+  //
+  // The underlying "program manager acting as a lead" record still works and is still
+  // honoured wherever leads are resolved — it is set from the Allocations page, so a project
+  // that already has one keeps showing it. This dropdown simply does not create them.
+  const teamLeadEmployees = useMemo(() => {
+    return employees.filter(
+      (emp) => emp.status === "active" && isTeamLeadDesignation(emp.designation),
     );
   }, [employees]);
 
@@ -1277,12 +1440,30 @@ const ProjectsPage = () => {
     return m;
   }, [employees, wfhTodayIds]);
 
-  const visibleMainProjects = isPm
-    ? getPmProjects(mainProjects, pmEmployeeId)
-    : mainProjects;
-  const visibleProjects = isPm
+  // Scoped for both PMs and team leads. getPmSubProjects grants a project when you are its
+  // PM *or* allocated to it, so a lead sees exactly the projects they lead — and nothing
+  // else. Keyed on isScoped, not isPm: a lead failing an isPm test would fall through to
+  // the unscoped admin branch and be shown every project in the organisation.
+  const visibleProjects = isScoped
     ? getPmSubProjects(projects, mainProjects, pmEmployeeId, allocations)
     : projects;
+
+  // Organisations to show: those the person manages, plus the parent of every project they
+  // can see. The second half matters for a team lead, who manages no organisation at all —
+  // without it `resolvePmIds` would find no parent to fall back to and a project whose PM is
+  // recorded only at organisation level would render with no manager.
+  const visibleMainProjects = useMemo(() => {
+    if (!isScoped) return mainProjects;
+    const managedIds = new Set(
+      getPmProjects(mainProjects, pmEmployeeId).map((p) => p.id),
+    );
+    const parentIds = new Set(
+      visibleProjects.map((p) => p.main_project_id).filter(Boolean),
+    );
+    return mainProjects.filter(
+      (mp) => managedIds.has(mp.id) || parentIds.has(mp.id),
+    );
+  }, [isScoped, mainProjects, visibleProjects, pmEmployeeId]);
 
   // Organization → Project cascade for the create/edit modal. "Organization" is
   // the free-text `client` on a main project (same concept as the Organizations
@@ -1343,6 +1524,7 @@ const ProjectsPage = () => {
   const filterStateRef = useRef({
     selectedOrganization,
     selectedPm,
+    selectedTeamLead,
     selectedStatus,
     subProjectSearch: "",
   });
@@ -1351,9 +1533,10 @@ const ProjectsPage = () => {
       ...filterStateRef.current,
       selectedOrganization,
       selectedPm,
+      selectedTeamLead,
       selectedStatus,
     };
-  }, [selectedOrganization, selectedPm, selectedStatus]);
+  }, [selectedOrganization, selectedPm, selectedTeamLead, selectedStatus]);
 
   useEffect(() => {
     if (!isLoading) {
@@ -1420,6 +1603,7 @@ const ProjectsPage = () => {
     setFormSentiment("");
     setModalInfoTab("status");
     setModalBuildTab("types");
+    setSelectedTeamLeadIds([]);
   };
 
   const addGuidelineFiles = (files) => {
@@ -1446,6 +1630,88 @@ const ProjectsPage = () => {
           `${targetFile.name}-${targetFile.size}-${targetFile.lastModified}`,
       ),
     );
+  };
+
+  /**
+   * Make the project's team leads match `leadIds`.
+   *
+   * A lead is an allocation carrying the "Team Lead" tag, so this adds and removes
+   * allocations rather than writing a field. Three rules it has to respect:
+   *
+   * - Never touch `assigned_employee_ids` — that is the manager set, and a lead placed there
+   *   would gain rank over the project's other leads.
+   * - Never delete an allocation that isn't a lead allocation. Someone can be a lead *and*
+   *   an annotator on the same project; dropping them as lead must leave their real work
+   *   allocation (and its hours) alone.
+   * - Read the project's allocations back from the server first. The cached list is a
+   *   snapshot from before the save, and on a *create* it cannot contain the row the backend
+   *   adds for whoever created the project — so diffing against it produced a second,
+   *   duplicate allocation for that person.
+   */
+  const syncTeamLeadAllocations = async (project, leadIds) => {
+    const projectId = project.id;
+    let existing;
+    try {
+      existing = await allocationApi.getByProject(projectId);
+    } catch {
+      // Fall back to the cache rather than skipping the sync entirely — a stale diff is
+      // recoverable from the Allocations page, silently dropping the assignment is not.
+      existing = allocations.filter((a) => a.sub_project_id === projectId);
+    }
+    const wanted = new Set(leadIds.map(Number));
+
+    const currentLeads = existing.filter((a) =>
+      isTeamLeadAllocation(a, employeeIndex.get(String(a.employee_id))),
+    );
+    const currentLeadIds = new Set(currentLeads.map((a) => Number(a.employee_id)));
+
+    // Drop the lead tag from anyone no longer listed. Where the allocation exists only to
+    // record leadership, remove it; where it also carries real work, just untag it.
+    const removals = currentLeads
+      .filter((a) => !wanted.has(Number(a.employee_id)))
+      .map((a) => {
+        const remainingTags = (a.role_tags || []).filter(
+          (tag) => !isTeamLeadDesignation(tag),
+        );
+        return remainingTags.length > 0
+          ? allocationApi.update(a.id, { role_tags: remainingTags })
+          : allocationApi.delete(a.id);
+      });
+
+    const additions = leadIds
+      .filter((id) => !currentLeadIds.has(Number(id)))
+      .map((id) => {
+        // Reuse an allocation they already hold on this project so one person never ends
+        // up with two rows — which would double-count them against manpower.
+        const held = existing.find((a) => Number(a.employee_id) === Number(id));
+        if (held) {
+          return allocationApi.update(held.id, {
+            role_tags: [...(held.role_tags || []), TEAM_LEAD_TAG],
+          });
+        }
+        return allocationApi.create({
+          employee_id: id,
+          sub_project_id: projectId,
+          total_daily_hours: 8,
+          // Leading is a position, not a workstream, so it claims no share of the day.
+          role_tags: [TEAM_LEAD_TAG],
+          time_distribution: {},
+          // Bound to the project's own window, as the Allocations page does — an
+          // open-ended allocation reads as indefinite in the capacity views.
+          active_start_date: project.start_date || null,
+          active_end_date: project.end_date || null,
+          // Naming a lead is recording a position, not booking their day, so the capacity
+          // guard must not veto it — it answers a different question. Left unset it returns
+          // 409 for any lead already running a project, and also for a part-time lead with
+          // no allocations at all, since the check compares against
+          // employees.working_hours_per_day rather than 8. Always overridden, with the
+          // reason recorded, so the behaviour has no edge cases and stays auditable.
+          override_flag: true,
+          override_reason: "Assigned as team lead from the project form",
+        });
+      });
+
+    await Promise.all([...removals, ...additions]);
   };
 
   const uploadGuidelinesForProject = async (
@@ -1559,12 +1825,29 @@ const ProjectsPage = () => {
       workforce_vendors: selectedVendors,
       autonex_annotators: num("autonex_annotators"),
       autonex_reviewers: num("autonex_reviewers"),
-      qc_count: num("qc_count"),
+      others_count: num("others_count"),
+      // Counted from who is actually selected, so the headcount cannot contradict the
+      // roster on the same screen.
+      team_lead_count: selectedTeamLeadIds.length,
+      team_manager_count: selectedPmIds.length,
+      // Zero unless Development is selected — the input is not rendered otherwise,
+      // so `num` reads nothing and the count is cleared rather than left stale
+      // from a project whose type changed.
+      developers_count: isDevelopmentSelected ? num("developers_count") : 0,
       // Assigned PMs / Employees
       assigned_employee_ids: selectedPmIds,
       pm_id: selectedPmIds[0] || null,
+      // PMs and leads are added on top of this when the ratio is displayed
+      // (see totalRequiredManpower) — they are not part of the stored figure.
+      // Recomputed server-side by _autonex_headcount; sent so the optimistic UI
+      // matches what comes back. Keep the two in step.
       required_manpower:
-        num("autonex_annotators") + num("autonex_reviewers") + num("qc_count"),
+        num("autonex_annotators") +
+        num("autonex_reviewers") +
+        num("others_count") +
+        selectedTeamLeadIds.length +
+        selectedPmIds.length +
+        (isDevelopmentSelected ? num("developers_count") : 0),
       project_duration_weeks: durationWeeks,
       project_duration_days: durationDays,
       project_status: formData.get("project_status") || "active",
@@ -1606,6 +1889,8 @@ const ProjectsPage = () => {
     // (e.g. guideline upload) can't lead to duplicate re-submissions.
     const wasEditing = Boolean(editingProject);
     const filesToUpload = guidelineFiles;
+    // Captured before the reset, for the same reason as the files above.
+    const teamLeadsToSave = selectedTeamLeadIds;
     resetModalState();
     toast.success(
       wasEditing
@@ -1627,9 +1912,29 @@ const ProjectsPage = () => {
       );
     }
 
+    try {
+      await syncTeamLeadAllocations(savedProject, teamLeadsToSave);
+    } catch (error) {
+      // The project itself is saved, so don't imply otherwise. Repeat the server's reason
+      // rather than a generic line — "failed, try the Allocations page" gives the reader
+      // nothing to act on, and this step fails for knowable reasons (capacity conflicts,
+      // scoping) that the message should name.
+      const detail = error.response?.data?.detail;
+      const reason =
+        typeof detail === "string"
+          ? detail
+          : detail?.message ||
+            (Array.isArray(detail) ? detail[0]?.msg : null) ||
+            "the allocation was rejected";
+      toast.error(
+        `Project saved, but the team lead assignment failed: ${reason}`,
+      );
+    }
+
     await Promise.all([
       queryClient.invalidateQueries({ queryKey: ["sub-projects"] }),
       queryClient.invalidateQueries({ queryKey: ["guidelines"] }),
+      queryClient.invalidateQueries({ queryKey: ["allocations"] }),
     ]);
   };
 
@@ -1652,27 +1957,17 @@ const ProjectsPage = () => {
     );
   };
 
-  const pmIdsOf = (mp) =>
-    mp?.program_manager_ids?.length
-      ? mp.program_manager_ids
-      : mp?.program_manager_id
-        ? [mp.program_manager_id]
-        : [];
-
   // A project's PMs are recorded on the project itself (`assigned_employee_ids`,
   // which only ever holds PM/admin ids) and fall back to the parent project's
   // managers. The card, the PM filter, the filter's option list, and the manpower
   // count must all resolve them through here — when the filter read only the
   // parent while the card read the project, filtering by a PM shown on screen
   // matched nothing.
-  const resolvePmIds = (project) => {
-    if (project?.assigned_employee_ids?.length)
-      return project.assigned_employee_ids;
-    if (project?.pm_id) return [project.pm_id];
-    return pmIdsOf(
-      visibleMainProjects.find((p) => p.id === project?.main_project_id),
-    );
-  };
+  // Shared with the Allocations page. Passing the roster lets it drop anyone since
+  // converted to Team Lead out of the manager list — they show under Team Lead instead,
+  // without waiting for someone to re-save the project.
+  const resolvePmIds = (project) =>
+    resolveProjectPmIds(project, visibleMainProjects, employeeIndex);
 
   // Manpower counts PEOPLE, not allocation rows, and a PM running the project
   // occupies a slot just like an annotator. Union by employee id so someone with
@@ -1681,35 +1976,88 @@ const ProjectsPage = () => {
   // Anyone off the roster is skipped: allocations outlive an archived employee,
   // and counting those ghosts reported projects as fully staffed by people who
   // had left.
+  // Allocation-tagged leads plus anyone still holding the manager seat whose designation
+  // says Team Lead. The second half matters: those people have no allocation row, so a
+  // lead set built from allocations alone named them on the card while leaving them out of
+  // the manpower count — the same project reporting two different teams.
+  const getTeamLeadIds = (project) => [
+    ...new Set([
+      ...(teamLeadIdsByProject.get(project?.id) || new Set()),
+      ...demotedToLeadIds(project, visibleMainProjects, employeeIndex),
+    ]),
+  ];
+
   const getManpowerEmployeeIds = (project) =>
     manpowerEmployeeIds({
       allocations: allocations.filter((a) => a.sub_project_id === project.id),
       pmIds: resolvePmIds(project),
+      leadIds: getTeamLeadIds(project),
       employeeIndex,
     });
 
   const getAllocatedManpower = (project) =>
     getManpowerEmployeeIds(project).size;
 
-  // Required counts those same PMs. The server computes required_manpower as
-  // annotators + reviewers + QC, so a project asking for 2 QC and run by 1 PM
-  // showed 1/2 with only the PM on it — the manager filled a slot the required
-  // side didn't know about.
+  // Computed live rather than read from `required_manpower`.
+  //
+  // The stored total is only refreshed when someone saves the project, so it goes stale
+  // the moment a designation changes — a project run by 5 managers and 3 leads still read
+  // 0 required because it had not been re-saved since they were typed in. The role counts
+  // come from the columns; the manager and lead counts come from the same resolvers the
+  // card and the modal use, so all three agree without anyone re-saving anything.
   const getRequiredManpower = (project) =>
     totalRequiredManpower({
-      required: project?.required_manpower || 0,
-      allocations: allocations.filter((a) => a.sub_project_id === project?.id),
+      project,
       pmIds: resolvePmIds(project),
+      leadIds: getTeamLeadIds(project),
       employeeIndex,
     });
 
   // How many of those required slots are the managers' — shown next to the ratio.
+  // Every on-roster manager, not only the ones lacking an allocation: the requirement now
+  // counts them unconditionally, so an "extra" count would disagree with the ratio it is
+  // meant to explain.
+  // How many of the required slots each rank accounts for, shown beside the ratio on the
+  // card. Counted live from the same resolvers, never from the stored team_manager_count /
+  // team_lead_count columns: those are only refreshed when a project is saved, so on
+  // anything untouched since they read 0 and the breakdown silently disappeared — one card
+  // showed "2 (1 PM · 1 Lead)" while its neighbour showed a bare "2" with a manager and a
+  // lead named directly above it.
   const getPmSlots = (project) =>
-    extraPmIds({
-      allocations: allocations.filter((a) => a.sub_project_id === project?.id),
-      pmIds: resolvePmIds(project),
-      employeeIndex,
-    }).size;
+    resolvePmIds(project).filter((id) => employeeIndex.has(String(id))).length;
+
+  // Team leads aren't recorded on the project (`assigned_employee_ids` only ever holds
+  // PM/admin ids, and a lead placed there would outrank the project's other leads) —
+  // they're whoever is allocated to it and qualifies as a lead: a "Team Lead" tag on the
+  // allocation, which is what the picker writes, or the "Team Lead" designation as a
+  // fallback for allocations made outside it.
+  // Deduped by employee id so two allocations don't name the same person twice.
+  const getTeamLeadNames = (project) => {
+    const seen = new Set();
+    const names = [];
+    allocations
+      .filter((a) => a.sub_project_id === project.id)
+      .forEach((a) => {
+        const key = String(a.employee_id);
+        if (a.employee_id == null || seen.has(key)) return;
+        seen.add(key);
+        const emp = employeeIndex.get(key);
+        if (!emp || !isTeamLeadAllocation(a, emp)) return;
+        // The stored name — the card shortens it for the label and keeps this
+        // for the hover. Formatting here would lose the middle name entirely.
+        if (emp.name) names.push(emp.name);
+      });
+    // Plus anyone still holding the manager seat whose designation now says Team Lead, so
+    // a conversion shows up without the project having to be re-saved first.
+    demotedToLeadIds(project, visibleMainProjects, employeeIndex).forEach((id) => {
+      const key = String(id);
+      if (seen.has(key)) return;
+      seen.add(key);
+      const name = employeeIndex.get(key)?.name;
+      if (name) names.push(name);
+    });
+    return names;
+  };
 
   const calculateManpowerBalance = (project) => {
     const matchingTotal = getMatchingEmployees(project).length;
@@ -1852,6 +2200,37 @@ const ProjectsPage = () => {
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [visibleProjects, visibleMainProjects, employees]);
 
+  // Employee ids leading each visible project, so the filter and the card agree. Built from
+  // allocations rather than a designation sweep: leadership is recorded per project, so a
+  // roster-wide sweep would list leads who do not lead this one.
+  const teamLeadIdsByProject = useMemo(() => {
+    const byProject = new Map();
+    allocations.forEach((allocation) => {
+      const employee = employeeIndex.get(String(allocation.employee_id));
+      if (!employee || !isTeamLeadAllocation(allocation, employee)) return;
+      const ids = byProject.get(allocation.sub_project_id) || new Set();
+      ids.add(Number(allocation.employee_id));
+      byProject.set(allocation.sub_project_id, ids);
+    });
+    return byProject;
+  }, [allocations, employeeIndex]);
+
+  // Only leads actually on a visible project — an org-wide roster would offer options that
+  // filter to nothing.
+  const teamLeads = useMemo(() => {
+    const map = new Map();
+    visibleProjects.forEach((project) => {
+      (teamLeadIdsByProject.get(project.id) || new Set()).forEach((id) => {
+        if (map.has(id)) return;
+        const employee = employeeIndex.get(String(id));
+        map.set(id, formatDisplayName(employee?.name) || `Lead #${id}`);
+      });
+    });
+    return [...map.entries()]
+      .map(([id, name]) => ({ id, name }))
+      .sort((a, b) => a.name.localeCompare(b.name));
+  }, [visibleProjects, teamLeadIdsByProject, employeeIndex]);
+
   // Close the Filters popover on outside click
   useEffect(() => {
     const handler = (e) => {
@@ -1886,10 +2265,7 @@ const ProjectsPage = () => {
       // (team composition = Autonex annotators + reviewers + QC).
       if (!autonexOnly) return true;
       return (
-        (project.autonex_annotators || 0) +
-          (project.autonex_reviewers || 0) +
-          (project.qc_count || 0) >
-        0
+        (project.autonex_annotators || 0) + (project.autonex_reviewers || 0) > 0
       );
     })
     .filter((project) => {
@@ -1904,6 +2280,12 @@ const ProjectsPage = () => {
     .filter((project) => {
       if (selectedPm === "all") return true;
       return resolvePmIds(project).includes(Number(selectedPm));
+    })
+    .filter((project) => {
+      if (selectedTeamLead === "all") return true;
+      return (teamLeadIdsByProject.get(project.id) || new Set()).has(
+        Number(selectedTeamLead),
+      );
     })
     .filter((project) => {
       if (selectedStatus === "all") return true;
@@ -2066,6 +2448,37 @@ const ProjectsPage = () => {
     setFormSentiment(project.sentiment || "");
     setModalInfoTab("status");
     setModalBuildTab("types");
+    // Prefill both rosters from the project. The PM list matters even though the field is
+    // hidden for a PM: submit sends `assigned_employee_ids: selectedPmIds`, so leaving
+    // stale state in place would rewrite this project's managers with the previous
+    // modal's selection.
+    //
+    // Read the project's own column rather than resolvePmIds — the resolved value can come
+    // from the organisation, and writing that back would pin an inheriting project to those
+    // people, which switches organisation-level inheritance off for it (see pmScope.js).
+    // Split the stored manager slot the same way the card does, so the modal cannot show a
+    // different set from the project it was opened on. Reading the column raw put converted
+    // managers in the Program Manager box and left Team Lead empty — and saving that would
+    // have written them straight back as managers.
+    const demoted = demotedToLeadIds(project, visibleMainProjects, employeeIndex);
+    const demotedSet = new Set(demoted.map(Number));
+    setSelectedPmIds(
+      (project.assigned_employee_ids || []).filter(
+        (id) => !demotedSet.has(Number(id)),
+      ),
+    );
+    setSelectedTeamLeadIds([
+      ...new Set([
+        ...allocations
+          .filter(
+            (a) =>
+              a.sub_project_id === project.id &&
+              isTeamLeadAllocation(a, employeeIndex.get(String(a.employee_id))),
+          )
+          .map((a) => a.employee_id),
+        ...demoted,
+      ]),
+    ]);
     setIsModalOpen(true);
   };
 
@@ -2077,10 +2490,12 @@ const ProjectsPage = () => {
       name: project.name || "",
       project_status: project.project_status || "active",
       autonex_annotators: String(project.autonex_annotators ?? 0),
-      qc_count: String(project.qc_count ?? 0),
       autonex_reviewers: String(project.autonex_reviewers ?? 0),
       annotation_minutes: project.estimated_time_per_task
         ? String(Math.round(project.estimated_time_per_task * 60))
+        : "",
+      review_minutes: project.review_time_per_task
+        ? String(Math.round(project.review_time_per_task * 60))
         : "",
       sentiment: project.sentiment || "",
       vendorsText: (project.workforce_vendors || []).join(", "),
@@ -2096,7 +2511,6 @@ const ProjectsPage = () => {
     if (!cardDraft || cardUpdateMutation.isPending) return;
     const ann = parseInt(cardDraft.autonex_annotators) || 0;
     const rev = parseInt(cardDraft.autonex_reviewers) || 0;
-    const qc = parseInt(cardDraft.qc_count) || 0;
     cardUpdateMutation.mutate({
       id: project.id,
       data: {
@@ -2104,12 +2518,26 @@ const ProjectsPage = () => {
         project_status: cardDraft.project_status,
         autonex_annotators: ann,
         autonex_reviewers: rev,
-        qc_count: qc,
-        required_manpower: ann + rev + qc,
+        // The inline card only edits annotators and reviewers, so the rest of the
+        // composition has to be carried over. Sending `ann + rev` alone silently zeroed
+        // the others/leads/managers/developers a project asked for, dropping its required
+        // headcount every time somebody double-clicked a card.
+        required_manpower:
+          ann +
+          rev +
+          (project.others_count || 0) +
+          (project.team_lead_count || 0) +
+          (project.team_manager_count || 0) +
+          (project.developers_count || 0),
         estimated_time_per_task:
           cardDraft.annotation_minutes !== ""
             ? parseFloat(cardDraft.annotation_minutes) / 60
             : (project.estimated_time_per_task ?? null),
+        // Same hours-on-the-wire, minutes-in-the-UI conversion as annotation time.
+        review_time_per_task:
+          cardDraft.review_minutes !== ""
+            ? parseFloat(cardDraft.review_minutes) / 60
+            : (project.review_time_per_task ?? null),
         sentiment: cardDraft.sentiment || null,
         workforce_vendors: cardDraft.vendorsText
           .split(",")
@@ -2238,7 +2666,7 @@ const ProjectsPage = () => {
           onChange={setSubProjectSearch}
           placeholder="Search projects..."
         />
-        {isPm && (
+        {isScoped && (
           <Link
             to={`${prefix}/projects`}
             className="inline-flex items-center gap-2 rounded-lg border border-slate-200 bg-white px-3 py-2 text-sm font-medium text-slate-700 shadow-sm hover:bg-slate-50 transition-colors"
@@ -2267,6 +2695,12 @@ const ProjectsPage = () => {
             setModalInfoTab("status");
             setModalBuildTab("types");
             setSelectedPmIds(isPm && pmEmployeeId ? [pmEmployeeId] : []);
+            // A lead creating a project leads it — the server allocates them either way
+            // (api/projects.py), so preselect it rather than letting the field imply
+            // otherwise.
+            setSelectedTeamLeadIds(
+              isTeamLeadRole && pmEmployeeId ? [pmEmployeeId] : [],
+            );
             setIsModalOpen(true);
           }}
           className="inline-flex items-center gap-1.5 rounded-lg bg-indigo-600 px-3.5 py-2 text-sm font-medium text-white shadow-sm hover:bg-indigo-700 transition-colors"
@@ -2318,6 +2752,22 @@ const ProjectsPage = () => {
               </button>
             </span>
           )}
+          {/* Emerald, matching the lead accents elsewhere, so it doesn't read as a
+              second manager chip. */}
+          {selectedTeamLead !== "all" && (
+            <span className="inline-flex items-center gap-1.5 rounded-lg border border-emerald-200 bg-emerald-50 px-2.5 py-1.5 text-xs font-medium text-emerald-700">
+              Lead:{" "}
+              {teamLeads.find((l) => String(l.id) === String(selectedTeamLead))
+                ?.name || "Team lead"}
+              <button
+                type="button"
+                onClick={() => setSelectedTeamLead("all")}
+                className="hover:text-emerald-900"
+              >
+                <X className="w-3 h-3" />
+              </button>
+            </span>
+          )}
 
           <button
             type="button"
@@ -2341,14 +2791,20 @@ const ProjectsPage = () => {
             >
               <SlidersHorizontal className="w-4 h-4 text-slate-400" />
               Filters
-              {[selectedOrganization, selectedPm, selectedStatus].some(
-                (v) => v !== "all",
-              ) && (
+              {[
+                selectedOrganization,
+                selectedPm,
+                selectedTeamLead,
+                selectedStatus,
+              ].some((v) => v !== "all") && (
                   <span className="ml-0.5 inline-flex items-center justify-center rounded-full bg-indigo-100 px-1.5 text-[10px] font-semibold text-indigo-700">
                     {
-                      [selectedOrganization, selectedPm, selectedStatus].filter(
-                        (v) => v !== "all",
-                      ).length
+                      [
+                        selectedOrganization,
+                        selectedPm,
+                        selectedTeamLead,
+                        selectedStatus,
+                      ].filter((v) => v !== "all").length
                     }
                   </span>
                 )}
@@ -2430,13 +2886,38 @@ const ProjectsPage = () => {
                     />
                   </div>
                 )}
-                {[selectedOrganization, selectedPm, selectedStatus].some(
-                  (v) => v !== "all",
-                ) && (
+                {/* Offered to PMs and team leads too, not just admins: with several leads on
+                    one project it is the quickest way to find your own. */}
+                <div>
+                  <label className="mb-1 block text-xs font-medium text-slate-500">
+                    Team Lead
+                  </label>
+                  <Dropdown
+                    value={selectedTeamLead}
+                    onChange={setSelectedTeamLead}
+                    searchable
+                    searchPlaceholder="Search team leads..."
+                    options={[
+                      { value: "all", label: "All team leads" },
+                      ...teamLeads.map((lead) => ({
+                        value: String(lead.id),
+                        label: lead.name,
+                      })),
+                    ]}
+                    className="w-full"
+                  />
+                </div>
+                {[
+                  selectedOrganization,
+                  selectedPm,
+                  selectedTeamLead,
+                  selectedStatus,
+                ].some((v) => v !== "all") && (
                     <button
                       onClick={() => {
                         setSelectedOrganization("all");
                         setSelectedPm("all");
+                        setSelectedTeamLead("all");
                         setSelectedStatus("all");
                       }}
                       className="w-full rounded-lg border border-slate-200 py-1.5 text-xs font-medium text-slate-500 hover:bg-slate-50"
@@ -2506,11 +2987,11 @@ const ProjectsPage = () => {
       )}
 
       {isLoading ? (
-        <div className="grid grid-cols-1 md:grid-cols-2 xl:grid-cols-3 gap-4">
+        <div className="grid grid-cols-1 md:grid-cols-2 xl:grid-cols-3 gap-2.5">
           {[...Array(6)].map((_, index) => (
             <div
               key={index}
-              className="h-72 rounded-2xl border border-slate-200 bg-white animate-pulse"
+              className="h-72 rounded-lg border border-slate-200 bg-white animate-pulse"
             />
           ))}
         </div>
@@ -2528,7 +3009,10 @@ const ProjectsPage = () => {
         </div>
       ) : (
         <>
-          <div className="grid grid-cols-1 md:grid-cols-2 xl:grid-cols-3 gap-4">
+          {/* Tighter gutter than the usual gap-4: every pixel taken back here
+              goes to the cards, and the project name is the field that runs out
+              of room first. */}
+          <div className="grid grid-cols-1 md:grid-cols-2 xl:grid-cols-3 gap-2.5">
             {filteredProjects
               .slice((currentPage - 1) * PAGE_SIZE, currentPage * PAGE_SIZE)
               .map((project) => {
@@ -2538,7 +3022,7 @@ const ProjectsPage = () => {
 
                 const pmIds = resolvePmIds(project);
                 const pmNames = pmIds
-                  .map((id) => formatDisplayName(employees.find((e) => e.id === id)?.name))
+                  .map((id) => employees.find((e) => e.id === id)?.name)
                   .filter(Boolean);
 
                 const allocatedManpower = getAllocatedManpower(project);
@@ -2551,12 +3035,15 @@ const ProjectsPage = () => {
                     project={project}
                     parentProject={parentProject}
                     pmNames={pmNames}
+                    teamLeadNames={getTeamLeadNames(project)}
                     pmIds={pmIds}
+                    leadIds={getTeamLeadIds(project)}
                     onLeaveEmployeeIds={leaveEmployeeIds}
                     locationByEmployeeId={locationByEmployeeId}
                     allocatedManpower={allocatedManpower}
                     requiredManpower={getRequiredManpower(project)}
                     pmSlots={getPmSlots(project)}
+                    leadSlots={getTeamLeadIds(project).length}
                     allocations={allocations}
                     employees={employees}
                     formerEmployees={formerEmployees}
@@ -2757,6 +3244,10 @@ const ProjectsPage = () => {
                 />
               </div>
 
+              {/* Shown to PMs as well as admins: a project takes several managers, so a PM
+                  needs this to add a co-manager to their own. They are still auto-assigned
+                  on create (api/projects.py) and PmMultiSelect refuses to let them remove
+                  themselves, so neither route can leave them without their own project. */}
               <div>
                 <div className="mb-1 flex items-center gap-1.5">
                   <label className="block text-xs font-semibold text-slate-600">
@@ -2794,6 +3285,49 @@ const ProjectsPage = () => {
                   onChange={setSelectedPmIds}
                   isPm={isPm}
                   pmEmployeeId={pmEmployeeId}
+                />
+              </div>
+
+              <div>
+                <div className="mb-1 flex items-center gap-1.5">
+                  <label className="block text-xs font-semibold text-slate-600">
+                    Team Lead
+                  </label>
+                  {selectedTeamLeadIds.length > 0 && (
+                    <span className="group relative inline-flex">
+                      <span className="inline-flex h-4 min-w-[16px] cursor-default items-center justify-center rounded-full bg-emerald-100 px-1 text-[10px] font-bold text-emerald-700">
+                        {selectedTeamLeadIds.length}
+                      </span>
+                      <span className="pointer-events-none absolute left-0 top-full z-30 mt-1 hidden w-max max-w-[240px] rounded-lg border border-slate-200 bg-white px-2.5 py-1.5 text-[11px] font-medium text-slate-600 shadow-lg group-hover:block">
+                        {selectedTeamLeadIds.map((id) => {
+                          const emp = employees.find((e) => e.id === id);
+                          return (
+                            <span
+                              key={id}
+                              className="flex items-center gap-1.5 whitespace-nowrap py-0.5"
+                            >
+                              {formatDisplayName(emp?.name) || "Unknown"}
+                              {/* Still reachable: the picker offers Team Leads only, but a
+                                  project may already carry a program manager tagged as a
+                                  lead from the Allocations page, and prefill shows them. */}
+                              {!isTeamLeadDesignation(emp?.designation) && (
+                                <span className="text-[9px] font-semibold uppercase tracking-wide text-amber-500">
+                                  temp
+                                </span>
+                              )}
+                            </span>
+                          );
+                        })}
+                      </span>
+                    </span>
+                  )}
+                </div>
+                <TeamLeadMultiSelect
+                  employees={teamLeadEmployees}
+                  value={selectedTeamLeadIds}
+                  onChange={setSelectedTeamLeadIds}
+                  excludeIds={selectedPmIds}
+                  lockedId={isTeamLeadRole ? pmEmployeeId : null}
                 />
               </div>
             </div>
@@ -3090,7 +3624,7 @@ const ProjectsPage = () => {
                           }}
                           className={`inline-flex items-center gap-1.5 rounded-lg px-3 py-1.5 text-xs font-medium transition-colors ${isActive ? "bg-indigo-600 text-white" : "border border-slate-200 bg-white text-slate-600 hover:bg-slate-50"}`}
                         >
-                          {cat.key}
+                          {cat.label || cat.key}
                           {chosen && (
                             <span
                               className={`rounded-full px-1.5 py-0.5 text-[10px] ${isActive ? "bg-white/20 text-white" : "bg-indigo-50 text-indigo-600"}`}
@@ -3108,7 +3642,7 @@ const ProjectsPage = () => {
                   ).map((cat) => (
                     <div key={cat.key} className="mt-3">
                       <label className="mb-1 block text-[11px] font-medium text-slate-500">
-                        {cat.key} — Subtype
+                        {cat.label || cat.key} — Subtype
                       </label>
                       <Dropdown
                         defaultOpen={typeTabTouched}
@@ -3137,7 +3671,10 @@ const ProjectsPage = () => {
                           key={cat}
                           className="inline-flex items-center gap-1 rounded-full bg-indigo-50 px-2.5 py-1 text-xs font-medium text-indigo-700"
                         >
-                          <span className="text-indigo-400">{cat}:</span> {sub}
+                          <span className="text-indigo-400">
+                            {typeLabel(cat)}:
+                          </span>{" "}
+                          {sub}
                           <button
                             type="button"
                             onClick={() =>
@@ -3214,8 +3751,14 @@ const ProjectsPage = () => {
                       ["annotators_total", "Total Annotators"],
                       ["autonex_annotators", "Autonex Annotators"],
                       ["autonex_reviewers", "Autonex Reviewers"],
-                      ["qc_count", "Autonex QC"],
-                    ].map(([field, label]) => (
+                      ["others_count", "Others"],
+                      // Only for development projects: they are staffed with
+                      // engineers, not annotators, so the field would be dead
+                      // weight on every other project type.
+                      isDevelopmentSelected && ["developers_count", "Developers"],
+                    ]
+                      .filter(Boolean)
+                      .map(([field, label]) => (
                       <div key={field}>
                         <label className="block text-[11px] font-medium text-slate-500 mb-1 truncate">
                           {label}
@@ -3233,11 +3776,35 @@ const ProjectsPage = () => {
                         />
                       </div>
                     ))}
+                    {/* Derived from the two pickers above rather than typed. They were
+                        editable numbers that could disagree with the people actually
+                        chosen — a project could name three leads and claim one. */}
+                    {[
+                      ["Team Managers", selectedPmIds.length],
+                      ["Team Leads", selectedTeamLeadIds.length],
+                    ].map(([label, value]) => (
+                      <div key={label}>
+                        <label className="mb-1 block truncate text-[11px] font-medium text-slate-500">
+                          {label}
+                        </label>
+                        <div
+                          className="input flex cursor-default items-center bg-slate-50 text-slate-500"
+                          title={`From the ${label === "Team Leads" ? "Team Lead" : "Program Manager"} field above`}
+                        >
+                          {value}
+                        </div>
+                      </div>
+                    ))}
                   </div>
 
+                  {/* Mirrors api/projects.py `_autonex_headcount`. "Total
+                      Annotators" is informational and deliberately not in the sum
+                      — it counts the vendor's people as well as ours. */}
                   <p className="mt-2 text-[11px] text-slate-400">
-                    Required headcount = Autonex Annotators + Autonex Reviewers
-                    + QC.
+                    Required headcount = Autonex Annotators + Autonex Reviewers +
+                    Others + Team Leads + Team Managers
+                    {isDevelopmentSelected ? " + Developers" : ""}. Leads and
+                    managers are counted from the fields above, not typed.
                   </p>
                 </div>
               </div>

@@ -7,8 +7,9 @@ import {
   ChevronDown,
   ChevronRight,
 } from "lucide-react";
+import { useQuery } from "@tanstack/react-query";
 import Button from "../../components/ui/Button";
-import { onboardingApi } from "../../services/api";
+import { onboardingApi, employeeApi } from "../../services/api";
 import Table from "../../components/ui/Table";
 import SearchBar from "../../components/ui/SearchBar";
 import UserAvatar from "../../components/ui/UserAvatar";
@@ -28,6 +29,15 @@ export default function AdminReportsPage() {
       .catch(console.error)
       .finally(() => setLoading(false));
   }, []);
+
+  // The reports payload carries no photo, so profile pictures come from the
+  // employee records, joined on the employeeId each row already has. Shares the
+  // ["employees"] cache entry with the rest of the admin portal.
+  const { data: employees = [] } = useQuery({
+    queryKey: ["employees"],
+    queryFn: employeeApi.getAll,
+  });
+  const avatarByEmployeeId = new Map(employees.map((e) => [e.id, e.avatar_url]));
 
   const handleExportCSV = () => {
     onboardingApi
@@ -149,9 +159,23 @@ export default function AdminReportsPage() {
         const displayName = formatDisplayName(row.name) || "Candidate";
         return (
           <div className="flex items-center gap-3 min-w-0 max-w-[240px]">
-            <UserAvatar name={displayName} src={row.avatarUrl || row.avatar_url} size="md" />
+            <UserAvatar
+              name={displayName}
+              // The reports payload has no photo field, so the picture comes from
+              // the joined employee record. The inline fields are kept as a
+              // fallback in case the endpoint starts sending one.
+              src={
+                avatarByEmployeeId.get(row.employeeId) ||
+                row.avatarUrl ||
+                row.avatar_url
+              }
+              size="md"
+            />
             <div className="min-w-0 flex-1">
-              <p className="text-sm font-bold text-slate-800 truncate" title={displayName}>
+              <p
+                className="text-sm font-bold text-slate-800 truncate"
+                title={displayName}
+              >
                 {displayName}
               </p>
               <p className="text-xs text-slate-500 truncate" title={row.email}>

@@ -26,7 +26,7 @@ import {
   getEndDateValidationMessage,
   isEndDateBeforeStartDate,
 } from "../utils/dateValidation";
-import { formatDisplayName } from "../utils/displayName";
+import { formatDisplayName, nameSearchText } from "../utils/displayName";
 import {
   getLeaveTypeBadgeClass,
   getLeaveTypeLabel,
@@ -46,82 +46,13 @@ import ReasonPopover, { ReasonText } from "../components/ui/ReasonPopover";
 import EmployeeKPIPanel from "../components/EmployeeKPIPanel";
 import Modal from "../components/ui/Modal";
 import OverLimitHoverCard from "../components/ui/OverLimitHoverCard";
+import FlagChip from "../components/ui/FlagChip";
+import { LEAVE_STATUS_TEXT } from "../components/ui/LeaveStatusText";
+import { makeOpensUpward } from "../utils/tableRows";
+import { checkHalfDayTiming } from "../utils/halfDayTiming";
 
 
 const TABS = ["Leave List", "Calendar", "WFH Requests", "Employee KPI"];
-
-const FLAG_TONES = {
-  orange: "bg-orange-100 text-orange-600 border-orange-200",
-  red: "bg-red-100 text-red-600 border-red-200",
-};
-
-/**
- * Round icon flag beside an employee's name, labelled on hover.
- *
- * The name cell has very little room, so anything worth flagging goes in as an
- * icon rather than a worded pill — the label lives in the tooltip.
- */
-const FlagChip = ({ icon: Icon, label, tone = "orange", pulse = false }) => (
-  <div className="relative group flex items-center">
-    <span
-      className={`inline-flex items-center justify-center h-5 w-5 shrink-0 rounded-full border cursor-help ${FLAG_TONES[tone]} ${pulse ? "animate-pulse" : ""}`}
-    >
-      <Icon className="w-3 h-3" />
-    </span>
-    <div className="absolute bottom-full left-1/2 -translate-x-1/2 mb-1 hidden group-hover:block px-2 py-1 bg-white text-slate-700 shadow border border-slate-100 text-xs rounded whitespace-nowrap z-50">
-      {label}
-    </div>
-  </div>
-);
-
-const getISTDateTime = () => {
-  const d = new Date();
-  const options = {
-    timeZone: "Asia/Kolkata",
-    year: "numeric",
-    month: "2-digit",
-    day: "2-digit",
-    hour: "2-digit",
-    minute: "2-digit",
-    second: "2-digit",
-    hour12: false,
-  };
-  const formatter = new Intl.DateTimeFormat("en-US", options);
-  const parts = formatter.formatToParts(d);
-  const partMap = Object.fromEntries(parts.map((p) => [p.type, p.value]));
-
-  const yr = parseInt(partMap.year);
-  const mo = parseInt(partMap.month) - 1;
-  const dy = parseInt(partMap.day);
-  const hr = parseInt(partMap.hour);
-  const min = parseInt(partMap.minute);
-
-  return {
-    dateStr: `${partMap.year}-${partMap.month}-${partMap.day}`,
-    hour: hr,
-    minute: min,
-  };
-};
-
-const checkHalfDayTiming = (startDateStr, slot) => {
-  const ist = getISTDateTime();
-  const todayStr = ist.dateStr;
-
-  if (slot === "first_half") {
-    if (todayStr >= startDateStr) {
-      return "First-half leaves must be applied at least one day in advance.";
-    }
-  } else if (slot === "second_half") {
-    if (todayStr > startDateStr) {
-      return "Cannot apply for a second-half leave after the request date has passed.";
-    } else if (todayStr === startDateStr) {
-      if (ist.hour >= 14) {
-        return "Second-half leaves must be applied before 2:00 PM on the same day.";
-      }
-    }
-  }
-  return null;
-};
 
 const LeavesPage = () => {
   const queryClient = useQueryClient();
@@ -189,7 +120,8 @@ const LeavesPage = () => {
   // the signed-in user's actual role rather than a generic "PM/Admin", so the stored
   // remark stays truthful — it is kept as the approval's audit trail.
   const approverLabel =
-    { admin: "Admin", pm: "PM", hr: "HR" }[user.role] || "Admin";
+    { admin: "Admin", pm: "PM", hr: "HR", team_lead: "Team Lead" }[user.role] ||
+    "Admin";
   const WFH_REMARK_PRESETS = [
     `Approved by ${approverLabel}`,
     "Approved — business requirement",
@@ -436,7 +368,11 @@ const LeavesPage = () => {
   const todayStr = format(new Date(), "yyyy-MM-dd");
   const filteredLeaves = leaves.filter((leave) => {
     if (!leave.start_date || !leave.end_date) return false;
-    const name = getEmployeeName(leave.employee_id).toLowerCase();
+    // Searched against the stored name as well as the shortened label, so a middle
+    // name still finds its owner — see nameSearchText.
+    const name = nameSearchText(
+      employees.find((e) => e.id === leave.employee_id)?.name,
+    );
     const typeLabel = getLeaveTypeLabel(leave.leave_type).toLowerCase();
     const q = searchQuery.toLowerCase();
     const matchesSearch = name.includes(q) || typeLabel.includes(q);
@@ -456,9 +392,10 @@ const LeavesPage = () => {
   }
 
   const filteredWFH = wfhRequests.filter((w) => {
-    const name = (
-      w.employee_name || getEmployeeName(w.employee_id)
-    ).toLowerCase();
+    const name = nameSearchText(
+      w.employee_name ||
+        employees.find((e) => e.id === w.employee_id)?.name,
+    );
     const reason = (w.reason || "").toLowerCase();
     const q = searchQuery.toLowerCase();
     const matchesSearch = name.includes(q) || reason.includes(q);
@@ -476,29 +413,8 @@ const LeavesPage = () => {
     });
   }
 
-  // Plain coloured text — the pill border read as heavy against the rest of the
-  // row, and colour alone separates the three states well enough here.
-  const STATUS_BADGE = {
-    pending: (
-      <span className="text-[13px] font-medium text-amber-600">Pending</span>
-    ),
-    approved: (
-      <span className="text-[13px] font-medium text-emerald-600">Approved</span>
-    ),
-    rejected: (
-      <span className="text-[13px] font-medium text-red-600">Rejected</span>
-    ),
-  };
-
-  // A menu or popover on one of the last rows would otherwise overflow the card.
-  const opensUpward = (rows, row) => {
-    const pageStart = (currentPage - 1) * PAGE_SIZE;
-    const visible = rows.slice(pageStart, pageStart + PAGE_SIZE);
-    const idx = visible.indexOf(row);
-    return visible.length <= 2
-      ? idx === visible.length - 1
-      : idx >= visible.length - 2;
-  };
+  const STATUS_BADGE = LEAVE_STATUS_TEXT;
+  const opensUpward = makeOpensUpward(currentPage, PAGE_SIZE);
 
   return (
     <div className="space-y-3">
@@ -689,7 +605,10 @@ const LeavesPage = () => {
                     <UserAvatar src={emp?.avatar_url} name={empName} size="sm" />
                     <div className="min-w-0">
                       <div className="flex items-center gap-2 min-w-0">
-                        <span className="font-semibold text-slate-800 truncate whitespace-nowrap">
+                        <span
+                          className="font-semibold text-slate-800 truncate whitespace-nowrap"
+                          title={emp?.name || empName}
+                        >
                           {empName}
                         </span>
                         {leave.flagged && (
@@ -917,7 +836,10 @@ const LeavesPage = () => {
                     <UserAvatar src={emp?.avatar_url} name={empName} size="sm" />
                     <div className="min-w-0">
                       <div className="flex items-center gap-2 min-w-0">
-                        <span className="font-semibold text-slate-800 truncate whitespace-nowrap">
+                        <span
+                          className="font-semibold text-slate-800 truncate whitespace-nowrap"
+                          title={emp?.name || empName}
+                        >
                           {empName}
                         </span>
                         {w.flagged && (
