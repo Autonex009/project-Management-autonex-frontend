@@ -156,23 +156,7 @@ const SignupRequestsPage = () => {
 
   return (
     <div className="space-y-4">
-      {/* Header */}
-      <div>
-        <div className="flex items-center gap-3">
-          <h1 className="text-lg font-semibold text-slate-900">
-            Signup Requests
-          </h1>
-          {pendingCount > 0 && (
-            <span className="inline-flex items-center justify-center h-6 min-w-[24px] px-1.5 rounded-full text-xs font-bold bg-red-500 text-white">
-              {pendingCount}
-            </span>
-          )}
-        </div>
-        <p className="mt-0.5 text-[13px] text-slate-500">
-          Review and approve employee signup requests. Approved accounts receive
-          credentials via email.
-        </p>
-      </div>
+
 
       {/* Tabs + Search */}
       <div className="flex flex-wrap items-center justify-between gap-3">

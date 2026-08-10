@@ -45,35 +45,41 @@ const shortDate = (s) => {
   }
 };
 
+const TONE_CLASSES = {
+  indigo: { iconBg: "bg-indigo-50 text-indigo-600 border border-indigo-100/80" },
+  emerald: { iconBg: "bg-emerald-50 text-emerald-600 border border-emerald-100/80" },
+  amber: { iconBg: "bg-amber-50 text-amber-600 border border-amber-100/80" },
+  sky: { iconBg: "bg-sky-50 text-sky-600 border border-sky-100/80" },
+  violet: { iconBg: "bg-violet-50 text-violet-600 border border-violet-100/80" },
+  rose: { iconBg: "bg-rose-50 text-rose-600 border border-rose-100/80" },
+  slate: { iconBg: "bg-slate-100 text-slate-600 border border-slate-200/80" },
+};
+
 const AutonexKpiCard = ({ icon: Icon, label, value, tone = "indigo", breakdown }) => {
-  const tones = {
-    indigo: "bg-indigo-500",
-    emerald: "bg-emerald-500",
-    amber: "bg-amber-500",
-    sky: "bg-sky-500",
-    violet: "bg-violet-500",
-    rose: "bg-rose-500",
-    slate: "bg-slate-500",
-  };
+  const toneStyle = TONE_CLASSES[tone] || TONE_CLASSES.indigo;
   const hasBreakdown = Array.isArray(breakdown) && breakdown.length > 0;
+
   return (
     <div
-      className={`group relative rounded-xl border border-slate-200 bg-white p-3.5 shadow-sm ${hasBreakdown ? "cursor-help" : ""}`}
+      className={`group relative bg-white border border-slate-200/70 rounded-2xl p-3.5 shadow-[0_1px_3px_rgba(0,0,0,0.04)] flex flex-col justify-between hover:shadow-md transition-all duration-200`}
     >
-      <div
-        className={`flex h-9 w-9 items-center justify-center rounded-lg text-white ${tones[tone]}`}
-      >
-        {Icon && <Icon className="h-[18px] w-[18px]" />}
+      <div>
+        <div className="flex items-center gap-2.5 min-w-0 mb-2">
+          <div className={`w-8 h-8 rounded-lg flex items-center justify-center shrink-0 ${toneStyle.iconBg}`}>
+            {Icon && <Icon className="w-4 h-4" />}
+          </div>
+          <div className="text-[11px] font-bold text-slate-700 uppercase tracking-wider leading-tight flex items-center gap-1 min-w-0 flex-1">
+            <span>{label}</span>
+            {hasBreakdown && <ChevronDown className="w-3 h-3 text-slate-400 shrink-0 inline" />}
+          </div>
+        </div>
+        <div className="text-lg sm:text-xl font-bold text-slate-900 tracking-tight font-mono truncate" title={String(value)}>
+          {value}
+        </div>
       </div>
-      <p className="mt-3 flex items-center gap-1 text-[11px] font-semibold uppercase tracking-wide text-slate-400">
-        {label}
-        {hasBreakdown && <ChevronDown className="h-3 w-3 text-slate-300" />}
-      </p>
-      <p className="mt-0.5 text-2xl font-bold tracking-tight text-slate-900">
-        {value}
-      </p>
+
       {hasBreakdown && (
-        <div className="pointer-events-none absolute right-0 top-full z-30 mt-1.5 w-max min-w-[220px] max-w-[320px] origin-top-right scale-95 rounded-xl border border-slate-200 bg-white p-2 opacity-0 shadow-xl transition-all duration-150 group-hover:scale-100 group-hover:opacity-100">
+        <div className="pointer-events-none absolute right-0 top-full z-30 mt-1.5 w-max min-w-[220px] max-w-[320px] origin-top-right scale-95 rounded-xl border border-slate-200 bg-white p-2.5 opacity-0 shadow-xl transition-all duration-150 group-hover:scale-100 group-hover:opacity-100">
           <p className="px-1.5 pb-1 text-[10px] font-semibold uppercase tracking-wide text-slate-400">
             Where time went
           </p>
@@ -229,16 +235,7 @@ const AnalyticsDashboard = () => {
   return (
     <div className="space-y-5">
       {/* Header + single range control */}
-      <div className="flex flex-col gap-3 sm:flex-row sm:items-start sm:justify-between">
-        <div>
-          <h1 className="text-lg font-semibold text-slate-900">
-            Project Analytics
-          </h1>
-          <p className="mt-0.5 text-[13px] text-slate-500">
-            Autonex team activity across all mapped projects — figures used for
-            billing.
-          </p>
-        </div>
+      <div className="flex flex-col gap-3 sm:flex-row sm:items-start sm:justify-end">
         <div className="flex items-center gap-2">
           <div className="inline-flex items-center rounded-xl border border-slate-200 bg-white p-0.5 shadow-sm">
             {AUTONEX_RANGES.map((r) => (
@@ -295,7 +292,7 @@ const AnalyticsDashboard = () => {
       )}
 
       {/* Unified Autonex KPIs — all driven by the selected range */}
-      <div className="grid grid-cols-2 gap-3 sm:grid-cols-3 lg:grid-cols-7">
+      <div className="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 lg:grid-cols-7 gap-3">
         <AutonexKpiCard
           icon={FolderKanban}
           label="Live Projects"
@@ -416,15 +413,20 @@ const AnalyticsDashboard = () => {
           {
             key: "name",
             label: "Project",
+            width: "w-[30%]",
             render: (value, row) => (
-              <div className="flex items-center gap-2">
+              <div className="flex items-center gap-2.5 min-w-0 pr-2">
                 <span
-                  className={`w-2 h-2 rounded-full ${row.status === "active" ? "bg-emerald-500" : "bg-slate-400"}`}
+                  className={`w-2 h-2 rounded-full shrink-0 ${row.status === "active" ? "bg-emerald-500" : "bg-slate-400"}`}
                 ></span>
-                <div>
-                  <div className="font-medium text-slate-800">{value}</div>
+                <div className="min-w-0 flex-1">
+                  <div className="font-semibold text-slate-800 text-[13.5px] truncate" title={value}>
+                    {value}
+                  </div>
                   {row.client && (
-                    <div className="text-xs text-slate-400">{row.client}</div>
+                    <div className="text-xs text-slate-400 truncate" title={row.client}>
+                      {row.client}
+                    </div>
                   )}
                 </div>
               </div>
@@ -433,7 +435,8 @@ const AnalyticsDashboard = () => {
           {
             key: "autonex_platform_hours",
             label: "Autonex Hours",
-            align: "center",
+            width: "w-[14%]",
+            align: "right",
             render: (v) => (
               <span className="font-mono text-slate-700">{v ?? 0}h</span>
             ),
@@ -441,13 +444,14 @@ const AnalyticsDashboard = () => {
           {
             key: "autonex_annotator_only",
             label: "Annotator only",
-            align: "center",
+            width: "w-[12%]",
+            align: "right",
             render: (v, row) => (
               <span
                 title={
                   (row.autonex_annotator_only_names || []).join("\n") || "None"
                 }
-                className={`text-slate-700 ${v ? "cursor-help underline decoration-dotted decoration-slate-300 underline-offset-2" : ""}`}
+                className={`text-slate-700 ${v ? "underline decoration-dotted decoration-slate-300 underline-offset-2" : ""}`}
               >
                 {v ?? 0}
               </span>
@@ -456,13 +460,14 @@ const AnalyticsDashboard = () => {
           {
             key: "autonex_reviewer_only",
             label: "Reviewer only",
-            align: "center",
+            width: "w-[12%]",
+            align: "right",
             render: (v, row) => (
               <span
                 title={
                   (row.autonex_reviewer_only_names || []).join("\n") || "None"
                 }
-                className={`text-slate-700 ${v ? "cursor-help underline decoration-dotted decoration-slate-300 underline-offset-2" : ""}`}
+                className={`text-slate-700 ${v ? "underline decoration-dotted decoration-slate-300 underline-offset-2" : ""}`}
               >
                 {v ?? 0}
               </span>
@@ -471,11 +476,12 @@ const AnalyticsDashboard = () => {
           {
             key: "autonex_both",
             label: "Both",
-            align: "center",
+            width: "w-[9%]",
+            align: "right",
             render: (v, row) => (
               <span
                 title={(row.autonex_both_names || []).join("\n") || "None"}
-                className={`text-slate-700 ${v ? "cursor-help underline decoration-dotted decoration-slate-300 underline-offset-2" : ""}`}
+                className={`text-slate-700 ${v ? "underline decoration-dotted decoration-slate-300 underline-offset-2" : ""}`}
               >
                 {v ?? 0}
               </span>
@@ -484,12 +490,15 @@ const AnalyticsDashboard = () => {
           {
             key: "autonex_people",
             label: "People",
-            align: "center",
+            width: "w-[9%]",
+            align: "right",
             render: (v) => <span className="text-slate-700">{v ?? 0}</span>,
           },
           {
             key: "sentiment",
             label: "Sentiment",
+            width: "w-[14%]",
+            align: "right",
             render: (v) =>
               v ? (
                 <span

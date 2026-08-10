@@ -18,6 +18,7 @@ import {
   Info,
   ClipboardList,
   BarChart3,
+  Trophy,
 } from "lucide-react";
 
 const rowBase =
@@ -99,6 +100,7 @@ const EmployeeSidebar = ({
         label: "Self Evaluation",
         icon: ClipboardList,
       },
+      { to: `${prefix}/leaderboard`, label: "Leaderboard", icon: Trophy },
       { to: `${prefix}/leaves`, label: "Team Leaves", icon: Calendar },
       { to: `${prefix}/my-leaves`, label: "My Leaves", icon: CalendarCheck },
       { to: `${prefix}/side-projects`, label: "Side Projects", icon: Rocket },
@@ -126,6 +128,7 @@ const EmployeeSidebar = ({
         label: "Self Evaluation",
         icon: ClipboardList,
       },
+      { to: `${prefix}/leaderboard`, label: "Leaderboard", icon: Trophy },
       { to: `${prefix}/leaves`, label: "Leaves", icon: Calendar },
       { to: `${prefix}/side-projects`, label: "Side Projects", icon: Rocket },
       { to: `${prefix}/guidelines`, label: "Guidelines", icon: FileText },

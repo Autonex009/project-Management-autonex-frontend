@@ -13,14 +13,7 @@ const PMMentorshipPage = () => {
 
   return (
     <div className="space-y-6 animate-in fade-in duration-500">
-      {/* Section header */}
-      <div>
-        <h1 className="text-lg font-semibold text-slate-900">Mentorship</h1>
-        <p className="text-slate-500 text-[13px] mt-0.5">
-          Pick from newly onboarded annotators and track the onboarding progress
-          of your team.
-        </p>
-      </div>
+
 
       {/* Tabs */}
       <div className="inline-flex items-center rounded-lg border border-slate-200 bg-slate-50 p-0.5 w-fit">

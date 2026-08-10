@@ -160,22 +160,7 @@ const ReferralsPage = () => {
 
   return (
     <div className="space-y-4">
-      {/* Header */}
-      <div>
-        <div className="flex items-center gap-2">
-          <h1 className="text-lg font-semibold text-slate-900">
-            Employee Referrals
-          </h1>
-          {stats.pending > 0 && (
-            <span className="inline-flex items-center justify-center h-5 min-w-[20px] px-1.5 rounded-full text-[11px] font-bold bg-amber-500 text-white">
-              {stats.pending}
-            </span>
-          )}
-        </div>
-        <p className="text-slate-500 text-[13px] mt-0.5">
-          Review and track candidates referred by employees.
-        </p>
-      </div>
+
 
       {/* KPIs */}
       <div className="grid grid-cols-2 lg:grid-cols-4 gap-3">

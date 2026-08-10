@@ -145,14 +145,7 @@ const MyTeamPage = () => {
 
   return (
     <div className="space-y-4">
-      {/* Header */}
-      <div>
-        <h1 className="text-lg font-semibold text-slate-900">My Team</h1>
-        <p className="text-slate-500 text-[13px] mt-0.5">
-          View your team’s profile details and the projects they are currently
-          allocated to within your PM scope.
-        </p>
-      </div>
+
 
       {/* KPIs */}
       <div className="grid grid-cols-1 sm:grid-cols-3 gap-3">
