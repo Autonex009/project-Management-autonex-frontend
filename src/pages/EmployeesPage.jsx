@@ -1767,22 +1767,7 @@ const EmployeesPage = () => {
 
   return (
     <div className="space-y-3">
-      {/* Page Header */}
-      <div className="flex flex-col gap-2.5">
-        <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-2">
-          <div className="flex items-center gap-4">
-            <div>
-              <h1 className="text-lg font-semibold text-slate-900 ">
-                Employees
-              </h1>
-              <p className="text-slate-500 text-[13px] mt-0.5">
-                Manage team members and their availability
-              </p>
-            </div>
-          </div>
-        </div>
-
-        {/* KPI Overview Cards Grid */}
+      {/* KPI Overview Cards Grid */}
         <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-3.5">
           {/* KPI 1: Total Employees */}
           <div className="bg-white border border-slate-200/70 rounded-2xl p-3.5 shadow-[0_1px_3px_rgba(0,0,0,0.04)] flex flex-col justify-between hover:shadow-md transition-all duration-200">
@@ -2249,7 +2234,6 @@ const EmployeesPage = () => {
             </button>
           </div>
         </div>
-      </div>
 
       {/* Server-search notice. Shown only when the rows below did not come from
           the current view, so an archived person appearing is explained rather

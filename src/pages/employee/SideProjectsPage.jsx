@@ -120,15 +120,7 @@ const SideProjectsPage = () => {
   return (
     <>
       <div className="space-y-6">
-        <div className="flex flex-col sm:flex-row items-start sm:items-center justify-between mb-8 gap-4">
-          <div>
-            <h1 className="text-lg font-semibold text-slate-900">
-              Side Projects
-            </h1>
-            <p className="text-[13px] text-slate-500 mt-0.5">
-              Personal projects and learning initiatives
-            </p>
-          </div>
+        <div className="flex justify-end mb-8 gap-4">
           <Button
             size="lg"
             onClick={() => {

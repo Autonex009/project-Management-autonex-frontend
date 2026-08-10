@@ -607,13 +607,7 @@ const AllocationsPage = () => {
 
   return (
     <div className="space-y-4">
-      {/* Page Header */}
-      <div>
-        <h1 className="text-lg font-semibold text-slate-900">Allocations</h1>
-        <p className="mt-0.5 text-[13px] text-slate-500">
-          Assign employees to projects
-        </p>
-      </div>
+
       {/* Toolbar — search (left) · create allocation (right) */}
       <div className="flex flex-wrap items-center justify-between gap-2">
         <SearchBar

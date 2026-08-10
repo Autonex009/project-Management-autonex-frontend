@@ -712,16 +712,7 @@ const CompanyInfoPage = () => {
 
   return (
     <div className="space-y-6">
-      <div className="flex flex-col sm:flex-row items-start sm:items-center justify-between mb-8 gap-4">
-        <div>
-          <h1 className="text-lg font-semibold text-slate-900">
-            Company Information
-          </h1>
-          <p className="text-[13px] text-slate-500 mt-0.5">
-            General reference handbook, policies, and guidelines
-          </p>
-        </div>
-      </div>
+
 
       {/* Tab Navigation */}
       <div className="inline-flex items-center rounded-lg border border-slate-200 bg-slate-50 p-0.5 w-fit overflow-x-auto max-w-full">
