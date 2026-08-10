@@ -689,6 +689,23 @@ const ProjectCard = ({
             </>
           ) : (
             <div className="flex items-center gap-1.5">
+              {project.priority && (
+                <span
+                  className={`inline-flex items-center rounded-full px-2.5 py-1 text-xs font-bold ${
+                    project.priority === "P0"
+                      ? "bg-red-50 text-red-700"
+                      : project.priority === "P1"
+                      ? "bg-orange-50 text-orange-700"
+                      : project.priority === "P2"
+                      ? "bg-blue-50 text-blue-700"
+                      : project.priority === "P3"
+                      ? "bg-purple-50 text-purple-700"
+                      : "bg-slate-50 text-slate-700"
+                  }`}
+                >
+                  {project.priority}
+                </span>
+              )}
               <span
                 className={`inline-flex items-center rounded-full px-2.5 py-1 text-xs font-medium ${status.pill}`}
               >
@@ -1261,7 +1278,10 @@ const ProjectsPage = () => {
   const fileInputRef = useRef(null);
   const [formMainProjectId, setFormMainProjectId] = useState("");
   const [formOrg, setFormOrg] = useState("");
-  const [formPriority, setFormPriority] = useState("medium");
+  const [formPriority, setFormPriority] = useState("auto");
+  const [prioritySuggestion, setPrioritySuggestion] = useState("P1");
+  const [manpowerTrigger, setManpowerTrigger] = useState(0);
+
   const [formProjectStatus, setFormProjectStatus] = useState("active");
   const [formSentiment, setFormSentiment] = useState("");
   const [modalInfoTab, setModalInfoTab] = useState("status"); // Status | Client Sentiment
@@ -1276,6 +1296,9 @@ const ProjectsPage = () => {
   );
   const [selectedStatus, setSelectedStatus] = useState(
     pageMemory.selectedStatus || "all",
+  );
+  const [selectedPriority, setSelectedPriority] = useState(
+    pageMemory.selectedPriority || "all",
   );
   const [projectView, setProjectView] = useState(
     pageMemory.projectView || "active",
@@ -1293,6 +1316,21 @@ const ProjectsPage = () => {
   const [editingCardId, setEditingCardId] = useState(null);
   const [cardDraft, setCardDraft] = useState(null);
   const [docsOpenId, setDocsOpenId] = useState(null);
+
+  useEffect(() => {
+    const form = document.getElementById("project-form");
+    if (!form) return;
+    const formData = new FormData(form);
+    const ann = parseInt(formData.get("autonex_annotators")) || 0;
+    const rev = parseInt(formData.get("autonex_reviewers")) || 0;
+    const tl = selectedTeamLeadIds.length;
+    const total = ann + rev + tl;
+    let sugg = "P1";
+    if (total === 0) sugg = "P3";
+    else if (ann + rev === 0 && tl > 0) sugg = "P2";
+    else if (total >= 5) sugg = "P0";
+    setPrioritySuggestion(sugg);
+  }, [manpowerTrigger, selectedTeamLeadIds, isModalOpen]);
 
   const { data: projects = [], isLoading } = useQuery({
     queryKey: ["sub-projects"],
@@ -1598,7 +1636,7 @@ const ProjectsPage = () => {
     setIsDragActive(false);
     setFormMainProjectId("");
     setFormOrg("");
-    setFormPriority("medium");
+    setFormPriority("auto");
     setFormProjectStatus("active");
     setFormSentiment("");
     setModalInfoTab("status");
@@ -1818,7 +1856,7 @@ const ProjectsPage = () => {
       start_date: startDate,
       end_date: endDate,
       daily_target: parseInt(formData.get("daily_target")) || 0,
-      priority: formData.get("priority") || "medium",
+      priority: formPriority === "auto" ? prioritySuggestion : formPriority,
       required_expertise: selectedSkills,
       // Team composition (required_manpower is auto-computed server-side from the Autonex counts)
       annotators_total: num("annotators_total"),
@@ -2302,6 +2340,10 @@ const ProjectsPage = () => {
       }
       return status === selectedStatus.toLowerCase();
     })
+    .filter((project) => {
+      if (selectedPriority === "all") return true;
+      return (project.priority || "medium") === selectedPriority;
+    })
     .filter((p) => {
       if (statusParam && p.project_status !== statusParam) return false;
 
@@ -2327,6 +2369,7 @@ const ProjectsPage = () => {
     selectedOrganization,
     selectedPm,
     selectedStatus,
+    selectedPriority,
     projectView,
     autonexOnly,
   ]);
@@ -2443,7 +2486,7 @@ const ProjectsPage = () => {
     setGuidelineFiles([]);
     setFormMainProjectId(String(project.main_project_id || ""));
     setFormOrg(orgOfMainProject(project.main_project_id));
-    setFormPriority(project.priority || "medium");
+    setFormPriority(project.priority || "auto");
     setFormProjectStatus(project.project_status || "active");
     setFormSentiment(project.sentiment || "");
     setModalInfoTab("status");
@@ -2689,7 +2732,7 @@ const ProjectsPage = () => {
             setFormOrg(
               filterMainProjectId ? orgOfMainProject(filterMainProjectId) : "",
             );
-            setFormPriority("medium");
+            setFormPriority("auto");
             setFormProjectStatus("active");
             setFormSentiment("");
             setModalInfoTab("status");
@@ -2796,6 +2839,7 @@ const ProjectsPage = () => {
                 selectedPm,
                 selectedTeamLead,
                 selectedStatus,
+                selectedPriority,
               ].some((v) => v !== "all") && (
                   <span className="ml-0.5 inline-flex items-center justify-center rounded-full bg-indigo-100 px-1.5 text-[10px] font-semibold text-indigo-700">
                     {
@@ -2804,6 +2848,7 @@ const ProjectsPage = () => {
                         selectedPm,
                         selectedTeamLead,
                         selectedStatus,
+                        selectedPriority,
                       ].filter((v) => v !== "all").length
                     }
                   </span>
@@ -2815,6 +2860,23 @@ const ProjectsPage = () => {
 
             {filtersOpen && (
               <div className="absolute right-0 top-full z-50 mt-2 w-72 rounded-xl border border-slate-200 bg-white p-3 shadow-xl space-y-3">
+                <div>
+                  <label className="mb-1 block text-xs font-medium text-slate-500">
+                    Priority
+                  </label>
+                  <Dropdown
+                    value={selectedPriority}
+                    onChange={setSelectedPriority}
+                    options={[
+                      { value: "all", label: "All priorities" },
+                      { value: "P0", label: "P0" },
+                      { value: "P1", label: "P1" },
+                      { value: "P2", label: "P2" },
+                      { value: "P3", label: "P3" },
+                    ]}
+                    className="w-full"
+                  />
+                </div>
                 <div>
                   <label className="mb-1 block text-xs font-medium text-slate-500">
                     Status
@@ -2912,7 +2974,8 @@ const ProjectsPage = () => {
                   selectedPm,
                   selectedTeamLead,
                   selectedStatus,
-                ].some((v) => v !== "all") && (
+                  selectedPriority,
+              ].some((v) => v !== "all") && (
                     <button
                       onClick={() => {
                         setSelectedOrganization("all");
@@ -3328,6 +3391,26 @@ const ProjectsPage = () => {
                   onChange={setSelectedTeamLeadIds}
                   excludeIds={selectedPmIds}
                   lockedId={isTeamLeadRole ? pmEmployeeId : null}
+                />
+              </div>
+
+              <div>
+                <label className="block text-[11px] font-semibold text-slate-600 mb-1">
+                  Priority <span className="font-normal text-slate-400">(Sugg: {prioritySuggestion})</span>
+                </label>
+                <Dropdown
+                  value={formPriority}
+                  onChange={setFormPriority}
+                  options={[
+                    { value: "auto", label: `Auto (${prioritySuggestion})` },
+                    { value: "P0", label: "P0" },
+                    { value: "P1", label: "P1" },
+                    { value: "P2", label: "P2" },
+                    { value: "P3", label: "P3" },
+                    { value: "medium", label: "Medium (Legacy)" }
+                  ]}
+                  className="w-full min-h-[42px]"
+                  optionsClassName="w-full"
                 />
               </div>
             </div>
@@ -3770,6 +3853,7 @@ const ProjectsPage = () => {
                           defaultValue={
                             (editingProject || copyingProject)?.[field] ?? ""
                           }
+                          onChange={() => setManpowerTrigger(v => v + 1)}
                           onWheel={(e) => e.target.blur()}
                           className="input"
                           placeholder="0"
