@@ -495,10 +495,6 @@ const PMLeavesPage = () => {
   const opensUpward = makeOpensUpward(currentPage, PAGE_SIZE);
 
   return (
-<<<<<<< HEAD
-    <div className="space-y-4">
-
-=======
     <div className="space-y-3">
       {/* Header */}
       <div>
@@ -507,7 +503,6 @@ const PMLeavesPage = () => {
           Manage leave and WFH requests from your team
         </p>
       </div>
->>>>>>> origin/dev-staging
 
       {/* Tabs · Filters · Sort · Search · Add Leave */}
       <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3">
