@@ -1,8 +1,7 @@
-import React, { useState, useEffect, useRef } from "react";
+import React, { useState, useRef, useEffect } from "react";
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
 import Button from "../../components/ui/Button";
 import UserAvatar from "../../components/ui/UserAvatar";
-import Dropdown from "../../components/ui/Dropdown";
 import { authApi, employeeApi, skillsApi } from "../../services/api";
 import {
   BadgeCheck,
@@ -11,11 +10,9 @@ import {
   ChevronDown,
   Clock3,
   Hash,
-  Info,
   Mail,
   Pencil,
   Phone,
-  Save,
   ShieldCheck,
   UserRound,
   X,
@@ -23,74 +20,38 @@ import {
   Trash2,
   Loader2,
   MessageSquare,
+  Sparkles,
+  Building2,
+  Save,
 } from "lucide-react";
 
-/* ── colour accent map for field cards ─────────────────────────── */
-const accentClasses = {
-  emerald: { bg: "bg-emerald-50", text: "text-emerald-600" },
-  blue: { bg: "bg-blue-50", text: "text-blue-600" },
-  violet: { bg: "bg-violet-50", text: "text-violet-600" },
-};
+/* ── Inline Field Item ───────────────────────────────────────────── */
+const CompactField = ({ icon: Icon, label, value, color = "emerald" }) => {
+  const colors = {
+    emerald: "bg-emerald-50 text-emerald-600 border-emerald-100",
+    blue: "bg-blue-50 text-blue-600 border-blue-100",
+    violet: "bg-violet-50 text-violet-600 border-violet-100",
+    slate: "bg-slate-100 text-slate-600 border-slate-200",
+  };
 
-/* ── read-only field card ──────────────────────────────────────── */
-const FieldCard = ({ icon: Icon, label, value, accent = "emerald" }) => {
-  const tone = accentClasses[accent] || accentClasses.emerald;
   return (
-    <div className="rounded-2xl border border-slate-200/70 bg-white p-4 shadow-sm">
-      <div className="flex items-start gap-3">
-        <div className={`rounded-xl p-2.5 ${tone.bg}`}>
-          <Icon className={`h-5 w-5 ${tone.text}`} />
-        </div>
-        <div className="min-w-0">
-          <p className="text-xs font-medium uppercase tracking-[0.16em] text-slate-400">
-            {label}
-          </p>
-          <p className="mt-1 break-words text-sm font-medium text-slate-800">
-            {value || "Not available"}
-          </p>
-        </div>
+    <div className="flex items-center gap-3 rounded-xl border border-slate-200/80 bg-slate-50/50 p-3 transition-all hover:bg-white hover:border-slate-300 hover:shadow-xs">
+      <div className={`rounded-lg border p-2 shrink-0 ${colors[color] || colors.emerald}`}>
+        <Icon className="h-4 w-4" />
+      </div>
+      <div className="min-w-0 flex-1">
+        <p className="text-[10px] font-bold uppercase tracking-wider text-slate-400">
+          {label}
+        </p>
+        <p className="truncate text-xs font-semibold text-slate-800">
+          {value || "—"}
+        </p>
       </div>
     </div>
   );
 };
 
-/* ── editable field card (inline input) ────────────────────────── */
-const EditableFieldCard = ({
-  icon: Icon,
-  label,
-  value,
-  onChange,
-  placeholder,
-  accent = "emerald",
-}) => {
-  const tone = accentClasses[accent] || accentClasses.emerald;
-  return (
-    <div className="rounded-2xl border-2 border-emerald-200 bg-white p-4 shadow-sm ring-1 ring-emerald-100 transition-all">
-      <div className="flex items-start gap-3">
-        <div className={`rounded-xl p-2.5 ${tone.bg}`}>
-          <Icon className={`h-5 w-5 ${tone.text}`} />
-        </div>
-        <div className="min-w-0 flex-1">
-          <p className="text-xs font-medium uppercase tracking-[0.16em] text-slate-400">
-            {label}
-          </p>
-          <input
-            type="text"
-            value={value || ""}
-            onChange={(e) => onChange(e.target.value)}
-            placeholder={placeholder}
-            className="mt-1 w-full rounded-lg border border-slate-200 bg-slate-50/80 px-3 py-1.5 text-sm font-medium text-slate-800 outline-none transition-colors placeholder:text-slate-300 focus:border-emerald-400 focus:bg-white focus:ring-2 focus:ring-emerald-100"
-          />
-        </div>
-      </div>
-    </div>
-  );
-};
-
-/* ── email card with its own inline editor ─────────────────────────
- Kept separate from the main Edit Profile form: changing this moves the
- login identity, so it saves on its own endpoint, is restricted to the
- company domain, and triggers a confirmation email. */
+/* ── Editable Email Inline Card ─────────────────────────────────── */
 const COMPANY_DOMAIN = "autonexai360.com";
 
 const EmailCard = ({ value, onSave, isSaving, error, onDismissError }) => {
@@ -98,7 +59,6 @@ const EmailCard = ({ value, onSave, isSaving, error, onDismissError }) => {
   const [draft, setDraft] = useState("");
 
   const start = () => {
-    // Pre-fill the local part so only the domain has to be corrected.
     const localPart = (value || "").split("@")[0] || "";
     setDraft(localPart ? `${localPart}@${COMPANY_DOMAIN}` : `@${COMPANY_DOMAIN}`);
     onDismissError();
@@ -123,28 +83,28 @@ const EmailCard = ({ value, onSave, isSaving, error, onDismissError }) => {
 
   if (!editing) {
     return (
-      <div className="rounded-2xl border border-slate-200/70 bg-white p-4 shadow-sm">
-        <div className="flex items-start gap-3">
-          <div className="rounded-xl bg-emerald-50 p-2.5">
-            <Mail className="h-5 w-5 text-emerald-600" />
+      <div className="flex items-center justify-between gap-3 rounded-xl border border-slate-200/80 bg-slate-50/50 p-3 transition-all hover:bg-white hover:border-slate-300 hover:shadow-xs">
+        <div className="flex items-center gap-3 min-w-0">
+          <div className="rounded-lg border border-emerald-100 bg-emerald-50 p-2 text-emerald-600 shrink-0">
+            <Mail className="h-4 w-4" />
           </div>
-          <div className="min-w-0 flex-1">
-            <p className="text-xs font-medium uppercase tracking-[0.16em] text-slate-400">
-              Email
+          <div className="min-w-0">
+            <p className="text-[10px] font-bold uppercase tracking-wider text-slate-400">
+              Login Email
             </p>
-            <p className="mt-1 break-words text-sm font-medium text-slate-800">
-              {value || "Not available"}
+            <p className="truncate text-xs font-semibold text-slate-800">
+              {value || "—"}
             </p>
           </div>
-          <button
-            type="button"
-            onClick={start}
-            title="Change your login email"
-            className="shrink-0 rounded-lg border border-emerald-200 bg-white p-1.5 text-emerald-700 transition-all hover:bg-emerald-50"
-          >
-            <Pencil className="h-3.5 w-3.5" />
-          </button>
         </div>
+        <button
+          type="button"
+          onClick={start}
+          title="Change login email"
+          className="shrink-0 rounded-lg border border-slate-200 bg-white p-1.5 text-slate-500 hover:border-emerald-300 hover:bg-emerald-50 hover:text-emerald-600 transition-colors"
+        >
+          <Pencil className="h-3 w-3" />
+        </button>
       </div>
     );
   }
@@ -152,76 +112,45 @@ const EmailCard = ({ value, onSave, isSaving, error, onDismissError }) => {
   return (
     <form
       onSubmit={submit}
-      className="rounded-2xl border-2 border-emerald-200 bg-white p-4 shadow-sm ring-1 ring-emerald-100"
+      className="col-span-full rounded-xl border-2 border-emerald-400 bg-emerald-50/40 p-3 shadow-xs"
     >
-      <div className="flex items-start gap-3">
-        <div className="rounded-xl bg-emerald-50 p-2.5">
-          <Mail className="h-5 w-5 text-emerald-600" />
-        </div>
-        <div className="min-w-0 flex-1">
-          <p className="text-xs font-medium uppercase tracking-[0.16em] text-slate-400">
-            Email
-          </p>
-          <input
-            type="email"
-            autoFocus
-            value={draft}
-            onChange={(e) => setDraft(e.target.value)}
-            placeholder={`you@${COMPANY_DOMAIN}`}
-            className="mt-1 w-full rounded-lg border border-slate-200 bg-slate-50/80 px-3 py-1.5 text-sm font-medium text-slate-800 outline-none transition-colors placeholder:text-slate-300 focus:border-emerald-400 focus:bg-white focus:ring-2 focus:ring-emerald-100"
-          />
-
-          {trimmed && !domainOk ? (
-            <p className="mt-2 flex items-start gap-1.5 text-xs font-medium text-rose-600">
-              <Info className="mt-0.5 h-3.5 w-3.5 shrink-0" />
-              Must be a @{COMPANY_DOMAIN} address.
-            </p>
-          ) : (
-            <p className="mt-2 text-xs text-slate-400">
-              Only @{COMPANY_DOMAIN} addresses. Your password stays the same —
-              you'll sign in with the new email.
-            </p>
-          )}
-
-          {error && (
-            <p className="mt-2 flex items-start gap-1.5 text-xs font-medium text-rose-600">
-              <X className="mt-0.5 h-3.5 w-3.5 shrink-0" />
-              {error}
-            </p>
-          )}
-
-          <div className="mt-3 flex items-center gap-2">
-            <Button
-              variant="success"
-              size="sm"
-              type="submit"
-              disabled={!canSave}
-              isLoading={isSaving}
-            >
-              {!isSaving && <Save className="h-3.5 w-3.5" />}
-              {isSaving ? "Saving…" : "Save email"}
-            </Button>
-            <button
-              type="button"
-              onClick={cancel}
-              disabled={isSaving}
-              className="rounded-lg border border-slate-200 bg-white px-3 py-1.5 text-xs font-semibold text-slate-600 transition-all hover:bg-slate-50 disabled:opacity-50"
-            >
-              Cancel
-            </button>
-          </div>
-        </div>
+      <div className="flex items-center justify-between">
+        <p className="text-[10px] font-bold uppercase tracking-wider text-emerald-700">
+          Update Login Email
+        </p>
+        <button type="button" onClick={cancel} className="text-slate-400 hover:text-slate-600">
+          <X className="h-3.5 w-3.5" />
+        </button>
       </div>
+      <div className="mt-2 flex items-center gap-2">
+        <input
+          type="email"
+          autoFocus
+          value={draft}
+          onChange={(e) => setDraft(e.target.value)}
+          placeholder={`you@${COMPANY_DOMAIN}`}
+          className="w-full rounded-lg border border-slate-200 bg-white px-3 py-1.5 text-xs font-medium text-slate-800 outline-none focus:border-emerald-500 focus:ring-1 focus:ring-emerald-500"
+        />
+        <Button
+          variant="success"
+          size="sm"
+          type="submit"
+          disabled={!canSave}
+          isLoading={isSaving}
+        >
+          Save
+        </Button>
+      </div>
+      {error && <p className="mt-1 text-[11px] font-medium text-rose-600">{error}</p>}
     </form>
   );
 };
 
-/* ── skills multi-select dropdown ──────────────────────────────── */
+/* ── Skills Multi-Select Inline Component ────────────────────────── */
 const SkillsMultiSelect = ({ selected, onChange, options, isLoading }) => {
   const [open, setOpen] = useState(false);
   const ref = useRef(null);
 
-  /* close on outside click */
   useEffect(() => {
     const handler = (e) => {
       if (ref.current && !ref.current.contains(e.target)) setOpen(false);
@@ -234,60 +163,43 @@ const SkillsMultiSelect = ({ selected, onChange, options, isLoading }) => {
     onChange(
       selected.includes(skillName)
         ? selected.filter((s) => s !== skillName)
-        : [...selected, skillName],
+        : [...selected, skillName]
     );
   };
 
   return (
-    <div ref={ref} className="relative">
-      {/* selected chips */}
-      {selected.length > 0 && (
-        <div className="mb-3 flex flex-wrap gap-2">
-          {selected.map((skill) => (
-            <span
-              key={skill}
-              className="inline-flex items-center gap-1.5 rounded-full border border-emerald-200 bg-emerald-50 px-3 py-1 text-sm font-medium text-emerald-700 transition-colors hover:bg-emerald-100"
+    <div ref={ref} className="relative w-full">
+      <div className="mb-2 flex flex-wrap gap-1.5">
+        {selected.map((skill) => (
+          <span
+            key={skill}
+            className="inline-flex items-center gap-1 rounded-md border border-emerald-200 bg-emerald-50 px-2 py-0.5 text-xs font-semibold text-emerald-800"
+          >
+            {skill}
+            <button
+              type="button"
+              onClick={() => toggle(skill)}
+              className="rounded text-emerald-600 hover:bg-emerald-200 hover:text-emerald-900"
             >
-              {skill}
-              <button
-                type="button"
-                onClick={() => toggle(skill)}
-                className="rounded-full p-0.5 transition-colors hover:bg-emerald-200"
-              >
-                <X className="h-3 w-3" />
-              </button>
-            </span>
-          ))}
-        </div>
-      )}
+              <X className="h-3 w-3" />
+            </button>
+          </span>
+        ))}
+      </div>
 
-      {/* trigger button */}
       <button
         type="button"
         onClick={() => setOpen((v) => !v)}
-        className="flex w-full items-center justify-between rounded-xl border-2 border-emerald-200 bg-white px-4 py-2.5 text-left text-sm font-medium text-slate-600 shadow-sm transition-all hover:border-emerald-300 hover:shadow focus:border-emerald-400 focus:ring-2 focus:ring-emerald-100"
+        className="flex w-full items-center justify-between rounded-lg border border-slate-200 bg-white px-3 py-1.5 text-xs font-medium text-slate-700 hover:border-emerald-300 focus:outline-none"
       >
-        <span>
-          {selected.length > 0
-            ? `${selected.length} skill${selected.length > 1 ? "s" : ""} selected`
-            : "Select skills…"}
-        </span>
-        <ChevronDown
-          className={`h-4 w-4 text-slate-400 transition-transform ${open ? "rotate-180" : ""}`}
-        />
+        <span className="text-slate-400">Add or remove skills…</span>
+        <ChevronDown className={`h-3.5 w-3.5 text-slate-400 transition-transform ${open ? "rotate-180" : ""}`} />
       </button>
 
-      {/* dropdown panel */}
       {open && (
-        <div className="absolute left-0 right-0 z-30 mt-2 max-h-64 overflow-y-auto rounded-xl border border-slate-200 bg-white py-1 shadow-xl animate-in fade-in slide-in-from-top-2">
+        <div className="absolute left-0 right-0 z-30 mt-1 max-h-48 overflow-y-auto rounded-xl border border-slate-200 bg-white py-1 shadow-lg">
           {isLoading ? (
-            <div className="px-4 py-6 text-center text-sm text-slate-400">
-              Loading skills…
-            </div>
-          ) : options.length === 0 ? (
-            <div className="px-4 py-6 text-center text-sm text-slate-400">
-              No skills available
-            </div>
+            <div className="p-3 text-center text-xs text-slate-400">Loading skills…</div>
           ) : (
             options.map((skill) => {
               const isSelected = selected.includes(skill.name);
@@ -296,18 +208,16 @@ const SkillsMultiSelect = ({ selected, onChange, options, isLoading }) => {
                   key={skill.id}
                   type="button"
                   onClick={() => toggle(skill.name)}
-                  className={`flex w-full items-center gap-3 px-4 py-2.5 text-left text-sm transition-colors ${isSelected
-                    ? "bg-emerald-50 font-medium text-emerald-800"
-                    : "text-slate-700 hover:bg-slate-50"
-                    }`}
+                  className={`flex w-full items-center gap-2 px-3 py-1.5 text-left text-xs transition-colors ${
+                    isSelected ? "bg-emerald-50 font-semibold text-emerald-800" : "hover:bg-slate-50 text-slate-700"
+                  }`}
                 >
                   <div
-                    className={`flex h-5 w-5 shrink-0 items-center justify-center rounded-md border-2 transition-all ${isSelected
-                      ? "border-emerald-500 bg-emerald-500 text-white"
-                      : "border-slate-300 bg-white"
-                      }`}
+                    className={`flex h-3.5 w-3.5 items-center justify-center rounded border ${
+                      isSelected ? "border-emerald-600 bg-emerald-600 text-white" : "border-slate-300"
+                    }`}
                   >
-                    {isSelected && <Check className="h-3 w-3" />}
+                    {isSelected && <Check className="h-2.5 w-2.5" />}
                   </div>
                   {skill.name}
                 </button>
@@ -321,14 +231,14 @@ const SkillsMultiSelect = ({ selected, onChange, options, isLoading }) => {
 };
 
 /* ══════════════════════════════════════════════════════════════════
- PROFILE PAGE
+ MAIN HIGH-DENSITY PROFILE PAGE
  ══════════════════════════════════════════════════════════════════ */
 const ProfilePage = () => {
   const queryClient = useQueryClient();
   const localUser = JSON.parse(localStorage.getItem("user") || "{}");
   const employeeId = localUser.employee_id;
 
-  /* ── data queries ──────────────────────────────────────────── */
+  /* ── Queries ────────────────────────────────────────────────── */
   const { data: account, isLoading: accountLoading } = useQuery({
     queryKey: ["auth-me"],
     queryFn: authApi.me,
@@ -347,7 +257,7 @@ const ProfilePage = () => {
 
   const isLoading = accountLoading || employeeLoading;
 
-  /* ── merged display profile ────────────────────────────────── */
+  /* ── Merged Profile State ───────────────────────────────────── */
   const mergedProfile = {
     name: account?.name || employee?.name || localUser.name,
     email: account?.email || employee?.email || localUser.email,
@@ -366,7 +276,7 @@ const ProfilePage = () => {
       employee?.avatar_url || account?.avatar_url || localUser.avatar_url || "",
   };
 
-  /* ── edit mode state ───────────────────────────────────────── */
+  /* ── Edit Form State ────────────────────────────────────────── */
   const [isEditing, setIsEditing] = useState(false);
   const [editPhone, setEditPhone] = useState("");
   const [editSkills, setEditSkills] = useState([]);
@@ -375,7 +285,6 @@ const ProfilePage = () => {
   const [saveError, setSaveError] = useState("");
   const [saveSuccess, setSaveSuccess] = useState(false);
 
-  /* populate form when entering edit mode */
   const enterEditMode = () => {
     setEditPhone(mergedProfile.phone || "");
     setEditSkills([...(mergedProfile.skills || [])]);
@@ -391,13 +300,11 @@ const ProfilePage = () => {
     setSaveError("");
   };
 
-  /* ── save mutation ─────────────────────────────────────────── */
+  /* ── Save Profile Mutation ──────────────────────────────────── */
   const saveMutation = useMutation({
     mutationFn: (data) => employeeApi.update(employeeId, data),
     onSuccess: () => {
-      queryClient.invalidateQueries({
-        queryKey: ["employee-profile", employeeId],
-      });
+      queryClient.invalidateQueries({ queryKey: ["employee-profile", employeeId] });
       queryClient.invalidateQueries({ queryKey: ["auth-me"] });
       setIsEditing(false);
       setSaveError("");
@@ -405,10 +312,7 @@ const ProfilePage = () => {
       setTimeout(() => setSaveSuccess(false), 3000);
     },
     onError: (err) => {
-      setSaveError(
-        err?.response?.data?.detail ||
-        "Failed to save changes. Please try again.",
-      );
+      setSaveError(err?.response?.data?.detail || "Failed to save changes.");
     },
   });
 
@@ -421,81 +325,62 @@ const ProfilePage = () => {
     });
   };
 
-  /* ── login email change (own endpoint, own state) ──────────── */
+  /* ── Email Change Mutation ──────────────────────────────────── */
   const [emailError, setEmailError] = useState("");
-  const [emailChangedTo, setEmailChangedTo] = useState("");
 
   const changeEmailMutation = useMutation({
     mutationFn: (newEmail) => employeeApi.changeEmail(employeeId, newEmail),
     onSuccess: (updated) => {
-      // The cached user drives the header and API calls, so keep it in step with
-      // the new login identity rather than waiting for the next sign-in.
       try {
         const cached = JSON.parse(localStorage.getItem("user") || "{}");
-        localStorage.setItem(
-          "user",
-          JSON.stringify({ ...cached, email: updated.email }),
-        );
-      } catch {
-        /* a corrupt cache shouldn't block the change that already succeeded */
-      }
+        localStorage.setItem("user", JSON.stringify({ ...cached, email: updated.email }));
+      } catch {}
       queryClient.invalidateQueries({ queryKey: ["auth-me"] });
-      queryClient.invalidateQueries({
-        queryKey: ["employee-profile", employeeId],
-      });
+      queryClient.invalidateQueries({ queryKey: ["employee-profile", employeeId] });
       setEmailError("");
-      setEmailChangedTo(updated.email);
     },
     onError: (err) => {
-      setEmailError(
-        err?.response?.data?.detail ||
-          "Could not change your email. Please try again.",
-      );
+      setEmailError(err?.response?.data?.detail || "Could not change email.");
     },
   });
 
   const handleChangeEmail = (newEmail, closeEditor) => {
-    setEmailChangedTo("");
     changeEmailMutation.mutate(newEmail, { onSuccess: closeEditor });
   };
 
-  /* ── avatar (profile picture) ──────────────────────────────── */
+  /* ── Avatar Mutations & Handlers ────────────────────────────── */
   const fileInputRef = useRef(null);
   const [avatarError, setAvatarError] = useState("");
 
   const onAvatarSuccess = () => {
-    queryClient.invalidateQueries({
-      queryKey: ["employee-profile", employeeId],
-    });
+    queryClient.invalidateQueries({ queryKey: ["employee-profile", employeeId] });
     queryClient.invalidateQueries({ queryKey: ["auth-me"] });
     setAvatarError("");
   };
-  const onAvatarError = (err) =>
-    setAvatarError(
-      err?.response?.data?.detail || "Failed to update profile picture.",
-    );
 
   const uploadAvatarMutation = useMutation({
     mutationFn: (formData) => employeeApi.uploadAvatar(employeeId, formData),
     onSuccess: onAvatarSuccess,
-    onError: onAvatarError,
+    onError: (err) => setAvatarError(err?.response?.data?.detail || "Upload failed."),
   });
+
   const slackAvatarMutation = useMutation({
     mutationFn: () => employeeApi.setAvatarFromSlack(employeeId),
     onSuccess: onAvatarSuccess,
-    onError: onAvatarError,
+    onError: (err) => setAvatarError(err?.response?.data?.detail || "Slack sync failed."),
   });
+
   const deleteAvatarMutation = useMutation({
     mutationFn: () => employeeApi.deleteAvatar(employeeId),
     onSuccess: onAvatarSuccess,
-    onError: onAvatarError,
+    onError: (err) => setAvatarError(err?.response?.data?.detail || "Delete failed."),
   });
 
   const handleAvatarFile = (e) => {
     const file = e.target.files?.[0];
     if (!file) return;
     if (file.size > 5 * 1024 * 1024) {
-      setAvatarError("Image is too large (max 5 MB).");
+      setAvatarError("Max size 5 MB.");
       return;
     }
     const formData = new FormData();
@@ -509,429 +394,306 @@ const ProfilePage = () => {
     slackAvatarMutation.isPending ||
     deleteAvatarMutation.isPending;
 
-  /* ── render ─────────────────────────────────────────────────── */
   return (
-    <div className="space-y-8">
-      {/* ── hero header ───────────────────────────────────── */}
-      <div>
-        <div className="flex flex-col gap-6 lg:flex-row lg:items-center lg:justify-between">
-          <div className="flex items-center gap-4">
-            <div className="group/avatar relative h-20 w-20 shrink-0">
-              {/* hidden file input */}
-              <input
-                ref={fileInputRef}
-                type="file"
-                accept="image/png,image/jpeg,image/gif,image/webp"
-                className="hidden"
-                onChange={handleAvatarFile}
-              />
-              <UserAvatar
-                src={mergedProfile.avatarUrl}
-                name={mergedProfile.name}
-                size="xl"
-                className="h-20 w-20 shadow-[0_16px_40px_rgba(5,150,105,0.24)] !rounded-3xl"
-                fallbackClassName="bg-emerald-600 text-white shadow-[0_16px_40px_rgba(5,150,105,0.24)] !rounded-3xl"
-                imgClassName="!rounded-3xl"
-              />
-
-              {/* hover overlay to change picture */}
-              <button
-                type="button"
-                onClick={() => fileInputRef.current?.click()}
-                disabled={avatarBusy || !employeeId}
-                title="Change profile picture"
-                className="absolute inset-0 flex items-center justify-center rounded-3xl bg-slate-900/55 text-white opacity-0 transition-opacity group-hover/avatar:opacity-100 disabled:cursor-not-allowed"
-              >
-                {avatarBusy ? (
-                  <Loader2 className="h-5 w-5 animate-spin" />
-                ) : (
-                  <Camera className="h-5 w-5" />
-                )}
-              </button>
-            </div>
-            <div>
-              <h1 className="text-lg font-semibold text-slate-900">
-                {mergedProfile.name || "Employee"}
-              </h1>
-              <p className="text-slate-500 text-[13px] mt-0.5">
-                Your account and work details in one place.
-              </p>
-
-              {/* avatar actions */}
-              <div className="mt-3 flex flex-wrap items-center gap-2">
-                <button
-                  type="button"
-                  onClick={() => fileInputRef.current?.click()}
-                  disabled={avatarBusy || !employeeId}
-                  className="inline-flex items-center gap-1.5 rounded-lg border border-emerald-200 bg-white px-3 py-1.5 text-xs font-semibold text-emerald-700 transition-all hover:bg-emerald-50 disabled:cursor-not-allowed disabled:opacity-50"
-                >
-                  <Camera className="h-3.5 w-3.5" />
-                  Upload photo
-                </button>
-                <button
-                  type="button"
-                  onClick={() => slackAvatarMutation.mutate()}
-                  disabled={avatarBusy || !employeeId}
-                  title="Fetch your photo from Slack"
-                  className="inline-flex items-center gap-1.5 rounded-lg border border-violet-200 bg-white px-3 py-1.5 text-xs font-semibold text-violet-700 transition-all hover:bg-violet-50 disabled:cursor-not-allowed disabled:opacity-50"
-                >
-                  <MessageSquare className="h-3.5 w-3.5" />
-                  Use Slack photo
-                </button>
-                {mergedProfile.avatarUrl && (
-                  <button
-                    type="button"
-                    onClick={() => deleteAvatarMutation.mutate()}
-                    disabled={avatarBusy}
-                    className="inline-flex items-center gap-1.5 rounded-lg border border-slate-200 bg-white px-3 py-1.5 text-xs font-semibold text-slate-500 transition-all hover:bg-rose-50 hover:text-rose-600 disabled:cursor-not-allowed disabled:opacity-50"
-                  >
-                    <Trash2 className="h-3.5 w-3.5" />
-                    Remove
-                  </button>
-                )}
-              </div>
-              {avatarError && (
-                <p className="mt-2 text-xs font-medium text-rose-600">
-                  {avatarError}
-                </p>
-              )}
-            </div>
-          </div>
-
-          <div className="flex items-center gap-3">
-            {/* edit / save / cancel controls */}
-            {!isEditing ? (
-              <button
-                type="button"
-                onClick={enterEditMode}
-                disabled={isLoading || !employeeId}
-                className="inline-flex items-center gap-2 rounded-xl border border-emerald-200 bg-white px-4 py-2.5 text-sm font-semibold text-emerald-700 shadow-sm transition-all hover:border-emerald-300 hover:bg-emerald-50 hover:shadow disabled:cursor-not-allowed disabled:opacity-40"
-              >
-                <Pencil className="h-4 w-4" />
-                Edit Profile
-              </button>
-            ) : (
-              <>
-                <button
-                  type="button"
-                  onClick={cancelEdit}
-                  className="inline-flex items-center gap-2 rounded-xl border border-slate-200 bg-white px-4 py-2.5 text-sm font-semibold text-slate-600 shadow-sm transition-all hover:bg-slate-50"
-                >
-                  <X className="h-4 w-4" />
-                  Cancel
-                </button>
-                <Button
-                  variant="success"
-                  type="button"
-                  onClick={handleSave}
-                  disabled={saveMutation.isPending}
-                  isLoading={saveMutation.isPending}
-                >
-                  {!saveMutation.isPending && <Save className="h-4 w-4" />}
-                  {saveMutation.isPending ? "Saving…" : "Save"}
-                </Button>
-              </>
-            )}
-
-            <div className="rounded-2xl border border-slate-200 bg-white px-4 py-3 text-sm text-slate-600 shadow-sm">
-              <p>
-                <span className="font-semibold text-slate-800">Role:</span>{" "}
-                {mergedProfile.role}
-              </p>
-              <p className="mt-1">
-                <span className="font-semibold text-slate-800">
-                  Employee ID:
-                </span>{" "}
-                {mergedProfile.employeeId || "Pending"}
-              </p>
-            </div>
-          </div>
-        </div>
-      </div>
-
-      {/* ── success / error banners ────────────────────────── */}
-      {saveSuccess && (
-        <div className="flex items-center gap-3 rounded-2xl border border-emerald-200 bg-emerald-50 px-5 py-3 text-sm font-medium text-emerald-700 shadow-sm animate-in fade-in slide-in-from-top-2">
-          <Check className="h-5 w-5 shrink-0" />
-          Profile updated successfully!
-        </div>
-      )}
-      {saveError && (
-        <div className="flex items-center gap-3 rounded-2xl border border-rose-200 bg-rose-50 px-5 py-3 text-sm font-medium text-rose-700 shadow-sm animate-in fade-in slide-in-from-top-2">
-          <X className="h-5 w-5 shrink-0" />
-          {saveError}
-        </div>
-      )}
-      {emailChangedTo && (
-        <div className="flex items-start gap-3 rounded-2xl border border-emerald-200 bg-emerald-50 px-5 py-3 text-sm text-emerald-800 shadow-sm animate-in fade-in slide-in-from-top-2">
-          <Check className="mt-0.5 h-5 w-5 shrink-0 text-emerald-600" />
-          <div>
-            <p className="font-semibold">
-              Your login email is now {emailChangedTo}
-            </p>
-            <p className="mt-0.5 text-emerald-700/90">
-              A confirmation was sent there. Next time, sign in with this address
-              and your <strong>existing password</strong> — it hasn't changed.
-            </p>
-          </div>
-          <button
-            type="button"
-            onClick={() => setEmailChangedTo("")}
-            className="ml-auto shrink-0 rounded-lg p-1 text-emerald-600 transition-colors hover:bg-emerald-100"
-          >
-            <X className="h-4 w-4" />
-          </button>
-        </div>
-      )}
-
+    <div className="mx-auto max-w-6xl space-y-4 pb-6">
       {isLoading ? (
-        <div className="rounded-2xl border border-slate-200 bg-white p-10 text-center text-sm text-slate-400 shadow-sm">
-          Loading profile details...
+        <div className="flex flex-col items-center justify-center py-20">
+          <Loader2 className="h-8 w-8 animate-spin text-emerald-600" />
+          <p className="mt-2 text-xs font-semibold text-slate-400">Loading Profile Details...</p>
         </div>
       ) : (
         <>
-          {/* ── info cards grid ────────────────────────── */}
-          <section className="grid gap-4 md:grid-cols-2 xl:grid-cols-3">
-            {/* Name — always read-only */}
-            <FieldCard
-              icon={UserRound}
-              label="Full Name"
-              value={mergedProfile.name}
-            />
+          {/* Notifications / Alerts */}
+          {saveSuccess && (
+            <div className="flex items-center gap-2 rounded-xl border border-emerald-200 bg-emerald-50 px-4 py-2.5 text-xs font-semibold text-emerald-800 shadow-xs">
+              <Check className="h-4 w-4 text-emerald-600 shrink-0" /> Details saved successfully!
+            </div>
+          )}
+          {saveError && (
+            <div className="flex items-center gap-2 rounded-xl border border-rose-200 bg-rose-50 px-4 py-2.5 text-xs font-semibold text-rose-800 shadow-xs">
+              <X className="h-4 w-4 text-rose-600 shrink-0" /> {saveError}
+            </div>
+          )}
 
-            {/* Email — self-service, company domain only */}
-            <EmailCard
-              value={mergedProfile.email}
-              onSave={handleChangeEmail}
-              isSaving={changeEmailMutation.isPending}
-              error={emailError}
-              onDismissError={() => setEmailError("")}
-            />
-
-            {/* Phone — editable */}
-            {isEditing ? (
-              <EditableFieldCard
-                icon={Phone}
-                label="Phone Number"
-                value={editPhone}
-                onChange={setEditPhone}
-                placeholder="+91 XXXXX XXXXX"
-              />
-            ) : (
-              <FieldCard
-                icon={Phone}
-                label="Phone Number"
-                value={mergedProfile.phone}
-              />
-            )}
-
-            {/* Role — always read-only */}
-            <FieldCard
-              icon={ShieldCheck}
-              label="Role"
-              value={mergedProfile.role}
-              accent="blue"
-            />
-
-            {/* Designation — always read-only */}
-            <FieldCard
-              icon={Briefcase}
-              label="Designation"
-              value={mergedProfile.designation}
-              accent="blue"
-            />
-
-            {/* Status — always read-only */}
-            <FieldCard
-              icon={BadgeCheck}
-              label="Status"
-              value={mergedProfile.status}
-            />
-
-            {/* Encord ID — editable */}
-            {isEditing ? (
-              <EditableFieldCard
-                icon={Mail}
-                label="Encord ID / Email"
-                value={editEncordId}
-                onChange={setEditEncordId}
-                placeholder="john.encord@example.com"
-              />
-            ) : (
-              <FieldCard
-                icon={Mail}
-                label="Encord ID / Email"
-                value={mergedProfile.encordId}
-              />
-            )}
-
-            {/* Slack User ID — editable */}
-            {isEditing ? (
-              <div className="space-y-3 xl:col-span-2">
-                <EditableFieldCard
-                  icon={Hash}
-                  label="Slack User ID"
-                  value={editSlackId}
-                  onChange={setEditSlackId}
-                  placeholder="e.g. U0123ABC456"
-                  accent="violet"
-                />
-                {/* How-to guide */}
-                <details className="group rounded-2xl border border-violet-100 bg-violet-50/50">
-                  <summary className="flex cursor-pointer items-center gap-2.5 px-4 py-3 text-sm font-medium text-violet-700 select-none [&::-webkit-details-marker]:hidden">
-                    <Info className="h-4 w-4 shrink-0 text-violet-500" />
-                    <span>How to find your Slack User ID</span>
-                    <ChevronDown className="ml-auto h-4 w-4 text-violet-400 transition-transform group-open:rotate-180" />
-                  </summary>
-                  <div className="border-t border-violet-100 px-4 pb-4 pt-3">
-                    <ol className="space-y-2.5 text-sm text-slate-600">
-                      <li className="flex gap-3">
-                        <span className="flex h-6 w-6 shrink-0 items-center justify-center rounded-full bg-violet-100 text-xs font-bold text-violet-600">
-                          1
-                        </span>
-                        <span>
-                          Open <strong className="text-slate-800">Slack</strong>{" "}
-                          (desktop or web app).
-                        </span>
-                      </li>
-                      <li className="flex gap-3">
-                        <span className="flex h-6 w-6 shrink-0 items-center justify-center rounded-full bg-violet-100 text-xs font-bold text-violet-600">
-                          2
-                        </span>
-                        <span>
-                          Click on your{" "}
-                          <strong className="text-slate-800">
-                            profile picture
-                          </strong>{" "}
-                          in the top-right corner, then select{" "}
-                          <strong className="text-slate-800">Profile</strong>.
-                        </span>
-                      </li>
-                      <li className="flex gap-3">
-                        <span className="flex h-6 w-6 shrink-0 items-center justify-center rounded-full bg-violet-100 text-xs font-bold text-violet-600">
-                          3
-                        </span>
-                        <span>
-                          In the profile panel, click the{" "}
-                          <strong className="text-slate-800">three dots</strong>{" "}
-                          or <strong className="text-slate-800">More</strong>{" "}
-                          button.
-                        </span>
-                      </li>
-                      <li className="flex gap-3">
-                        <span className="flex h-6 w-6 shrink-0 items-center justify-center rounded-full bg-violet-100 text-xs font-bold text-violet-600">
-                          4
-                        </span>
-                        <span>
-                          Click{" "}
-                          <strong className="text-slate-800">
-                            Copy member ID
-                          </strong>{" "}
-                          and paste it here. It looks like{" "}
-                          <code className="rounded bg-violet-100 px-1.5 py-0.5 font-mono text-xs text-violet-700">
-                            U0123ABC456
-                          </code>
-                          .
-                        </span>
-                      </li>
-                    </ol>
-                  </div>
-                </details>
-              </div>
-            ) : (
-              <FieldCard
-                icon={Hash}
-                label="Slack User ID"
-                value={mergedProfile.slackUserId}
-                accent="violet"
-              />
-            )}
-          </section>
-
-          {/* ── bottom sections ────────────────────────── */}
-          <section className="grid gap-6 xl:grid-cols-[1.1fr,0.9fr]">
-            {/* work details — always read-only */}
-            <div className="rounded-3xl border border-slate-200/70 bg-white p-6 shadow-sm">
-              <div className="mb-5">
-                <h2 className="text-lg font-semibold text-slate-900">
-                  Work Details
-                </h2>
-                <p className="mt-1 text-sm text-slate-500">
-                  Employment and availability information connected to your
-                  account.
-                </p>
-              </div>
-              <div className="grid gap-4 md:grid-cols-2">
-                <div className="rounded-2xl bg-slate-50 p-4">
-                  <p className="text-xs font-medium uppercase tracking-[0.16em] text-slate-400">
-                    Employee Type
-                  </p>
-                  <p className="mt-2 text-sm font-medium text-slate-800">
-                    {mergedProfile.employeeType || "Not available"}
-                  </p>
-                </div>
-                <div className="rounded-2xl bg-slate-50 p-4">
-                  <p className="text-xs font-medium uppercase tracking-[0.16em] text-slate-400">
-                    Weekly Availability
-                  </p>
-                  <p className="mt-2 text-sm font-medium text-slate-800">
-                    {mergedProfile.weeklyAvailability
-                      ? `${mergedProfile.weeklyAvailability} hours`
-                      : "Not available"}
-                  </p>
-                </div>
-                <div className="rounded-2xl bg-slate-50 p-4">
-                  <div className="flex items-center gap-2">
-                    <Clock3 className="h-4 w-4 text-emerald-600" />
-                    <p className="text-xs font-medium uppercase tracking-[0.16em] text-slate-400">
-                      Working Hours Per Day
-                    </p>
-                  </div>
-                  <p className="mt-2 text-sm font-medium text-slate-800">
-                    {mergedProfile.workingHours
-                      ? `${mergedProfile.workingHours} hours/day`
-                      : "Not available"}
-                  </p>
-                </div>
+          {/* ════════════════════════════════════════════════════════
+             TOP HERO BANNER & PROFILE CARD HEADER
+             ════════════════════════════════════════════════════════ */}
+          <div className="overflow-hidden rounded-3xl border border-slate-200/80 bg-white shadow-xs">
+            {/* Header Cover Art Accent */}
+            <div className="h-28 bg-gradient-to-r from-[#0b6f4a] via-[#0d7b52] to-[#0f8a5a] px-6 pt-4 text-white">
+              <div className="flex justify-between items-start">
+                <span className="inline-flex items-center gap-1.5 rounded-full bg-black/20 px-3 py-1 text-[11px] font-semibold text-emerald-100 backdrop-blur-md">
+                  <Building2 className="h-3.5 w-3.5" /> AutoNex AI 360
+                </span>
               </div>
             </div>
 
-            {/* skills — editable in edit mode */}
-            <div className="rounded-3xl border border-slate-200/70 bg-white p-6 shadow-sm">
-              <div className="mb-5">
-                <h2 className="text-lg font-semibold text-slate-900">Skills</h2>
-                <p className="mt-1 text-sm text-slate-500">
-                  {isEditing
-                    ? "Select your skills from the approved list below."
-                    : "Skills captured in your employee profile."}
-                </p>
-              </div>
+            {/* Profile Avatar & Info Overlay Header */}
+            <div className="px-6 pb-6 pt-0">
+              <div className="flex flex-col sm:flex-row items-center sm:items-end gap-5 -mt-14">
+                
+                {/* ENLARGED PROFILE IMAGE CONTAINER */}
+                <div className="relative h-44 w-44 sm:h-52 sm:w-52 shrink-0 rounded-2xl border-4 border-white bg-slate-100 shadow-md ring-1 ring-slate-200 group overflow-hidden">
+                  <input
+                    ref={fileInputRef}
+                    type="file"
+                    accept="image/png,image/jpeg,image/gif,image/webp"
+                    className="hidden"
+                    onChange={handleAvatarFile}
+                  />
 
-              {isEditing ? (
-                <SkillsMultiSelect
-                  selected={editSkills}
-                  onChange={setEditSkills}
-                  options={skillsList}
-                  isLoading={skillsLoading}
-                />
-              ) : mergedProfile.skills.length > 0 ? (
-                <div className="flex flex-wrap gap-2">
-                  {mergedProfile.skills.map((skill) => (
-                    <span
-                      key={skill}
-                      className="rounded-full border border-emerald-100 bg-emerald-50 px-3 py-1.5 text-sm font-medium text-emerald-700"
+                  {/* Profile Image View */}
+                  <UserAvatar
+                    src={mergedProfile.avatarUrl}
+                    name={mergedProfile.name}
+                    className="h-full w-full object-cover"
+                    fallbackClassName="bg-emerald-700 text-white font-black text-6xl h-full w-full flex items-center justify-center"
+                    imgClassName="h-full w-full object-cover"
+                  />
+
+                  {/* Quick Change Overlay Button */}
+                  <button
+                    type="button"
+                    onClick={() => fileInputRef.current?.click()}
+                    disabled={avatarBusy}
+                    className="absolute inset-0 z-10 flex flex-col items-center justify-center bg-slate-900/65 text-white opacity-0 transition-opacity duration-200 group-hover:opacity-100 disabled:cursor-not-allowed"
+                  >
+                    {avatarBusy ? (
+                      <Loader2 className="h-8 w-8 animate-spin" />
+                    ) : (
+                      <>
+                        <Camera className="h-7 w-7" />
+                        <span className="mt-1.5 text-xs font-bold uppercase tracking-wider">
+                          Change Photo
+                        </span>
+                      </>
+                    )}
+                  </button>
+                </div>
+
+                {/* Main Hero Header Info */}
+                <div className="flex-1 text-center sm:text-left min-w-0 mb-1">
+                  <div className="flex flex-col sm:flex-row sm:items-center gap-2 justify-between">
+                    <div>
+                      <h1 className="text-2xl font-black tracking-tight text-slate-900">
+                        {mergedProfile.name || "Employee Profile"}
+                      </h1>
+                      <p className="text-sm font-semibold text-slate-500 flex items-center justify-center sm:justify-start gap-1.5 mt-0.5">
+                        <span>{mergedProfile.designation || "Team Member"}</span>
+                        <span className="text-slate-300">•</span>
+                        <span className="text-slate-400 capitalize">{mergedProfile.role}</span>
+                      </p>
+                    </div>
+
+                    <div className="flex items-center justify-center sm:justify-end gap-1.5 mt-2 sm:mt-0">
+                      <span className="rounded-full border border-emerald-200 bg-emerald-50 px-3 py-1 text-xs font-bold text-emerald-700 capitalize">
+                        ● {mergedProfile.status || "Active"}
+                      </span>
+                      <span className="rounded-full border border-slate-200 bg-slate-100 px-3 py-1 text-xs font-bold text-slate-700 uppercase tracking-wider">
+                        ID: {mergedProfile.employeeId || "—"}
+                      </span>
+                    </div>
+                  </div>
+
+                  {/* Photo Action Bar */}
+                  <div className="mt-4 flex flex-wrap items-center justify-center sm:justify-start gap-2">
+                    <button
+                      type="button"
+                      onClick={() => slackAvatarMutation.mutate()}
+                      disabled={avatarBusy}
+                      className="inline-flex items-center gap-1.5 rounded-lg border border-violet-200 bg-violet-50/70 px-2.5 py-1 text-xs font-semibold text-violet-700 hover:bg-violet-100 transition-colors"
                     >
-                      {skill}
-                    </span>
-                  ))}
+                      <MessageSquare className="h-3.5 w-3.5" /> Sync Slack Photo
+                    </button>
+                    
+                    {mergedProfile.avatarUrl && (
+                      <button
+                        type="button"
+                        onClick={() => deleteAvatarMutation.mutate()}
+                        disabled={avatarBusy}
+                        className="inline-flex items-center gap-1 rounded-lg border border-slate-200 bg-white px-2.5 py-1 text-xs font-semibold text-slate-500 hover:text-rose-600 hover:border-rose-200 transition-colors"
+                      >
+                        <Trash2 className="h-3.5 w-3.5" /> Remove Photo
+                      </button>
+                    )}
+                    {avatarError && (
+                      <span className="text-xs font-medium text-rose-600 ml-1">{avatarError}</span>
+                    )}
+                  </div>
                 </div>
-              ) : (
-                <div className="rounded-2xl border border-dashed border-slate-200 bg-slate-50 p-5 text-sm text-slate-500">
-                  No skills have been added to this profile yet.
-                </div>
-              )}
+
+              </div>
             </div>
-          </section>
+          </div>
+
+          {/* ════════════════════════════════════════════════════════
+             MAIN INFORMATION GRID
+             ════════════════════════════════════════════════════════ */}
+          <div className="grid grid-cols-1 lg:grid-cols-12 gap-4">
+            
+            {/* LEFT COLUMN: Contact & System Credentials (6 Cols) */}
+            <div className="lg:col-span-6 space-y-4">
+              <div className="rounded-3xl border border-slate-200/80 bg-white p-5 shadow-xs">
+                
+                {/* Header & Edit Action Controls Right Next to Editable Details */}
+                <div className="flex items-center justify-between pb-3 border-b border-slate-100 mb-3">
+                  <div className="flex items-center gap-2">
+                    <UserRound className="h-4 w-4 text-emerald-600" />
+                    <h2 className="text-xs font-bold uppercase tracking-wider text-slate-500">
+                      Contact & Communication
+                    </h2>
+                  </div>
+
+                  {/* Contextual Action Button (Placed right where information gets updated) */}
+                  {!isEditing ? (
+                    <button
+                      type="button"
+                      onClick={enterEditMode}
+                      className="inline-flex items-center gap-1.5 rounded-lg border border-emerald-200 bg-emerald-50 px-3 py-1 text-xs font-bold text-emerald-700 hover:bg-emerald-100 transition-colors"
+                    >
+                      <Pencil className="h-3.5 w-3.5" /> Edit Information
+                    </button>
+                  ) : (
+                    <div className="flex items-center gap-2">
+                      <button
+                        type="button"
+                        onClick={cancelEdit}
+                        className="rounded-lg border border-slate-200 bg-white px-2.5 py-1 text-xs font-semibold text-slate-600 hover:bg-slate-50 transition-colors"
+                      >
+                        Cancel
+                      </button>
+                      <Button
+                        variant="success"
+                        size="sm"
+                        onClick={handleSave}
+                        isLoading={saveMutation.isPending}
+                        className="inline-flex items-center gap-1"
+                      >
+                        <Save className="h-3.5 w-3.5" /> Save
+                      </Button>
+                    </div>
+                  )}
+                </div>
+
+                <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
+                  <EmailCard
+                    value={mergedProfile.email}
+                    onSave={handleChangeEmail}
+                    isSaving={changeEmailMutation.isPending}
+                    error={emailError}
+                    onDismissError={() => setEmailError("")}
+                  />
+
+                  {isEditing ? (
+                    <div className="rounded-xl border-2 border-emerald-400 bg-emerald-50/30 p-2.5">
+                      <p className="text-[10px] font-bold uppercase tracking-wider text-emerald-700">Phone</p>
+                      <input
+                        type="text"
+                        value={editPhone}
+                        onChange={(e) => setEditPhone(e.target.value)}
+                        placeholder="+91 XXXXX XXXXX"
+                        className="mt-1 w-full rounded-lg border border-slate-200 bg-white px-2.5 py-1 text-xs outline-none focus:border-emerald-500"
+                      />
+                    </div>
+                  ) : (
+                    <CompactField icon={Phone} label="Phone Number" value={mergedProfile.phone} />
+                  )}
+
+                  {isEditing ? (
+                    <div className="rounded-xl border-2 border-emerald-400 bg-emerald-50/30 p-2.5">
+                      <p className="text-[10px] font-bold uppercase tracking-wider text-emerald-700">Encord ID</p>
+                      <input
+                        type="text"
+                        value={editEncordId}
+                        onChange={(e) => setEditEncordId(e.target.value)}
+                        placeholder="john.encord@example.com"
+                        className="mt-1 w-full rounded-lg border border-slate-200 bg-white px-2.5 py-1 text-xs outline-none focus:border-emerald-500"
+                      />
+                    </div>
+                  ) : (
+                    <CompactField icon={Mail} label="Encord ID" value={mergedProfile.encordId} />
+                  )}
+
+                  {isEditing ? (
+                    <div className="rounded-xl border-2 border-emerald-400 bg-emerald-50/30 p-2.5">
+                      <p className="text-[10px] font-bold uppercase tracking-wider text-emerald-700">Slack ID</p>
+                      <input
+                        type="text"
+                        value={editSlackId}
+                        onChange={(e) => setEditSlackId(e.target.value)}
+                        placeholder="U0123ABC456"
+                        className="mt-1 w-full rounded-lg border border-slate-200 bg-white px-2.5 py-1 text-xs outline-none focus:border-emerald-500"
+                      />
+                    </div>
+                  ) : (
+                    <CompactField icon={Hash} label="Slack Member ID" value={mergedProfile.slackUserId} color="violet" />
+                  )}
+                </div>
+              </div>
+
+              {/* Skills Section */}
+              <div className="rounded-3xl border border-slate-200/80 bg-white p-5 shadow-xs">
+                <div className="flex items-center gap-2 pb-3 border-b border-slate-100 mb-3">
+                  <Sparkles className="h-4 w-4 text-emerald-600" />
+                  <h2 className="text-xs font-bold uppercase tracking-wider text-slate-500">
+                    Skills & Competencies
+                  </h2>
+                </div>
+
+                {isEditing ? (
+                  <SkillsMultiSelect
+                    selected={editSkills}
+                    onChange={setEditSkills}
+                    options={skillsList}
+                    isLoading={skillsLoading}
+                  />
+                ) : mergedProfile.skills.length > 0 ? (
+                  <div className="flex flex-wrap gap-1.5">
+                    {mergedProfile.skills.map((skill) => (
+                      <span
+                        key={skill}
+                        className="rounded-lg border border-slate-200 bg-slate-50 px-2.5 py-1 text-xs font-semibold text-slate-700"
+                      >
+                        {skill}
+                      </span>
+                    ))}
+                  </div>
+                ) : (
+                  <p className="text-xs text-slate-400 italic">No skills currently assigned.</p>
+                )}
+              </div>
+            </div>
+
+            {/* RIGHT COLUMN: Employment Details & Work Capacity (6 Cols) */}
+            <div className="lg:col-span-6 space-y-4">
+              <div className="rounded-3xl border border-slate-200/80 bg-white p-5 shadow-xs h-full">
+                <div className="flex items-center gap-2 pb-3 border-b border-slate-100 mb-3">
+                  <Briefcase className="h-4 w-4 text-blue-600" />
+                  <h2 className="text-xs font-bold uppercase tracking-wider text-slate-500">
+                    Employment Details & Capacity
+                  </h2>
+                </div>
+
+                <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
+                  <CompactField icon={ShieldCheck} label="System Role" value={mergedProfile.role} color="blue" />
+                  <CompactField icon={Briefcase} label="Designation" value={mergedProfile.designation} color="blue" />
+                  <CompactField icon={BadgeCheck} label="Employee Type" value={mergedProfile.employeeType} />
+                  <CompactField icon={Hash} label="Employee ID" value={mergedProfile.employeeId} />
+                  <CompactField
+                    icon={Clock3}
+                    label="Daily Capacity"
+                    value={mergedProfile.workingHours ? `${mergedProfile.workingHours} hrs/day` : null}
+                  />
+                  <CompactField
+                    icon={Clock3}
+                    label="Weekly Capacity"
+                    value={mergedProfile.weeklyAvailability ? `${mergedProfile.weeklyAvailability} hrs/week` : null}
+                  />
+                </div>
+              </div>
+            </div>
+
+          </div>
         </>
       )}
     </div>

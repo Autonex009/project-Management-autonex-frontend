@@ -25,6 +25,7 @@ const EmployeeProjectsPage = () => {
     })
     .filter((a) => a.project);
 
+  console.log(myProjects);
   return (
     <div className="space-y-6">
       <div className="flex flex-col sm:flex-row items-start sm:items-center justify-between mb-8 gap-4">
