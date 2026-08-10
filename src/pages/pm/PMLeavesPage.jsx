@@ -44,7 +44,7 @@ import {
   getEndDateValidationMessage,
   isEndDateBeforeStartDate,
 } from "../../utils/dateValidation";
-import { formatDisplayName } from "../../utils/displayName";
+import { formatDisplayName, nameSearchText } from "../../utils/displayName";
 import {
   getLeaveTypeLabel,
   getLeaveTypeBadgeClass,
@@ -447,7 +447,11 @@ const PMLeavesPage = () => {
   // ── Search / filter / sort, applied on top of the PM's scoped rows ──
   const todayStr = format(new Date(), "yyyy-MM-dd");
   const filteredLeaves = teamLeaves.filter((leave) => {
-    const name = getEmployeeName(leave.employee_id).toLowerCase();
+    // Searched against the stored name as well as the shortened label, so a middle
+    // name still finds its owner — see nameSearchText.
+    const name = nameSearchText(
+      employees.find((e) => e.id === leave.employee_id)?.name,
+    );
     const typeLabel = getLeaveTypeLabel(leave.leave_type).toLowerCase();
     const q = searchQuery.toLowerCase();
     const matchesSearch = name.includes(q) || typeLabel.includes(q);
@@ -467,9 +471,10 @@ const PMLeavesPage = () => {
   }
 
   const filteredWFH = teamWfh.filter((w) => {
-    const name = (
-      w.employee_name || getEmployeeName(w.employee_id)
-    ).toLowerCase();
+    const name = nameSearchText(
+      w.employee_name ||
+        employees.find((e) => e.id === w.employee_id)?.name,
+    );
     const reason = (w.reason || "").toLowerCase();
     const q = searchQuery.toLowerCase();
     const matchesSearch = name.includes(q) || reason.includes(q);
@@ -685,7 +690,10 @@ const PMLeavesPage = () => {
                     <UserAvatar src={emp?.avatar_url} name={empName} size="sm" />
                     <div className="min-w-0">
                       <div className="flex items-center gap-2 min-w-0">
-                        <span className="font-semibold text-slate-800 truncate whitespace-nowrap">
+                        <span
+                          className="font-semibold text-slate-800 truncate whitespace-nowrap"
+                          title={emp?.name || empName}
+                        >
                           {empName}
                         </span>
                         {leave.flagged && (
@@ -931,7 +939,10 @@ const PMLeavesPage = () => {
                     <UserAvatar src={emp?.avatar_url} name={empName} size="sm" />
                     <div className="min-w-0">
                       <div className="flex items-center gap-2 min-w-0">
-                        <span className="font-semibold text-slate-800 truncate whitespace-nowrap">
+                        <span
+                          className="font-semibold text-slate-800 truncate whitespace-nowrap"
+                          title={emp?.name || empName}
+                        >
                           {empName}
                         </span>
                         {w.flagged && (

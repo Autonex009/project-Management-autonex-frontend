@@ -79,18 +79,22 @@ const STATUS_COLORS = {
 // Stored Encord IDs are trimmed here: a few carry leading whitespace from import.
 const matchesSearchTerm = (employee, term) => {
   if (!term) return true;
-  const fields = [
+  
+  // Split search term by spaces to match individual words
+  const searchParts = term.trim().split(/\s+/);
+  
+  // Combine all searchable fields into one big string
+  const fieldsText = [
     employee.name,
     employee.email,
     employee.designation,
     employee.encord_id,
-  ];
-  return fields.some((field) =>
-    String(field || "")
-      .trim()
-      .toLowerCase()
-      .includes(term),
-  );
+  ]
+    .map((field) => String(field || "").trim().toLowerCase())
+    .join(" ");
+
+  // Check if every word typed by the user exists somewhere in the employee's data
+  return searchParts.every((part) => fieldsText.includes(part));
 };
 
 function formatDateRange(start, end) {
@@ -2310,8 +2314,11 @@ const EmployeesPage = () => {
                     size="md"
                   />
                   <div className="group relative min-w-0">
-                    <div className="text-[13.5px] font-semibold text-slate-900 truncate leading-tight">
-                      {value}
+                    <div
+                      className="text-[13.5px] font-semibold text-slate-900 truncate leading-tight"
+                      title={value}
+                    >
+                      {shortName}
                     </div>
                     <div
                       onClick={(e) => {
@@ -2482,9 +2489,14 @@ const EmployeesPage = () => {
               const extra = managers.length - 1;
 
               return (
-                <div className="group relative flex items-center gap-1 flex-nowrap whitespace-nowrap cursor-default">
+                <div
+                  className="group relative flex items-center gap-1 flex-nowrap whitespace-nowrap cursor-default"
+                  title={managers.join(", ")}
+                >
+                  {/* Shortened here, full in the hover card below — a manager's
+                      middle name is what tells two of them apart. */}
                   <span className="pointer-events-none text-[13px] font-medium text-slate-700 truncate max-w-[150px] inline-block">
-                    {managers[0]}
+                    {formatDisplayName(managers[0]) || managers[0]}
                   </span>
                   {extra > 0 && (
                     <span className="inline-flex items-center justify-center flex-shrink-0 h-4 min-w-4 rounded-full bg-slate-100 px-1 text-[10px] font-semibold text-slate-500">
@@ -2492,7 +2504,12 @@ const EmployeesPage = () => {
                     </span>
                   )}
 
-                  {(extra > 0 || (managers[0] || "").length > 18) && (
+                  {/* Also opens when the name was shortened, not just when it is
+                      long or there are several — otherwise the dropped middle
+                      name would be unreachable. */}
+                  {(extra > 0 ||
+                    (managers[0] || "").length > 18 ||
+                    formatDisplayName(managers[0]) !== managers[0]) && (
                     <div
                       className={`absolute left-0 ${positionClass} hidden group-hover:flex flex-col gap-1.5 z-30 p-2.5 bg-white text-slate-700 rounded-xl shadow-xl border border-slate-200 min-w-[180px] max-w-[260px] pointer-events-none`}
                     >

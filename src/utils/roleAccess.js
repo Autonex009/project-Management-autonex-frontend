@@ -54,18 +54,47 @@ const mainProjectPmIds = (mainProject) => {
 };
 
 /**
- * The employee ids that manage `project` (a daily sheet).
+ * Whoever occupies `project`'s manager slot, before designation is considered.
  *
  * Project-level assignment wins; an organisation's PMs apply only to projects that name
  * no PM of their own. That ordering is what lets several PMs share one client while each
  * owns distinct projects under it.
  */
-export const resolveProjectPmIds = (project, mainProjects = []) => {
+const assignedManagerIds = (project, mainProjects = []) => {
   if (project?.assigned_employee_ids?.length)
     return project.assigned_employee_ids;
   return mainProjectPmIds(
     mainProjects.find((p) => p.id === project?.main_project_id),
   );
+};
+
+/**
+ * Manager-slot occupants the roster now designates a Team Lead.
+ *
+ * People converted from Program Manager to Team Lead keep their seat in
+ * `assigned_employee_ids` until someone edits the project, so the stored data still calls
+ * them managers. Designation is the newer, deliberate statement of rank, so it wins — they
+ * show under Team Lead without waiting for a manual pass over every project. Mirrors
+ * `_demoted_to_lead` in backend project_scope.py.
+ */
+export const demotedToLeadIds = (project, mainProjects = [], employeeIndex) =>
+  assignedManagerIds(project, mainProjects).filter((id) =>
+    isTeamLeadDesignation(employeeIndex?.get?.(String(id))?.designation),
+  );
+
+/**
+ * The employee ids that manage `project`, excluding anyone since converted to Team Lead.
+ *
+ * `employeeIndex` is optional so callers without a roster to hand still resolve the raw
+ * slot; pass it wherever the distinction matters.
+ */
+export const resolveProjectPmIds = (project, mainProjects = [], employeeIndex) => {
+  const ids = assignedManagerIds(project, mainProjects);
+  if (!employeeIndex) return ids;
+  const demoted = new Set(
+    demotedToLeadIds(project, mainProjects, employeeIndex).map(Number),
+  );
+  return ids.filter((id) => !demoted.has(Number(id)));
 };
 
 /**
