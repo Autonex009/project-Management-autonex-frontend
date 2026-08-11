@@ -71,6 +71,7 @@ import ConfirmDialog from "../components/ui/ConfirmDialog";
 import Modal from "../components/ui/Modal";
 import StatCard from "../components/dashboard/StatCard";
 import useScrollStore from "../store/useScrollStore";
+import useProjectsStore from "../store/useProjectsStore";
 import { formatDisplayName } from "../utils/displayName";
 
 const STATUS_CONFIG = {
@@ -1288,31 +1289,35 @@ const ProjectsPage = () => {
   const [formSentiment, setFormSentiment] = useState("");
   const [modalInfoTab, setModalInfoTab] = useState("status"); // Status | Client Sentiment
   const [modalBuildTab, setModalBuildTab] = useState("types"); // Project Types | Team Composition
-  const pageMemory = useScrollStore.getState().memory["projects-page"] || {};
-  const [selectedOrganization, setSelectedOrganization] = useState(
-    pageMemory.selectedOrganization || "all",
-  );
-  const [selectedPm, setSelectedPm] = useState(pageMemory.selectedPm || "all");
-  const [selectedTeamLead, setSelectedTeamLead] = useState(
-    pageMemory.selectedTeamLead || "all",
-  );
-  const [selectedStatus, setSelectedStatus] = useState(
-    pageMemory.selectedStatus || "all",
-  );
-  const [selectedPriority, setSelectedPriority] = useState(
-    pageMemory.selectedPriority || "all",
-  );
-  const [projectView, setProjectView] = useState(
-    pageMemory.projectView || "active",
-  ); // 'active' | 'archived' | 'development'
-  // "Autonex" quick filter — only projects staffed with ≥1 Autonex employee.
-  const [autonexOnly, setAutonexOnly] = useState(false);
+  
+  const {
+    selectedOrganization,
+    setSelectedOrganization,
+    selectedPm,
+    setSelectedPm,
+    selectedTeamLead,
+    setSelectedTeamLead,
+    selectedStatus,
+    setSelectedStatus,
+    selectedPriority,
+    setSelectedPriority,
+    projectView,
+    setProjectView,
+    autonexOnly,
+    setAutonexOnly,
+    subProjectSearch,
+    setSubProjectSearch,
+    currentPage,
+    setCurrentPage,
+    filtersOpen,
+    setFiltersOpen,
+  } = useProjectsStore((state) => state);
+
   const [selectedPmIds, setSelectedPmIds] = useState([]);
   // Team leads chosen in the modal. Saved as allocations tagged "Team Lead" after the
   // project itself is saved — deliberately NOT merged into `assigned_employee_ids`, which
   // is the PM set and would grant them the approval rights the role exists to withhold.
   const [selectedTeamLeadIds, setSelectedTeamLeadIds] = useState([]);
-  const [filtersOpen, setFiltersOpen] = useState(false);
   const filtersRef = useRef(null);
   // Inline (double-click) card editing + per-card docs popover
   const [editingCardId, setEditingCardId] = useState(null);
@@ -1561,23 +1566,6 @@ const ProjectsPage = () => {
 
   const setScrollPosition = useScrollStore((state) => state.setScrollPosition);
 
-  const filterStateRef = useRef({
-    selectedOrganization,
-    selectedPm,
-    selectedTeamLead,
-    selectedStatus,
-    subProjectSearch: "",
-  });
-  useEffect(() => {
-    filterStateRef.current = {
-      ...filterStateRef.current,
-      selectedOrganization,
-      selectedPm,
-      selectedTeamLead,
-      selectedStatus,
-    };
-  }, [selectedOrganization, selectedPm, selectedTeamLead, selectedStatus]);
-
   useEffect(() => {
     if (!isLoading) {
       const initialScroll =
@@ -1608,20 +1596,8 @@ const ProjectsPage = () => {
       if (mainContainer) {
         mainContainer.removeEventListener("scroll", handleScroll);
       }
-
-      const nextPath = window.location.pathname;
-      const isRelatedPage =
-        nextPath.includes("/analytics/") || nextPath.includes("/allocation");
-
-      if (isRelatedPage) {
-        setScrollPosition("projects-page", currentScroll);
-        useScrollStore
-          .getState()
-          .setMemory("projects-page", filterStateRef.current);
-      } else {
-        useScrollStore.getState().clearMemory("projects-page");
-        setScrollPosition("projects-page", 0);
-      }
+      // Always save scroll position on unmount
+      setScrollPosition("projects-page", currentScroll);
     };
   }, [setScrollPosition]);
 
@@ -2204,16 +2180,9 @@ const ProjectsPage = () => {
   const statusParam = searchParams.get("status");
   const recommendationParam = searchParams.get("recommendation");
   const focusId = searchParams.get("focus"); // scroll to + highlight this sub-project (e.g. from Allocations)
-  const [subProjectSearch, setSubProjectSearch] = useState(
-    pageMemory.subProjectSearch || "",
-  );
-
-  useEffect(() => {
-    filterStateRef.current.subProjectSearch = subProjectSearch;
-  }, [subProjectSearch]);
   const [deleteConfirm, setDeleteConfirm] = useState(null);
-  const [currentPage, setCurrentPage] = useState(1);
   const [highlightId, setHighlightId] = useState(null);
+
   const PAGE_SIZE = 12;
 
   // Options for the PM filter: every program manager on the roster, not only those
@@ -2619,9 +2588,11 @@ const ProjectsPage = () => {
                 <button
                   key={t.key}
                   onClick={() => {
+                    console.log("Tab clicked:", t.key);
                     setProjectView(t.key);
                     setSelectedStatus("all");
                   }}
+                  type="button"
                   className={`inline-flex items-center gap-2 px-4 py-2 text-sm font-semibold border-b-2 -mb-px transition-colors ${isActive
                       ? "border-indigo-600 text-indigo-600"
                       : "border-transparent text-slate-500 hover:text-slate-700"
