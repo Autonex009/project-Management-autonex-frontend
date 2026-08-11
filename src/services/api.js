@@ -155,11 +155,16 @@ export const employeeApi = {
   create: (data) => api.post("/employees", data).then((res) => res.data),
   update: (id, data) =>
     api.put(`/employees/${id}`, data).then((res) => res.data),
-  // Self-service login-email change. Company domain only; the server emails a
-  // confirmation to the new address and leaves the password alone.
-  changeEmail: (id, newEmail) =>
+  // Self-service login-email change.
+  // Step 1: Request OTP
+  requestEmailChange: (id, newEmail) =>
     api
-      .patch(`/employees/${id}/email`, { new_email: newEmail })
+      .post(`/employees/${id}/email/request`, { new_email: newEmail })
+      .then((res) => res.data),
+  // Step 2: Verify OTP
+  verifyEmailChange: (id, otp) =>
+    api
+      .post(`/employees/${id}/email/verify`, { otp })
       .then((res) => res.data),
   delete: (id) => api.delete(`/employees/${id}`).then((res) => res.data),
   getAvailability: (id) =>
