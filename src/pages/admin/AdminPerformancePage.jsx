@@ -151,8 +151,10 @@ const AdminPerformancePage = () => {
     [employees],
   );
   const empName = (id) => formatDisplayName(empById.get(id)?.name) || `Employee #${id}`;
-  const projName = (id) =>
-    projects.find((p) => p.id === id)?.name || `Project #${id}`;
+  const projName = (id) => {
+    if (id === 0) return "Overall (PM)";
+    return projects.find((p) => p.id === id)?.name || `Project #${id}`;
+  };
 
   // Reporting manager(s) of an evaluation = PM(s) of the main project its sub-project
   // belongs to. Same join the Employees table uses: sub_project → main_project → PM.
@@ -216,10 +218,10 @@ const AdminPerformancePage = () => {
 
   const bonusEvals = useMemo(
     () =>
-      employeeEvals
+      evaluations
         .filter((e) => e.bonus_suggested)
         .sort((a, b) => (b.period || "").localeCompare(a.period || "")),
-    [employeeEvals],
+    [evaluations],
   );
 
   const avgAll = useMemo(() => {
