@@ -1,8 +1,8 @@
-import React, { useState, useMemo } from "react";
+import React, { useState, useMemo, useEffect, useRef } from "react";
 import { useQuery } from "@tanstack/react-query";
 import toast from "react-hot-toast";
 import { analyticsApi, authApi } from "../../services/api";
-import UserAvatar from "../../components/ui/UserAvatar";
+import UserAvatar, { getAvatarUrl } from "../../components/ui/UserAvatar";
 import {
   Trophy,
   Crown,
@@ -13,12 +13,14 @@ import {
   Zap,
   CalendarDays,
   Sparkles,
+  Flame,
   Info,
   Folder,
   Award,
   TrendingUp,
   TrendingDown,
   Minus,
+  User,
 } from "lucide-react";
 import { formatDisplayName } from "../../utils/displayName";
 
@@ -77,56 +79,155 @@ const formatFirstAndLastName = (name, email) => {
   return `${parts[0]} ${parts[parts.length - 1]}`;
 };
 
-// 🌟 Skeleton Loader for Podium Showcase Cards
-const PodiumSkeleton = ({ theme = "indigo" }) => {
-  const cardBorder = theme === "amber" ? "border-amber-300/60 bg-white/70" : "border-indigo-300/60 bg-white/70";
+// 🌟 Leaderboard-Only Avatar (renders styled User icon for employees without uploaded profile photo)
+const LeaderboardAvatar = ({ src, name = "User", size = "md", className = "" }) => {
+  const [imgError, setImgError] = useState(false);
+  const resolvedUrl = useMemo(() => getAvatarUrl(src), [src]);
 
+  useEffect(() => {
+    setImgError(false);
+  }, [src]);
+
+  const sizeMap = {
+    xs: "w-6 h-6 text-xs",
+    sm: "w-7 h-7 text-xs",
+    md: "w-9 h-9 text-xs",
+    lg: "w-10 h-10 text-sm",
+    xl: "w-20 h-20 text-lg",
+  };
+  const sizeClass = sizeMap[size] || size || "w-9 h-9 text-xs";
+
+  if (resolvedUrl && !imgError) {
+    return (
+      <img
+        src={resolvedUrl}
+        alt={name}
+        referrerPolicy="no-referrer"
+        onError={() => setImgError(true)}
+        className={`${sizeClass} rounded-full object-cover flex-shrink-0 ring-1 ring-slate-200 ${className}`}
+      />
+    );
+  }
+
+  return (
+    <div
+      className={`${sizeClass} rounded-full flex items-center justify-center flex-shrink-0 bg-gradient-to-b from-slate-100 via-indigo-50/90 to-slate-200 text-slate-500 ring-1 ring-slate-300/80 shadow-2xs select-none ${className}`}
+      title={name}
+    >
+      <User className="w-1/2 h-1/2 text-slate-500/90" />
+    </div>
+  );
+};
+
+// 🌟 Skeleton Loader for Podium Showcase Cards matching exact card heights, avatar rings, and pedestal bases
+const PodiumSkeleton = ({ theme = "indigo" }) => {
+  const isAmber = theme === "amber";
+
+  if (isAmber) {
+    // 3D Stepped Olympic Podium Skeleton (Annual Hall of Fame)
+    return (
+      <div className="px-0.5 pt-2 pb-0 -mb-0.5 w-full animate-pulse">
+        <div className="grid grid-cols-3 items-end gap-2 sm:gap-2.5 max-w-xl mx-auto">
+          {/* #2 Silver Pedestal Skeleton */}
+          <div className="flex flex-col items-center w-full">
+            <div className="flex flex-col items-center justify-between border-2 border-slate-300 rounded-2xl p-1.5 relative text-center w-full mb-0.5 min-h-[115px] bg-white/70">
+              <div className="w-5 h-2.5 bg-slate-200/90 rounded-full mb-0.5" />
+              <div className="w-10 h-10 rounded-full bg-slate-200/90 my-0.5" />
+              <div className="w-14 h-2.5 bg-slate-200/90 rounded-md my-0.5" />
+              <div className="w-9 h-3 rounded-full bg-slate-200/90 mt-0.5" />
+            </div>
+            <div className="w-full h-6 rounded-t-xl bg-slate-200/80" />
+          </div>
+
+          {/* #1 Champion Pedestal Skeleton */}
+          <div className="flex flex-col items-center w-full">
+            <div className="flex flex-col items-center justify-between border-2 border-amber-400 rounded-2xl p-1.5 relative text-center w-full mb-0.5 min-h-[115px] bg-white/70">
+              <div className="w-12 h-2.5 bg-amber-200/90 rounded-full mb-0.5" />
+              <div className="w-10 h-10 rounded-full bg-amber-200/90 my-0.5" />
+              <div className="w-14 h-2.5 bg-slate-200/90 rounded-md my-0.5" />
+              <div className="w-9 h-3 rounded-full bg-amber-200/90 mt-0.5" />
+            </div>
+            <div className="w-full h-9 rounded-t-xl bg-amber-200/80" />
+          </div>
+
+          {/* #3 Bronze Pedestal Skeleton */}
+          <div className="flex flex-col items-center w-full">
+            <div className="flex flex-col items-center justify-between border-2 border-[#d99b73] rounded-2xl p-1.5 relative text-center w-full mb-0.5 min-h-[115px] bg-white/70">
+              <div className="w-5 h-2.5 bg-slate-200/90 rounded-full mb-0.5" />
+              <div className="w-10 h-10 rounded-full bg-slate-200/90 my-0.5" />
+              <div className="w-14 h-2.5 bg-slate-200/90 rounded-md my-0.5" />
+              <div className="w-9 h-3 rounded-full bg-slate-200/90 mt-0.5" />
+            </div>
+            <div className="w-full h-4 rounded-t-xl bg-slate-200/80" />
+          </div>
+        </div>
+      </div>
+    );
+  }
+
+  // Equal Glass Showcase Cards Skeleton (Monthly Performers)
   return (
     <div className="px-1 py-1 w-full animate-pulse">
       <div className="grid grid-cols-3 items-stretch gap-2.5 sm:gap-3 max-w-xl mx-auto">
         {/* 2nd Place Skeleton */}
-        <div className={`flex flex-col items-center justify-between border-2 rounded-2xl p-2.5 relative text-center min-h-[175px] ${cardBorder}`}>
-          <div className="w-8 h-4 bg-slate-200/90 rounded-full mb-1" />
-          <div className="w-18 h-18 rounded-full bg-slate-200/90 my-1" />
-          <div className="w-20 h-3 bg-slate-200/90 rounded-md my-1" />
-          <div className="w-14 h-5 rounded-full bg-slate-200/90 mt-1" />
+        <div className="flex flex-col items-center justify-between border-2 border-slate-300 rounded-2xl p-2 relative text-center min-h-[135px] bg-white/70">
+          <div className="w-5 h-2.5 bg-slate-200/90 rounded-full mb-0.5" />
+          <div className="w-13 h-13 rounded-full bg-slate-200/90 my-0.5" />
+          <div className="w-16 h-2.5 bg-slate-200/90 rounded-md my-0.5" />
+          <div className="w-10 h-3.5 rounded-full bg-slate-200/90 mt-0.5" />
         </div>
 
         {/* 1st Place Skeleton */}
-        <div className={`flex flex-col items-center justify-between border-2 rounded-2xl p-3 relative text-center min-h-[195px] ${cardBorder}`}>
-          <div className="w-14 h-4 bg-slate-200/90 rounded-full mb-1" />
-          <div className="w-22 h-22 rounded-full bg-slate-200/90 my-1" />
-          <div className="w-24 h-3.5 bg-slate-200/90 rounded-md my-1" />
-          <div className="w-16 h-6 rounded-full bg-slate-200/90 mt-1" />
+        <div className="flex flex-col items-center justify-between border-2 border-amber-300 rounded-2xl p-2 relative text-center min-h-[135px] bg-white/70">
+          <div className="w-12 h-2.5 bg-amber-200/90 rounded-full mb-0.5" />
+          <div className="w-13 h-13 rounded-full bg-amber-200/90 my-0.5" />
+          <div className="w-16 h-2.5 bg-slate-200/90 rounded-md my-0.5" />
+          <div className="w-10 h-3.5 rounded-full bg-amber-200/90 mt-0.5" />
         </div>
 
         {/* 3rd Place Skeleton */}
-        <div className={`flex flex-col items-center justify-between border-2 rounded-2xl p-2.5 relative text-center min-h-[175px] ${cardBorder}`}>
-          <div className="w-8 h-4 bg-slate-200/90 rounded-full mb-1" />
-          <div className="w-18 h-18 rounded-full bg-slate-200/90 my-1" />
-          <div className="w-20 h-3 bg-slate-200/90 rounded-md my-1" />
-          <div className="w-14 h-5 rounded-full bg-slate-200/90 mt-1" />
+        <div className="flex flex-col items-center justify-between border-2 border-[#d99b73]/80 rounded-2xl p-2 relative text-center min-h-[135px] bg-white/70">
+          <div className="w-5 h-2.5 bg-slate-200/90 rounded-full mb-0.5" />
+          <div className="w-13 h-13 rounded-full bg-slate-200/90 my-0.5" />
+          <div className="w-16 h-2.5 bg-slate-200/90 rounded-md my-0.5" />
+          <div className="w-10 h-3.5 rounded-full bg-slate-200/90 mt-0.5" />
         </div>
       </div>
     </div>
   );
 };
 
-// 🌟 Skeleton Loader for Table Rows
+// 🌟 Skeleton Loader for Table Rows matching exact cell grid, sizes, and padding
 const TableSkeleton = ({ rows = 5 }) => {
   return (
-    <div className="bg-white border border-slate-200/80 rounded-2xl overflow-hidden divide-y divide-slate-100 w-full animate-pulse">
+    <div className="divide-y divide-slate-100/80 w-full animate-pulse">
       {Array.from({ length: rows }).map((_, i) => (
         <div
           key={i}
-          className="flex items-center justify-between p-1 sm:px-3 sm:py-1 h-9 bg-white"
+          className="flex flex-col sm:grid sm:grid-cols-12 items-center gap-2 p-1 sm:px-3 sm:py-1 bg-white min-h-[41px]"
         >
-          <div className="flex items-center gap-3">
+          {/* Col 1: Rank Badge */}
+          <div className="sm:col-span-1 flex items-center justify-center">
             <div className="w-7 h-7 rounded-xl bg-slate-200/80" />
-            <div className="w-8 h-8 rounded-full bg-slate-200/80" />
-            <div className="w-28 sm:w-36 h-3.5 bg-slate-200/80 rounded-md" />
           </div>
-          <div className="w-12 h-5 rounded-full bg-slate-200/80" />
+
+          {/* Col 2: Employee Profile & Name */}
+          <div className="sm:col-span-6 flex items-center gap-3 min-w-0 w-full">
+            <div className="w-9 h-9 rounded-full bg-slate-200/80 flex-shrink-0" />
+            <div className="flex items-center gap-2 min-w-0 flex-1">
+              <div className="w-28 sm:w-36 h-4 bg-slate-200/80 rounded-md" />
+            </div>
+          </div>
+
+          {/* Col 3: Rank Change */}
+          <div className="sm:col-span-2 flex items-center justify-start sm:justify-center w-full">
+            <div className="w-9 h-4 bg-slate-200/80 rounded-full" />
+          </div>
+
+          {/* Col 4: Hours Logged */}
+          <div className="sm:col-span-3 flex items-center justify-start sm:justify-end w-full pr-2">
+            <div className="w-12 h-4.5 bg-slate-200/80 rounded-md" />
+          </div>
         </div>
       ))}
     </div>
@@ -214,6 +315,208 @@ const generatePastWeeks = (count = 12) => {
   return weeks;
 };
 
+// Utility to generate past N days for historical daily navigation
+const generatePastDays = (count = 30) => {
+  const days = [];
+  const now = new Date();
+
+  for (let i = 0; i < count; i++) {
+    const d = new Date(now);
+    d.setDate(now.getDate() - i);
+
+    const year = d.getFullYear();
+    const monthNum = String(d.getMonth() + 1).padStart(2, "0");
+    const dayNum = String(d.getDate()).padStart(2, "0");
+    const dateStr = `${year}-${monthNum}-${dayNum}`;
+    const key = `day-${dateStr}`;
+
+    const dateFormatted = d.toLocaleDateString("en-US", { month: "short", day: "numeric", year: "numeric" });
+    const label = i === 0 ? `Today · ${dateFormatted}` : dateFormatted;
+
+    days.push({
+      key,
+      dateStr,
+      label,
+      isToday: i === 0,
+    });
+  }
+  return days;
+};
+
+// 🌟 Dummy Project-Wise Leaderboard Data
+const DUMMY_PROJECT_LEADERBOARDS = [
+  {
+    id: "proj-1",
+    projectName: "Encord Vision AI",
+    category: "Computer Vision",
+    totalHours: 245.5,
+    top3: [
+      { rank: 1, name: "Sakshi Pampattiwar", hours: 44.95, avatar_url: "" },
+      { rank: 2, name: "Bhairavi K", hours: 39.28, avatar_url: "" },
+      { rank: 3, name: "Mohammad Khan", hours: 38.72, avatar_url: "" },
+    ],
+  },
+  {
+    id: "proj-2",
+    projectName: "Autonomous Lidar Tracking",
+    category: "3D Bounding",
+    totalHours: 198.2,
+    top3: [
+      { rank: 1, name: "Himanshu Maurya", hours: 42.10, avatar_url: "" },
+      { rank: 2, name: "Aditi Mane", hours: 36.50, avatar_url: "" },
+      { rank: 3, name: "Rahul Sharma", hours: 31.80, avatar_url: "" },
+    ],
+  },
+  {
+    id: "proj-3",
+    projectName: "Medical Imaging Segmentation",
+    category: "Healthcare",
+    totalHours: 172.0,
+    top3: [
+      { rank: 1, name: "Priya Patel", hours: 38.00, avatar_url: "" },
+      { rank: 2, name: "Aditya Verma", hours: 34.20, avatar_url: "" },
+      { rank: 3, name: "Sneha Reddi", hours: 29.50, avatar_url: "" },
+    ],
+  },
+  {
+    id: "proj-4",
+    projectName: "NLP Document Extraction",
+    category: "LLM & Text",
+    totalHours: 154.8,
+    top3: [
+      { rank: 1, name: "Vikram Joshi", hours: 35.60, avatar_url: "" },
+      { rank: 2, name: "Ananya Roy", hours: 31.40, avatar_url: "" },
+      { rank: 3, name: "Karan Mehta", hours: 27.90, avatar_url: "" },
+    ],
+  },
+  {
+    id: "proj-5",
+    projectName: "Retail Video Analytics",
+    category: "Object Detection",
+    totalHours: 139.4,
+    top3: [
+      { rank: 1, name: "Aditi Mane", hours: 33.10, avatar_url: "" },
+      { rank: 2, name: "Mohammad Khan", hours: 29.80, avatar_url: "" },
+      { rank: 3, name: "Bhairavi K", hours: 25.40, avatar_url: "" },
+    ],
+  },
+  {
+    id: "proj-6",
+    projectName: "Geospatial Satellite Mapping",
+    category: "GIS Mapping",
+    totalHours: 112.6,
+    top3: [
+      { rank: 1, name: "Aditya Verma", hours: 30.50, avatar_url: "" },
+      { rank: 2, name: "Sakshi Pampattiwar", hours: 26.20, avatar_url: "" },
+      { rank: 3, name: "Priya Patel", hours: 22.80, avatar_url: "" },
+    ],
+  },
+];
+
+// 🌟 Project-Wise Top 3 Rankings Component (Scrollable with 3 projects in view at a time)
+const ProjectWiseLeaderboardSection = () => {
+  const scrollRef = useRef(null);
+
+  const handleScrollLeft = () => {
+    if (scrollRef.current) {
+      const scrollAmount = scrollRef.current.clientWidth;
+      scrollRef.current.scrollBy({ left: -scrollAmount, behavior: "smooth" });
+    }
+  };
+
+  const handleScrollRight = () => {
+    if (scrollRef.current) {
+      const scrollAmount = scrollRef.current.clientWidth;
+      scrollRef.current.scrollBy({ left: scrollAmount, behavior: "smooth" });
+    }
+  };
+
+  return (
+    <div className="bg-white border border-slate-200/90 rounded-3xl shadow-sm overflow-hidden p-4 sm:p-5 space-y-4">
+      {/* Outer Card Header */}
+      <div className="flex items-center justify-between border-b border-slate-100 pb-3 flex-wrap gap-2">
+        <div className="flex items-center gap-2">
+          <Flame className="w-4.5 h-4.5 text-amber-500 fill-amber-500/20" />
+          <h2 className="text-sm font-black text-slate-800 uppercase tracking-wider">
+            PROJECT STARS
+          </h2>
+        </div>
+      </div>
+
+      {/* Relative wrapper with side navigation buttons */}
+      <div className="relative flex items-center group/carousel">
+        {/* Left Side Arrow Button (Fixed Vertical Center) */}
+        <button
+          type="button"
+          onClick={handleScrollLeft}
+          className="absolute -left-4 top-1/2 -translate-y-1/2 z-10 inline-flex items-center justify-center w-8 h-8 rounded-full border border-slate-200/90 bg-white/95 text-slate-700 hover:bg-indigo-600 hover:text-white hover:border-indigo-600 shadow-md transition-all cursor-pointer backdrop-blur-xs active:scale-95"
+          title="Previous 3 Projects"
+        >
+          <ChevronLeft className="w-4 h-4" />
+        </button>
+
+        {/* Horizontal Scrollable Container (3 Projects in View at a time) */}
+        <div
+          ref={scrollRef}
+          className="flex gap-4 overflow-x-auto snap-x snap-mandatory py-1 px-1 select-none scrollbar-none w-full"
+        >
+        {DUMMY_PROJECT_LEADERBOARDS.map((project) => (
+          <div
+            key={project.id}
+            className="group flex flex-col justify-between bg-gradient-to-b from-slate-50/80 via-white to-slate-50/40 border border-slate-200 rounded-2xl p-3.5 shadow-2xs hover:shadow-md hover:border-indigo-300 transition-all duration-200 w-[88%] sm:w-[calc(50%-0.5rem)] lg:w-[calc(33.333%-0.67rem)] flex-shrink-0 snap-start"
+          >
+            {/* Project Header Info */}
+            <div className="flex items-center justify-between gap-2 mb-3">
+              <div className="min-w-0 flex-1">
+                <h3 className="text-xs font-black text-slate-900 truncate group-hover:text-indigo-600 transition-colors" title={project.projectName}>
+                  {project.projectName}
+                </h3>
+                <span className="text-[10px] font-semibold text-slate-400 uppercase tracking-wider">
+                  {project.category}
+                </span>
+              </div>
+              <span className="font-mono text-xs font-extrabold text-indigo-900 bg-indigo-50 px-2.5 py-0.5 rounded-full border border-indigo-100 shrink-0">
+                {project.totalHours}h
+              </span>
+            </div>
+
+            {/* Top 3 Employees List */}
+            <div className="space-y-1.5 bg-slate-50/90 p-2 rounded-xl border border-slate-200/60">
+              {project.top3.map((emp) => (
+                <div
+                  key={emp.rank}
+                  className="flex items-center gap-2 px-2.5 py-1.5 rounded-lg border border-slate-200/70 bg-white shadow-2xs group/emp hover:border-indigo-200 transition-colors"
+                >
+                  <span className="w-4 h-4 rounded text-[10px] font-black flex items-center justify-center font-mono shrink-0 bg-indigo-600 text-white shadow-2xs">
+                    #{emp.rank}
+                  </span>
+                  <span className="text-xs font-bold text-slate-800 truncate flex-1" title={emp.name}>
+                    {formatFirstAndLastName(emp.name)}
+                  </span>
+                  <span className="font-mono text-[11px] font-extrabold text-indigo-950 bg-indigo-50/80 px-2 py-0.5 rounded-md border border-indigo-100/80 shrink-0">
+                    {emp.hours}h
+                  </span>
+                </div>
+              ))}
+            </div>
+          </div>
+        ))}
+        </div>
+
+        {/* Right Side Arrow Button (Fixed Vertical Center) */}
+        <button
+          type="button"
+          onClick={handleScrollRight}
+          className="absolute -right-4 top-1/2 -translate-y-1/2 z-10 inline-flex items-center justify-center w-8 h-8 rounded-full border border-slate-200/90 bg-white/95 text-slate-700 hover:bg-indigo-600 hover:text-white hover:border-indigo-600 shadow-md transition-all cursor-pointer backdrop-blur-xs active:scale-95"
+          title="Next 3 Projects"
+        >
+          <ChevronRight className="w-4 h-4" />
+        </button>
+      </div>
+    </div>
+  );
+};
+
 // 🌟 Reusable Stunning Top Rankings Cards Component
 const TopRankingsCards = ({
   data,
@@ -224,9 +527,11 @@ const TopRankingsCards = ({
   activeTabLabel,
   prevRankMap = {},
   hasPrevData = false,
+  skeletonRows = 7,
+  isMonthly = false,
 }) => {
   if (isLoading) {
-    return <TableSkeleton rows={4} />;
+    return <TableSkeleton rows={skeletonRows} />;
   }
 
   if (!data || data.length === 0) {
@@ -249,7 +554,9 @@ const TopRankingsCards = ({
             return (
               <div
                 key={row.rank}
-                className={`group flex flex-col sm:grid sm:grid-cols-12 items-center gap-2 p-1 sm:px-3 sm:py-1 transition-all duration-150 ${isUser
+                className={`group flex flex-col sm:grid sm:grid-cols-12 items-center gap-2 p-1 sm:px-3 ${
+                  isMonthly ? "sm:py-[7px]" : "sm:py-1"
+                } transition-all duration-150 ${isUser
                   ? "bg-indigo-50/60 ring-2 ring-indigo-400/40 z-10"
                   : idx % 2 === 0
                     ? "bg-white hover:bg-indigo-50/30"
@@ -264,8 +571,8 @@ const TopRankingsCards = ({
                 </div>
 
                 {/* Employee Profile */}
-                <div className="sm:col-span-8 flex items-center gap-3 min-w-0 w-full">
-                  <UserAvatar
+                <div className="sm:col-span-6 flex items-center gap-3 min-w-0 w-full">
+                  <LeaderboardAvatar
                     src={row.avatar_url}
                     name={row.employee_name || row.user_email}
                     size="md"
@@ -275,11 +582,6 @@ const TopRankingsCards = ({
                       <span className="font-bold text-slate-900 text-sm truncate">
                         {formatFirstAndLastName(row.employee_name, row.user_email)}
                       </span>
-                      <RankChangeBadge
-                        currentRank={row.rank}
-                        prevRank={prevRankMap[(row.user_email || "").toLowerCase().trim()]}
-                        hasPrevData={hasPrevData}
-                      />
                       {isUser && (
                         <span className="inline-flex items-center gap-1 px-2 py-0.5 rounded-full bg-indigo-600 text-white text-[10px] font-black uppercase tracking-wider shadow-xs">
                           YOU
@@ -287,6 +589,15 @@ const TopRankingsCards = ({
                       )}
                     </div>
                   </div>
+                </div>
+
+                {/* Rank Change */}
+                <div className="sm:col-span-2 flex items-center justify-start sm:justify-center w-full">
+                  <RankChangeBadge
+                    currentRank={row.rank}
+                    prevRank={prevRankMap[(row.user_email || "").toLowerCase().trim()]}
+                    hasPrevData={hasPrevData}
+                  />
                 </div>
 
                 {/* Hours Logged */}
@@ -312,7 +623,7 @@ const TopRankingsCards = ({
             </div>
 
             <div className="sm:col-span-8 flex items-center gap-3 min-w-0 w-full">
-              <UserAvatar
+              <LeaderboardAvatar
                 src={userRankItem.avatar_url}
                 name={userRankItem.employee_name || userRankItem.user_email}
                 size="md"
@@ -586,7 +897,9 @@ const LeaderboardPage = () => {
 
   const hasPrevMonthData = Object.keys(prevMonthRankMap).length > 0;
 
-  // ── Weekly State & Query ──
+  // ── Weekly & Daily State & Query Mode ──
+  const [viewMode, setViewMode] = useState("weekly"); // "weekly" | "daily"
+
   const pastWeeks = useMemo(() => generatePastWeeks(12), []);
   const currentWeekKey = pastWeeks[0]?.key || "";
   const [selectedWeekKey, setSelectedWeekKey] = useState(currentWeekKey);
@@ -672,6 +985,134 @@ const LeaderboardPage = () => {
     refetchOnReconnect: false,
     refetchOnMount: false,
   });
+
+  // ── Daily Top 10 Query & Navigation ──
+  const pastDays = useMemo(() => generatePastDays(30), []);
+  const currentDayKey = pastDays[0]?.key || "";
+  const [selectedDayKey, setSelectedDayKey] = useState(currentDayKey);
+
+  const activeDay = useMemo(
+    () => pastDays.find((d) => d.key === selectedDayKey) || pastDays[0],
+    [selectedDayKey, pastDays]
+  );
+
+  const activeDayIndex = useMemo(
+    () => pastDays.findIndex((d) => d.key === selectedDayKey),
+    [selectedDayKey, pastDays]
+  );
+
+  const canGoPrevDay = activeDayIndex < pastDays.length - 1;
+  const canGoNextDay = activeDayIndex > 0;
+
+  const handlePrevDayClick = () => {
+    if (activeDayIndex < pastDays.length - 1) {
+      setSelectedDayKey(pastDays[activeDayIndex + 1].key);
+    }
+  };
+
+  const handleNextDayClick = () => {
+    if (activeDayIndex > 0) {
+      setSelectedDayKey(pastDays[activeDayIndex - 1].key);
+    }
+  };
+
+  const dailyParams = useMemo(
+    () => ({
+      range: "custom",
+      date_from: activeDay.dateStr,
+      date_to: activeDay.dateStr,
+    }),
+    [activeDay]
+  );
+
+  const { data: dailyData, isLoading: isDailyLoading, isFetching: isDailyFetching } = useQuery({
+    queryKey: ["admin-leaderboard-daily", dailyParams],
+    queryFn: () => analyticsApi.getLeaderboard(dailyParams),
+    staleTime: Infinity,
+    refetchOnWindowFocus: false,
+    refetchOnReconnect: false,
+    refetchOnMount: false,
+  });
+
+  const allDailyLeaderboard = dailyData?.leaderboard || [];
+
+  const filteredDailyLeaderboard = useMemo(() => {
+    let list = [...allDailyLeaderboard];
+    list.sort((a, b) => (b.total_hours || 0) - (a.total_hours || 0));
+    list = list.slice(0, 10);
+
+    const maxHours = list[0] ? Number(list[0].total_hours) || 0 : 0;
+    const totalHours = list.reduce(
+      (sum, item) => sum + (Number(item.total_hours) || 0),
+      0
+    );
+
+    return list.map((item, idx) => {
+      const hrs = Number(item.total_hours) || 0;
+      const sharePct =
+        totalHours > 0
+          ? Math.round((hrs / totalHours) * 1000) / 10
+          : 0;
+      const barWidth =
+        maxHours > 0
+          ? Math.min(100, Math.max(4, Math.round((hrs / maxHours) * 100)))
+          : 0;
+
+      return {
+        ...item,
+        rank: idx + 1,
+        active_hours: hrs,
+        share_percentage: sharePct,
+        bar_width_pct: barWidth,
+      };
+    });
+  }, [allDailyLeaderboard]);
+
+  const userDailyRankItem = useMemo(() => {
+    if (isAdmin || allDailyLeaderboard.length === 0) return null;
+    let list = [...allDailyLeaderboard];
+    list.sort((a, b) => (b.total_hours || 0) - (a.total_hours || 0));
+
+    let userIndex = -1;
+    if (currentUserEmail) {
+      userIndex = list.findIndex((item) => {
+        const itemEmail = (item.user_email || "").toLowerCase().trim();
+        return itemEmail && (itemEmail === currentUserEmail || currentUserEmail.includes(itemEmail) || itemEmail.includes(currentUserEmail));
+      });
+    }
+
+    if (userIndex === -1 && currentUserName) {
+      userIndex = list.findIndex((item) => {
+        const itemObjName = (item.employee_name || formatDisplayName(item.user_email || "")).toLowerCase().trim();
+        return itemObjName && (itemObjName === currentUserName || currentUserName.includes(itemObjName) || itemObjName.includes(currentUserName));
+      });
+    }
+
+    if (userIndex !== -1) {
+      const item = list[userIndex];
+      const hrs = Number(item.total_hours) || 0;
+      return {
+        ...item,
+        rank: userIndex + 1,
+        active_hours: hrs,
+      };
+    }
+
+    if (currentUser || currentUserEmail) {
+      const email = currentUserEmail || currentUser?.email || currentUser?.user_email || "user@autonex.ai";
+      const name = currentUserName || currentUser?.name || formatDisplayName(email);
+      return {
+        user_email: email,
+        employee_name: name,
+        avatar_url: currentUser?.avatar_url || "",
+        rank: list.length + 1,
+        active_hours: 0,
+        isUnranked: true,
+      };
+    }
+
+    return null;
+  }, [allDailyLeaderboard, currentUserEmail, currentUserName, currentUser, isAdmin]);
 
   const allWeekLeaderboard = weekData?.leaderboard || [];
   const hasWeekData = !isWeekLoading && allWeekLeaderboard.length > 0;
@@ -803,45 +1244,22 @@ const LeaderboardPage = () => {
   const canGoNextMonth_ = canGoNextMonth;
 
   return (
-    <div className="grid grid-cols-1 xl:grid-cols-2 gap-6 items-start">
+    <div className="space-y-6">
+      {/* 2-Column Leaderboard Showcase (Monthly on Left, Annual + Weekly/Daily on Right) */}
+      <div className="grid grid-cols-1 xl:grid-cols-2 gap-6 items-stretch">
 
       {/* ════════════════════════════════════════════
           MONTHLY TOPPERS — Podium section
           ════════════════════════════════════════════ */}
-      <div className="space-y-2">
-        {/* Section heading */}
-        <div className="flex items-center justify-center px-1 mb-1">
-          <div className="inline-flex items-center justify-center gap-2 px-4 py-1 rounded-full bg-indigo-100/90 border border-indigo-300/80 shadow-2xs">
-            <Zap className="w-4 h-4 text-indigo-700 fill-indigo-600/30" />
-            <h2 className="text-sm font-black text-indigo-950 uppercase tracking-wider font-mono">Monthly Performers</h2>
-          </div>
-        </div>
-
+      <div className="flex flex-col justify-between h-full">
         {/* ── Podium Card ── */}
-        <div className="bg-gradient-to-b from-indigo-100 via-indigo-50/90 to-purple-100/60 border-2 border-indigo-500/80 ring-2 ring-indigo-400/30 rounded-3xl shadow-md shadow-indigo-500/10 relative p-3 min-h-[215px] flex flex-col justify-between">
-          {/* Month Label Header */}
-          <div className="flex items-center justify-center mb-2.5">
-            {activeMonth.isCurrent ? (
-              <div className="inline-flex items-center justify-center px-5 py-1 rounded-full bg-gradient-to-r from-indigo-600 via-purple-600 to-indigo-700 border border-indigo-300 shadow-md ring-4 ring-indigo-500/30">
-                <span className="text-sm sm:text-base font-black text-white uppercase tracking-widest font-mono">
-                  {activeMonth.label}
-                </span>
-              </div>
-            ) : (
-              <div className="inline-flex items-center justify-center px-5 py-1 rounded-full bg-indigo-900 border border-indigo-700 shadow-sm">
-                <span className="text-sm sm:text-base font-black text-white uppercase tracking-widest font-mono">
-                  {activeMonth.label}
-                </span>
-              </div>
-            )}
-          </div>
-
-          {/* Vertically Centered Side Nav Arrows */}
+        <div className="bg-gradient-to-b from-indigo-100 via-indigo-50/90 to-purple-100/60 border-2 border-indigo-500/80 ring-2 ring-indigo-400/30 rounded-3xl shadow-md shadow-indigo-500/10 relative p-2.5 sm:p-3 flex-1 flex flex-col justify-between">
+          {/* Side Nav Arrows (Fixed at Vertical Center of Podium Card) */}
           <button
             type="button"
             onClick={handlePrevMonthClick}
             disabled={!canGoPrevMonth_}
-            className="absolute -left-3 top-1/2 -translate-y-1/2 z-20 inline-flex items-center justify-center w-8 h-8 rounded-full border border-slate-200 bg-white/95 text-slate-700 shadow-md hover:bg-white hover:text-indigo-600 active:scale-95 disabled:opacity-20 disabled:cursor-not-allowed transition-all cursor-pointer backdrop-blur-xs"
+            className="absolute -left-3.5 top-1/2 -translate-y-1/2 z-20 inline-flex items-center justify-center w-8 h-8 rounded-full border border-indigo-200 bg-white/95 text-indigo-700 shadow-md hover:bg-white active:scale-95 disabled:opacity-20 disabled:cursor-not-allowed transition-all cursor-pointer backdrop-blur-xs"
             title="Previous month"
           >
             <ChevronLeft className="w-4 h-4" />
@@ -851,11 +1269,30 @@ const LeaderboardPage = () => {
             type="button"
             onClick={handleNextMonthClick}
             disabled={!canGoNextMonth_}
-            className="absolute -right-3 top-1/2 -translate-y-1/2 z-20 inline-flex items-center justify-center w-8 h-8 rounded-full border border-slate-200 bg-white/95 text-slate-700 shadow-md hover:bg-white hover:text-indigo-600 active:scale-95 disabled:opacity-20 disabled:cursor-not-allowed transition-all cursor-pointer backdrop-blur-xs"
+            className="absolute -right-3.5 top-1/2 -translate-y-1/2 z-20 inline-flex items-center justify-center w-8 h-8 rounded-full border border-indigo-200 bg-white/95 text-indigo-700 shadow-md hover:bg-white active:scale-95 disabled:opacity-20 disabled:cursor-not-allowed transition-all cursor-pointer backdrop-blur-xs"
             title="Next month"
           >
             <ChevronRight className="w-4 h-4" />
           </button>
+
+          {/* Month Label Header */}
+          <div className="flex items-center justify-center mb-2">
+            {activeMonth.isCurrent ? (
+              <div className="inline-flex items-center justify-center gap-1.5 px-4 py-1 rounded-full bg-gradient-to-r from-indigo-600 via-purple-600 to-indigo-700 border border-indigo-300 shadow-md ring-3 ring-indigo-500/30">
+                <Zap className="w-3.5 h-3.5 text-amber-300 fill-amber-300/40" />
+                <span className="text-xs sm:text-sm font-black text-white uppercase tracking-wider font-mono">
+                  Monthly Performers · {activeMonth.label}
+                </span>
+              </div>
+            ) : (
+              <div className="inline-flex items-center justify-center gap-1.5 px-4 py-1 rounded-full bg-indigo-900 border border-indigo-700 shadow-sm">
+                <Zap className="w-3.5 h-3.5 text-indigo-300 fill-indigo-300/40" />
+                <span className="text-xs sm:text-sm font-black text-white uppercase tracking-wider font-mono">
+                  Monthly Performers · {activeMonth.label}
+                </span>
+              </div>
+            )}
+          </div>
 
           {/* Podium Grid OR Loading Skeleton OR Empty State */}
           {isMonthLoading || isMonthFetching ? (
@@ -870,20 +1307,20 @@ const LeaderboardPage = () => {
               <div className="grid grid-cols-3 items-stretch gap-2.5 sm:gap-3 max-w-xl mx-auto">
                 {/* 2nd Place (Silver) */}
                 {top3Month_[1] ? (
-                  <div className="flex flex-col items-center justify-between bg-gradient-to-b from-slate-200/90 via-slate-100/70 to-white/95 border-2 border-slate-400/80 rounded-2xl p-2.5 shadow-xs relative text-center">
-                    <span className="absolute -top-2.5 px-2.5 py-0.5 rounded-full bg-gradient-to-r from-slate-500 via-slate-600 to-slate-800 text-white font-black text-[10px] uppercase tracking-wider shadow-xs border border-white">
+                  <div className="flex flex-col items-center justify-between bg-gradient-to-b from-slate-200/90 via-slate-100/70 to-white/95 border-2 border-slate-400/80 rounded-2xl p-2 shadow-xs relative text-center min-h-[135px]">
+                    <span className="absolute -top-2 px-2 py-0.5 rounded-full bg-gradient-to-r from-slate-500 via-slate-600 to-slate-800 text-white font-black text-[9px] uppercase tracking-wider shadow-xs border border-white">
                       #2
                     </span>
-                    <div className="mt-2 mb-1.5 relative">
-                      <div className="rounded-full ring-4 ring-slate-400/90 p-[3px] bg-gradient-to-b from-slate-300 via-slate-100 to-white shadow-xs">
-                        <UserAvatar
+                    <div className="mt-3 mb-1 relative">
+                      <div className="rounded-full ring-2 ring-slate-400/90 p-[2px] bg-gradient-to-b from-slate-300 via-slate-100 to-white shadow-xs">
+                        <LeaderboardAvatar
                           src={top3Month_[1]?.avatar_url}
                           name={top3Month_[1].employee_name || top3Month_[1].user_email}
-                          size="w-18 h-18 text-lg"
+                          size="w-13 h-13 text-sm"
                         />
                       </div>
                     </div>
-                    <h3 className="text-xs font-bold text-slate-900 truncate max-w-[120px] mb-0.5">
+                    <h3 className="text-xs font-bold text-slate-900 truncate max-w-[110px] mb-0.5">
                       {formatFirstAndLastName(top3Month_[1].employee_name, top3Month_[1].user_email)}
                     </h3>
                     <div className="flex items-center gap-1 mb-1">
@@ -903,20 +1340,20 @@ const LeaderboardPage = () => {
 
                 {/* 1st Place (Champion) */}
                 {top3Month_[0] && (
-                  <div className="flex flex-col items-center justify-between bg-gradient-to-b from-amber-100/70 via-amber-50/30 to-white/95 border-2 border-amber-300/80 rounded-2xl p-3 shadow-md shadow-amber-500/10 relative text-center ring-1 ring-amber-400/20">
-                    <span className="absolute -top-2.5 px-2.5 py-0.5 rounded-full bg-gradient-to-r from-amber-400 via-amber-500 to-amber-600 text-white font-black text-[10px] uppercase tracking-wider shadow-xs flex items-center gap-1 border border-white">
-                      <Trophy className="w-3 h-3 text-amber-100" /> #1 MVP
+                  <div className="flex flex-col items-center justify-between bg-gradient-to-b from-amber-100/95 via-amber-50/90 to-white/95 border-2 border-amber-400 rounded-2xl p-2 shadow-md relative text-center ring-2 ring-amber-400/40 z-10 min-h-[135px]">
+                    <span className="absolute -top-2 px-2 py-0.5 rounded-full bg-gradient-to-r from-amber-500 via-amber-600 to-orange-600 text-white font-black text-[9px] uppercase tracking-wider shadow-md flex items-center gap-0.5 border border-white">
+                      <Crown className="w-2.5 h-2.5 text-amber-200 fill-amber-100" /> #1 MVP
                     </span>
-                    <div className="mt-2 mb-1.5 relative">
-                      <div className="rounded-full ring-4 ring-amber-400/90 p-[3px] bg-gradient-to-b from-amber-200 to-white shadow-md shadow-amber-500/20">
-                        <UserAvatar
+                    <div className="mt-3 mb-1 relative">
+                      <div className="rounded-full ring-3 ring-amber-400 shadow-[0_0_12px_rgba(251,191,36,0.5)] p-[2px] bg-gradient-to-b from-amber-300 via-amber-100 to-white">
+                        <LeaderboardAvatar
                           src={top3Month_[0]?.avatar_url}
                           name={top3Month_[0].employee_name || top3Month_[0].user_email}
-                          size="w-22 h-22 text-2xl font-bold"
+                          size="w-13 h-13 text-sm font-bold"
                         />
                       </div>
                     </div>
-                    <h3 className="text-sm font-black text-slate-900 truncate max-w-[140px] mb-0.5">
+                    <h3 className="text-xs font-black text-slate-900 truncate max-w-[110px] mb-0.5">
                       {formatFirstAndLastName(top3Month_[0].employee_name, top3Month_[0].user_email)}
                     </h3>
                     <div className="flex items-center gap-1 mb-1">
@@ -934,20 +1371,20 @@ const LeaderboardPage = () => {
 
                 {/* 3rd Place (Bronze) */}
                 {top3Month_[2] ? (
-                  <div className="flex flex-col items-center justify-between bg-gradient-to-b from-[#f7e6dc]/90 via-[#fcf5f0]/70 to-white/95 border-2 border-[#d99b73]/80 rounded-2xl p-2.5 shadow-xs relative text-center">
-                    <span className="absolute -top-2.5 px-2.5 py-0.5 rounded-full bg-gradient-to-r from-[#b35924] via-[#8c4217] to-[#59280b] text-white font-black text-[10px] uppercase tracking-wider shadow-xs border border-white">
+                  <div className="flex flex-col items-center justify-between bg-gradient-to-b from-[#fcf5f0]/95 via-[#f9ebd9]/70 to-white/95 border-2 border-[#d99b73] rounded-2xl p-2 shadow-xs relative text-center min-h-[135px]">
+                    <span className="absolute -top-2 px-2 py-0.5 rounded-full bg-gradient-to-r from-[#b35924] via-[#8c4217] to-[#59280b] text-white font-black text-[9px] uppercase tracking-wider shadow-xs border border-white">
                       #3
                     </span>
-                    <div className="mt-2 mb-1.5 relative">
-                      <div className="rounded-full ring-4 ring-[#a04e1e]/60 p-[3px] bg-gradient-to-b from-[#e6a175] to-white shadow-xs">
-                        <UserAvatar
+                    <div className="mt-3 mb-1 relative">
+                      <div className="rounded-full ring-2 ring-[#a04e1e]/60 p-[2px] bg-gradient-to-b from-[#e6a175] via-[#f7e6dc] to-white shadow-xs">
+                        <LeaderboardAvatar
                           src={top3Month_[2]?.avatar_url}
                           name={top3Month_[2].employee_name || top3Month_[2].user_email}
-                          size="w-18 h-18 text-lg"
+                          size="w-13 h-13 text-sm"
                         />
                       </div>
                     </div>
-                    <h3 className="text-xs font-bold text-slate-900 truncate max-w-[120px] mb-0.5">
+                    <h3 className="text-xs font-bold text-slate-900 truncate max-w-[110px] mb-0.5">
                       {formatFirstAndLastName(top3Month_[2].employee_name, top3Month_[2].user_email)}
                     </h3>
                     <div className="flex items-center gap-1 mb-1">
@@ -992,6 +1429,8 @@ const LeaderboardPage = () => {
                 activeTabLabel={activeMonth.label}
                 prevRankMap={prevMonthRankMap}
                 hasPrevData={hasPrevMonthData}
+                skeletonRows={7}
+                isMonthly={true}
               />
             </div>
           )}
@@ -1004,22 +1443,14 @@ const LeaderboardPage = () => {
       <div className="space-y-4">
 
         {/* ── Overall Toppers Card (Top 3 Throughout the Year) ── */}
-        <div className="space-y-2">
-          <div className="flex items-center justify-center px-1 mb-1">
-            <div className="inline-flex items-center justify-center gap-2 px-4 py-1 rounded-full bg-amber-100/90 border border-amber-300/80 shadow-2xs">
-              <Crown className="w-4 h-4 text-amber-700 fill-amber-500/40" />
-              <h2 className="text-sm font-black text-amber-950 uppercase tracking-wider font-mono">
-                Annual Hall of Fame
-              </h2>
-            </div>
-          </div>
-
-          <div className="bg-gradient-to-b from-amber-100 via-amber-50/90 to-orange-100/60 border-2 border-amber-500/90 ring-4 ring-amber-400/30 rounded-3xl shadow-lg shadow-amber-500/15 relative p-3 min-h-[210px] flex flex-col justify-between">
+        <div>
+          <div className="bg-gradient-to-b from-amber-100 via-amber-50/90 to-orange-100/60 border-2 border-amber-500/90 ring-4 ring-amber-400/30 rounded-3xl shadow-lg shadow-amber-500/15 relative p-2.5 pb-0 min-h-[145px] flex flex-col justify-between overflow-hidden">
             {/* Year Label Header */}
-            <div className="flex items-center justify-center mb-2.5">
-              <div className="inline-flex items-center justify-center px-5 py-1 rounded-full bg-gradient-to-r from-amber-500 via-orange-500 to-amber-600 border border-amber-300 shadow-md ring-4 ring-amber-500/30">
-                <span className="text-sm sm:text-base font-black text-white uppercase tracking-widest font-mono">
-                  {new Date().getFullYear()}
+            <div className="flex items-center justify-center mb-1.5">
+              <div className="inline-flex items-center justify-center gap-1.5 px-3.5 py-0.5 rounded-full bg-gradient-to-r from-amber-500 via-orange-500 to-amber-600 border border-amber-300 shadow-md ring-3 ring-amber-500/30">
+                <Crown className="w-3.5 h-3.5 text-amber-100 fill-amber-100/40" />
+                <span className="text-xs font-black text-white uppercase tracking-wider font-mono">
+                  Annual Hall of Fame · {new Date().getFullYear()}
                 </span>
               </div>
             </div>
@@ -1027,97 +1458,97 @@ const LeaderboardPage = () => {
             {isOverallLoading || isOverallFetching ? (
               <PodiumSkeleton theme="amber" />
             ) : top3Overall.length === 0 ? (
-              <div className="flex-1 flex flex-col items-center justify-center p-4 text-center my-auto min-h-[140px]">
-                <div className="w-10 h-10 rounded-2xl bg-amber-50 text-amber-500 border border-amber-100 flex items-center justify-center mb-2">
-                  <Trophy className="w-5 h-5" />
+              <div className="flex-1 flex flex-col items-center justify-center p-3 text-center my-auto min-h-[120px]">
+                <div className="w-8 h-8 rounded-2xl bg-amber-50 text-amber-500 border border-amber-100 flex items-center justify-center mb-1.5">
+                  <Trophy className="w-4 h-4" />
                 </div>
                 <h4 className="text-xs font-bold text-slate-800 mb-0.5">
                   No overall records logged for {new Date().getFullYear()} yet
                 </h4>
               </div>
             ) : (
-              <div className="px-1 py-1">
-                <div className="grid grid-cols-3 items-stretch gap-2.5 sm:gap-3 max-w-xl mx-auto">
-                  {/* 2nd Place (Silver) */}
+              <div className="px-0.5 pt-2 pb-0 -mb-0.5">
+                <div className="grid grid-cols-3 items-end gap-2 sm:gap-2.5 max-w-xl mx-auto">
+                  {/* 2nd Place (Silver Pedestal - Left) */}
                   {top3Overall[1] ? (
-                    <div className="flex flex-col items-center justify-between bg-gradient-to-b from-slate-200/90 via-slate-100/70 to-white/95 border-2 border-slate-400/80 rounded-2xl p-2.5 shadow-xs relative text-center">
-                      <span className="absolute -top-2.5 px-2.5 py-0.5 rounded-full bg-gradient-to-r from-slate-500 via-slate-600 to-slate-800 text-white font-black text-[10px] uppercase tracking-wider shadow-xs border border-white">
-                        #2
-                      </span>
-                      <div className="mt-2 mb-1.5 relative">
-                        <div className="rounded-full ring-4 ring-slate-400/90 p-[3px] bg-gradient-to-b from-slate-300 via-slate-100 to-white shadow-xs">
-                          <UserAvatar
-                            src={top3Overall[1]?.avatar_url}
-                            name={top3Overall[1].employee_name || top3Overall[1].user_email}
-                            size="w-18 h-18 text-lg"
-                          />
+                    <div className="flex flex-col items-center">
+                      <div className="flex flex-col items-center justify-between bg-gradient-to-b from-white/95 via-slate-100/90 to-white/95 border-2 border-slate-300 rounded-2xl p-1.5 shadow-xs backdrop-blur-md relative text-center w-full mb-0.5 min-h-[115px]">
+                        <span className="absolute -top-2 px-2 py-0.5 rounded-full bg-gradient-to-r from-slate-600 via-slate-700 to-slate-800 text-white font-black text-[8px] uppercase tracking-wider shadow-xs border border-white">
+                          #2
+                        </span>
+                        <div className="mt-2.5 mb-0.5 relative">
+                          <div className="rounded-full ring-2 ring-slate-400/90 p-[2px] bg-gradient-to-b from-slate-300 to-white shadow-xs">
+                            <LeaderboardAvatar
+                              src={top3Overall[1]?.avatar_url}
+                              name={top3Overall[1].employee_name || top3Overall[1].user_email}
+                              size="w-10 h-10 text-xs"
+                            />
+                          </div>
+                        </div>
+                        <h3 className="text-[11px] font-bold text-slate-900 truncate max-w-[90px] mb-0.5">
+                          {formatFirstAndLastName(top3Overall[1].employee_name, top3Overall[1].user_email)}
+                        </h3>
+                        <div className="font-mono text-[11px] font-black text-slate-900 bg-slate-200/90 px-1.5 py-0.5 rounded-full border border-slate-300 shadow-2xs">
+                          {top3Overall[1].total_hours || 0}h
                         </div>
                       </div>
-                      <h3 className="text-xs font-bold text-slate-900 truncate max-w-[120px] mb-0.5">
-                        {formatFirstAndLastName(top3Overall[1].employee_name, top3Overall[1].user_email)}
-                      </h3>
-                      <div className="flex items-center gap-1 mb-1 opacity-0 select-none h-[16px]">
-                        <span className="text-[9px]">▲</span>(+0)
-                      </div>
-                      <div className="font-mono text-base font-black text-slate-900 bg-slate-200/90 px-2.5 py-0.5 rounded-full border border-slate-300 shadow-2xs">
-                        {top3Overall[1].total_hours || 0}h
-                      </div>
+                      <div className="w-full h-6 rounded-t-xl bg-gradient-to-t from-slate-500/50 via-slate-400 to-slate-200 border-t-2 border-white shadow-xs flex items-center justify-center" />
                     </div>
                   ) : (
                     <div />
                   )}
 
-                  {/* 1st Place (Overall Grand Champion) */}
+                  {/* 1st Place (Gold Champion Pedestal - Center) */}
                   {top3Overall[0] && (
-                    <div className="flex flex-col items-center justify-between bg-gradient-to-b from-amber-100/70 via-amber-50/30 to-white/95 border-2 border-amber-300/80 rounded-2xl p-3 shadow-md shadow-amber-500/10 relative text-center ring-1 ring-amber-400/20">
-                      <span className="absolute -top-2.5 px-2.5 py-0.5 rounded-full bg-gradient-to-r from-amber-500 via-amber-600 to-orange-600 text-white font-black text-[10px] uppercase tracking-wider shadow-xs flex items-center gap-1 border border-white">
-                        <Crown className="w-3.5 h-3.5 text-amber-200 fill-amber-100" /> #1 Champion
-                      </span>
-                      <div className="mt-2 mb-1.5 relative">
-                        <div className="rounded-full ring-4 ring-amber-400/90 p-[3px] bg-gradient-to-b from-amber-200 to-white shadow-md shadow-amber-500/20">
-                          <UserAvatar
-                            src={top3Overall[0]?.avatar_url}
-                            name={top3Overall[0].employee_name || top3Overall[0].user_email}
-                            size="w-22 h-22 text-2xl font-bold"
-                          />
+                    <div className="flex flex-col items-center z-10">
+                      <div className="flex flex-col items-center justify-between bg-gradient-to-b from-amber-50/95 via-white/90 to-amber-50/95 border-2 border-amber-400 rounded-2xl p-1.5 shadow-md backdrop-blur-md relative text-center ring-2 ring-amber-400/50 w-full mb-0.5 min-h-[115px]">
+                        <span className="absolute -top-2 px-2 py-0.5 rounded-full bg-gradient-to-r from-amber-500 via-amber-600 to-orange-600 text-white font-black text-[8px] uppercase tracking-wider shadow-md flex items-center gap-0.5 border border-white">
+                          <Crown className="w-2.5 h-2.5 text-amber-200 fill-amber-100" /> #1 Champion
+                        </span>
+                        <div className="mt-2.5 mb-0.5 relative">
+                          <div className="rounded-full ring-3 ring-amber-400 shadow-[0_0_10px_rgba(251,191,36,0.5)] p-[2px] bg-gradient-to-b from-amber-300 to-white">
+                            <LeaderboardAvatar
+                              src={top3Overall[0]?.avatar_url}
+                              name={top3Overall[0].employee_name || top3Overall[0].user_email}
+                              size="w-10 h-10 text-xs font-bold"
+                            />
+                          </div>
+                        </div>
+                        <h3 className="text-[11px] font-black text-slate-900 truncate max-w-[90px] mb-0.5">
+                          {formatFirstAndLastName(top3Overall[0].employee_name, top3Overall[0].user_email)}
+                        </h3>
+                        <div className="font-mono text-[11px] font-black text-amber-950 bg-amber-200/80 px-2 py-0.5 rounded-full border border-amber-400 shadow-2xs">
+                          {top3Overall[0].total_hours || 0}h
                         </div>
                       </div>
-                      <h3 className="text-sm font-black text-slate-900 truncate max-w-[140px] mb-0.5">
-                        {formatFirstAndLastName(top3Overall[0].employee_name, top3Overall[0].user_email)}
-                      </h3>
-                      <div className="flex items-center gap-1 mb-1 opacity-0 select-none h-[16px]">
-                        <span className="text-[9px]">▲</span>(+0)
-                      </div>
-                      <div className="font-mono text-lg font-black text-amber-950 bg-amber-200/60 px-3 py-0.5 rounded-full border border-amber-300/70 shadow-2xs">
-                        {top3Overall[0].total_hours || 0}h
-                      </div>
+                      <div className="w-full h-9 rounded-t-xl bg-gradient-to-t from-amber-600/60 via-amber-500 to-amber-300 border-t-2 border-amber-200 shadow-xs flex items-center justify-center" />
                     </div>
                   )}
 
-                  {/* 3rd Place (Bronze) */}
+                  {/* 3rd Place (Bronze Pedestal - Right) */}
                   {top3Overall[2] ? (
-                    <div className="flex flex-col items-center justify-between bg-gradient-to-b from-[#f7e6dc]/90 via-[#fcf5f0]/70 to-white/95 border-2 border-[#d99b73]/80 rounded-2xl p-2.5 shadow-xs relative text-center">
-                      <span className="absolute -top-2.5 px-2.5 py-0.5 rounded-full bg-gradient-to-r from-[#b35924] via-[#8c4217] to-[#59280b] text-white font-black text-[10px] uppercase tracking-wider shadow-xs border border-white">
-                        #3
-                      </span>
-                      <div className="mt-2 mb-1.5 relative">
-                        <div className="rounded-full ring-4 ring-[#a04e1e]/60 p-[3px] bg-gradient-to-b from-[#e6a175] to-white shadow-xs">
-                          <UserAvatar
-                            src={top3Overall[2]?.avatar_url}
-                            name={top3Overall[2].employee_name || top3Overall[2].user_email}
-                            size="w-18 h-18 text-lg"
-                          />
+                    <div className="flex flex-col items-center">
+                      <div className="flex flex-col items-center justify-between bg-gradient-to-b from-[#fcf5f0]/95 via-white/90 to-[#fcf5f0]/95 border-2 border-[#d99b73] rounded-2xl p-1.5 shadow-xs backdrop-blur-md relative text-center w-full mb-0.5 min-h-[115px]">
+                        <span className="absolute -top-2 px-2 py-0.5 rounded-full bg-gradient-to-r from-[#b35924] via-[#8c4217] to-[#59280b] text-white font-black text-[8px] uppercase tracking-wider shadow-xs border border-white">
+                          #3
+                        </span>
+                        <div className="mt-2.5 mb-0.5 relative">
+                          <div className="rounded-full ring-2 ring-[#a04e1e]/60 p-[2px] bg-gradient-to-b from-[#e6a175] to-white shadow-xs">
+                            <LeaderboardAvatar
+                              src={top3Overall[2]?.avatar_url}
+                              name={top3Overall[2].employee_name || top3Overall[2].user_email}
+                              size="w-10 h-10 text-xs"
+                            />
+                          </div>
+                        </div>
+                        <h3 className="text-[11px] font-bold text-slate-900 truncate max-w-[90px] mb-0.5">
+                          {formatFirstAndLastName(top3Overall[2].employee_name, top3Overall[2].user_email)}
+                        </h3>
+                        <div className="font-mono text-[11px] font-black text-[#59280b] bg-[#f0d5c4]/90 px-1.5 py-0.5 rounded-full border border-[#c47d52]/60 shadow-2xs">
+                          {top3Overall[2].total_hours || 0}h
                         </div>
                       </div>
-                      <h3 className="text-xs font-bold text-slate-900 truncate max-w-[120px] mb-0.5">
-                        {formatFirstAndLastName(top3Overall[2].employee_name, top3Overall[2].user_email)}
-                      </h3>
-                      <div className="flex items-center gap-1 mb-1 opacity-0 select-none h-[16px]">
-                        <span className="text-[9px]">▲</span>(+0)
-                      </div>
-                      <div className="font-mono text-base font-black text-[#59280b] bg-[#f0d5c4]/90 px-2.5 py-0.5 rounded-full border border-[#c47d52]/60 shadow-2xs">
-                        {top3Overall[2].total_hours || 0}h
-                      </div>
+                      <div className="w-full h-4 rounded-t-xl bg-gradient-to-t from-[#59280b]/60 via-[#b35924] to-[#e6a175] border-t-2 border-[#f7e6dc] shadow-xs flex items-center justify-center" />
                     </div>
                   ) : (
                     <div />
@@ -1128,73 +1559,149 @@ const LeaderboardPage = () => {
           </div>
         </div>
 
-        {/* ── Weekly Toppers Section ── */}
+        {/* ── Weekly & Daily Toppers Section ── */}
         <div className="space-y-2">
-          {/* Section heading */}
-          <div className="flex items-center justify-center gap-2 px-1">
-            <Zap className="w-5 h-5 text-indigo-500" />
-            <h2 className="text-base font-black text-slate-800 uppercase tracking-wider">Weekly Toppers</h2>
-          </div>
-
-          {/* Weekly nav + full table card */}
+          {/* Weekly / Daily integrated header + full table card */}
           <div className="bg-white border border-slate-200/90 rounded-3xl shadow-sm overflow-hidden">
-            {/* Week nav bar */}
-            <div className="relative flex items-center justify-center px-4 py-2 bg-gradient-to-b from-white to-slate-50/60 border-b border-slate-100/60">
-              <div className="flex items-center gap-3">
-                <button
-                  type="button"
-                  onClick={handlePrevWeekClick}
-                  disabled={!canGoPrevWeek}
-                  className="inline-flex items-center justify-center w-7 h-7 rounded-lg border border-slate-200 bg-white text-slate-600 hover:bg-slate-50 hover:text-slate-900 disabled:opacity-25 disabled:cursor-not-allowed transition-all cursor-pointer shadow-xs"
-                  title="Previous week"
-                >
-                  <ChevronLeft className="w-3.5 h-3.5" />
-                </button>
+            {/* Integrated Header Bar strictly in a SINGLE LINE (Zero Overlap Guaranteed) */}
+            <div className="flex items-center justify-between px-2.5 sm:px-3 py-2 bg-gradient-to-b from-white to-slate-50/60 border-b border-slate-100/60 select-none gap-1 sm:gap-2">
+              {/* Left Slot: Title */}
+              <div className="flex items-center gap-1 shrink-0 min-w-0">
+                <Zap className="w-3.5 h-3.5 sm:w-4 sm:h-4 text-indigo-500 shrink-0" />
+                <h2 className="text-[11px] sm:text-xs font-black text-slate-800 uppercase tracking-wider truncate">
+                  {viewMode === "daily" ? "Daily Top 10" : "Weekly Toppers"}
+                </h2>
+              </div>
 
-                {activeWeek.isCurrent ? (
-                  <div className="inline-flex items-center justify-center px-4 py-0.5 rounded-full bg-gradient-to-r from-indigo-500/10 via-indigo-500/20 to-purple-500/10 border border-indigo-400/50 shadow-xs ring-2 ring-indigo-400/30">
-                    <span className="text-xs font-black text-indigo-950 uppercase tracking-wider">
-                      {activeWeek.label}
-                    </span>
-                  </div>
+              {/* Center Slot: Date Navigation */}
+              <div className="flex items-center justify-center gap-1 min-w-0 shrink">
+                {viewMode === "weekly" ? (
+                  <>
+                    <button
+                      type="button"
+                      onClick={handlePrevWeekClick}
+                      disabled={!canGoPrevWeek}
+                      className="inline-flex items-center justify-center w-5.5 h-5.5 sm:w-6 sm:h-6 rounded-lg border border-slate-200 bg-white text-slate-600 hover:bg-slate-50 hover:text-slate-900 disabled:opacity-25 disabled:cursor-not-allowed transition-all cursor-pointer shadow-xs shrink-0"
+                      title="Previous week"
+                    >
+                      <ChevronLeft className="w-3 h-3 sm:w-3.5 sm:h-3.5" />
+                    </button>
+
+                    {activeWeek.isCurrent ? (
+                      <div className="inline-flex items-center justify-center px-2 sm:px-2.5 py-0.5 rounded-full bg-gradient-to-r from-indigo-500/10 via-indigo-500/20 to-purple-500/10 border border-indigo-400/50 shadow-xs ring-1 ring-indigo-400/30 truncate shrink">
+                        <span className="text-[10px] sm:text-[11px] font-black text-indigo-950 uppercase tracking-wider truncate">
+                          {activeWeek.label}
+                        </span>
+                      </div>
+                    ) : (
+                      <span className="text-[10px] sm:text-[11px] font-black text-slate-800 uppercase tracking-wider px-1 py-0.5 truncate shrink">
+                        {activeWeek.label}
+                      </span>
+                    )}
+
+                    <button
+                      type="button"
+                      onClick={handleNextWeekClick}
+                      disabled={!canGoNextWeek}
+                      className="inline-flex items-center justify-center w-5.5 h-5.5 sm:w-6 sm:h-6 rounded-lg border border-slate-200 bg-white text-slate-600 hover:bg-slate-50 hover:text-slate-900 disabled:opacity-25 disabled:cursor-not-allowed transition-all cursor-pointer shadow-xs shrink-0"
+                      title="Next week"
+                    >
+                      <ChevronRight className="w-3 h-3 sm:w-3.5 sm:h-3.5" />
+                    </button>
+                  </>
                 ) : (
-                  <span className="text-xs font-black text-slate-800 uppercase tracking-wider px-2 py-0.5">
-                    {activeWeek.label}
-                  </span>
-                )}
+                  <>
+                    <button
+                      type="button"
+                      onClick={handlePrevDayClick}
+                      disabled={!canGoPrevDay}
+                      className="inline-flex items-center justify-center w-5.5 h-5.5 sm:w-6 sm:h-6 rounded-lg border border-slate-200 bg-white text-slate-600 hover:bg-slate-50 hover:text-slate-900 disabled:opacity-25 disabled:cursor-not-allowed transition-all cursor-pointer shadow-xs shrink-0"
+                      title="Previous day"
+                    >
+                      <ChevronLeft className="w-3 h-3 sm:w-3.5 sm:h-3.5" />
+                    </button>
 
+                    {activeDay.isToday ? (
+                      <div className="inline-flex items-center justify-center px-2 sm:px-2.5 py-0.5 rounded-full bg-gradient-to-r from-indigo-500/10 via-indigo-500/20 to-purple-500/10 border border-indigo-400/50 shadow-xs ring-1 ring-indigo-400/30 truncate shrink">
+                        <span className="text-[10px] sm:text-[11px] font-black text-indigo-950 uppercase tracking-wider truncate">
+                          {activeDay.label}
+                        </span>
+                      </div>
+                    ) : (
+                      <span className="text-[10px] sm:text-[11px] font-black text-slate-800 uppercase tracking-wider px-1 py-0.5 truncate shrink">
+                        {activeDay.label}
+                      </span>
+                    )}
+
+                    <button
+                      type="button"
+                      onClick={handleNextDayClick}
+                      disabled={!canGoNextDay}
+                      className="inline-flex items-center justify-center w-5.5 h-5.5 sm:w-6 sm:h-6 rounded-lg border border-slate-200 bg-white text-slate-600 hover:bg-slate-50 hover:text-slate-900 disabled:opacity-25 disabled:cursor-not-allowed transition-all cursor-pointer shadow-xs shrink-0"
+                      title="Next day"
+                    >
+                      <ChevronRight className="w-3 h-3 sm:w-3.5 sm:h-3.5" />
+                    </button>
+                  </>
+                )}
+              </div>
+
+              {/* Right Slot: Toggle Switch */}
+              <div className="inline-flex items-center p-0.5 rounded-full bg-slate-100 border border-slate-200 shadow-2xs shrink-0">
                 <button
                   type="button"
-                  onClick={handleNextWeekClick}
-                  disabled={!canGoNextWeek}
-                  className="inline-flex items-center justify-center w-7 h-7 rounded-lg border border-slate-200 bg-white text-slate-600 hover:bg-slate-50 hover:text-slate-900 disabled:opacity-25 disabled:cursor-not-allowed transition-all cursor-pointer shadow-xs"
-                  title="Next week"
+                  onClick={() => setViewMode("weekly")}
+                  className={`px-2 sm:px-2.5 py-0.5 text-[10px] sm:text-[11px] font-bold rounded-full transition-all cursor-pointer whitespace-nowrap ${
+                    viewMode === "weekly"
+                      ? "bg-indigo-600 text-white shadow-xs"
+                      : "text-slate-600 hover:text-slate-900"
+                  }`}
                 >
-                  <ChevronRight className="w-3.5 h-3.5" />
+                  Weekly
+                </button>
+                <button
+                  type="button"
+                  onClick={() => setViewMode("daily")}
+                  className={`px-2 sm:px-2.5 py-0.5 text-[10px] sm:text-[11px] font-bold rounded-full transition-all cursor-pointer whitespace-nowrap ${
+                    viewMode === "daily"
+                      ? "bg-indigo-600 text-white shadow-xs"
+                      : "text-slate-600 hover:text-slate-900"
+                  }`}
+                >
+                  Daily Top 10
                 </button>
               </div>
             </div>
 
-            {/* Weekly top-10 table */}
-            {isWeekLoading || isWeekFetching ? (
+            {/* Table Rendering inside rounded sub-card */}
+            {(viewMode === "weekly" ? (isWeekLoading || isWeekFetching) : (isDailyLoading || isDailyFetching)) ? (
               <TableSkeleton rows={10} />
-            ) : filteredWeekLeaderboard.length === 0 ? (
+            ) : (viewMode === "weekly" ? filteredWeekLeaderboard.length === 0 : filteredDailyLeaderboard.length === 0) ? (
               <div className="p-12 text-center">
                 <div className="w-12 h-12 rounded-2xl bg-amber-50 text-amber-500 border border-amber-100 flex items-center justify-center mx-auto mb-3">
                   <Trophy className="w-6 h-6" />
                 </div>
-                <h4 className="text-sm font-bold text-slate-800 mb-1">No records for {activeWeek.label}</h4>
-                <p className="text-xs text-slate-500">No team members logged platform hours during this week.</p>
+                <h4 className="text-sm font-bold text-slate-800 mb-1">
+                  {viewMode === "weekly"
+                    ? `No records for ${activeWeek.label}`
+                    : `No daily records for ${activeDay.isToday ? "today" : activeDay.label}`}
+                </h4>
+                <p className="text-xs text-slate-500">
+                  {viewMode === "weekly"
+                    ? "No team members logged platform hours during this week."
+                    : `No team members logged platform hours on ${activeDay.isToday ? "today" : activeDay.label}.`}
+                </p>
               </div>
             ) : (
-              <>
-                <div className="divide-y divide-slate-100/80">
-                  {filteredWeekLeaderboard.map((row) => {
+              <div className="p-2 sm:p-2.5">
+                <div className="bg-white border border-slate-200/80 rounded-2xl shadow-xs overflow-hidden">
+                  <div className="divide-y divide-slate-100/80">
+                  {(viewMode === "weekly" ? filteredWeekLeaderboard : filteredDailyLeaderboard).map((row) => {
+                    const activeUserItem = viewMode === "weekly" ? userWeekRankItem : userDailyRankItem;
                     const isCurrentUser =
-                      userWeekRankItem?.user_email &&
-                      row.user_email?.toLowerCase().trim() === userWeekRankItem.user_email.toLowerCase().trim();
+                      activeUserItem?.user_email &&
+                      row.user_email?.toLowerCase().trim() === activeUserItem.user_email.toLowerCase().trim();
 
-                    // Row color based on rank
                     const rowBg =
                       isCurrentUser
                         ? "bg-indigo-50/70 ring-2 ring-inset ring-indigo-400/40"
@@ -1228,8 +1735,8 @@ const LeaderboardPage = () => {
                         </div>
 
                         {/* Employee */}
-                        <div className="sm:col-span-8 flex items-center gap-3 min-w-0 w-full">
-                          <UserAvatar
+                        <div className="sm:col-span-6 flex items-center gap-3 min-w-0 w-full">
+                          <LeaderboardAvatar
                             src={row.avatar_url}
                             name={row.employee_name || row.user_email}
                             size="md"
@@ -1239,14 +1746,9 @@ const LeaderboardPage = () => {
                               <span className="font-bold text-slate-900 text-sm truncate">
                                 {formatFirstAndLastName(row.employee_name, row.user_email)}
                               </span>
-                              <RankChangeBadge
-                                currentRank={row.rank}
-                                prevRank={prevWeekRankMap[(row.user_email || "").toLowerCase().trim()]}
-                                hasPrevData={hasPrevWeekData}
-                              />
                               {row.rank === 1 && (
                                 <span className="inline-flex items-center gap-1 px-2 py-0.5 rounded-full bg-amber-100 text-amber-800 border border-amber-300/70 text-[10px] font-black uppercase tracking-wider shadow-2xs">
-                                  <Trophy className="w-2.5 h-2.5 text-amber-600" /> MVP
+                                  <Trophy className="w-2.5 h-2.5 text-amber-600" /> 1ST
                                 </span>
                               )}
                               {row.rank === 2 && (
@@ -1268,6 +1770,17 @@ const LeaderboardPage = () => {
                           </div>
                         </div>
 
+                        {/* Rank Change (Dedicated Column matching Monthly Table) */}
+                        <div className="sm:col-span-2 flex items-center justify-start sm:justify-center w-full">
+                          {viewMode === "weekly" && (
+                            <RankChangeBadge
+                              currentRank={row.rank}
+                              prevRank={prevWeekRankMap[(row.user_email || "").toLowerCase().trim()]}
+                              hasPrevData={hasPrevWeekData}
+                            />
+                          )}
+                        </div>
+
                         {/* Hours */}
                         <div className="sm:col-span-3 text-left sm:text-right w-full pr-2">
                           <span className="font-mono text-base font-extrabold text-indigo-900">{row.active_hours}h</span>
@@ -1276,41 +1789,68 @@ const LeaderboardPage = () => {
                     );
                   })}
                 </div>
-              </>
+              </div>
+            </div>
             )}
           </div>
 
           {/* User's rank (if not in top 10) */}
-          {userWeekRankItem && !filteredWeekLeaderboard.some(
-            (r) => r.user_email?.toLowerCase().trim() === userWeekRankItem.user_email?.toLowerCase().trim()
-          ) && (
-              <div className="pt-0.5">
-                <div className="group relative flex flex-col sm:grid sm:grid-cols-12 items-center gap-3 p-2.5 sm:px-4 sm:py-2.5 rounded-2xl bg-white border-2 border-indigo-400/90 shadow-lg shadow-indigo-500/10 ring-4 ring-indigo-500/10 transition-all duration-300 hover:-translate-y-0.5 cursor-default">
-                  <div className="sm:col-span-1 flex items-center justify-center">
-                    <span className="w-8 h-8 rounded-xl text-xs font-black flex items-center justify-center font-mono bg-indigo-600 text-white shadow-xs">
-                      #{userWeekRankItem.rank}
-                    </span>
-                  </div>
-                  <div className="sm:col-span-8 flex items-center gap-3 min-w-0 w-full">
-                    <UserAvatar src={userWeekRankItem.avatar_url} name={userWeekRankItem.employee_name || userWeekRankItem.user_email} size="md" />
-                    <div className="min-w-0 flex-1">
-                      <div className="flex items-center gap-2">
-                        <span className="font-bold text-slate-900 text-sm truncate">
-                          {formatFirstAndLastName(userWeekRankItem.employee_name, userWeekRankItem.user_email)}
-                        </span>
-                        <span className="inline-flex items-center gap-1 px-2.5 py-0.5 rounded-full bg-indigo-600 text-white text-[10px] font-black uppercase tracking-wider shadow-xs">YOU</span>
+          {(() => {
+            const activeUserItem = viewMode === "weekly" ? userWeekRankItem : userDailyRankItem;
+            const currentList = viewMode === "weekly" ? filteredWeekLeaderboard : filteredDailyLeaderboard;
+            if (
+              activeUserItem &&
+              !currentList.some(
+                (r) => r.user_email?.toLowerCase().trim() === activeUserItem.user_email?.toLowerCase().trim()
+              )
+            ) {
+              return (
+                <div className="pt-0.5">
+                  <div className="group relative flex flex-col sm:grid sm:grid-cols-12 items-center gap-3 p-2.5 sm:px-4 sm:py-2.5 rounded-2xl bg-white border-2 border-indigo-400/90 shadow-lg shadow-indigo-500/10 ring-4 ring-indigo-500/10 transition-all duration-300 hover:-translate-y-0.5 cursor-default">
+                    <div className="sm:col-span-1 flex items-center justify-center">
+                      <span className="w-8 h-8 rounded-xl text-xs font-black flex items-center justify-center font-mono bg-indigo-600 text-white shadow-xs">
+                        #{activeUserItem.rank}
+                      </span>
+                    </div>
+                    <div className="sm:col-span-6 flex items-center gap-3 min-w-0 w-full">
+                      <LeaderboardAvatar src={activeUserItem.avatar_url} name={activeUserItem.employee_name || activeUserItem.user_email} size="md" />
+                      <div className="min-w-0 flex-1">
+                        <div className="flex items-center gap-2">
+                          <span className="font-bold text-slate-900 text-sm truncate">
+                            {formatFirstAndLastName(activeUserItem.employee_name, activeUserItem.user_email)}
+                          </span>
+                          <span className="inline-flex items-center gap-1 px-2.5 py-0.5 rounded-full bg-indigo-600 text-white text-[10px] font-black uppercase tracking-wider shadow-xs">YOU</span>
+                        </div>
                       </div>
                     </div>
-                  </div>
-                  <div className="sm:col-span-3 text-left sm:text-right w-full pr-2">
-                    <span className="font-mono text-base font-extrabold text-indigo-900">{userWeekRankItem.active_hours}h</span>
+                    <div className="sm:col-span-2 flex items-center justify-center w-full">
+                      {viewMode === "weekly" && (
+                        <RankChangeBadge
+                          currentRank={activeUserItem.rank}
+                          prevRank={prevWeekRankMap[(activeUserItem.user_email || "").toLowerCase().trim()]}
+                          hasPrevData={hasPrevWeekData}
+                        />
+                      )}
+                    </div>
+                    <div className="sm:col-span-3 text-left sm:text-right w-full pr-2">
+                      <span className="font-mono text-base font-extrabold text-indigo-900">{activeUserItem.active_hours}h</span>
+                    </div>
                   </div>
                 </div>
-              </div>
-            )}
+              );
+            }
+            return null;
+          })()}
         </div>
       </div>
 
+      {/* Close 2-Column Grid */}
+      </div>
+
+      {/* ── Project-Wise Top 3 Rankings (Full-Width Standalone Section Across Both Columns) ── */}
+      <div className="w-full">
+        <ProjectWiseLeaderboardSection />
+      </div>
     </div>
   );
 };
