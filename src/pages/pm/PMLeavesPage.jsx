@@ -473,7 +473,7 @@ const PMLeavesPage = () => {
   const filteredWFH = teamWfh.filter((w) => {
     const name = nameSearchText(
       w.employee_name ||
-        employees.find((e) => e.id === w.employee_id)?.name,
+      employees.find((e) => e.id === w.employee_id)?.name,
     );
     const reason = (w.reason || "").toLowerCase();
     const q = searchQuery.toLowerCase();
@@ -513,11 +513,10 @@ const PMLeavesPage = () => {
               <button
                 key={tab}
                 onClick={() => handleTabChange(tab)}
-                className={`inline-flex items-center gap-1.5 px-3.5 py-1.5 text-[13px] font-semibold rounded-md transition-all whitespace-nowrap ${
-                  isActive
+                className={`inline-flex items-center gap-1.5 px-3.5 py-1.5 text-[13px] font-semibold rounded-md transition-all whitespace-nowrap ${isActive
                     ? "bg-white text-slate-900 shadow-sm ring-1 ring-slate-200/70"
                     : "text-slate-500 hover:text-slate-800"
-                }`}
+                  }`}
               >
                 {tab === "WFH Requests" ? (
                   <>
@@ -545,108 +544,108 @@ const PMLeavesPage = () => {
         <div className="flex items-center gap-2">
           {(activeTab === "Leave Requests" ||
             activeTab === "WFH Requests") && (
-            <div ref={filtersRef} className="relative shrink-0">
-              <button
-                type="button"
-                onClick={() => setFiltersOpen((o) => !o)}
-                className="inline-flex items-center gap-2 h-9 px-3 rounded-lg border border-slate-200 bg-white text-[13px] font-medium text-slate-700 hover:bg-slate-50 transition-colors"
-              >
-                <Filter className="w-4 h-4 text-slate-500" />
-                Filters
-                {activeFilterCount > 0 && (
-                  <span className="inline-flex items-center justify-center h-4 min-w-4 px-1 rounded-full bg-indigo-600 text-white text-[10px] font-semibold">
-                    {activeFilterCount}
-                  </span>
-                )}
-              </button>
-              {filtersOpen && (
-                <div className="absolute left-0 mt-1.5 z-40 w-64 bg-white rounded-xl shadow-xl border border-slate-200 p-3 space-y-3">
-                  <div className="space-y-1.5">
-                    <label className="text-[11px] font-semibold uppercase tracking-wide text-slate-400">
-                      Status
-                    </label>
-                    <Dropdown
-                      options={[
-                        { value: "all", label: "All Status" },
-                        { value: "pending", label: "Pending" },
-                        { value: "approved", label: "Approved" },
-                        { value: "rejected", label: "Rejected" },
-                      ]}
-                      value={statusFilter}
-                      onChange={(v) => {
-                        setStatusFilter(v);
-                        setCurrentPage(1);
-                      }}
-                      placeholder="All Status"
-                      optionsClassName="w-full"
-                    />
-                  </div>
-                  <div className="flex items-center justify-between rounded-lg border border-slate-200 px-3 py-2">
-                    <span className="text-[13px] font-medium text-slate-600">
-                      {activeTab === "WFH Requests"
-                        ? "Today's WFH"
-                        : "Today's Leaves"}
-                    </span>
-                    <button
-                      type="button"
-                      onClick={() => {
-                        setTodayOnly((t) => !t);
-                        setCurrentPage(1);
-                      }}
-                      className={`inline-flex h-5 w-9 items-center rounded-full transition-colors ${todayOnly ? "bg-indigo-600" : "bg-slate-200"}`}
-                    >
-                      <span
-                        className={`inline-block h-4 w-4 transform rounded-full bg-white transition-transform ${todayOnly ? "translate-x-4" : "translate-x-0.5"}`}
-                      />
-                    </button>
-                  </div>
+              <div ref={filtersRef} className="relative shrink-0">
+                <button
+                  type="button"
+                  onClick={() => setFiltersOpen((o) => !o)}
+                  className="inline-flex items-center gap-2 h-9 px-3 rounded-lg border border-slate-200 bg-white text-[13px] font-medium text-slate-700 hover:bg-slate-50 transition-colors"
+                >
+                  <Filter className="w-4 h-4 text-slate-500" />
+                  Filters
                   {activeFilterCount > 0 && (
-                    <button
-                      type="button"
-                      onClick={() => {
-                        setStatusFilter("all");
-                        setTodayOnly(false);
-                        setCurrentPage(1);
-                      }}
-                      className="w-full text-center pt-2.5 text-xs font-medium text-indigo-600 hover:text-indigo-700 border-t border-slate-100"
-                    >
-                      Clear filters
-                    </button>
+                    <span className="inline-flex items-center justify-center h-4 min-w-4 px-1 rounded-full bg-indigo-600 text-white text-[10px] font-semibold">
+                      {activeFilterCount}
+                    </span>
                   )}
-                </div>
-              )}
-            </div>
-          )}
+                </button>
+                {filtersOpen && (
+                  <div className="absolute left-0 mt-1.5 z-40 w-64 bg-white rounded-xl shadow-xl border border-slate-200 p-3 space-y-3">
+                    <div className="space-y-1.5">
+                      <label className="text-[11px] font-semibold uppercase tracking-wide text-slate-400">
+                        Status
+                      </label>
+                      <Dropdown
+                        options={[
+                          { value: "all", label: "All Status" },
+                          { value: "pending", label: "Pending" },
+                          { value: "approved", label: "Approved" },
+                          { value: "rejected", label: "Rejected" },
+                        ]}
+                        value={statusFilter}
+                        onChange={(v) => {
+                          setStatusFilter(v);
+                          setCurrentPage(1);
+                        }}
+                        placeholder="All Status"
+                        optionsClassName="w-full"
+                      />
+                    </div>
+                    <div className="flex items-center justify-between rounded-lg border border-slate-200 px-3 py-2">
+                      <span className="text-[13px] font-medium text-slate-600">
+                        {activeTab === "WFH Requests"
+                          ? "Today's WFH"
+                          : "Today's Leaves"}
+                      </span>
+                      <button
+                        type="button"
+                        onClick={() => {
+                          setTodayOnly((t) => !t);
+                          setCurrentPage(1);
+                        }}
+                        className={`inline-flex h-5 w-9 items-center rounded-full transition-colors ${todayOnly ? "bg-indigo-600" : "bg-slate-200"}`}
+                      >
+                        <span
+                          className={`inline-block h-4 w-4 transform rounded-full bg-white transition-transform ${todayOnly ? "translate-x-4" : "translate-x-0.5"}`}
+                        />
+                      </button>
+                    </div>
+                    {activeFilterCount > 0 && (
+                      <button
+                        type="button"
+                        onClick={() => {
+                          setStatusFilter("all");
+                          setTodayOnly(false);
+                          setCurrentPage(1);
+                        }}
+                        className="w-full text-center pt-2.5 text-xs font-medium text-indigo-600 hover:text-indigo-700 border-t border-slate-100"
+                      >
+                        Clear filters
+                      </button>
+                    )}
+                  </div>
+                )}
+              </div>
+            )}
           {(activeTab === "Leave Requests" ||
             activeTab === "WFH Requests") && (
-            <div className="shrink-0">
-              <Dropdown
-                options={[
-                  { value: "", label: "Sort: Default" },
-                  {
-                    value: "asc",
-                    label:
-                      activeTab === "WFH Requests"
-                        ? "WFH date: Jan → Dec"
-                        : "Start date: Jan → Dec",
-                  },
-                  {
-                    value: "desc",
-                    label:
-                      activeTab === "WFH Requests"
-                        ? "WFH date: Dec → Jan"
-                        : "Start date: Dec → Jan",
-                  },
-                ]}
-                value={dateSort}
-                onChange={(v) => {
-                  setDateSort(v);
-                  setCurrentPage(1);
-                }}
-                placeholder="Sort by date"
-              />
-            </div>
-          )}
+              <div className="shrink-0">
+                <Dropdown
+                  options={[
+                    { value: "", label: "Sort: Default" },
+                    {
+                      value: "asc",
+                      label:
+                        activeTab === "WFH Requests"
+                          ? "WFH date: Jan → Dec"
+                          : "Start date: Jan → Dec",
+                    },
+                    {
+                      value: "desc",
+                      label:
+                        activeTab === "WFH Requests"
+                          ? "WFH date: Dec → Jan"
+                          : "Start date: Dec → Jan",
+                    },
+                  ]}
+                  value={dateSort}
+                  onChange={(v) => {
+                    setDateSort(v);
+                    setCurrentPage(1);
+                  }}
+                  placeholder="Sort by date"
+                />
+              </div>
+            )}
           {activeTab !== "Calendar" && activeTab !== "Employee KPI" && (
             <SearchBar
               responsive
@@ -822,7 +821,7 @@ const PMLeavesPage = () => {
                         <>
                           day (
                           {leave.half_day_slot === "first_half" ||
-                          leave.half_day_slot === "1st Half"
+                            leave.half_day_slot === "1st Half"
                             ? "1st Half"
                             : "2nd Half"}
                           )
@@ -1163,11 +1162,10 @@ const PMLeavesPage = () => {
                   key={preset}
                   type="button"
                   onClick={() => setWfhRemark(preset)}
-                  className={`px-2.5 py-1 rounded-lg border text-[11px] font-semibold transition-colors ${
-                    wfhRemark === preset
+                  className={`px-2.5 py-1 rounded-lg border text-[11px] font-semibold transition-colors ${wfhRemark === preset
                       ? "bg-indigo-600 text-white border-indigo-600"
                       : "bg-slate-50 text-slate-600 border-slate-200 hover:bg-slate-100"
-                  }`}
+                    }`}
                 >
                   {preset}
                 </button>
@@ -1273,7 +1271,7 @@ const PMLeavesPage = () => {
             </div>
             <div>
               {selectedLeaveType === "first_half" ||
-              selectedLeaveType === "second_half" ? (
+                selectedLeaveType === "second_half" ? (
                 <div>
                   <label className="block text-sm font-medium text-gray-700 mb-1">
                     Date <span className="text-red-500">*</span>
@@ -1326,37 +1324,37 @@ const PMLeavesPage = () => {
             </div>
             {(selectedLeaveType === "first_half" ||
               selectedLeaveType === "second_half") && (
-              <div className="rounded-xl border border-indigo-150 bg-indigo-50/50 p-4 text-sm text-indigo-900 space-y-2">
-                <div className="flex items-center gap-1.5 font-semibold text-indigo-950">
-                  <Clock className="w-4 h-4 text-indigo-600" /> Half-day Leave
-                  Policy &amp; Slots
-                </div>
-                <div className="grid grid-cols-1 sm:grid-cols-2 gap-3 text-xs">
-                  <div className="p-2.5 bg-white rounded-lg border border-indigo-100/80">
-                    <p className="font-semibold text-indigo-950">
-                      First Half-day Leave
-                    </p>
-                    <p className="text-slate-600 mt-0.5">
-                      🕒 Slot: 9:00 AM – 2:00 PM
-                    </p>
-                    <p className="text-slate-500 mt-1 font-medium italic">
-                      ⚠️ Apply at least one day in advance.
-                    </p>
+                <div className="rounded-xl border border-indigo-150 bg-indigo-50/50 p-4 text-sm text-indigo-900 space-y-2">
+                  <div className="flex items-center gap-1.5 font-semibold text-indigo-950">
+                    <Clock className="w-4 h-4 text-indigo-600" /> Half-day Leave
+                    Policy &amp; Slots
                   </div>
-                  <div className="p-2.5 bg-white rounded-lg border border-indigo-100/80">
-                    <p className="font-semibold text-indigo-950">
-                      Second Half-day Leave
-                    </p>
-                    <p className="text-slate-600 mt-0.5">
-                      🕒 Slot: 2:00 PM – 7:00 PM
-                    </p>
-                    <p className="text-slate-500 mt-1 font-medium italic">
-                      ⚠️ Apply before 2:00 PM on the same day.
-                    </p>
+                  <div className="grid grid-cols-1 sm:grid-cols-2 gap-3 text-xs">
+                    <div className="p-2.5 bg-white rounded-lg border border-indigo-100/80">
+                      <p className="font-semibold text-indigo-950">
+                        First Half-day Leave
+                      </p>
+                      <p className="text-slate-600 mt-0.5">
+                        🕒 Slot: 9:00 AM – 2:00 PM
+                      </p>
+                      <p className="text-slate-500 mt-1 font-medium italic">
+                        ⚠️ Apply at least one day in advance.
+                      </p>
+                    </div>
+                    <div className="p-2.5 bg-white rounded-lg border border-indigo-100/80">
+                      <p className="font-semibold text-indigo-950">
+                        Second Half-day Leave
+                      </p>
+                      <p className="text-slate-600 mt-0.5">
+                        🕒 Slot: 2:00 PM – 7:00 PM
+                      </p>
+                      <p className="text-slate-500 mt-1 font-medium italic">
+                        ⚠️ Apply before 2:00 PM on the same day.
+                      </p>
+                    </div>
                   </div>
                 </div>
-              </div>
-            )}
+              )}
           </Modal.Body>
           <Modal.Footer>
             <Button
