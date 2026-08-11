@@ -118,11 +118,11 @@ const AdminPerformancePage = () => {
     queryKey: ["employees"],
     queryFn: employeeApi.getAll,
   });
-  const { data: projects = [] } = useQuery({
+  const { data: projects = [], isLoading: projectsLoading } = useQuery({
     queryKey: ["sub-projects"],
     queryFn: subProjectApi.getAll,
   });
-  const { data: mainProjects = [] } = useQuery({
+  const { data: mainProjects = [], isLoading: mainProjectsLoading } = useQuery({
     queryKey: ["parent-projects"],
     queryFn: parentProjectApi.getAll,
     staleTime: 5 * 60 * 1000,
@@ -132,6 +132,8 @@ const AdminPerformancePage = () => {
     queryKey: ["perf-evals", "all"],
     queryFn: () => perfEvalApi.getAll(),
   });
+
+  const isLoading = empLoading || evalLoading || projectsLoading || mainProjectsLoading;
 
   const [tab, setTab] = useState("employees"); // 'employees' | 'pm'
   const [search, setSearch] = useState("");
@@ -228,8 +230,6 @@ const AdminPerformancePage = () => {
       Math.round((vals.reduce((a, b) => a + b, 0) / vals.length) * 100) / 100
     );
   }, [employeeEvals]);
-
-  const isLoading = empLoading || evalLoading;
 
   const reviewColumns = [
     {
@@ -585,7 +585,7 @@ const AdminPerformancePage = () => {
               columns={reviewColumns}
               data={[]}
               loading
-              skeletonRows={8}
+              skeletonRows={10}
             />
           ) : employeeEvals.length === 0 ? (
             <div className="rounded-3xl border border-dashed border-slate-200 bg-white p-12 text-center shadow-sm">

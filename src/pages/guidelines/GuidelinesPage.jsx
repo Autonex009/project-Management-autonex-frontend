@@ -68,21 +68,23 @@ const GuidelinesPage = () => {
   const params = {};
   if (filterProject) params.main_project_id = filterProject;
   if (role === "pm" && user.id) params.uploaded_by = user.id;
-  const { data: guidelines = [], isLoading } = useQuery({
+  const { data: guidelines = [], isLoading: guidelinesLoading } = useQuery({
     queryKey: ["guidelines", filterProject, role, user.id],
     queryFn: () => guidelineApi.getAll(params),
   });
 
   // Fetch main projects for filter/selector
-  const { data: mainProjects = [] } = useQuery({
+  const { data: mainProjects = [], isLoading: mainProjectsLoading } = useQuery({
     queryKey: ["main-projects"],
     queryFn: projectApi.getAll,
   });
 
-  const { data: subProjects = [] } = useQuery({
+  const { data: subProjects = [], isLoading: subProjectsLoading } = useQuery({
     queryKey: ["sub-projects"],
     queryFn: subProjectApi.getAll,
   });
+
+  const isLoading = guidelinesLoading || mainProjectsLoading || subProjectsLoading;
 
   const visibleMainProjects = isPm
     ? getPmVisibleOrgs(mainProjects, subProjects, pmEmployeeId)
@@ -551,7 +553,7 @@ const GuidelinesPage = () => {
         columns={columns}
         data={filteredGuidelines}
         loading={isLoading}
-        skeletonRows={8}
+        skeletonRows={12}
         currentPage={page}
         pageSize={PAGE_SIZE}
         onPageChange={setPage}

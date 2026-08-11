@@ -133,7 +133,7 @@ const LeavesPage = () => {
     queryFn: leaveApi.getAll,
   });
 
-  const { data: employees = [] } = useQuery({
+  const { data: employees = [], isLoading: employeesLoading } = useQuery({
     queryKey: ["employees"],
     queryFn: employeeApi.getAll,
   });
@@ -806,7 +806,8 @@ const LeavesPage = () => {
           currentPage={currentPage}
           pageSize={PAGE_SIZE}
           onPageChange={setCurrentPage}
-          loading={isLoading}
+          loading={isLoading || employeesLoading}
+          skeletonRows={10}
           emptyState={{
             title: "No leaves recorded yet",
             description: "Try adjusting your search query",
@@ -822,7 +823,8 @@ const LeavesPage = () => {
         <Table
           variant="untitled"
           allowOverflow
-          loading={wfhLoading}
+          loading={wfhLoading || employeesLoading}
+          skeletonRows={10}
           columns={[
             {
               key: "employee_name",

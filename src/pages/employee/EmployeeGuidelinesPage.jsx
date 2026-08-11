@@ -7,19 +7,21 @@ const EmployeeGuidelinesPage = () => {
   const user = JSON.parse(localStorage.getItem("user") || "{}");
   const employeeId = user.employee_id;
 
-  const { data: allocations = [] } = useQuery({
+  const { data: allocations = [], isLoading: allocLoading } = useQuery({
     queryKey: ["my-allocations", employeeId],
     queryFn: () => allocationApi.getByEmployee(employeeId),
     enabled: !!employeeId,
   });
-  const { data: projects = [] } = useQuery({
+  const { data: projects = [], isLoading: projectsLoading } = useQuery({
     queryKey: ["sub-projects"],
     queryFn: subProjectApi.getAll,
   });
-  const { data: allGuidelines = [], isLoading } = useQuery({
+  const { data: allGuidelines = [], isLoading: guidelinesLoading } = useQuery({
     queryKey: ["guidelines"],
     queryFn: () => guidelineApi.getAll(),
   });
+
+  const isLoading = guidelinesLoading || allocLoading || projectsLoading;
 
   const myProjectIds = new Set(allocations.map((a) => a.sub_project_id));
   const myProjects = projects.filter((p) => myProjectIds.has(p.id));

@@ -76,7 +76,12 @@ export default function ChangeLogPage() {
     page_size: PAGE_SIZE,
     ...(search.trim() ? { search: search.trim() } : {}),
     ...(category !== "All" ? { category } : {}),
-    ...(actorRole !== "All" ? { actor_role: actorRole.toLowerCase() } : {}),
+    ...(actorRole !== "All"
+      ? {
+          actor_role:
+            actorRole === "Team Lead" ? "team_lead" : actorRole.toLowerCase(),
+        }
+      : {}),
     ...(dateFrom ? { date_from: dateFrom } : {}),
     ...(dateTo ? { date_to: dateTo } : {}),
   };
@@ -97,8 +102,29 @@ export default function ChangeLogPage() {
     queryFn: auditLogApi.getFilters,
   });
 
-  const logs = result?.items || [];
-  const total = result?.total ?? 0;
+  const rawLogs = result?.items || [];
+  const logs = useMemo(() => {
+    if (actorRole === "All") return rawLogs;
+    const roleClean = actorRole.toLowerCase().replace(/\s+/g, "_");
+    const roleSpaced = actorRole.toLowerCase();
+
+    return rawLogs.filter((item) => {
+      const r = (item.actor?.role || item.actor_role || "").toLowerCase().trim();
+      if (!r) return true;
+      if (actorRole === "Team Lead") {
+        return (
+          r === "team_lead" ||
+          r === "team lead" ||
+          r === "teamlead" ||
+          r === "tl" ||
+          r.includes("lead")
+        );
+      }
+      return r === roleClean || r === roleSpaced;
+    });
+  }, [rawLogs, actorRole]);
+
+  const total = result?.total ?? logs.length;
   const totalPages = Math.ceil(total / PAGE_SIZE) || 1;
 
   const categoryOptions = useMemo(
@@ -116,6 +142,7 @@ export default function ChangeLogPage() {
       { value: "PM", label: "PM" },
       { value: "Employee", label: "Employee" },
       { value: "HR", label: "HR" },
+      { value: "Team Lead", label: "Team Lead" },
     ],
     []
   );
@@ -245,8 +272,8 @@ export default function ChangeLogPage() {
   return (
     <div className="bg-white min-h-screen p-6 space-y-6">
 
-      {/* Toolbar & Controls */}
-      <div className="flex flex-wrap items-center justify-between gap-3">
+      {/* Toolbar & Controls (Strictly Single Horizontal Line) */}
+      <div className="flex items-center justify-between gap-3 overflow-x-auto pb-1 select-none">
 
         {/* LEFT: Role tabs */}
         <div className="flex items-center gap-1 bg-slate-100/70 rounded-lg p-1 shrink-0">
@@ -257,7 +284,7 @@ export default function ChangeLogPage() {
                 key={value}
                 type="button"
                 onClick={() => { setActorRole(value); setPage(1); }}
-                className={`px-3 py-1 rounded-md text-sm font-medium transition-all whitespace-nowrap ${isActive
+                className={`px-2.5 sm:px-3 py-1 rounded-md text-xs sm:text-sm font-medium transition-all whitespace-nowrap ${isActive
                     ? "bg-white text-indigo-700 shadow-sm ring-1 ring-slate-200/80 font-semibold"
                     : "text-slate-500 hover:text-slate-800 hover:bg-white/60"
                   }`}
@@ -269,22 +296,22 @@ export default function ChangeLogPage() {
         </div>
 
         {/* RIGHT: Search + filters + refresh */}
-        <div className="flex flex-wrap items-center gap-3">
+        <div className="flex items-center gap-2.5 shrink-0">
           {/* Filter by keyword search box */}
-          <div className="relative">
+          <div className="relative shrink-0">
             <input
               type="text"
               value={searchInput}
               onChange={(e) => setSearchInput(e.target.value)}
               placeholder="Filter by keyword"
-              className="w-56 rounded-md border border-slate-300 bg-white px-3 py-1.5 text-sm text-slate-800 placeholder:text-slate-400 focus:border-blue-500 focus:outline-none focus:ring-1 focus:ring-blue-500"
+              className="w-48 sm:w-56 rounded-md border border-slate-300 bg-white px-3 py-1.5 text-sm text-slate-800 placeholder:text-slate-400 focus:border-blue-500 focus:outline-none focus:ring-1 focus:ring-blue-500"
             />
             <Search className="absolute right-2.5 top-2.5 h-4 w-4 text-slate-400 pointer-events-none" />
           </div>
 
           {/* Filter by Time dropdown */}
           <Dropdown
-            className="w-[215px] shrink-0"
+            className="w-[195px] sm:w-[215px] shrink-0"
             options={TIME_FILTER_OPTIONS}
             value={timeFilter}
             onChange={handleTimeFilterChange}
@@ -292,7 +319,7 @@ export default function ChangeLogPage() {
 
           {/* Custom date range selector */}
           {showCustomDateModal && (
-            <div className="w-60 shrink-0">
+            <div className="w-56 sm:w-60 shrink-0">
               <DatePicker
                 type="range"
                 startDate={dateFrom}
@@ -309,7 +336,7 @@ export default function ChangeLogPage() {
 
           {/* Category filter */}
           <Dropdown
-            className="w-44 shrink-0"
+            className="w-36 sm:w-44 shrink-0"
             options={categoryOptions}
             value={category}
             onChange={(v) => {
@@ -323,7 +350,7 @@ export default function ChangeLogPage() {
             type="button"
             onClick={() => refetch()}
             title="Refresh audit log"
-            className="inline-flex items-center gap-1.5 text-sm font-medium text-slate-700 hover:text-blue-600 transition-colors"
+            className="inline-flex items-center gap-1.5 text-sm font-medium text-slate-700 hover:text-blue-600 transition-colors shrink-0 whitespace-nowrap"
           >
             <RefreshCw className={`h-4 w-4 text-slate-500 ${isFetching ? "animate-spin" : ""}`} />
             Refresh
