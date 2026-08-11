@@ -52,15 +52,25 @@ const CompactField = ({ icon: Icon, label, value, color = "emerald" }) => {
 };
 
 /* ── Editable Email Inline Card ─────────────────────────────────── */
-const COMPANY_DOMAIN = "autonexai360.com";
-
-const EmailCard = ({ value, onSave, isSaving, error, onDismissError }) => {
+const EmailCard = ({ value, onRequestOTP, onVerifyOTP, isRequesting, isVerifying, error, onDismissError }) => {
   const [editing, setEditing] = useState(false);
+  const [step, setStep] = useState(1); // 1 = Request, 2 = Verify
   const [draft, setDraft] = useState("");
+  const [otp, setOtp] = useState("");
+  const [timeLeft, setTimeLeft] = useState(600); // 10 minutes
+
+  useEffect(() => {
+    let timer;
+    if (step === 2 && timeLeft > 0) {
+      timer = setInterval(() => setTimeLeft((prev) => prev - 1), 1000);
+    }
+    return () => clearInterval(timer);
+  }, [step, timeLeft]);
 
   const start = () => {
-    const localPart = (value || "").split("@")[0] || "";
-    setDraft(localPart ? `${localPart}@${COMPANY_DOMAIN}` : `@${COMPANY_DOMAIN}`);
+    setDraft(value || "");
+    setStep(1);
+    setOtp("");
     onDismissError();
     setEditing(true);
   };
@@ -71,14 +81,35 @@ const EmailCard = ({ value, onSave, isSaving, error, onDismissError }) => {
   };
 
   const trimmed = draft.trim().toLowerCase();
-  const domainOk = trimmed.endsWith(`@${COMPANY_DOMAIN}`);
-  const hasLocalPart = trimmed.split("@")[0].length > 0;
+  const isValidEmail = /^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(trimmed);
   const unchanged = trimmed === (value || "").trim().toLowerCase();
-  const canSave = domainOk && hasLocalPart && !unchanged && !isSaving;
+  const canRequest = isValidEmail && !unchanged && !isRequesting;
 
-  const submit = (e) => {
+  const canVerify = otp.length === 6 && !isVerifying;
+
+  const handleRequest = (e) => {
     e.preventDefault();
-    if (canSave) onSave(trimmed, () => setEditing(false));
+    if (canRequest) {
+      onRequestOTP(trimmed, () => {
+        setStep(2);
+        setTimeLeft(600);
+      });
+    }
+  };
+
+  const handleVerify = (e) => {
+    e.preventDefault();
+    if (canVerify) {
+      onVerifyOTP(otp, () => {
+        setEditing(false);
+      });
+    }
+  };
+
+  const formatTime = (seconds) => {
+    const m = Math.floor(seconds / 60);
+    const s = seconds % 60;
+    return `${m}:${s.toString().padStart(2, "0")}`;
   };
 
   if (!editing) {
@@ -110,39 +141,81 @@ const EmailCard = ({ value, onSave, isSaving, error, onDismissError }) => {
   }
 
   return (
-    <form
-      onSubmit={submit}
-      className="col-span-full rounded-xl border-2 border-emerald-400 bg-emerald-50/40 p-3 shadow-xs"
-    >
+    <div className="col-span-full rounded-xl border-2 border-emerald-400 bg-emerald-50/40 p-3 shadow-xs">
       <div className="flex items-center justify-between">
         <p className="text-[10px] font-bold uppercase tracking-wider text-emerald-700">
-          Update Login Email
+          {step === 1 ? "Update Login Email" : "Verify Email with OTP"}
         </p>
         <button type="button" onClick={cancel} className="text-slate-400 hover:text-slate-600">
           <X className="h-3.5 w-3.5" />
         </button>
       </div>
-      <div className="mt-2 flex items-center gap-2">
-        <input
-          type="email"
-          autoFocus
-          value={draft}
-          onChange={(e) => setDraft(e.target.value)}
-          placeholder={`you@${COMPANY_DOMAIN}`}
-          className="w-full rounded-lg border border-slate-200 bg-white px-3 py-1.5 text-xs font-medium text-slate-800 outline-none focus:border-emerald-500 focus:ring-1 focus:ring-emerald-500"
-        />
-        <Button
-          variant="success"
-          size="sm"
-          type="submit"
-          disabled={!canSave}
-          isLoading={isSaving}
-        >
-          Save
-        </Button>
-      </div>
+      
+      {step === 1 ? (
+        <form onSubmit={handleRequest} className="mt-2 flex items-center gap-2">
+          <input
+            type="email"
+            autoFocus
+            value={draft}
+            onChange={(e) => setDraft(e.target.value)}
+            placeholder="new@example.com"
+            className="w-full rounded-lg border border-slate-200 bg-white px-3 py-1.5 text-xs font-medium text-slate-800 outline-none focus:border-emerald-500 focus:ring-1 focus:ring-emerald-500"
+          />
+          <Button
+            variant="success"
+            size="sm"
+            type="submit"
+            disabled={!canRequest}
+            isLoading={isRequesting}
+          >
+            Send OTP
+          </Button>
+        </form>
+      ) : (
+        <form onSubmit={handleVerify} className="mt-2 flex flex-col gap-2">
+          <p className="text-xs text-slate-600">
+            We sent a 6-digit code to <span className="font-bold">{draft}</span>
+          </p>
+          <div className="flex items-center gap-2">
+            <input
+              type="text"
+              autoFocus
+              maxLength={6}
+              value={otp}
+              onChange={(e) => setOtp(e.target.value.replace(/[^0-9]/g, ""))}
+              placeholder="000000"
+              className="w-full rounded-lg border border-slate-200 bg-white px-3 py-1.5 text-xs font-medium text-slate-800 outline-none focus:border-emerald-500 focus:ring-1 focus:ring-emerald-500 tracking-widest text-center"
+              disabled={timeLeft === 0}
+            />
+            <Button
+              variant="success"
+              size="sm"
+              type="submit"
+              disabled={!canVerify || timeLeft === 0}
+              isLoading={isVerifying}
+            >
+              Verify
+            </Button>
+          </div>
+          <div className="flex items-center justify-between mt-1">
+            <p className="text-[11px] font-medium text-slate-500">
+              {timeLeft > 0 ? `Code expires in ${formatTime(timeLeft)}` : "Code expired."}
+            </p>
+            {timeLeft === 0 && (
+              <button
+                type="button"
+                onClick={() => setStep(1)}
+                className="text-[11px] font-bold text-emerald-600 hover:text-emerald-700 underline"
+              >
+                Request New Code
+              </button>
+            )}
+          </div>
+        </form>
+      )}
+
       {error && <p className="mt-1 text-[11px] font-medium text-rose-600">{error}</p>}
-    </form>
+    </div>
   );
 };
 
@@ -328,24 +401,38 @@ const ProfilePage = () => {
   /* ── Email Change Mutation ──────────────────────────────────── */
   const [emailError, setEmailError] = useState("");
 
-  const changeEmailMutation = useMutation({
-    mutationFn: (newEmail) => employeeApi.changeEmail(employeeId, newEmail),
+  const requestEmailChangeMutation = useMutation({
+    mutationFn: (newEmail) => employeeApi.requestEmailChange(employeeId, newEmail),
+    onSuccess: () => {
+      setEmailError("");
+    },
+    onError: (err) => {
+      setEmailError(err?.response?.data?.detail || "Could not send OTP.");
+    },
+  });
+
+  const verifyEmailChangeMutation = useMutation({
+    mutationFn: (otp) => employeeApi.verifyEmailChange(employeeId, otp),
     onSuccess: (updated) => {
       try {
         const cached = JSON.parse(localStorage.getItem("user") || "{}");
-        localStorage.setItem("user", JSON.stringify({ ...cached, email: updated.email }));
+        localStorage.setItem("user", JSON.stringify({ ...cached, email: updated.email || updated.new_email }));
       } catch {}
       queryClient.invalidateQueries({ queryKey: ["auth-me"] });
       queryClient.invalidateQueries({ queryKey: ["employee-profile", employeeId] });
       setEmailError("");
     },
     onError: (err) => {
-      setEmailError(err?.response?.data?.detail || "Could not change email.");
+      setEmailError(err?.response?.data?.detail || "Invalid or expired OTP.");
     },
   });
 
-  const handleChangeEmail = (newEmail, closeEditor) => {
-    changeEmailMutation.mutate(newEmail, { onSuccess: closeEditor });
+  const handleRequestOTP = (newEmail, nextStep) => {
+    requestEmailChangeMutation.mutate(newEmail, { onSuccess: nextStep });
+  };
+
+  const handleVerifyOTP = (otp, closeEditor) => {
+    verifyEmailChangeMutation.mutate(otp, { onSuccess: closeEditor });
   };
 
   /* ── Avatar Mutations & Handlers ────────────────────────────── */
@@ -578,8 +665,10 @@ const ProfilePage = () => {
                 <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
                   <EmailCard
                     value={mergedProfile.email}
-                    onSave={handleChangeEmail}
-                    isSaving={changeEmailMutation.isPending}
+                    onRequestOTP={handleRequestOTP}
+                    onVerifyOTP={handleVerifyOTP}
+                    isRequesting={requestEmailChangeMutation.isPending}
+                    isVerifying={verifyEmailChangeMutation.isPending}
                     error={emailError}
                     onDismissError={() => setEmailError("")}
                   />

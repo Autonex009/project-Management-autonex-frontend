@@ -138,6 +138,7 @@ const AdminPerformancePage = () => {
   const [roleFilter, setRoleFilter] = useState("all");
   const [expandedEval, setExpandedEval] = useState(null);
   const [bonusOpen, setBonusOpen] = useState(false); // collapsible "Suggested for Bonus" table
+  const [bonusPage, setBonusPage] = useState(1);
   const [perfPage, setPerfPage] = useState(1);
   useEffect(() => {
     setPerfPage(1);
@@ -573,6 +574,8 @@ const AdminPerformancePage = () => {
                     columns={bonusColumns}
                     data={bonusEvals}
                     getRowId={(row) => row.id}
+                    currentPage={bonusPage}
+                    onPageChange={setBonusPage}
                   />
                 </div>
               )}
