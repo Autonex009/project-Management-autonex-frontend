@@ -125,18 +125,28 @@ export const Table = ({
 
           <tbody className="divide-y divide-slate-100 ">
             {loading ? (
-              Array.from({ length: skeletonRows }).map((_, i) => (
-                <tr key={i} className="bg-white">
+              Array.from({ length: skeletonRows || pageSize }).map((_, i) => (
+                <tr key={i} className="bg-white h-[52px]">
                   {columns.map((col) => (
                     <td key={col.key} className={cellPad}>
-                      <div
-                        className={`h-4 rounded ${shimmer} ${col.align === "center"
-                          ? "mx-auto w-2/3"
-                          : col.align === "right"
-                            ? "ml-auto w-1/2"
-                            : "w-3/4"
-                          }`}
-                      />
+                      {col.key === "name" || col.key === "employee" || col.key === "user" || col.key === "actor" ? (
+                        <div className="flex items-center gap-3">
+                          <div className={`w-9 h-9 rounded-full flex-shrink-0 ${shimmer}`} />
+                          <div className="space-y-1.5 flex-1 min-w-0">
+                            <div className={`h-3.5 w-28 rounded ${shimmer}`} />
+                            <div className={`h-2.5 w-36 rounded ${shimmer}`} />
+                          </div>
+                        </div>
+                      ) : (
+                        <div
+                          className={`h-4 rounded ${shimmer} ${col.align === "center"
+                            ? "mx-auto w-2/3"
+                            : col.align === "right"
+                              ? "ml-auto w-1/2"
+                              : "w-3/4"
+                            }`}
+                        />
+                      )}
                     </td>
                   ))}
                 </tr>

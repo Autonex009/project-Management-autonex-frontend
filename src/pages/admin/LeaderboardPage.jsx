@@ -1573,77 +1573,41 @@ const LeaderboardPage = () => {
                 </h2>
               </div>
 
-              {/* Center Slot: Date Navigation */}
-              <div className="flex items-center justify-center gap-1 min-w-0 shrink">
-                {viewMode === "weekly" ? (
-                  <>
-                    <button
-                      type="button"
-                      onClick={handlePrevWeekClick}
-                      disabled={!canGoPrevWeek}
-                      className="inline-flex items-center justify-center w-5.5 h-5.5 sm:w-6 sm:h-6 rounded-lg border border-slate-200 bg-white text-slate-600 hover:bg-slate-50 hover:text-slate-900 disabled:opacity-25 disabled:cursor-not-allowed transition-all cursor-pointer shadow-xs shrink-0"
-                      title="Previous week"
-                    >
-                      <ChevronLeft className="w-3 h-3 sm:w-3.5 sm:h-3.5" />
-                    </button>
+              {/* Center Slot: Fixed Position Date Navigation (Zero Shift Guarantee) */}
+              <div className="flex items-center justify-center shrink-0">
+                <button
+                  type="button"
+                  onClick={viewMode === "weekly" ? handlePrevWeekClick : handlePrevDayClick}
+                  disabled={viewMode === "weekly" ? !canGoPrevWeek : !canGoPrevDay}
+                  className="inline-flex items-center justify-center w-5.5 h-5.5 sm:w-6 sm:h-6 rounded-lg border border-slate-200 bg-white text-slate-600 hover:bg-slate-50 hover:text-slate-900 disabled:opacity-25 disabled:cursor-not-allowed transition-all cursor-pointer shadow-xs shrink-0"
+                  title={viewMode === "weekly" ? "Previous week" : "Previous day"}
+                >
+                  <ChevronLeft className="w-3 h-3 sm:w-3.5 sm:h-3.5" />
+                </button>
 
-                    {activeWeek.isCurrent ? (
-                      <div className="inline-flex items-center justify-center px-2 sm:px-2.5 py-0.5 rounded-full bg-gradient-to-r from-indigo-500/10 via-indigo-500/20 to-purple-500/10 border border-indigo-400/50 shadow-xs ring-1 ring-indigo-400/30 truncate shrink">
-                        <span className="text-[10px] sm:text-[11px] font-black text-indigo-950 uppercase tracking-wider truncate">
-                          {activeWeek.label}
-                        </span>
-                      </div>
-                    ) : (
-                      <span className="text-[10px] sm:text-[11px] font-black text-slate-800 uppercase tracking-wider px-1 py-0.5 truncate shrink">
-                        {activeWeek.label}
+                <div className="w-[145px] sm:w-[170px] flex items-center justify-center text-center shrink-0 px-1">
+                  {(viewMode === "weekly" ? activeWeek.isCurrent : activeDay.isToday) ? (
+                    <div className="inline-flex items-center justify-center px-2 sm:px-2.5 py-0.5 rounded-full bg-gradient-to-r from-indigo-500/10 via-indigo-500/20 to-purple-500/10 border border-indigo-400/50 shadow-xs ring-1 ring-indigo-400/30 w-full">
+                      <span className="text-[10px] sm:text-[11px] font-black text-indigo-950 uppercase tracking-wider truncate">
+                        {viewMode === "weekly" ? activeWeek.label : activeDay.label}
                       </span>
-                    )}
+                    </div>
+                  ) : (
+                    <span className="text-[10px] sm:text-[11px] font-black text-slate-800 uppercase tracking-wider px-1 truncate">
+                      {viewMode === "weekly" ? activeWeek.label : activeDay.label}
+                    </span>
+                  )}
+                </div>
 
-                    <button
-                      type="button"
-                      onClick={handleNextWeekClick}
-                      disabled={!canGoNextWeek}
-                      className="inline-flex items-center justify-center w-5.5 h-5.5 sm:w-6 sm:h-6 rounded-lg border border-slate-200 bg-white text-slate-600 hover:bg-slate-50 hover:text-slate-900 disabled:opacity-25 disabled:cursor-not-allowed transition-all cursor-pointer shadow-xs shrink-0"
-                      title="Next week"
-                    >
-                      <ChevronRight className="w-3 h-3 sm:w-3.5 sm:h-3.5" />
-                    </button>
-                  </>
-                ) : (
-                  <>
-                    <button
-                      type="button"
-                      onClick={handlePrevDayClick}
-                      disabled={!canGoPrevDay}
-                      className="inline-flex items-center justify-center w-5.5 h-5.5 sm:w-6 sm:h-6 rounded-lg border border-slate-200 bg-white text-slate-600 hover:bg-slate-50 hover:text-slate-900 disabled:opacity-25 disabled:cursor-not-allowed transition-all cursor-pointer shadow-xs shrink-0"
-                      title="Previous day"
-                    >
-                      <ChevronLeft className="w-3 h-3 sm:w-3.5 sm:h-3.5" />
-                    </button>
-
-                    {activeDay.isToday ? (
-                      <div className="inline-flex items-center justify-center px-2 sm:px-2.5 py-0.5 rounded-full bg-gradient-to-r from-indigo-500/10 via-indigo-500/20 to-purple-500/10 border border-indigo-400/50 shadow-xs ring-1 ring-indigo-400/30 truncate shrink">
-                        <span className="text-[10px] sm:text-[11px] font-black text-indigo-950 uppercase tracking-wider truncate">
-                          {activeDay.label}
-                        </span>
-                      </div>
-                    ) : (
-                      <span className="text-[10px] sm:text-[11px] font-black text-slate-800 uppercase tracking-wider px-1 py-0.5 truncate shrink">
-                        {activeDay.label}
-                      </span>
-                    )}
-
-                    <button
-                      type="button"
-                      onClick={handleNextDayClick}
-                      disabled={!canGoNextDay}
-                      className="inline-flex items-center justify-center w-5.5 h-5.5 sm:w-6 sm:h-6 rounded-lg border border-slate-200 bg-white text-slate-600 hover:bg-slate-50 hover:text-slate-900 disabled:opacity-25 disabled:cursor-not-allowed transition-all cursor-pointer shadow-xs shrink-0"
-                      title="Next day"
-                    >
-                      <ChevronRight className="w-3 h-3 sm:w-3.5 sm:h-3.5" />
-                    </button>
-                  </>
-                )}
+                <button
+                  type="button"
+                  onClick={viewMode === "weekly" ? handleNextWeekClick : handleNextDayClick}
+                  disabled={viewMode === "weekly" ? !canGoNextWeek : !canGoNextDay}
+                  className="inline-flex items-center justify-center w-5.5 h-5.5 sm:w-6 sm:h-6 rounded-lg border border-slate-200 bg-white text-slate-600 hover:bg-slate-50 hover:text-slate-900 disabled:opacity-25 disabled:cursor-not-allowed transition-all cursor-pointer shadow-xs shrink-0"
+                  title={viewMode === "weekly" ? "Next week" : "Next day"}
+                >
+                  <ChevronRight className="w-3 h-3 sm:w-3.5 sm:h-3.5" />
+                </button>
               </div>
 
               {/* Right Slot: Toggle Switch */}

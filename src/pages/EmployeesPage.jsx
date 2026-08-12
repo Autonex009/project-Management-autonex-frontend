@@ -1190,12 +1190,12 @@ const EmployeesPage = () => {
 
   // Sub-projects + main projects are needed to resolve each employee's reporting
   // manager: allocation.sub_project_id → subProject.main_project_id → mainProject PM.
-  const { data: subProjects = [] } = useQuery({
+  const { data: subProjects = [], isLoading: subProjectsLoading } = useQuery({
     queryKey: ["sub-projects"],
     queryFn: subProjectApi.getAll,
     staleTime: 5 * 60 * 1000,
   });
-  const { data: mainProjects = [] } = useQuery({
+  const { data: mainProjects = [], isLoading: mainProjectsLoading } = useQuery({
     queryKey: ["parent-projects"],
     queryFn: parentProjectApi.getAll,
     staleTime: 5 * 60 * 1000,
@@ -1375,10 +1375,10 @@ const EmployeesPage = () => {
     return t.includes("contract") || t.includes("part");
   }).length;
 
-  // KPI Classification 3: Roles (Project Managers, Annotator/Reviewer, QC)
+  // KPI Classification 3: Roles (Project Managers, Annotator/Reviewer, Team Leads / TL)
   const pmCount = onRosterStaff.filter((e) => {
     const d = (e.designation || "").toLowerCase();
-    return d.includes("manager") || d.includes("pm") || d.includes("lead");
+    return d.includes("manager") || d.includes("pm");
   }).length;
 
   const annotatorCount = onRosterStaff.filter((e) => {
@@ -1386,9 +1386,9 @@ const EmployeesPage = () => {
     return d.includes("annotator") || d.includes("reviewer");
   }).length;
 
-  const qcCount = onRosterStaff.filter((e) => {
+  const tlCount = onRosterStaff.filter((e) => {
     const d = (e.designation || "").toLowerCase();
-    return d.includes("qc") || d.includes("quality");
+    return d.includes("lead") || d.includes("tl");
   }).length;
 
   // KPI Classification 4: Work Model (WFO, WFH, Hybrid)
@@ -1648,13 +1648,13 @@ const EmployeesPage = () => {
       if (!colDesignation) return true;
       const d = (employee.designation || "").toLowerCase();
       if (colDesignation === "Manager") {
-        return d.includes("manager") || d.includes("pm") || d.includes("lead");
+        return d.includes("manager") || d.includes("pm");
       }
       if (colDesignation === "Annotator") {
         return d.includes("annotator") || d.includes("reviewer");
       }
-      if (colDesignation === "Quality") {
-        return d.includes("qc") || d.includes("quality");
+      if (colDesignation === "TL") {
+        return d.includes("lead") || d.includes("tl");
       }
       return d === colDesignation.toLowerCase();
     })();
@@ -2009,6 +2009,22 @@ const EmployeesPage = () => {
 
               <button
                 type="button"
+                onClick={() => handleSelectColDesignation("TL")}
+                className={`p-2 rounded-xl text-center border transition-all hover:scale-[1.02] ${colDesignation === "TL"
+                  ? "bg-purple-100/90 border-purple-300 ring-2 ring-purple-500/20"
+                  : "bg-purple-50/60 border-purple-100/80 hover:bg-purple-100/60"
+                  }`}
+              >
+                <div className="text-base sm:text-lg font-extrabold text-purple-700 font-mono leading-none">
+                  {tlCount}
+                </div>
+                <div className="text-[10px] font-bold text-purple-600 uppercase tracking-wider mt-1 truncate">
+                  TL
+                </div>
+              </button>
+
+              <button
+                type="button"
                 onClick={() => handleSelectColDesignation("Annotator")}
                 className={`p-2 rounded-xl text-center border transition-all hover:scale-[1.02] ${colDesignation === "Annotator"
                   ? "bg-sky-100/90 border-sky-300 ring-2 ring-sky-500/20"
@@ -2020,22 +2036,6 @@ const EmployeesPage = () => {
                 </div>
                 <div className="text-[10px] font-bold text-sky-600 uppercase tracking-wider mt-1 truncate">
                   Annotators
-                </div>
-              </button>
-
-              <button
-                type="button"
-                onClick={() => handleSelectColDesignation("Quality")}
-                className={`p-2 rounded-xl text-center border transition-all hover:scale-[1.02] ${colDesignation === "Quality"
-                  ? "bg-purple-100/90 border-purple-300 ring-2 ring-purple-500/20"
-                  : "bg-purple-50/60 border-purple-100/80 hover:bg-purple-100/60"
-                  }`}
-              >
-                <div className="text-base sm:text-lg font-extrabold text-purple-700 font-mono leading-none">
-                  {qcCount}
-                </div>
-                <div className="text-[10px] font-bold text-purple-600 uppercase tracking-wider mt-1 truncate">
-                  QC
                 </div>
               </button>
             </div>
@@ -2255,7 +2255,8 @@ const EmployeesPage = () => {
       <Table
         variant="untitled"
         allowOverflow
-        loading={isLoading || skillsLoading || allocationsLoading}
+        loading={isLoading || skillsLoading || allocationsLoading || subProjectsLoading || mainProjectsLoading}
+        skeletonRows={10}
         columns={[
           {
             key: "name",
