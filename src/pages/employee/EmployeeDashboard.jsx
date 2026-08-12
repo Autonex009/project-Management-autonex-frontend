@@ -1,5 +1,6 @@
 import React, { useMemo, useState, useRef, useEffect } from "react";
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
+import { useParams, Link } from "react-router-dom";
 
 import {
   allocationApi,
@@ -46,7 +47,8 @@ import {
   TrendingUp,
   LineChart,
   Trophy,
-  Target
+  Target,
+  Plus
 } from "lucide-react";
 
 import {
@@ -63,6 +65,7 @@ import {
   parseISO,
   startOfMonth,
 } from "date-fns";
+import { setPageDetailTitle } from "../../utils/pageDetailTitle";
 
 import fiftyHoursBadge from "../../components/badges/50hrs.png";
 import twoHundredHoursBadge from "../../components/badges/200hrs.png";
@@ -220,6 +223,7 @@ const SkillsMultiSelect = ({ selected, onChange, options, isLoading }) => {
 
 const EmployeeDashboard = () => {
   const queryClient = useQueryClient();
+  const params = useParams();
   const [showFullFeedback, setShowFullFeedback] = useState(false);
   const [imgError, setImgError] = useState(false);
   const [showLogsModal, setShowLogsModal] = useState(false);
@@ -231,7 +235,8 @@ const EmployeeDashboard = () => {
   const todayStr = useMemo(() => format(new Date(), "yyyy-MM-dd"), []);
 
   const localUser = JSON.parse(localStorage.getItem("user") || "{}");
-  const employeeId = localUser.employee_id || localUser.id || 1;
+  const isAdmin = localUser.role === "admin";
+  const employeeId = params.id || localUser.employee_id || localUser.id || 1;
 
   /* ── Queries ─────────────────────────────────────── */
   const { data: account } = useQuery({
@@ -319,11 +324,10 @@ const EmployeeDashboard = () => {
 
   /* ── Profile ─────────────────────────────────────── */
   const profile = useMemo(() => {
-    const name = account?.name || employee?.name || localUser.name || "";
+    const name = employee?.name || account?.name || localUser.name || "";
     const jobTitle = employee?.designation || account?.role || "Annotator/Reviewer";
     const status = employee?.status || "active";
-    const avatarUrl =
-      employee?.avatar_url || account?.avatar_url || localUser.avatar_url || null;
+    const avatarUrl = employee?.avatar_url || account?.avatar_url || localUser.avatar_url || null;
     const rawJoiningDate = employee?.joining_date || employee?.created_at;
     const joiningDate = rawJoiningDate
       ? format(parseISO(rawJoiningDate), "dd MMM yyyy")
@@ -332,7 +336,7 @@ const EmployeeDashboard = () => {
     const badge = employee?.employee_type || localUser.employee_type || "";
     const initials = getNameInitials(name);
 
-    const email = account?.email || employee?.email || localUser.email || "";
+    const email = employee?.email || account?.email || localUser.email || "";
     const phone = employee?.phone || account?.phone || "";
     const encordId = employee?.encord_id || "";
     const slackUserId = employee?.slack_user_id || "";
@@ -360,6 +364,12 @@ const EmployeeDashboard = () => {
       weeklyAvailability,
     };
   }, [account, employee, localUser, employeeId]);
+
+  useEffect(() => {
+    if (isAdmin && params.id && profile.name) {
+      setPageDetailTitle(profile.name);
+    }
+  }, [isAdmin, params.id, profile.name]);
 
   /* ── Edit State & Mutations ──────────────────────── */
   const [isEditing, setIsEditing] = useState(false);
@@ -559,6 +569,7 @@ const EmployeeDashboard = () => {
       analyticsApi.getMyEncordActivity({
         days: daysElapsedInMonth,
         sub_project_id: currentSubProjectId,
+        employee_id: employeeId,
       }),
     enabled: !!employeeId,
   });
@@ -1287,9 +1298,16 @@ const EmployeeDashboard = () => {
                     <AlertCircle className="w-3.5 h-3.5 text-rose-500 shrink-0" />
                     <h3 className="text-[10px] font-bold text-stone-700 uppercase tracking-wider">Complaints</h3>
                   </div>
-                  <button onClick={() => setNotesModal({ isOpen: true, type: 'complaints', title: 'Complaints History', data: complaintsList })} className="flex items-center gap-1 text-[9px] font-semibold text-stone-500 hover:text-stone-800 bg-stone-100 hover:bg-stone-200 border border-stone-200 px-1.5 py-0.5 rounded transition-colors cursor-pointer">
-                    <History className="w-2.5 h-2.5" /> History
-                  </button>
+                  <div className="flex items-center gap-1.5">
+                    <button onClick={() => setNotesModal({ isOpen: true, type: 'complaints', title: 'Complaints History', data: complaintsList })} className="flex items-center gap-1 text-[9px] font-semibold text-stone-500 hover:text-stone-800 bg-stone-100 hover:bg-stone-200 border border-stone-200 px-1.5 py-0.5 rounded transition-colors cursor-pointer">
+                      <History className="w-2.5 h-2.5" /> History
+                    </button>
+                    {isAdmin && (
+                      <button className="flex items-center justify-center bg-stone-100 hover:bg-stone-200 border border-stone-200 w-5 h-5 rounded transition-colors text-stone-600">
+                        <Plus className="w-3 h-3" />
+                      </button>
+                    )}
+                  </div>
                 </div>
                 <div className="flex flex-col gap-1.5 flex-1 overflow-y-auto db-scroll">
                   {complaintsList.length > 0 ? (
@@ -1316,9 +1334,16 @@ const EmployeeDashboard = () => {
                     <AlertTriangle className="w-3.5 h-3.5 text-amber-500 shrink-0" />
                     <h3 className="text-[10px] font-bold text-stone-700 uppercase tracking-wider">Warnings</h3>
                   </div>
-                  <button onClick={() => setNotesModal({ isOpen: true, type: 'warnings', title: 'Warnings History', data: warningsList })} className="flex items-center gap-1 text-[9px] font-semibold text-stone-500 hover:text-stone-800 bg-stone-100 hover:bg-stone-200 border border-stone-200 px-1.5 py-0.5 rounded transition-colors cursor-pointer">
-                    <History className="w-2.5 h-2.5" /> History
-                  </button>
+                  <div className="flex items-center gap-1.5">
+                    <button onClick={() => setNotesModal({ isOpen: true, type: 'warnings', title: 'Warnings History', data: warningsList })} className="flex items-center gap-1 text-[9px] font-semibold text-stone-500 hover:text-stone-800 bg-stone-100 hover:bg-stone-200 border border-stone-200 px-1.5 py-0.5 rounded transition-colors cursor-pointer">
+                      <History className="w-2.5 h-2.5" /> History
+                    </button>
+                    {isAdmin && (
+                      <button className="flex items-center justify-center bg-stone-100 hover:bg-stone-200 border border-stone-200 w-5 h-5 rounded transition-colors text-stone-600">
+                        <Plus className="w-3 h-3" />
+                      </button>
+                    )}
+                  </div>
                 </div>
                 <div className="flex flex-col gap-1.5 flex-1 overflow-y-auto db-scroll">
                   {warningsList.length > 0 ? (
@@ -1345,9 +1370,16 @@ const EmployeeDashboard = () => {
                     <Award className="w-3.5 h-3.5 text-emerald-600 shrink-0" />
                     <h3 className="text-[10px] font-bold text-stone-700 uppercase tracking-wider">Recognition</h3>
                   </div>
-                  <button onClick={() => setNotesModal({ isOpen: true, type: 'recognitions', title: 'Recognition History', data: recognitionsList })} className="flex items-center gap-1 text-[9px] font-semibold text-stone-500 hover:text-stone-800 bg-stone-100 hover:bg-stone-200 border border-stone-200 px-1.5 py-0.5 rounded transition-colors cursor-pointer">
-                    <History className="w-2.5 h-2.5" /> History
-                  </button>
+                  <div className="flex items-center gap-1.5">
+                    <button onClick={() => setNotesModal({ isOpen: true, type: 'recognitions', title: 'Recognition History', data: recognitionsList })} className="flex items-center gap-1 text-[9px] font-semibold text-stone-500 hover:text-stone-800 bg-stone-100 hover:bg-stone-200 border border-stone-200 px-1.5 py-0.5 rounded transition-colors cursor-pointer">
+                      <History className="w-2.5 h-2.5" /> History
+                    </button>
+                    {isAdmin && (
+                      <button className="flex items-center justify-center bg-stone-100 hover:bg-stone-200 border border-stone-200 w-5 h-5 rounded transition-colors text-stone-600">
+                        <Plus className="w-3 h-3" />
+                      </button>
+                    )}
+                  </div>
                 </div>
                 <div className="flex flex-col gap-1.5 flex-1 overflow-y-auto db-scroll">
                   {recognitionsList.length > 0 ? (
