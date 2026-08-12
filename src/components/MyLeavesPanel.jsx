@@ -87,22 +87,6 @@ const getISTDateTime = () => {
 };
 
 const checkHalfDayTiming = (startDateStr, slot) => {
-  const ist = getISTDateTime();
-  const todayStr = ist.dateStr;
-
-  if (slot === "first_half") {
-    if (todayStr >= startDateStr) {
-      return "First-half leaves must be applied at least one day in advance.";
-    }
-  } else if (slot === "second_half") {
-    if (todayStr > startDateStr) {
-      return "Cannot apply for a second-half leave after the request date has passed.";
-    } else if (todayStr === startDateStr) {
-      if (ist.hour >= 14) {
-        return "Second-half leaves must be applied before 2:00 PM on the same day.";
-      }
-    }
-  }
   return null;
 };
 
@@ -510,10 +494,6 @@ const MyLeavesPanel = ({
     const eDate = isHalf ? sDate : leaveForm.end_date;
 
     const todayStr = format(new Date(), "yyyy-MM-dd");
-    if (!leaveForm.is_emergency && sDate < todayStr) {
-      toast.error("Leaves for past dates are not allowed unless marked as Emergency Leave.");
-      return;
-    }
 
     if (isHalf) {
       const timingErr = checkHalfDayTiming(sDate, leaveForm.leave_type);
@@ -581,10 +561,6 @@ const MyLeavesPanel = ({
       toast.error("Please select a date");
       return;
     }
-    if (wfhForm.wfh_date < todayStr) {
-      toast.error("WFH requests for past dates are not allowed.");
-      return;
-    }
     createWfhMutation.mutate({ ...wfhForm, end_date: wfhForm.wfh_date });
   };
 
@@ -615,10 +591,6 @@ const MyLeavesPanel = ({
     const eDate = isHalf ? sDate : editForm.end_date;
 
     const todayStr = format(new Date(), "yyyy-MM-dd");
-    if (!editForm.is_emergency && sDate < todayStr) {
-      toast.error("Leaves for past dates are not allowed unless marked as Emergency Leave.");
-      return;
-    }
 
     if (isHalf) {
       const timingErr = checkHalfDayTiming(sDate, editForm.leave_type);
@@ -702,10 +674,6 @@ const MyLeavesPanel = ({
     }
     if (!editWfhForm.wfh_date) {
       toast.error("Please select a date");
-      return;
-    }
-    if (editWfhForm.wfh_date < todayStr) {
-      toast.error("WFH requests for past dates are not allowed.");
       return;
     }
     updateWfhMutation.mutate({
@@ -841,7 +809,6 @@ const MyLeavesPanel = ({
                             </label>
                             <DatePicker
                               type="date"
-                              minDate={leaveForm.is_emergency ? undefined : format(new Date(), "yyyy-MM-dd")}
                               value={leaveForm.start_date}
                               onChange={(e) => {
                                 const sDate = e.target.value;
@@ -861,7 +828,6 @@ const MyLeavesPanel = ({
                             </label>
                             <DatePicker
                               type="range"
-                              minDate={leaveForm.is_emergency ? undefined : format(new Date(), "yyyy-MM-dd")}
                               startDate={leaveForm.start_date}
                               endDate={leaveForm.end_date}
                               onRangeChange={({ startDate, endDate }) => {
@@ -1037,7 +1003,6 @@ const MyLeavesPanel = ({
                             </label>
                             <DatePicker
                               type="date"
-                              minDate={editForm.is_emergency ? undefined : format(new Date(), "yyyy-MM-dd")}
                               value={editForm.start_date}
                               onChange={(e) => {
                                 const sDate = e.target.value;
@@ -1057,7 +1022,6 @@ const MyLeavesPanel = ({
                             </label>
                             <DatePicker
                               type="range"
-                              minDate={editForm.is_emergency ? undefined : format(new Date(), "yyyy-MM-dd")}
                               startDate={editForm.start_date}
                               endDate={editForm.end_date}
                               onRangeChange={({ startDate, endDate }) => {
@@ -1367,7 +1331,6 @@ const MyLeavesPanel = ({
                 <DatePicker
                   type="date"
                   accentColor="purple"
-                  minDate={format(new Date(), "yyyy-MM-dd")}
                   value={wfhForm.wfh_date}
                   onChange={(e) =>
                     setWfhForm({ ...wfhForm, wfh_date: e.target.value })
@@ -1432,7 +1395,6 @@ const MyLeavesPanel = ({
                 <DatePicker
                   type="date"
                   accentColor="purple"
-                  minDate={format(new Date(), "yyyy-MM-dd")}
                   value={editWfhForm.wfh_date}
                   onChange={(e) =>
                     setEditWfhForm({
