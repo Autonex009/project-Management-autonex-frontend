@@ -32,11 +32,17 @@ const resolveAdminCrumb = (pathname) => {
   if (pathname.startsWith("/admin/analytics/")) {
     return { name: "Analytics", key: "admin-analytics-detail", isDetail: true };
   }
+  if (pathname.startsWith("/admin/employees/")) {
+    return { name: "Employee Details", key: "admin-employees-detail", isDetail: true };
+  }
+  if (pathname === "/admin/dashboard" || pathname === "/admin") {
+    return { name: "Autonex", key: "/admin/dashboard" };
+  }
   const navItem = navigation.find((n) => n.href === pathname);
   if (navItem) return { name: navItem.name, key: pathname };
   if (ADMIN_ROUTE_LABELS[pathname])
     return { name: ADMIN_ROUTE_LABELS[pathname], key: pathname };
-  return { name: "Dashboard", key: "/admin/dashboard" };
+  return { name: "Autonex", key: "/admin/dashboard" };
 };
 
 const MIN_WIDTH = 200;
@@ -50,7 +56,7 @@ const AdminLayout = () => {
   // (e.g. the project name) once the detail page has loaded it.
   const breadcrumbTrail = detailTitle
     ? rawBreadcrumbTrail.map((c) =>
-        c.key === "admin-analytics-detail" ? { ...c, name: detailTitle } : c,
+        c.key === "admin-analytics-detail" || c.key === "admin-employees-detail" ? { ...c, name: detailTitle } : c,
       )
     : rawBreadcrumbTrail;
   const queryClient = useQueryClient();

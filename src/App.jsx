@@ -156,6 +156,7 @@ function App() {
               element={<Navigate to="/admin/sub-projects" replace />}
             />
             <Route path="employees" element={<EmployeesPage />} />
+            <Route path="employees/:id" element={<EmployeeDashboard />} />
             <Route path="change-log" element={<ChangeLogPage />} />
             <Route path="leaderboard" element={<LeaderboardPage />} />
             <Route path="sub-projects" element={<SubProjectsPage />} />
