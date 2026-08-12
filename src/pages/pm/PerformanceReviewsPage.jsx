@@ -117,11 +117,11 @@ const PerformanceReviewsPage = () => {
   const role = localStorage.getItem("role") || user.role || "pm";
   const pmEmployeeId = getPmEmployeeId(user);
 
-  const { data: parentProjects = [] } = useQuery({
+  const { data: parentProjects = [], isLoading: parentProjectsLoading } = useQuery({
     queryKey: ["parent-projects"],
     queryFn: parentProjectApi.getAll,
   });
-  const { data: projects = [] } = useQuery({
+  const { data: projects = [], isLoading: projectsLoading } = useQuery({
     queryKey: ["sub-projects"],
     queryFn: subProjectApi.getAll,
   });
@@ -129,7 +129,7 @@ const PerformanceReviewsPage = () => {
     queryKey: ["employees"],
     queryFn: employeeApi.getAll,
   });
-  const { data: allocations = [] } = useQuery({
+  const { data: allocations = [], isLoading: allocationsLoading } = useQuery({
     queryKey: ["allocations"],
     queryFn: allocationApi.getAll,
   });
@@ -167,7 +167,7 @@ const PerformanceReviewsPage = () => {
   const pendingCount = reviewable.filter(
     (e) => e.status === "submitted",
   ).length;
-  const isLoading = empLoading || evalLoading;
+  const isLoading = empLoading || evalLoading || projectsLoading || parentProjectsLoading || allocationsLoading;
 
   return (
     <div className="space-y-4">

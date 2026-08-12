@@ -155,11 +155,11 @@ const PMLeavesPage = () => {
     queryKey: ["leaves"],
     queryFn: () => leaveApi.getAll(),
   });
-  const { data: allocations = [] } = useQuery({
+  const { data: allocations = [], isLoading: allocationsLoading } = useQuery({
     queryKey: ["allocations"],
     queryFn: allocationApi.getAll,
   });
-  const { data: employees = [] } = useQuery({
+  const { data: employees = [], isLoading: employeesLoading } = useQuery({
     queryKey: ["employees"],
     queryFn: employeeApi.getAll,
   });
@@ -675,7 +675,8 @@ const PMLeavesPage = () => {
         <Table
           variant="untitled"
           allowOverflow
-          loading={isLoading}
+          loading={isLoading || employeesLoading || allocationsLoading}
+          skeletonRows={10}
           columns={[
             {
               key: "employee_id",
@@ -922,7 +923,8 @@ const PMLeavesPage = () => {
         <Table
           variant="untitled"
           allowOverflow
-          loading={wfhLoading}
+          loading={wfhLoading || employeesLoading || allocationsLoading}
+          skeletonRows={10}
           columns={[
             {
               key: "employee_name",
