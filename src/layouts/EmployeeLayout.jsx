@@ -304,7 +304,7 @@ const EmployeeLayout = () => {
 
         {/* Content */}
         <main className="flex-1 overflow-auto px-4 pt-3 pb-4 sm:px-6 sm:pt-4 sm:pb-6 relative">
-          <div className="max-w-[1600px] mx-auto space-y-5">
+          <div className="w-full h-full">
             <Outlet />
           </div>
         </main>
