@@ -731,8 +731,11 @@ const EmployeeDashboard = () => {
 
     return {
       paidRemaining,
+      paidQuota,
       casualRemaining,
+      casualQuota,
       wfhRemaining,
+      wfhQuota,
       currentLeave,
       isInternOrContractor: internOrContractor,
     };
@@ -908,17 +911,52 @@ const EmployeeDashboard = () => {
               {profileTab === "attendance" ? (
                 <div className="grid grid-cols-3 gap-2">
                   {[
-                    { icon: <Home className="w-3.5 h-3.5 text-emerald-600" />, label: "WFH", value: leavesAndWfhStats.wfhRemaining },
-                    { icon: <Calendar className="w-3.5 h-3.5 text-emerald-600" />, label: "Paid", value: leavesAndWfhStats.paidRemaining },
-                    { icon: <HeartPulse className="w-3.5 h-3.5 text-amber-600" />, label: "Sick", value: leavesAndWfhStats.isInternOrContractor ? "—" : leavesAndWfhStats.casualRemaining },
-                  ].map(({ icon, label, value }) => (
-                    <div key={label} className="flex flex-col items-center gap-0.5 border border-stone-200 rounded-xl pt-2 pb-1 shadow-sm bg-white">
-                      <div className={`w-7 h-7 rounded-full flex items-center justify-center ${label === 'Sick' ? 'bg-orange-50' : 'bg-emerald-50'}`}>
+                    {
+                      icon: <Home className="w-3.5 h-3.5 text-emerald-600" />,
+                      label: "WFH",
+                      remaining: leavesAndWfhStats.wfhRemaining,
+                      quota: leavesAndWfhStats.wfhQuota,
+                    },
+                    {
+                      icon: <Calendar className="w-3.5 h-3.5 text-emerald-600" />,
+                      label: "Paid",
+                      remaining: leavesAndWfhStats.paidRemaining,
+                      quota: leavesAndWfhStats.paidQuota,
+                    },
+                    {
+                      icon: <HeartPulse className="w-3.5 h-3.5 text-amber-600" />,
+                      label: "Sick",
+                      remaining: leavesAndWfhStats.isInternOrContractor
+                        ? "—"
+                        : leavesAndWfhStats.casualRemaining,
+                      quota: leavesAndWfhStats.isInternOrContractor
+                        ? "—"
+                        : leavesAndWfhStats.casualQuota,
+                    },
+                  ].map(({ icon, label, remaining, quota }) => (
+                    <div
+                      key={label}
+                      className="flex flex-col items-center gap-0.5 border border-stone-200 rounded-xl pt-2 pb-1 shadow-sm bg-white"
+                    >
+                      <div
+                        className={`w-7 h-7 rounded-full flex items-center justify-center ${
+                          label === "Sick" ? "bg-orange-50" : "bg-emerald-50"
+                        }`}
+                      >
                         {icon}
                       </div>
                       <div className="text-center">
-                        <span className="font-data text-lg font-extrabold text-stone-800 leading-none block">{value}</span>
-                        <span className="text-[9px] font-medium text-stone-400 mt-0.5 block uppercase tracking-wider">{label}</span>
+                        <div className="font-data text-lg font-extrabold text-stone-800 leading-none flex items-baseline justify-center gap-0.5">
+                          <span>{remaining}</span>
+                          {quota !== "—" && (
+                            <span className="text-xs font-semibold text-stone-400">
+                              / {quota}
+                            </span>
+                          )}
+                        </div>
+                        <span className="text-[9px] font-medium text-stone-400 mt-0.5 block uppercase tracking-wider">
+                          {label}
+                        </span>
                       </div>
                     </div>
                   ))}
