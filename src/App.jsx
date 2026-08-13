@@ -20,7 +20,7 @@ const AnalyticsDashboard = lazy(() => import("./pages/AnalyticsDashboard"));
 const ProjectAnalyticsPage = lazy(() => import("./pages/ProjectAnalyticsPage"));
 const EmployeesPage = lazy(() => import("./pages/EmployeesPage"));
 const ChangeLogPage = lazy(() => import("./pages/ChangeLogPage"));
-const SubProjectsPage = lazy(() => import("./pages/ProjectsPage"));
+import SubProjectsPage from "./pages/ProjectsPage";
 const AllocationsPage = lazy(() => import("./pages/AllocationsPage"));
 const LeavesPage = lazy(() => import("./pages/LeavesPage"));
 const ProjectsPage = lazy(() => import("./pages/ParentProjectsPage"));
@@ -114,13 +114,7 @@ function App() {
           style: { background: "#333", color: "#fff" },
         }}
       />
-      <Suspense
-        fallback={
-          <div className="flex items-center justify-center min-h-screen text-slate-500 font-medium">
-            Loading Application...
-          </div>
-        }
-      >
+      <Suspense fallback={null}>
         <Routes>
           {/* Public Auth Routes */}
           <Route path="/login/admin" element={<AdminLogin />} />

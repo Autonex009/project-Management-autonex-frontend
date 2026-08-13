@@ -56,8 +56,8 @@ const AdminLayout = () => {
   // (e.g. the project name) once the detail page has loaded it.
   const breadcrumbTrail = detailTitle
     ? rawBreadcrumbTrail.map((c) =>
-        c.key === "admin-analytics-detail" || c.key === "admin-employees-detail" ? { ...c, name: detailTitle } : c,
-      )
+      c.key === "admin-analytics-detail" || c.key === "admin-employees-detail" ? { ...c, name: detailTitle } : c,
+    )
     : rawBreadcrumbTrail;
   const queryClient = useQueryClient();
   const [sidebarOpen, setSidebarOpen] = useState(false); // mobile drawer
