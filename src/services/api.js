@@ -669,4 +669,23 @@ export const wifiNetworksApi = {
   delete: (id) => api.delete(`/wifi-networks/${id}`).then((res) => res.data),
 };
 
+// === Complaints, Warnings and Recognition ===
+export const employeeNotesApi = {
+  getByEmployee: (employeeId, params = {}) =>
+    api.get(`/employee-notes/by-employee/${employeeId}`, { params }).then((r) => r.data),
+
+  create: (payload) =>
+    api.post("/employee-notes", payload).then((r) => r.data),
+
+  resolve: (id, payload) =>
+    api.post(`/employee-notes/${id}/resolve`, payload).then((r) => r.data),
+  delete: (id) =>
+    api.delete(`/employee-notes/${id}`).then((r) => r.data),
+};
+
+export const badgesApi = {
+  getByEmployee: (employeeId, params = {}) =>
+    api.get(`/employee-badges/by-employee/${employeeId}`, { params }),
+};
+
 export default api;
