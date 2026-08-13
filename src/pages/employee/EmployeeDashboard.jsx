@@ -702,9 +702,8 @@ const EmployeeDashboard = () => {
       const wfhStart = new Date(`${wfh.wfh_date}T00:00:00`);
 
       if (
-        internOrContractor &&
-        (wfhStart.getFullYear() !== currentYear ||
-          wfhStart.getMonth() !== currentMonth)
+        wfhStart.getFullYear() !== currentYear ||
+        wfhStart.getMonth() !== currentMonth
       ) {
         return;
       }
@@ -717,7 +716,7 @@ const EmployeeDashboard = () => {
       totalWfhApproved += days;
     });
 
-    const wfhQuota = internOrContractor ? 2 : 100;
+    const wfhQuota = internOrContractor ? 2 : 4;
     const wfhRemaining = Math.max(wfhQuota - totalWfhApproved, 0);
 
     const currentLeave = allLeaves.find((leave) => {
