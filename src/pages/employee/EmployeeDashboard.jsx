@@ -12,6 +12,8 @@ import {
   subProjectApi,
   wfhApi,
   skillsApi,
+  employeeNotesApi,
+  badgesApi,
 } from "../../services/api";
 
 import {
@@ -21,7 +23,7 @@ import {
   Check,
   ChevronLeft,
   ChevronRight,
-  ChevronDown, 
+  ChevronDown,
   FolderKanban,
   MessageSquare,
   Star,
@@ -49,7 +51,7 @@ import {
   LineChart,
   Trophy,
   Target,
-  Plus
+  Plus,
 } from "lucide-react";
 
 import {
@@ -118,14 +120,47 @@ function calculateTenure(dateStr) {
 }
 
 /* ── Achievement badge visual config ── */
-const BADGE_STYLES = {
-  "50-hours-week": { image: fiftyHoursBadge },
-  "200-hours-month": { image: twoHundredHoursBadge },
-  "weekly-top": { image: weeklyTopBadge },
-  "monthly-top": { image: monthlyTopBadge },
-  "three-months": { image: threeMonthsBadge },
-  "six-months": { image: sixMonthsBadge },
+const BADGE_CONFIG = {
+  hrs_50_week: {
+    label: "50 Hours",
+    meta: "Weekly",
+    image: fiftyHoursBadge,
+  },
+  hrs_200_month: {
+    label: "200 Hours",
+    meta: "Monthly",
+    image: twoHundredHoursBadge,
+  },
+  weekly_top: {
+    label: "Weekly Top",
+    meta: "Performer",
+    image: weeklyTopBadge,
+  },
+  monthly_top: {
+    label: "Monthly Top",
+    meta: "Performer",
+    image: monthlyTopBadge,
+  },
+  tenure: {
+    label: "Tenure",
+    meta: "Completed",
+    image: threeMonthsBadge,
+  },
+  yearly_milestone: {
+    label: "Yearly",
+    meta: "Milestone",
+    image: sixMonthsBadge, // swap when you have a yearly image
+  },
 };
+
+const DISPLAY_SLOTS = [
+  "hrs_50_week",
+  "hrs_200_month",
+  "weekly_top",
+  "monthly_top",
+  "tenure",
+  "yearly_milestone",
+];
 
 /* ── Skills Multi-Select ─────────────────────────────── */
 const SkillsMultiSelect = ({ selected, onChange, options, isLoading }) => {
@@ -150,7 +185,6 @@ const SkillsMultiSelect = ({ selected, onChange, options, isLoading }) => {
 
   return (
     <div ref={ref} className="relative w-full">
-      
       <div className="mb-2 flex flex-wrap gap-1.5">
         {selected.map((skill) => (
           <span
@@ -236,6 +270,13 @@ const EmployeeDashboard = () => {
   const [attendanceModalTab, setAttendanceModalTab] = useState(null);
   const [modalSelectedMonth, setModalSelectedMonth] = useState(new Date());
   const todayStr = useMemo(() => format(new Date(), "yyyy-MM-dd"), []);
+  const [addNoteModal, setAddNoteModal] = useState({ isOpen: false, type: null });
+  const [noteForm, setNoteForm] = useState({
+    title: "",
+    content: "",
+    severity: "medium",
+  });
+  const [noteFormError, setNoteFormError] = useState("");
 
   const handleOpenAttendanceModal = (tabKey) => {
     setModalSelectedMonth(new Date());
@@ -334,6 +375,62 @@ const EmployeeDashboard = () => {
     queryFn: skillsApi.getAll,
   });
 
+  /* ── Employee Notes (complaints / warnings / recognitions) ── */
+  const { data: employeeNotes = [], isLoading: notesLoading } = useQuery({
+    queryKey: ["employee-notes", employeeId],
+    queryFn: () => employeeNotesApi.getByEmployee(employeeId),
+    enabled: !!employeeId,
+  });
+
+  const { data: employeeBadges = [] } = useQuery({
+    queryKey: ["employee-badges", employeeId],
+    queryFn: async () => {
+      const res = await badgesApi.getByEmployee(employeeId, { status: "active" });
+      const payload = res?.data !== undefined ? res.data : res;
+      return Array.isArray(payload)
+        ? payload
+        : Array.isArray(payload?.data)
+          ? payload.data
+          : Array.isArray(payload?.items)
+            ? payload.items
+            : [];
+    },
+    enabled: !!employeeId,
+  });
+
+  const createNoteMutation = useMutation({
+    mutationFn: (payload) => employeeNotesApi.create(payload),
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ["employee-notes", employeeId] });
+      setAddNoteModal({ isOpen: false, type: null });
+      setNoteForm({ title: "", content: "", severity: "medium" });
+    },
+    onError: (err) => {
+      setNoteFormError(err?.response?.data?.detail || "Failed to create note.");
+    },
+  });
+
+  const deleteNoteMutation = useMutation({
+    mutationFn: (noteId) => employeeNotesApi.delete(noteId),
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ["employee-notes", employeeId] });
+    },
+    onError: (err) => {
+      console.error(err?.response?.data?.detail || "Failed to delete note.");
+    },
+  });
+
+  const resolveNoteMutation = useMutation({
+    mutationFn: ({ id, resolution_note }) =>
+      employeeNotesApi.resolve(id, { resolution_note }),
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ["employee-notes", employeeId] });
+    },
+    onError: (err) => {
+      console.error(err?.response?.data?.detail || "Failed to resolve note.");
+    },
+  });
+
   const getEmployeeRank = (leaderboard) => {
     if (!leaderboard?.leaderboard || !loggedInEncordId) return null;
     const ranked = [...leaderboard.leaderboard].sort(
@@ -363,7 +460,8 @@ const EmployeeDashboard = () => {
     const name = employee?.name || account?.name || localUser.name || "";
     const jobTitle = employee?.designation || account?.role || "Annotator/Reviewer";
     const status = employee?.status || "active";
-    const avatarUrl = employee?.avatar_url || account?.avatar_url || localUser.avatar_url || null;
+    const avatarUrl =
+      employee?.avatar_url || account?.avatar_url || localUser.avatar_url || null;
     const rawJoiningDate = employee?.joining_date || employee?.created_at;
     const joiningDate = rawJoiningDate
       ? format(parseISO(rawJoiningDate), "dd MMM yyyy")
@@ -442,7 +540,9 @@ const EmployeeDashboard = () => {
         );
       } catch {}
       queryClient.invalidateQueries({ queryKey: ["auth-me"] });
-      queryClient.invalidateQueries({ queryKey: ["employee-profile", employeeId] });
+      queryClient.invalidateQueries({
+        queryKey: ["employee-profile", employeeId],
+      });
       setEmailError("");
     },
     onError: (err) => {
@@ -453,7 +553,9 @@ const EmployeeDashboard = () => {
   const saveMutation = useMutation({
     mutationFn: (data) => employeeApi.update(employeeId, data),
     onSuccess: () => {
-      queryClient.invalidateQueries({ queryKey: ["employee-profile", employeeId] });
+      queryClient.invalidateQueries({
+        queryKey: ["employee-profile", employeeId],
+      });
       queryClient.invalidateQueries({ queryKey: ["auth-me"] });
       setIsEditing(false);
       setSaveError("");
@@ -466,7 +568,6 @@ const EmployeeDashboard = () => {
   const COMPANY_DOMAIN = "autonexai360.com";
 
   const handleSave = async () => {
-    // First save the normal fields
     saveMutation.mutate({
       phone: editPhone || null,
       skills: editSkills,
@@ -474,7 +575,6 @@ const EmployeeDashboard = () => {
       encord_id: editEncordId || null,
     });
 
-    // Then handle email change if needed
     const trimmedEmail = editEmail.trim().toLowerCase();
     const originalEmail = (profile.email || "").trim().toLowerCase();
 
@@ -493,7 +593,9 @@ const EmployeeDashboard = () => {
   const [avatarError, setAvatarError] = useState("");
 
   const onAvatarSuccess = () => {
-    queryClient.invalidateQueries({ queryKey: ["employee-profile", employeeId] });
+    queryClient.invalidateQueries({
+      queryKey: ["employee-profile", employeeId],
+    });
     queryClient.invalidateQueries({ queryKey: ["auth-me"] });
     setAvatarError("");
   };
@@ -568,7 +670,8 @@ const EmployeeDashboard = () => {
         return {
           id: alloc.id,
           name: project?.name || "Project",
-          role: (alloc.role_tags || []).join(", ") || profile.jobTitle || "Developer",
+          role:
+            (alloc.role_tags || []).join(", ") || profile.jobTitle || "Developer",
           status: isActive ? "active" : "completed",
           startDate: alloc.active_start_date
             ? format(parseISO(alloc.active_start_date), "dd MMM yyyy")
@@ -777,17 +880,112 @@ const EmployeeDashboard = () => {
     };
   }, [allLeaves, myWfh, internOrContractor, currentYear, currentMonth, todayStr]);
 
-  const achievementBadges = useMemo(
-    () => [
-      { id: "50-hours-week", label: "50 Hours", meta: "Weekly", earned: true },
-      { id: "200-hours-month", label: "200 Hours", meta: "Monthly", earned: true },
-      { id: "weekly-top", label: "Weekly Top", meta: "Performer", earned: true },
-      { id: "monthly-top", label: "Monthly Top", meta: "Performer", earned: false },
-      { id: "three-months", label: "3 Months", meta: "Completed", earned: false },
-      { id: "six-months", label: "6 Months", meta: "Completed", earned: false },
-    ],
-    []
-  );
+  const achievementBadges = useMemo(() => {
+    const list = Array.isArray(employeeBadges)
+      ? employeeBadges
+      : Array.isArray(employeeBadges?.data)
+        ? employeeBadges.data
+        : Array.isArray(employeeBadges?.items)
+          ? employeeBadges.items
+          : [];
+
+    const has = (code) => list.some((b) => b.badge_code === code);
+
+    // Best weekly rank
+    let weeklyRank = null;
+    if (has("weekly_top_1")) weeklyRank = 1;
+    else if (has("weekly_top_2")) weeklyRank = 2;
+    else if (has("weekly_top_3")) weeklyRank = 3;
+
+    // Best monthly rank
+    let monthlyRankBadge = null;
+    if (has("monthly_top_1")) monthlyRankBadge = 1;
+    else if (has("monthly_top_2")) monthlyRankBadge = 2;
+    else if (has("monthly_top_3")) monthlyRankBadge = 3;
+
+    // Tenure: prefer 6 months
+    const has6 = has("tenure_6_months");
+    const has3 = has("tenure_3_months");
+    const tenureEarned = has6 || has3;
+    const tenureLabel = has6 ? "6 Months" : has3 ? "3 Months" : "Tenure";
+    const tenureImage = has6 ? sixMonthsBadge : threeMonthsBadge;
+
+    // Yearly: one badge + count
+    const yearlyCount = list.filter((b) => b.badge_code === "yearly_milestone").length;
+
+    return DISPLAY_SLOTS.map((slot) => {
+      const base = BADGE_CONFIG[slot];
+
+      if (slot === "hrs_50_week") {
+        return {
+          id: slot,
+          label: base.label,
+          meta: base.meta,
+          image: base.image,
+          earned: has("hrs_50_week"),
+          badgeText: null,
+        };
+      }
+
+      if (slot === "hrs_200_month") {
+        return {
+          id: slot,
+          label: base.label,
+          meta: base.meta,
+          image: base.image,
+          earned: has("hrs_200_month"),
+          badgeText: null,
+        };
+      }
+
+      if (slot === "weekly_top") {
+        return {
+          id: slot,
+          label: base.label,
+          meta: weeklyRank ? `#${weeklyRank}` : base.meta,
+          image: base.image,
+          earned: weeklyRank != null,
+          badgeText: weeklyRank ? `#${weeklyRank}` : null,
+        };
+      }
+
+      if (slot === "monthly_top") {
+        return {
+          id: slot,
+          label: base.label,
+          meta: monthlyRankBadge ? `#${monthlyRankBadge}` : base.meta,
+          image: base.image,
+          earned: monthlyRankBadge != null,
+          badgeText: monthlyRankBadge ? `#${monthlyRankBadge}` : null,
+        };
+      }
+
+      if (slot === "tenure") {
+        return {
+          id: slot,
+          label: tenureLabel,
+          meta: tenureEarned ? "Completed" : base.meta,
+          image: tenureImage,
+          earned: tenureEarned,
+          badgeText: null,
+        };
+      }
+
+      if (slot === "yearly_milestone") {
+        return {
+          id: slot,
+          label: base.label,
+          meta: yearlyCount > 0 ? `${yearlyCount} yr${yearlyCount > 1 ? "s" : ""}` : base.meta,
+          image: base.image,
+          earned: yearlyCount > 0,
+          badgeText: yearlyCount > 1 ? `×${yearlyCount}` : yearlyCount === 1 ? "1" : null,
+        };
+      }
+
+      return null;
+    }).filter(Boolean);
+  }, [employeeBadges]);
+
   const earnedBadgeCount = achievementBadges.filter((b) => b.earned).length;
 
   const display = (value, fallback = "Not set") => {
@@ -795,19 +993,46 @@ const EmployeeDashboard = () => {
     return value;
   };
 
-  // Arrays for messages
-  const complaintsList = employee?.complaints?.length ? employee.complaints : ["Late arrival reported by supervisor", "Missed daily sync meeting"];
-  const warningsList = employee?.warnings?.length ? employee.warnings : ["First warning: Incomplete task submissions"];
-  const recognitionsList = (employee?.recognitions?.length || employee?.recognition_messages?.length) 
-    ? (employee.recognitions || employee.recognition_messages) 
-    : ["Outstanding work on Project Alpha!", "Client praised communication skills"];
+  // Full lists (used by History modals)
+  const complaintsList = useMemo(
+    () => employeeNotes.filter((n) => n.type === "complaint"),
+    [employeeNotes]
+  );
+  const warningsList = useMemo(
+    () => employeeNotes.filter((n) => n.type === "warning"),
+    [employeeNotes]
+  );
+  const recognitionsList = useMemo(
+    () => employeeNotes.filter((n) => n.type === "recognition"),
+    [employeeNotes]
+  );
 
-  const complaintsCount = employee?.complaints_count ?? complaintsList.length;
-  const warningsCount = employee?.warnings_count ?? warningsList.length;
+  // Open only (shown in the three cards)
+  const openComplaints = useMemo(
+    () => complaintsList.filter((n) => n.status !== "resolved"),
+    [complaintsList]
+  );
+  const openWarnings = useMemo(
+    () => warningsList.filter((n) => n.status !== "resolved"),
+    [warningsList]
+  );
+  const openRecognitions = useMemo(
+    () => recognitionsList.filter((n) => n.status !== "resolved"),
+    [recognitionsList]
+  );
+
+  // Counts shown in profile Notes tab (open for complaints/warnings)
+  const complaintsCount = openComplaints.length;
+  const warningsCount = openWarnings.length;
+
+  const canManageNotes =
+    localUser.role === "admin" ||
+    localUser.role === "pm" ||
+    localUser.role === "hr";
 
   return (
     <div
-      className="w-full h-full text-stone-800  font-sans flex flex-col gap-2 sm:gap-3"
+      className="w-full h-full text-stone-800 font-sans flex flex-col gap-2 sm:gap-3"
       style={{ fontFamily: "'Inter', system-ui, sans-serif" }}
     >
       <style>{`
@@ -824,13 +1049,10 @@ const EmployeeDashboard = () => {
 
       {/* ════════════════ TOP SECTION ════════════════ */}
       <div className="grid grid-cols-1 lg:grid-cols-12 gap-2 sm:gap-3 items-stretch">
-        
         {/* ──────────── PROFILE CARD ──────────── */}
         <div className="lg:col-span-5 rounded-xl border border-stone-200 p-3 shadow-sm bg-white flex gap-2.5">
-          
           {/* Left Column: Avatar, Date, Phone, Skills */}
           <div className="flex flex-col shrink-0 w-[120px]">
-            {/* Avatar - NO tick mark */}
             <div className="relative mb-3 mx-auto">
               {profile.avatarUrl && !imgError ? (
                 <img
@@ -846,27 +1068,33 @@ const EmployeeDashboard = () => {
               )}
             </div>
 
-            {/* Date */}
             <div className="flex items-center justify-center gap-1.5 text-[10px] text-stone-700 font-semibold w-full mb-1.5 px-0.5">
               <Calendar className="w-3.5 h-3.5 text-stone-400 shrink-0" />
-              <span className="truncate text-center">{display(profile.joiningDate)}</span>
+              <span className="truncate text-center">
+                {display(profile.joiningDate)}
+              </span>
             </div>
-            
-            {/* Phone */}
+
             <div className="flex items-center justify-center gap-1.5 text-[10px] text-stone-500 font-medium w-full mb-2 px-0.5">
               <Phone className="w-3.5 h-3.5 text-stone-400 shrink-0" />
-              <span className="truncate text-center">{profile.phone || "No phone"}</span>
+              <span className="truncate text-center">
+                {profile.phone || "No phone"}
+              </span>
             </div>
 
             <div className="w-full h-px bg-stone-100 mb-2" />
 
-            {/* Skills */}
             {profile.skills?.length > 0 && (
               <div className="flex flex-col gap-1 w-full mt-1">
-                <span className="text-[9px] font-bold text-stone-400 uppercase tracking-wider ml-0.5">Skills</span>
+                <span className="text-[9px] font-bold text-stone-400 uppercase tracking-wider ml-0.5">
+                  Skills
+                </span>
                 <div className="flex flex-wrap gap-1.5 w-full">
                   {profile.skills.slice(0, 3).map((skill, idx) => (
-                    <span key={idx} className="bg-emerald-50/70 text-stone-700 px-2 py-0.5 rounded-full text-[9px] font-medium border border-emerald-100/50 leading-tight break-words max-w-full">
+                    <span
+                      key={idx}
+                      className="bg-emerald-50/70 text-stone-700 px-2 py-0.5 rounded-full text-[9px] font-medium border border-emerald-100/50 leading-tight break-words max-w-full"
+                    >
                       {skill}
                     </span>
                   ))}
@@ -875,9 +1103,8 @@ const EmployeeDashboard = () => {
             )}
           </div>
 
-          {/* Right Column: Details, Tabs, Cards */}
+          {/* Right Column */}
           <div className="flex-1 min-w-0 flex flex-col pt-1">
-            {/* Badge + Name */}
             <div className="flex items-center gap-2 flex-wrap mb-2.5">
               <h1 className="font-display text-[16px] font-bold text-stone-900 truncate leading-none">
                 {display(profile.name, "Employee")}
@@ -889,17 +1116,23 @@ const EmployeeDashboard = () => {
               )}
             </div>
 
-            {/* Email, Encord, Role */}
             <div className="text-[11px] text-stone-600 space-y-1.5 mb-3">
               <div className="flex items-center gap-2 truncate">
                 <Mail className="w-3.5 h-3.5 text-stone-400 shrink-0" />
-                <span className={profile.email ? "text-stone-700" : "text-stone-400 italic"}>
+                <span
+                  className={
+                    profile.email ? "text-stone-700" : "text-stone-400 italic"
+                  }
+                >
                   {display(profile.email)}
                 </span>
               </div>
               <div className="flex items-center gap-2 truncate">
-                <span className="w-3.5 h-3.5 flex items-center justify-center text-[8px] font-bold border border-stone-400 rounded-sm text-stone-500 shrink-0">E</span>
-                <span className="text-stone-500">EncordId:{" "}
+                <span className="w-3.5 h-3.5 flex items-center justify-center text-[8px] font-bold border border-stone-400 rounded-sm text-stone-500 shrink-0">
+                  E
+                </span>
+                <span className="text-stone-500">
+                  EncordId:{" "}
                   {profile.encordId ? (
                     <span className="text-stone-700">{profile.encordId}</span>
                   ) : (
@@ -909,14 +1142,17 @@ const EmployeeDashboard = () => {
               </div>
               <div className="flex items-center gap-2 truncate">
                 <User className="w-3.5 h-3.5 text-stone-400 shrink-0" />
-                <span className="text-stone-500">Role: <span className="text-stone-700">{display(profile.jobTitle, "Annotator/Reviewer")}</span></span>
+                <span className="text-stone-500">
+                  Role:{" "}
+                  <span className="text-stone-700">
+                    {display(profile.jobTitle, "Annotator/Reviewer")}
+                  </span>
+                </span>
               </div>
             </div>
 
-            {/* Divider only in right column */}
             <div className="w-full h-px bg-stone-100 mb-2" />
-            
-            {/* Tabs: Attendance | Notes */}
+
             <div className="flex flex-col gap-4 mt-1">
               <div className="flex gap-4">
                 <button
@@ -943,7 +1179,6 @@ const EmployeeDashboard = () => {
                 </button>
               </div>
 
-              {/* Tab content exactly matching image5 stats */}
               {profileTab === "attendance" ? (
                 <div className="grid grid-cols-3 gap-2">
                   {[
@@ -1005,17 +1240,51 @@ const EmployeeDashboard = () => {
               ) : (
                 <div className="grid grid-cols-3 gap-2">
                   {[
-                    { icon: <AlertCircle className="w-3.5 h-3.5 text-rose-500" />, label: "Complaints", value: complaintsCount, color: "text-rose-600" },
-                    { icon: <AlertTriangle className="w-3.5 h-3.5 text-amber-500" />, label: "Warnings", value: warningsCount, color: "text-amber-600" },
-                    { icon: <Award className="w-3.5 h-3.5 text-emerald-600" />, label: "Recognition", value: recognitionsList.length, color: "text-emerald-600" },
+                    {
+                      icon: <AlertCircle className="w-3.5 h-3.5 text-rose-500" />,
+                      label: "Complaints",
+                      value: complaintsCount,
+                      color: "text-rose-600",
+                    },
+                    {
+                      icon: (
+                        <AlertTriangle className="w-3.5 h-3.5 text-amber-500" />
+                      ),
+                      label: "Warnings",
+                      value: warningsCount,
+                      color: "text-amber-600",
+                    },
+                    {
+                      icon: <Award className="w-3.5 h-3.5 text-emerald-600" />,
+                      label: "Recognition",
+                      value: recognitionsList.length,
+                      color: "text-emerald-600",
+                    },
                   ].map(({ icon, label, value, color }) => (
-                    <div key={label} className="flex flex-col items-center gap-0.5 border border-stone-200 rounded-xl pt-2 pb-1 shadow-sm bg-white">
-                      <div className={`w-7 h-7 rounded-full flex items-center justify-center ${label === 'Recognition' ? 'bg-emerald-50' : label === 'Warnings' ? 'bg-amber-50' : 'bg-rose-50'}`}>
+                    <div
+                      key={label}
+                      className="flex flex-col items-center gap-0.5 border border-stone-200 rounded-xl pt-2 pb-1 shadow-sm bg-white"
+                    >
+                      <div
+                        className={`w-7 h-7 rounded-full flex items-center justify-center ${
+                          label === "Recognition"
+                            ? "bg-emerald-50"
+                            : label === "Warnings"
+                            ? "bg-amber-50"
+                            : "bg-rose-50"
+                        }`}
+                      >
                         {icon}
                       </div>
                       <div className="text-center">
-                        <span className={`font-data text-lg font-extrabold leading-none block ${color}`}>{value}</span>
-                        <span className="text-[9px] font-medium text-stone-400 mt-0.5 block uppercase tracking-wider">{label}</span>
+                        <span
+                          className={`font-data text-lg font-extrabold leading-none block ${color}`}
+                        >
+                          {value}
+                        </span>
+                        <span className="text-[9px] font-medium text-stone-400 mt-0.5 block uppercase tracking-wider">
+                          {label}
+                        </span>
                       </div>
                     </div>
                   ))}
@@ -1027,56 +1296,80 @@ const EmployeeDashboard = () => {
 
         {/* ───────── BADGE (col-7) ───────── */}
         <div className="lg:col-span-7 bg-white border border-stone-200 rounded-xl p-3 flex flex-col gap-2 shadow-[0_1px_4px_rgba(28,25,23,0.06)]">
-          
-          {/* Header row */}
           <div className="flex items-center justify-between pb-1">
-            <h2 className="font-display text-[15px] font-extrabold text-stone-900">Badges</h2>
+            <h2 className="font-display text-[15px] font-extrabold text-stone-900">
+              Badges
+            </h2>
             <div className="text-[10px] font-medium text-stone-500">
-              <span className="text-emerald-600 font-bold">{earnedBadgeCount}/{achievementBadges.length}</span> badges earned
+              <span className="text-emerald-600 font-bold">
+                {earnedBadgeCount}/{achievementBadges.length}
+              </span>{" "}
+              badges earned
             </div>
           </div>
 
-          {/* Badges row */}
           <div className="grid grid-cols-6 gap-2">
-            {achievementBadges.map((badge) => {
-              const style = BADGE_STYLES[badge.id];
-              return (
-                <div key={badge.id} className="relative flex flex-col items-center justify-between text-center p-2 rounded-2xl border border-stone-200 bg-white shadow-sm h-full">
-                  <div className="absolute top-2 right-2 z-10">
-                    {badge.earned ? (
+            {achievementBadges.map((badge) => (
+              <div
+                key={badge.id}
+                className="relative flex flex-col items-center justify-between text-center p-2 rounded-2xl border border-stone-200 bg-white shadow-sm h-full"
+              >
+                {/* status / rank / count pill */}
+                <div className="absolute top-2 right-2 z-10">
+                  {badge.earned ? (
+                    badge.badgeText ? (
+                      <div className="min-w-[18px] h-4 px-1 rounded-full bg-emerald-500 flex items-center justify-center border border-white">
+                        <span className="text-[8px] font-bold text-white leading-none">
+                          {badge.badgeText}
+                        </span>
+                      </div>
+                    ) : (
                       <div className="w-3.5 h-3.5 rounded-full bg-emerald-500 flex items-center justify-center border border-white">
                         <Check className="w-2.5 h-2.5 text-white stroke-[3]" />
                       </div>
-                    ) : (
-                      <div className="w-3.5 h-3.5 rounded-full bg-stone-100 flex items-center justify-center border border-white">
-                        <Lock className="w-2 h-2 text-stone-400" />
-                      </div>
-                    )}
-                  </div>
-                  <img
-                    src={style?.image}
-                    alt={badge.label}
-                    className={`w-9 h-9 object-contain mt-1 mb-1 relative z-0 ${badge.earned ? "" : "grayscale opacity-40"}`}
-                  />
-                  <div className="flex flex-col items-center w-full">
-                    <span className={`text-[9px] font-bold leading-tight w-full truncate px-1 ${badge.earned ? "text-stone-800" : "text-stone-400"}`}>
-                      {badge.label}
-                    </span>
-                    <span className="text-[8px] font-medium text-stone-400 mt-0.5 truncate w-full px-1">{badge.meta}</span>
-                  </div>
+                    )
+                  ) : (
+                    <div className="w-3.5 h-3.5 rounded-full bg-stone-100 flex items-center justify-center border border-white">
+                      <Lock className="w-2 h-2 text-stone-400" />
+                    </div>
+                  )}
                 </div>
-              );
-            })}
+
+                <img
+                  src={badge.image}
+                  alt={badge.label}
+                  className={`w-9 h-9 object-contain mt-1 mb-1 relative z-0 ${
+                    badge.earned ? "" : "grayscale opacity-40"
+                  }`}
+                />
+
+                <div className="flex flex-col items-center w-full">
+                  <span
+                    className={`text-[9px] font-bold leading-tight w-full truncate px-1 ${
+                      badge.earned ? "text-stone-800" : "text-stone-400"
+                    }`}
+                  >
+                    {badge.label}
+                  </span>
+                  <span className="text-[8px] font-medium text-stone-400 mt-0.5 truncate w-full px-1">
+                    {badge.meta}
+                  </span>
+                </div>
+              </div>
+            ))}
           </div>
 
-          {/* Stats section */}
           <div className="flex flex-col gap-1.5 flex-1">
-            <h3 className="font-display text-[15px] font-extrabold text-stone-900">Stats</h3>
+            <h3 className="font-display text-[15px] font-extrabold text-stone-900">
+              Stats
+            </h3>
             <div className="grid grid-cols-4 gap-2 flex-1">
               {/* Previous Day Rank */}
               <div className="bg-white border border-stone-200 rounded-2xl p-2.5 flex flex-col justify-between shadow-sm">
                 <div className="flex items-start justify-between">
-                  <span className="text-[10px] font-semibold text-stone-500 leading-tight max-w-[50%]">Prev Day Rank</span>
+                  <span className="text-[10px] font-semibold text-stone-500 leading-tight max-w-[50%]">
+                    Prev Day Rank
+                  </span>
                   <div className="w-6 h-6 rounded-full bg-emerald-50 flex items-center justify-center shrink-0">
                     <TrendingUp className="w-3.5 h-3.5 text-emerald-600" />
                   </div>
@@ -1103,7 +1396,9 @@ const EmployeeDashboard = () => {
               {/* Weekly Rank */}
               <div className="bg-white border border-stone-200 rounded-2xl p-2.5 flex flex-col justify-between shadow-sm">
                 <div className="flex items-start justify-between">
-                  <span className="text-[10px] font-semibold text-stone-500 leading-tight max-w-[50%]">Weekly Rank</span>
+                  <span className="text-[10px] font-semibold text-stone-500 leading-tight max-w-[50%]">
+                    Weekly Rank
+                  </span>
                   <div className="w-6 h-6 rounded-full bg-violet-50 flex items-center justify-center shrink-0">
                     <Calendar className="w-3.5 h-3.5 text-violet-600" />
                   </div>
@@ -1130,7 +1425,9 @@ const EmployeeDashboard = () => {
               {/* Monthly Rank */}
               <div className="bg-white border border-stone-200 rounded-2xl p-2.5 flex flex-col justify-between shadow-sm">
                 <div className="flex items-start justify-between">
-                  <span className="text-[10px] font-semibold text-stone-500 leading-tight max-w-[50%]">Monthly Rank</span>
+                  <span className="text-[10px] font-semibold text-stone-500 leading-tight max-w-[50%]">
+                    Monthly Rank
+                  </span>
                   <div className="w-6 h-6 rounded-full bg-blue-50 flex items-center justify-center shrink-0">
                     <Award className="w-3.5 h-3.5 text-blue-600" />
                   </div>
@@ -1149,23 +1446,37 @@ const EmployeeDashboard = () => {
               {/* Monthly Rating */}
               <div className="relative bg-white border border-stone-200 rounded-2xl p-2.5 flex flex-col justify-between shadow-sm group cursor-default">
                 <div className="flex items-start justify-between">
-                  <span className="text-[10px] font-semibold text-stone-500 leading-tight max-w-[50%]">Monthly Rating</span>
+                  <span className="text-[10px] font-semibold text-stone-500 leading-tight max-w-[50%]">
+                    Monthly Rating
+                  </span>
                   <div className="w-6 h-6 rounded-full bg-amber-50 flex items-center justify-center shrink-0">
                     <Star className="w-3.5 h-3.5 text-amber-500 fill-amber-500" />
                   </div>
                 </div>
                 <div className="flex items-end justify-between mt-2.5">
                   <div className="flex items-baseline gap-0.5">
-                    <span className="font-data text-[22px] font-extrabold text-stone-800 leading-none">{latestRating || "—"}</span>
-                    {latestRating && <span className="font-data text-[9px] font-bold text-stone-500">/5</span>}
+                    <span className="font-data text-[22px] font-extrabold text-stone-800 leading-none">
+                      {latestRating || "—"}
+                    </span>
+                    {latestRating && (
+                      <span className="font-data text-[9px] font-bold text-stone-500">
+                        /5
+                      </span>
+                    )}
                   </div>
                   <div className="flex items-center gap-0.5 -mb-0.5">
                     {[1, 2, 3, 4, 5].map((s) => (
-                      <Star key={s} className={`w-2.5 h-2.5 ${(latestRating && s <= Math.floor(latestRating)) ? "fill-amber-400 text-amber-400" : "fill-stone-200 text-stone-200"}`} />
+                      <Star
+                        key={s}
+                        className={`w-2.5 h-2.5 ${
+                          latestRating && s <= Math.floor(latestRating)
+                            ? "fill-amber-400 text-amber-400"
+                            : "fill-stone-200 text-stone-200"
+                        }`}
+                      />
                     ))}
                   </div>
                 </div>
-                {/* Tooltip */}
                 <div className="absolute bottom-full left-1/2 -translate-x-1/2 mb-2 w-48 opacity-0 group-hover:opacity-100 pointer-events-none transition-opacity duration-200 z-20">
                   <div className="bg-stone-800 text-white text-[10px] leading-relaxed rounded-lg p-2.5 shadow-xl text-center">
                     {latestPmReview?.overall_comment || "No comments recorded."}
@@ -1182,36 +1493,64 @@ const EmployeeDashboard = () => {
           ROW 2 — Productivity Trend | Project Status
       ══════════════════════════════════════════ */}
       <div className="grid grid-cols-1 lg:grid-cols-12 gap-3 items-stretch">
-
         {/* ───────── PRODUCTIVITY TREND (col-7) ───────── */}
         <div className="lg:col-span-7 bg-white border border-stone-200 rounded-2xl p-4 flex flex-col gap-3 min-h-[260px] shadow-[0_1px_4px_rgba(28,25,23,0.06)]">
-          {/* Header */}
           <div className="flex items-start justify-between gap-2">
             <div>
-              <h3 className="font-display text-sm font-bold text-stone-800">Productivity Trend &amp; Project Highlights</h3>
-              <p className="text-[10px] text-stone-400 mt-0.5">{currentMonthLabel}</p>
+              <h3 className="font-display text-sm font-bold text-stone-800">
+                Productivity Trend &amp; Project Highlights
+              </h3>
+              <p className="text-[10px] text-stone-400 mt-0.5">
+                {currentMonthLabel}
+              </p>
             </div>
             <div className="text-right shrink-0">
-              <span className="font-data text-lg font-extrabold text-teal-700 leading-none">{totalDailyHours}h</span>
-              <span className="text-[9px] font-medium text-stone-400 block mt-0.5">Total Hours</span>
+              <span className="font-data text-lg font-extrabold text-teal-700 leading-none">
+                {totalDailyHours}h
+              </span>
+              <span className="text-[9px] font-medium text-stone-400 block mt-0.5">
+                Total Hours
+              </span>
             </div>
           </div>
 
-          {/* Mini-stats */}
           <div className="grid grid-cols-3 gap-2">
             {[
-              { label: "Daily Avg", value: `${activityStats.avgHours}h`, color: "text-stone-800" },
-              { label: "Active Days", value: String(activityStats.activeDays), color: "text-stone-800" },
-              { label: "vs Team Avg", value: `${activityStats.deltaPct >= 0 ? "+" : ""}${activityStats.deltaPct}%`, color: activityStats.deltaPct >= 0 ? "text-emerald-600" : "text-rose-500" },
+              {
+                label: "Daily Avg",
+                value: `${activityStats.avgHours}h`,
+                color: "text-stone-800",
+              },
+              {
+                label: "Active Days",
+                value: String(activityStats.activeDays),
+                color: "text-stone-800",
+              },
+              {
+                label: "vs Team Avg",
+                value: `${activityStats.deltaPct >= 0 ? "+" : ""}${
+                  activityStats.deltaPct
+                }%`,
+                color:
+                  activityStats.deltaPct >= 0
+                    ? "text-emerald-600"
+                    : "text-rose-500",
+              },
             ].map(({ label, value, color }) => (
-              <div key={label} className="bg-stone-50 border border-stone-100 rounded-xl px-3 py-2 text-center">
-                <span className="text-[9px] font-bold uppercase text-stone-400 block">{label}</span>
-                <span className={`font-data text-sm font-bold ${color} block mt-0.5`}>{value}</span>
+              <div
+                key={label}
+                className="bg-stone-50 border border-stone-100 rounded-xl px-3 py-2 text-center"
+              >
+                <span className="text-[9px] font-bold uppercase text-stone-400 block">
+                  {label}
+                </span>
+                <span className={`font-data text-sm font-bold ${color} block mt-0.5`}>
+                  {value}
+                </span>
               </div>
             ))}
           </div>
 
-          {/* Chart */}
           <div className="flex-1 min-h-[100px]">
             {dailyData.length === 0 ? (
               <div className="h-full flex items-center justify-center text-xs text-stone-400 bg-stone-50 rounded-xl border border-stone-100">
@@ -1221,7 +1560,13 @@ const EmployeeDashboard = () => {
               <div className="relative bg-stone-50/60 border border-stone-100 rounded-xl p-2 h-full">
                 <div className="flex h-full">
                   <div className="flex flex-col justify-between h-full pr-2 text-[8px] text-stone-400 shrink-0 font-data">
-                    {[chartMax, chartMax * 0.75, chartMax * 0.5, chartMax * 0.25, 0].map((n, i) => (
+                    {[
+                      chartMax,
+                      chartMax * 0.75,
+                      chartMax * 0.5,
+                      chartMax * 0.25,
+                      0,
+                    ].map((n, i) => (
                       <span key={i}>{Math.round(n)}h</span>
                     ))}
                   </div>
@@ -1236,23 +1581,78 @@ const EmployeeDashboard = () => {
                     >
                       <defs>
                         <linearGradient id="empFill" x1="0" y1="0" x2="0" y2="1">
-                          <stop offset="0%" stopColor="#0D9488" stopOpacity="0.12" />
-                          <stop offset="100%" stopColor="#0D9488" stopOpacity="0" />
+                          <stop
+                            offset="0%"
+                            stopColor="#0D9488"
+                            stopOpacity="0.12"
+                          />
+                          <stop
+                            offset="100%"
+                            stopColor="#0D9488"
+                            stopOpacity="0"
+                          />
                         </linearGradient>
                       </defs>
                       {[0, 1, 2, 3, 4].map((i) => (
-                        <line key={i} x1="0" x2={CHART_W} y1={(CHART_H / 4) * i} y2={(CHART_H / 4) * i} stroke="#e7e5e4" strokeWidth="1" />
+                        <line
+                          key={i}
+                          x1="0"
+                          x2={CHART_W}
+                          y1={(CHART_H / 4) * i}
+                          y2={(CHART_H / 4) * i}
+                          stroke="#e7e5e4"
+                          strokeWidth="1"
+                        />
                       ))}
                       {hoverPoint && (
-                        <line x1={hoverPoint.x} x2={hoverPoint.x} y1="0" y2={CHART_H} stroke="#d6d3d1" strokeWidth="1" strokeDasharray="2 3" />
+                        <line
+                          x1={hoverPoint.x}
+                          x2={hoverPoint.x}
+                          y1="0"
+                          y2={CHART_H}
+                          stroke="#d6d3d1"
+                          strokeWidth="1"
+                          strokeDasharray="2 3"
+                        />
                       )}
-                      <polygon points={chartGeometry.areaFill} fill="url(#empFill)" />
-                      <polyline points={chartGeometry.teamLine} fill="none" stroke="#a8a29e" strokeWidth="1.25" strokeDasharray="3 3" strokeOpacity="0.7" />
-                      <polyline points={chartGeometry.empLine} fill="none" stroke="#0f766e" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" />
+                      <polygon
+                        points={chartGeometry.areaFill}
+                        fill="url(#empFill)"
+                      />
+                      <polyline
+                        points={chartGeometry.teamLine}
+                        fill="none"
+                        stroke="#a8a29e"
+                        strokeWidth="1.25"
+                        strokeDasharray="3 3"
+                        strokeOpacity="0.7"
+                      />
+                      <polyline
+                        points={chartGeometry.empLine}
+                        fill="none"
+                        stroke="#0f766e"
+                        strokeWidth="2"
+                        strokeLinecap="round"
+                        strokeLinejoin="round"
+                      />
                       {hoverPoint && (
                         <>
-                          <circle cx={hoverPoint.x} cy={hoverPoint.yTeam} r="2.5" fill="#a8a29e" stroke="white" strokeWidth="1" />
-                          <circle cx={hoverPoint.x} cy={hoverPoint.yEmp} r="3.5" fill="#0f766e" stroke="white" strokeWidth="1.5" />
+                          <circle
+                            cx={hoverPoint.x}
+                            cy={hoverPoint.yTeam}
+                            r="2.5"
+                            fill="#a8a29e"
+                            stroke="white"
+                            strokeWidth="1"
+                          />
+                          <circle
+                            cx={hoverPoint.x}
+                            cy={hoverPoint.yEmp}
+                            r="3.5"
+                            fill="#0f766e"
+                            stroke="white"
+                            strokeWidth="1.5"
+                          />
                         </>
                       )}
                     </svg>
@@ -1261,12 +1661,26 @@ const EmployeeDashboard = () => {
                         className="absolute -top-1 bg-white/95 text-stone-700 text-[9px] rounded-lg px-2 py-1.5 pointer-events-none shadow-md border border-stone-200/70 whitespace-nowrap z-10 font-data"
                         style={{
                           left: `${(hoverPoint.x / CHART_W) * 100}%`,
-                          transform: hoverPoint.x / CHART_W > 0.85 ? "translate(-100%, -100%)" : hoverPoint.x / CHART_W < 0.15 ? "translate(0%, -100%)" : "translate(-50%, -100%)",
+                          transform:
+                            hoverPoint.x / CHART_W > 0.85
+                              ? "translate(-100%, -100%)"
+                              : hoverPoint.x / CHART_W < 0.15
+                              ? "translate(0%, -100%)"
+                              : "translate(-50%, -100%)",
                         }}
                       >
-                        <p className="font-display font-medium text-stone-500 mb-0.5">{format(parseISO(hoverPoint.date), "EEE, d MMM")}</p>
-                        <p>You: <span className="font-semibold text-stone-800">{hoverPoint.employee_hours}h</span></p>
-                        <p className="text-stone-400">Team: {hoverPoint.team_avg_hours}h</p>
+                        <p className="font-display font-medium text-stone-500 mb-0.5">
+                          {format(parseISO(hoverPoint.date), "EEE, d MMM")}
+                        </p>
+                        <p>
+                          You:{" "}
+                          <span className="font-semibold text-stone-800">
+                            {hoverPoint.employee_hours}h
+                          </span>
+                        </p>
+                        <p className="text-stone-400">
+                          Team: {hoverPoint.team_avg_hours}h
+                        </p>
                       </div>
                     )}
                     <div className="flex justify-between mt-0.5 text-[7.5px] text-stone-400 font-medium font-data">
@@ -1283,11 +1697,12 @@ const EmployeeDashboard = () => {
 
         {/* ───────── PROJECT STATUS (col-5) ───────── */}
         <div className="lg:col-span-5 bg-white border border-stone-200 rounded-2xl p-4 flex flex-col gap-3 shadow-[0_1px_4px_rgba(28,25,23,0.06)]">
-          {/* Header */}
           <div className="flex items-center justify-between">
             <div className="flex items-center gap-2">
               <FolderKanban className="w-4 h-4 text-teal-600" />
-              <h3 className="font-display text-sm font-bold text-stone-800">Project Status</h3>
+              <h3 className="font-display text-sm font-bold text-stone-800">
+                Project Status
+              </h3>
             </div>
             <button
               onClick={() => setShowLogsModal(true)}
@@ -1297,7 +1712,6 @@ const EmployeeDashboard = () => {
             </button>
           </div>
 
-          {/* Project list */}
           <div className="flex-1 flex flex-col gap-1.5 overflow-y-auto db-scroll">
             {allEmployeeProjects.length === 0 ? (
               <div className="flex-1 flex items-center justify-center text-xs text-stone-400 italic">
@@ -1305,29 +1719,45 @@ const EmployeeDashboard = () => {
               </div>
             ) : (
               allEmployeeProjects.slice(0, 6).map((proj) => (
-                <div key={proj.id} className="flex items-center gap-3 p-2.5 rounded-xl border border-stone-100 bg-stone-50 hover:bg-stone-100/60 transition-colors">
+                <div
+                  key={proj.id}
+                  className="flex items-center gap-3 p-2.5 rounded-xl border border-stone-100 bg-stone-50 hover:bg-stone-100/60 transition-colors"
+                >
                   <span className="w-8 h-8 rounded-lg bg-teal-100 text-teal-700 flex items-center justify-center font-extrabold text-[11px] shrink-0">
                     {proj.symbol}
                   </span>
                   <div className="flex-1 min-w-0">
-                    <p className="font-bold text-stone-800 text-xs truncate">{proj.name}</p>
-                    <p className="text-[10px] text-stone-500 truncate">{proj.role}</p>
+                    <p className="font-bold text-stone-800 text-xs truncate">
+                      {proj.name}
+                    </p>
+                    <p className="text-[10px] text-stone-500 truncate">
+                      {proj.role}
+                    </p>
                   </div>
                   <div className="text-right shrink-0">
-                    <span className={`inline-block px-2 py-0.5 text-[8.5px] font-bold uppercase rounded-md ${proj.status === "active" ? "bg-teal-700 text-white" : "bg-stone-200 text-stone-500"}`}>
+                    <span
+                      className={`inline-block px-2 py-0.5 text-[8.5px] font-bold uppercase rounded-md ${
+                        proj.status === "active"
+                          ? "bg-teal-700 text-white"
+                          : "bg-stone-200 text-stone-500"
+                      }`}
+                    >
                       {proj.status === "active" ? "Active" : "Done"}
                     </span>
-                    <p className="text-[9px] text-stone-400 font-data mt-0.5">{proj.startDate}</p>
+                    <p className="text-[9px] text-stone-400 font-data mt-0.5">
+                      {proj.startDate}
+                    </p>
                   </div>
                 </div>
               ))
             )}
           </div>
 
-          {/* Footer */}
           <div className="border-t border-stone-100 pt-2 flex items-center justify-between text-[10px] text-stone-400">
             <span>Active allocations</span>
-            <strong className="text-stone-700 font-data">{allEmployeeProjects.length} total</strong>
+            <strong className="text-stone-700 font-data">
+              {allEmployeeProjects.length} total
+            </strong>
           </div>
         </div>
       </div>
@@ -1336,11 +1766,9 @@ const EmployeeDashboard = () => {
           ROW 3 — Notes/Perf History  |  Awards
       ══════════════════════════════════════════ */}
       <div className="grid grid-cols-1 lg:grid-cols-12 gap-3 items-stretch">
-
         {/* ───────── NOTES & PERFORMANCE HISTORY (col-8) ───────── */}
         <div className="lg:col-span-8 bg-white border border-stone-200 rounded-2xl p-4 flex flex-col gap-3 shadow-[0_1px_4px_rgba(28,25,23,0.06)]">
           <div className="flex flex-col gap-3 h-full">
-            {/* Tab switcher */}
             <div className="flex gap-5 border-b border-stone-100 pb-0.5">
               <button
                 type="button"
@@ -1366,144 +1794,429 @@ const EmployeeDashboard = () => {
               </button>
             </div>
 
-          {/* Tab body */}
-          {bottomTab === "notes" ? (
-            <div className="grid grid-cols-3 gap-3 flex-1">
-              {/* Complaints */}
-              <div className="flex flex-col bg-stone-50 border border-stone-200 rounded-xl p-2.5">
-                <div className="flex items-center justify-between gap-1.5 mb-2">
-                  <div className="flex items-center gap-1.5">
-                    <AlertCircle className="w-3.5 h-3.5 text-rose-500 shrink-0" />
-                    <h3 className="text-[10px] font-bold text-stone-700 uppercase tracking-wider">Complaints</h3>
-                  </div>
-                  <div className="flex items-center gap-1.5">
-                    <button onClick={() => setNotesModal({ isOpen: true, type: 'complaints', title: 'Complaints History', data: complaintsList })} className="flex items-center gap-1 text-[9px] font-semibold text-stone-500 hover:text-stone-800 bg-stone-100 hover:bg-stone-200 border border-stone-200 px-1.5 py-0.5 rounded transition-colors cursor-pointer">
-                      <History className="w-2.5 h-2.5" /> History
-                    </button>
-                    {isAdmin && (
-                      <button className="flex items-center justify-center bg-stone-100 hover:bg-stone-200 border border-stone-200 w-5 h-5 rounded transition-colors text-stone-600">
-                        <Plus className="w-3 h-3" />
-                      </button>
-                    )}
-                  </div>
-                </div>
-                <div className="flex flex-col gap-1.5 flex-1 overflow-y-auto db-scroll">
-                  {complaintsList.length > 0 ? (
-                    <>
-                      {[...complaintsList].reverse().slice(0, 4).map((item, idx) => (
-                        <p key={idx} className="text-[10px] text-stone-600 leading-snug bg-rose-50/50 border border-rose-100/70 p-1.5 rounded-lg">
-                          {typeof item === "string" ? item : item.message || item.reason || "Complaint recorded"}
-                        </p>
-                      ))}
-                      {complaintsList.length > 4 && (
-                        <button className="text-[9.5px] font-semibold text-teal-600 hover:underline w-full text-left mt-0.5">See {complaintsList.length - 4} more…</button>
-                      )}
-                    </>
-                  ) : (
-                    <p className="text-[10px] text-stone-400 italic">No complaints filed.</p>
-                  )}
-                </div>
-              </div>
-
-              {/* Warnings */}
-              <div className="flex flex-col bg-stone-50 border border-stone-200 rounded-xl p-2.5">
-                <div className="flex items-center justify-between gap-1.5 mb-2">
-                  <div className="flex items-center gap-1.5">
-                    <AlertTriangle className="w-3.5 h-3.5 text-amber-500 shrink-0" />
-                    <h3 className="text-[10px] font-bold text-stone-700 uppercase tracking-wider">Warnings</h3>
-                  </div>
-                  <div className="flex items-center gap-1.5">
-                    <button onClick={() => setNotesModal({ isOpen: true, type: 'warnings', title: 'Warnings History', data: warningsList })} className="flex items-center gap-1 text-[9px] font-semibold text-stone-500 hover:text-stone-800 bg-stone-100 hover:bg-stone-200 border border-stone-200 px-1.5 py-0.5 rounded transition-colors cursor-pointer">
-                      <History className="w-2.5 h-2.5" /> History
-                    </button>
-                    {isAdmin && (
-                      <button className="flex items-center justify-center bg-stone-100 hover:bg-stone-200 border border-stone-200 w-5 h-5 rounded transition-colors text-stone-600">
-                        <Plus className="w-3 h-3" />
-                      </button>
-                    )}
-                  </div>
-                </div>
-                <div className="flex flex-col gap-1.5 flex-1 overflow-y-auto db-scroll">
-                  {warningsList.length > 0 ? (
-                    <>
-                      {[...warningsList].reverse().slice(0, 4).map((item, idx) => (
-                        <p key={idx} className="text-[10px] text-stone-600 leading-snug bg-amber-50/50 border border-amber-100/70 p-1.5 rounded-lg">
-                          {typeof item === "string" ? item : item.message || item.reason || "Warning issued"}
-                        </p>
-                      ))}
-                      {warningsList.length > 4 && (
-                        <button className="text-[9.5px] font-semibold text-teal-600 hover:underline w-full text-left mt-0.5">See {warningsList.length - 4} more…</button>
-                      )}
-                    </>
-                  ) : (
-                    <p className="text-[10px] text-stone-400 italic">No warnings issued.</p>
-                  )}
-                </div>
-              </div>
-
-              {/* Recognition */}
-              <div className="flex flex-col bg-stone-50 border border-stone-200 rounded-xl p-2.5">
-                <div className="flex items-center justify-between gap-1.5 mb-2">
-                  <div className="flex items-center gap-1.5">
-                    <Award className="w-3.5 h-3.5 text-emerald-600 shrink-0" />
-                    <h3 className="text-[10px] font-bold text-stone-700 uppercase tracking-wider">Recognition</h3>
-                  </div>
-                  <div className="flex items-center gap-1.5">
-                    <button onClick={() => setNotesModal({ isOpen: true, type: 'recognitions', title: 'Recognition History', data: recognitionsList })} className="flex items-center gap-1 text-[9px] font-semibold text-stone-500 hover:text-stone-800 bg-stone-100 hover:bg-stone-200 border border-stone-200 px-1.5 py-0.5 rounded transition-colors cursor-pointer">
-                      <History className="w-2.5 h-2.5" /> History
-                    </button>
-                    {isAdmin && (
-                      <button className="flex items-center justify-center bg-stone-100 hover:bg-stone-200 border border-stone-200 w-5 h-5 rounded transition-colors text-stone-600">
-                        <Plus className="w-3 h-3" />
-                      </button>
-                    )}
-                  </div>
-                </div>
-                <div className="flex flex-col gap-1.5 flex-1 overflow-y-auto db-scroll">
-                  {recognitionsList.length > 0 ? (
-                    <>
-                      {[...recognitionsList].reverse().slice(0, 4).map((item, idx) => (
-                        <p key={idx} className="text-[10px] text-stone-600 leading-snug bg-emerald-50/50 border border-emerald-100/70 p-1.5 rounded-lg">
-                          {typeof item === "string" ? item : item.message || item.note || "Recognition received"}
-                        </p>
-                      ))}
-                      {recognitionsList.length > 4 && (
-                        <button className="text-[9.5px] font-semibold text-teal-600 hover:underline w-full text-left mt-0.5">See {recognitionsList.length - 4} more…</button>
-                      )}
-                    </>
-                  ) : (
-                    <p className="text-[10px] text-stone-400 italic">No recognition messages yet.</p>
-                  )}
-                </div>
-              </div>
-            </div>
-          ) : (
-            <div className="flex flex-col gap-2 flex-1 overflow-y-auto db-scroll">
-              {perfReviews.length > 0 ? (
-                [...perfReviews].reverse().map((review, idx) => {
-                  const rts = review.parameter_values?.map((p) => p.pm_rating).filter((r) => r != null) || [];
-                  const rAvg = rts.length ? (rts.reduce((s, v) => s + v, 0) / rts.length).toFixed(1) : null;
-                  return (
-                    <div key={idx} className="flex items-start gap-3 bg-stone-50 border border-stone-100 rounded-xl p-3">
-                      <div className="flex-1 min-w-0">
-                        <div className="flex items-center gap-2 mb-1">
-                          <span className="text-[11px] font-bold text-stone-800">{review.period || "Review"}</span>
-                          {rAvg && (
-                            <span className="flex items-center gap-0.5 text-[9px] font-bold text-amber-700 bg-amber-50 border border-amber-100 px-1.5 py-0.5 rounded-md">
-                              <Star className="w-2.5 h-2.5 fill-amber-400 text-amber-400" /> {rAvg}
-                            </span>
-                          )}
-                        </div>
-                        <p className="text-[10px] text-stone-600 leading-relaxed">{review.overall_comment || "No detailed comments."}</p>
-                      </div>
+            {bottomTab === "notes" ? (
+              <div className="grid grid-cols-3 gap-3 flex-1">
+                {/* ── Complaints ── */}
+                <div className="flex flex-col bg-stone-50 border border-stone-200 rounded-xl p-2.5">
+                  <div className="flex items-center justify-between gap-1.5 mb-2">
+                    <div className="flex items-center gap-1.5">
+                      <AlertCircle className="w-3.5 h-3.5 text-rose-500 shrink-0" />
+                      <h3 className="text-[10px] font-bold text-stone-700 uppercase tracking-wider">
+                        Complaints
+                      </h3>
                     </div>
-                  );
-                })
-              ) : (
-                <p className="text-[10px] text-stone-400 italic">No performance history found.</p>
-              )}
-            </div>
-          )}
+                    <div className="flex items-center gap-1.5">
+                      <button
+                        onClick={() =>
+                          setNotesModal({
+                            isOpen: true,
+                            type: "complaints",
+                            title: "Complaints History",
+                            data: complaintsList,
+                          })
+                        }
+                        className="flex items-center gap-1 text-[9px] font-semibold text-stone-500 hover:text-stone-800 bg-stone-100 hover:bg-stone-200 border border-stone-200 px-1.5 py-0.5 rounded transition-colors cursor-pointer"
+                      >
+                        <History className="w-2.5 h-2.5" /> History
+                      </button>
+
+                      {canManageNotes && (
+                        <button
+                          type="button"
+                          onClick={() => {
+                            setNoteForm({
+                              title: "",
+                              content: "",
+                              severity: "medium",
+                            });
+                            setNoteFormError("");
+                            setAddNoteModal({
+                              isOpen: true,
+                              type: "complaint",
+                            });
+                          }}
+                          className="flex items-center justify-center bg-stone-100 hover:bg-stone-200 border border-stone-200 w-5 h-5 rounded transition-colors text-stone-600"
+                        >
+                          <Plus className="w-3 h-3" />
+                        </button>
+                      )}
+                    </div>
+                  </div>
+
+                  <div className="flex flex-col gap-1.5 flex-1 overflow-y-auto db-scroll">
+                    {openComplaints.length > 0 ? (
+                      <>
+                        {[...openComplaints]
+                          .reverse()
+                          .slice(0, 4)
+                          .map((item, idx) => (
+                            <div
+                              key={item.id ?? idx}
+                              className="group relative flex items-start gap-1.5 bg-rose-50/50 border border-rose-100/70 p-1.5 rounded-lg"
+                            >
+                              <p className="text-[10px] text-stone-600 leading-snug flex-1 min-w-0">
+                                {item.title
+                                  ? `${item.title}${
+                                      item.content ? ` — ${item.content}` : ""
+                                    }`
+                                  : item.message ||
+                                    item.reason ||
+                                    item.note ||
+                                    "Complaint recorded"}
+                              </p>
+
+                              {canManageNotes && item.id && (
+                                <div className="flex items-center gap-0.5 shrink-0 opacity-0 group-hover:opacity-100 transition-all">
+                                  <button
+                                    type="button"
+                                    title="Mark as resolved"
+                                    onClick={() => {
+                                      if (
+                                        window.confirm(
+                                          "Mark this complaint as resolved?"
+                                        )
+                                      ) {
+                                        resolveNoteMutation.mutate({
+                                          id: item.id,
+                                        });
+                                      }
+                                    }}
+                                    disabled={resolveNoteMutation.isPending}
+                                    className="p-0.5 rounded text-stone-400 hover:text-emerald-600 hover:bg-emerald-50"
+                                  >
+                                    <Check className="w-3 h-3" />
+                                  </button>
+
+                                  <button
+                                    type="button"
+                                    title="Delete"
+                                    onClick={() => {
+                                      if (
+                                        window.confirm(
+                                          "Delete this complaint?"
+                                        )
+                                      ) {
+                                        deleteNoteMutation.mutate(item.id);
+                                      }
+                                    }}
+                                    disabled={deleteNoteMutation.isPending}
+                                    className="p-0.5 rounded text-stone-400 hover:text-rose-600 hover:bg-rose-100"
+                                  >
+                                    <Trash2 className="w-3 h-3" />
+                                  </button>
+                                </div>
+                              )}
+                            </div>
+                          ))}
+
+                        {openComplaints.length > 4 && (
+                          <button className="text-[9.5px] font-semibold text-teal-600 hover:underline w-full text-left mt-0.5">
+                            See {openComplaints.length - 4} more…
+                          </button>
+                        )}
+                      </>
+                    ) : (
+                      <p className="text-[10px] text-stone-400 italic">
+                        No open complaints.
+                      </p>
+                    )}
+                  </div>
+                </div>
+
+                {/* ── Warnings ── */}
+                <div className="flex flex-col bg-stone-50 border border-stone-200 rounded-xl p-2.5">
+                  <div className="flex items-center justify-between gap-1.5 mb-2">
+                    <div className="flex items-center gap-1.5">
+                      <AlertTriangle className="w-3.5 h-3.5 text-amber-500 shrink-0" />
+                      <h3 className="text-[10px] font-bold text-stone-700 uppercase tracking-wider">
+                        Warnings
+                      </h3>
+                    </div>
+                    <div className="flex items-center gap-1.5">
+                      <button
+                        onClick={() =>
+                          setNotesModal({
+                            isOpen: true,
+                            type: "warnings",
+                            title: "Warnings History",
+                            data: warningsList,
+                          })
+                        }
+                        className="flex items-center gap-1 text-[9px] font-semibold text-stone-500 hover:text-stone-800 bg-stone-100 hover:bg-stone-200 border border-stone-200 px-1.5 py-0.5 rounded transition-colors cursor-pointer"
+                      >
+                        <History className="w-2.5 h-2.5" /> History
+                      </button>
+
+                      {canManageNotes && (
+                        <button
+                          type="button"
+                          onClick={() => {
+                            setNoteForm({
+                              title: "",
+                              content: "",
+                              severity: "medium",
+                            });
+                            setNoteFormError("");
+                            setAddNoteModal({
+                              isOpen: true,
+                              type: "warning",
+                            });
+                          }}
+                          className="flex items-center justify-center bg-stone-100 hover:bg-stone-200 border border-stone-200 w-5 h-5 rounded transition-colors text-stone-600"
+                        >
+                          <Plus className="w-3 h-3" />
+                        </button>
+                      )}
+                    </div>
+                  </div>
+
+                  <div className="flex flex-col gap-1.5 flex-1 overflow-y-auto db-scroll">
+                    {openWarnings.length > 0 ? (
+                      <>
+                        {[...openWarnings]
+                          .reverse()
+                          .slice(0, 4)
+                          .map((item, idx) => (
+                            <div
+                              key={item.id ?? idx}
+                              className="group relative flex items-start gap-1.5 bg-amber-50/50 border border-amber-100/70 p-1.5 rounded-lg"
+                            >
+                              <p className="text-[10px] text-stone-600 leading-snug flex-1 min-w-0">
+                                {item.title
+                                  ? `${item.title}${
+                                      item.content ? ` — ${item.content}` : ""
+                                    }`
+                                  : item.message ||
+                                    item.reason ||
+                                    item.note ||
+                                    "Warning issued"}
+                              </p>
+
+                              {canManageNotes && item.id && (
+                                <div className="flex items-center gap-0.5 shrink-0 opacity-0 group-hover:opacity-100 transition-all">
+                                  <button
+                                    type="button"
+                                    title="Mark as resolved"
+                                    onClick={() => {
+                                      if (
+                                        window.confirm(
+                                          "Mark this warning as resolved?"
+                                        )
+                                      ) {
+                                        resolveNoteMutation.mutate({
+                                          id: item.id,
+                                        });
+                                      }
+                                    }}
+                                    disabled={resolveNoteMutation.isPending}
+                                    className="p-0.5 rounded text-stone-400 hover:text-emerald-600 hover:bg-emerald-50"
+                                  >
+                                    <Check className="w-3 h-3" />
+                                  </button>
+
+                                  <button
+                                    type="button"
+                                    title="Delete"
+                                    onClick={() => {
+                                      if (
+                                        window.confirm("Delete this warning?")
+                                      ) {
+                                        deleteNoteMutation.mutate(item.id);
+                                      }
+                                    }}
+                                    disabled={deleteNoteMutation.isPending}
+                                    className="p-0.5 rounded text-stone-400 hover:text-rose-600 hover:bg-rose-100"
+                                  >
+                                    <Trash2 className="w-3 h-3" />
+                                  </button>
+                                </div>
+                              )}
+                            </div>
+                          ))}
+
+                        {openWarnings.length > 4 && (
+                          <button className="text-[9.5px] font-semibold text-teal-600 hover:underline w-full text-left mt-0.5">
+                            See {openWarnings.length - 4} more…
+                          </button>
+                        )}
+                      </>
+                    ) : (
+                      <p className="text-[10px] text-stone-400 italic">
+                        No open warnings.
+                      </p>
+                    )}
+                  </div>
+                </div>
+
+                {/* ── Recognition ── */}
+                <div className="flex flex-col bg-stone-50 border border-stone-200 rounded-xl p-2.5">
+                  <div className="flex items-center justify-between gap-1.5 mb-2">
+                    <div className="flex items-center gap-1.5">
+                      <Award className="w-3.5 h-3.5 text-emerald-600 shrink-0" />
+                      <h3 className="text-[10px] font-bold text-stone-700 uppercase tracking-wider">
+                        Recognition
+                      </h3>
+                    </div>
+                    <div className="flex items-center gap-1.5">
+                      <button
+                        onClick={() =>
+                          setNotesModal({
+                            isOpen: true,
+                            type: "recognitions",
+                            title: "Recognition History",
+                            data: recognitionsList,
+                          })
+                        }
+                        className="flex items-center gap-1 text-[9px] font-semibold text-stone-500 hover:text-stone-800 bg-stone-100 hover:bg-stone-200 border border-stone-200 px-1.5 py-0.5 rounded transition-colors cursor-pointer"
+                      >
+                        <History className="w-2.5 h-2.5" /> History
+                      </button>
+
+                      {canManageNotes && (
+                        <button
+                          type="button"
+                          onClick={() => {
+                            setNoteForm({
+                              title: "",
+                              content: "",
+                              severity: "medium",
+                            });
+                            setNoteFormError("");
+                            setAddNoteModal({
+                              isOpen: true,
+                              type: "recognition",
+                            });
+                          }}
+                          className="flex items-center justify-center bg-stone-100 hover:bg-stone-200 border border-stone-200 w-5 h-5 rounded transition-colors text-stone-600"
+                        >
+                          <Plus className="w-3 h-3" />
+                        </button>
+                      )}
+                    </div>
+                  </div>
+
+                  <div className="flex flex-col gap-1.5 flex-1 overflow-y-auto db-scroll">
+                    {openRecognitions.length > 0 ? (
+                      <>
+                        {[...openRecognitions]
+                          .reverse()
+                          .slice(0, 4)
+                          .map((item, idx) => (
+                            <div
+                              key={item.id ?? idx}
+                              className="group relative flex items-start gap-1.5 bg-emerald-50/50 border border-emerald-100/70 p-1.5 rounded-lg"
+                            >
+                              <p className="text-[10px] text-stone-600 leading-snug flex-1 min-w-0">
+                                {item.title
+                                  ? `${item.title}${
+                                      item.content ? ` — ${item.content}` : ""
+                                    }`
+                                  : item.message ||
+                                    item.reason ||
+                                    item.note ||
+                                    "Recognition received"}
+                              </p>
+
+                              {canManageNotes && item.id && (
+                                <div className="flex items-center gap-0.5 shrink-0 opacity-0 group-hover:opacity-100 transition-all">
+                                  <button
+                                    type="button"
+                                    title="Mark as resolved"
+                                    onClick={() => {
+                                      if (
+                                        window.confirm(
+                                          "Mark this recognition as resolved?"
+                                        )
+                                      ) {
+                                        resolveNoteMutation.mutate({
+                                          id: item.id,
+                                        });
+                                      }
+                                    }}
+                                    disabled={resolveNoteMutation.isPending}
+                                    className="p-0.5 rounded text-stone-400 hover:text-emerald-600 hover:bg-emerald-50"
+                                  >
+                                    <Check className="w-3 h-3" />
+                                  </button>
+
+                                  <button
+                                    type="button"
+                                    title="Delete"
+                                    onClick={() => {
+                                      if (
+                                        window.confirm(
+                                          "Delete this recognition?"
+                                        )
+                                      ) {
+                                        deleteNoteMutation.mutate(item.id);
+                                      }
+                                    }}
+                                    disabled={deleteNoteMutation.isPending}
+                                    className="p-0.5 rounded text-stone-400 hover:text-rose-600 hover:bg-rose-100"
+                                  >
+                                    <Trash2 className="w-3 h-3" />
+                                  </button>
+                                </div>
+                              )}
+                            </div>
+                          ))}
+
+                        {openRecognitions.length > 4 && (
+                          <button className="text-[9.5px] font-semibold text-teal-600 hover:underline w-full text-left mt-0.5">
+                            See {openRecognitions.length - 4} more…
+                          </button>
+                        )}
+                      </>
+                    ) : (
+                      <p className="text-[10px] text-stone-400 italic">
+                        No open recognition messages.
+                      </p>
+                    )}
+                  </div>
+                </div>
+              </div>
+            ) : (
+              <div className="flex flex-col gap-2 flex-1 overflow-y-auto db-scroll">
+                {perfReviews.length > 0 ? (
+                  [...perfReviews].reverse().map((review, idx) => {
+                    const rts =
+                      review.parameter_values
+                        ?.map((p) => p.pm_rating)
+                        .filter((r) => r != null) || [];
+                    const rAvg = rts.length
+                      ? (rts.reduce((s, v) => s + v, 0) / rts.length).toFixed(1)
+                      : null;
+                    return (
+                      <div
+                        key={idx}
+                        className="flex items-start gap-3 bg-stone-50 border border-stone-100 rounded-xl p-3"
+                      >
+                        <div className="flex-1 min-w-0">
+                          <div className="flex items-center gap-2 mb-1">
+                            <span className="text-[11px] font-bold text-stone-800">
+                              {review.period || "Review"}
+                            </span>
+                            {rAvg && (
+                              <span className="flex items-center gap-0.5 text-[9px] font-bold text-amber-700 bg-amber-50 border border-amber-100 px-1.5 py-0.5 rounded-md">
+                                <Star className="w-2.5 h-2.5 fill-amber-400 text-amber-400" />{" "}
+                                {rAvg}
+                              </span>
+                            )}
+                          </div>
+                          <p className="text-[10px] text-stone-600 leading-relaxed">
+                            {review.overall_comment || "No detailed comments."}
+                          </p>
+                        </div>
+                      </div>
+                    );
+                  })
+                ) : (
+                  <p className="text-[10px] text-stone-400 italic">
+                    No performance history found.
+                  </p>
+                )}
+              </div>
+            )}
           </div>
         </div>
 
@@ -1511,22 +2224,69 @@ const EmployeeDashboard = () => {
         <div className="lg:col-span-4 bg-white border border-stone-200 rounded-2xl p-4 flex flex-col gap-3 shadow-[0_1px_4px_rgba(28,25,23,0.06)]">
           <div className="flex items-center gap-2 border-b border-stone-100 pb-3">
             <Award className="w-4 h-4 text-emerald-600" />
-            <h3 className="font-display text-sm font-bold text-stone-800">Awards</h3>
+            <h3 className="font-display text-sm font-bold text-stone-800">
+              Awards
+            </h3>
           </div>
 
           <div className="flex flex-col gap-2 flex-1 overflow-y-auto db-scroll">
             {[
-              { icon: Trophy, title: "Top Performer", date: "August 2026", earned: true, color: "text-amber-500" },
-              { icon: Star, title: "Quality Champion", date: "July 2026", earned: true, color: "text-amber-500" },
-              { icon: Target, title: "Perfect Attendance", date: "June 2026", earned: false, color: "text-emerald-500" },
+              {
+                icon: Trophy,
+                title: "Top Performer",
+                date: "August 2026",
+                earned: true,
+                color: "text-amber-500",
+              },
+              {
+                icon: Star,
+                title: "Quality Champion",
+                date: "July 2026",
+                earned: true,
+                color: "text-amber-500",
+              },
+              {
+                icon: Target,
+                title: "Perfect Attendance",
+                date: "June 2026",
+                earned: false,
+                color: "text-emerald-500",
+              },
             ].map(({ icon: Icon, title, date, earned, color }) => (
-              <div key={title} className={`flex items-center gap-3 p-2.5 rounded-xl border transition-colors ${earned ? "bg-stone-50 border-stone-200 hover:bg-stone-100/60" : "bg-stone-50/40 border-stone-200/50 opacity-50"}`}>
-                <span className={`w-9 h-9 rounded-xl flex items-center justify-center shrink-0 ${earned ? "bg-white border border-stone-200" : "bg-stone-100"}`}>
-                  <Icon className={`w-4 h-4 ${earned ? color : "text-stone-400"}`} />
+              <div
+                key={title}
+                className={`flex items-center gap-3 p-2.5 rounded-xl border transition-colors ${
+                  earned
+                    ? "bg-stone-50 border-stone-200 hover:bg-stone-100/60"
+                    : "bg-stone-50/40 border-stone-200/50 opacity-50"
+                }`}
+              >
+                <span
+                  className={`w-9 h-9 rounded-xl flex items-center justify-center shrink-0 ${
+                    earned ? "bg-white border border-stone-200" : "bg-stone-100"
+                  }`}
+                >
+                  <Icon
+                    className={`w-4 h-4 ${
+                      earned ? color : "text-stone-400"
+                    }`}
+                  />
                 </span>
                 <div className="min-w-0">
-                  <p className={`text-[11px] font-bold truncate ${earned ? "text-stone-800" : "text-stone-500"}`}>{title}</p>
-                  <p className={`text-[9.5px] ${earned ? "text-stone-400" : "text-stone-300"}`}>{date}</p>
+                  <p
+                    className={`text-[11px] font-bold truncate ${
+                      earned ? "text-stone-800" : "text-stone-500"
+                    }`}
+                  >
+                    {title}
+                  </p>
+                  <p
+                    className={`text-[9.5px] ${
+                      earned ? "text-stone-400" : "text-stone-300"
+                    }`}
+                  >
+                    {date}
+                  </p>
                 </div>
               </div>
             ))}
@@ -1534,18 +2294,195 @@ const EmployeeDashboard = () => {
         </div>
       </div>
 
+      {/* ════════════ ADD NOTE MODAL ════════════ */}
+      {addNoteModal.isOpen && (
+        <div className="fixed inset-0 z-50 flex items-end sm:items-center justify-center p-0 sm:p-4 bg-stone-900/40 backdrop-blur-sm">
+          <div className="bg-white border border-stone-200 rounded-t-2xl sm:rounded-2xl w-full max-w-lg shadow-2xl overflow-hidden flex flex-col max-h-[90vh]">
+            <div className="px-4 py-3 border-b border-stone-100 flex items-center justify-between">
+              <div className="flex items-center gap-2.5">
+                <div
+                  className={`w-8 h-8 rounded-xl flex items-center justify-center ${
+                    addNoteModal.type === "complaint"
+                      ? "bg-rose-50 text-rose-600"
+                      : addNoteModal.type === "warning"
+                      ? "bg-amber-50 text-amber-600"
+                      : "bg-emerald-50 text-emerald-600"
+                  }`}
+                >
+                  {addNoteModal.type === "complaint" ? (
+                    <AlertCircle className="w-4 h-4" />
+                  ) : addNoteModal.type === "warning" ? (
+                    <AlertTriangle className="w-4 h-4" />
+                  ) : (
+                    <Award className="w-4 h-4" />
+                  )}
+                </div>
+                <div>
+                  <h3 className="font-display text-sm font-bold text-stone-800">
+                    Add{" "}
+                    {addNoteModal.type === "complaint"
+                      ? "Complaint"
+                      : addNoteModal.type === "warning"
+                      ? "Warning"
+                      : "Recognition"}
+                  </h3>
+                  <p className="text-[10px] text-stone-400">
+                    This will be visible on the employee’s profile
+                  </p>
+                </div>
+              </div>
+              <button
+                onClick={() => setAddNoteModal({ isOpen: false, type: null })}
+                className="w-8 h-8 rounded-xl text-stone-400 hover:text-stone-600 hover:bg-stone-100 flex items-center justify-center"
+              >
+                <X className="w-4 h-4" />
+              </button>
+            </div>
+
+            <div className="p-4 space-y-4 overflow-y-auto">
+              <div>
+                <label className="text-[10px] font-bold uppercase tracking-wider text-stone-400">
+                  Title
+                </label>
+                <input
+                  type="text"
+                  value={noteForm.title}
+                  onChange={(e) =>
+                    setNoteForm((f) => ({ ...f, title: e.target.value }))
+                  }
+                  placeholder="Short title…"
+                  className="mt-1 w-full rounded-xl border border-stone-200 bg-white px-3 py-2 text-xs outline-none focus:border-teal-500 focus:ring-1 focus:ring-teal-500"
+                />
+              </div>
+
+              <div>
+                <label className="text-[10px] font-bold uppercase tracking-wider text-stone-400">
+                  Details
+                </label>
+                <textarea
+                  value={noteForm.content}
+                  onChange={(e) =>
+                    setNoteForm((f) => ({ ...f, content: e.target.value }))
+                  }
+                  rows={4}
+                  placeholder="Describe the issue or recognition…"
+                  className="mt-1 w-full rounded-xl border border-stone-200 bg-white px-3 py-2 text-xs outline-none focus:border-teal-500 focus:ring-1 focus:ring-teal-500 resize-none"
+                />
+              </div>
+
+              {(addNoteModal.type === "complaint" ||
+                addNoteModal.type === "warning") && (
+                <div>
+                  <label className="text-[10px] font-bold uppercase tracking-wider text-stone-400">
+                    Severity
+                  </label>
+                  <div className="mt-1.5 flex gap-2">
+                    {["low", "medium", "high"].map((s) => (
+                      <button
+                        key={s}
+                        type="button"
+                        onClick={() =>
+                          setNoteForm((f) => ({ ...f, severity: s }))
+                        }
+                        className={`flex-1 py-1.5 rounded-lg text-[11px] font-semibold border transition-colors ${
+                          noteForm.severity === s
+                            ? s === "high"
+                              ? "bg-rose-50 border-rose-300 text-rose-700"
+                              : s === "medium"
+                              ? "bg-amber-50 border-amber-300 text-amber-700"
+                              : "bg-emerald-50 border-emerald-300 text-emerald-700"
+                            : "bg-white border-stone-200 text-stone-500 hover:bg-stone-50"
+                        }`}
+                      >
+                        {s.charAt(0).toUpperCase() + s.slice(1)}
+                      </button>
+                    ))}
+                  </div>
+                </div>
+              )}
+
+              {noteFormError && (
+                <p className="text-xs font-medium text-rose-600">
+                  {noteFormError}
+                </p>
+              )}
+            </div>
+
+            <div className="px-4 py-3 border-t border-stone-100 bg-stone-50/60 flex items-center justify-end gap-2">
+              <button
+                onClick={() => setAddNoteModal({ isOpen: false, type: null })}
+                className="px-3 py-1.5 rounded-lg border border-stone-200 text-xs font-semibold text-stone-600 hover:bg-stone-100"
+              >
+                Cancel
+              </button>
+              <button
+                onClick={() => {
+                  if (!noteForm.title.trim() || !noteForm.content.trim()) {
+                    setNoteFormError("Title and details are required.");
+                    return;
+                  }
+                  setNoteFormError("");
+                  createNoteMutation.mutate({
+                    employee_id: Number(employeeId),
+                    type: addNoteModal.type,
+                    title: noteForm.title.trim(),
+                    content: noteForm.content.trim(),
+                    severity:
+                      addNoteModal.type === "recognition"
+                        ? null
+                        : noteForm.severity,
+                  });
+                }}
+                disabled={createNoteMutation.isPending}
+                className="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-lg bg-teal-600 text-white text-xs font-semibold hover:bg-teal-700 disabled:opacity-60"
+              >
+                {createNoteMutation.isPending ? (
+                  <Loader2 className="w-3.5 h-3.5 animate-spin" />
+                ) : (
+                  <Plus className="w-3.5 h-3.5" />
+                )}
+                Add{" "}
+                {addNoteModal.type === "complaint"
+                  ? "Complaint"
+                  : addNoteModal.type === "warning"
+                  ? "Warning"
+                  : "Recognition"}
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
+
       {/* ════════════════ NOTES HISTORY MODAL ════════════════ */}
       {notesModal.isOpen && (
         <div className="fixed inset-0 z-50 flex items-end sm:items-center justify-center p-0 sm:p-4 bg-stone-900/40 backdrop-blur-sm">
           <div className="bg-white border border-stone-200 rounded-t-2xl sm:rounded-2xl w-full max-w-xl shadow-2xl overflow-hidden flex flex-col max-h-[90vh] sm:max-h-[85vh]">
             <div className="px-4 py-3 border-b border-stone-100 flex items-center justify-between">
               <div className="flex items-center gap-2.5">
-                <div className={`w-8 h-8 rounded-xl flex items-center justify-center ${notesModal.type === 'complaints' ? 'bg-rose-50 text-rose-600' : notesModal.type === 'warnings' ? 'bg-amber-50 text-amber-600' : 'bg-emerald-50 text-emerald-600'}`}>
-                  {notesModal.type === 'complaints' ? <AlertCircle className="w-4 h-4" /> : notesModal.type === 'warnings' ? <AlertTriangle className="w-4 h-4" /> : <Award className="w-4 h-4" />}
+                <div
+                  className={`w-8 h-8 rounded-xl flex items-center justify-center ${
+                    notesModal.type === "complaints"
+                      ? "bg-rose-50 text-rose-600"
+                      : notesModal.type === "warnings"
+                      ? "bg-amber-50 text-amber-600"
+                      : "bg-emerald-50 text-emerald-600"
+                  }`}
+                >
+                  {notesModal.type === "complaints" ? (
+                    <AlertCircle className="w-4 h-4" />
+                  ) : notesModal.type === "warnings" ? (
+                    <AlertTriangle className="w-4 h-4" />
+                  ) : (
+                    <Award className="w-4 h-4" />
+                  )}
                 </div>
                 <div>
-                  <h3 className="font-display text-sm font-bold text-stone-800">{notesModal.title}</h3>
-                  <p className="text-[10px] text-stone-400">Complete history of records</p>
+                  <h3 className="font-display text-sm font-bold text-stone-800">
+                    {notesModal.title}
+                  </h3>
+                  <p className="text-[10px] text-stone-400">
+                    Complete history of records
+                  </p>
                 </div>
               </div>
               <button
@@ -1558,13 +2495,56 @@ const EmployeeDashboard = () => {
 
             <div className="p-4 overflow-y-auto db-scroll space-y-2 flex-1">
               {notesModal.data.length === 0 ? (
-                <p className="text-xs text-stone-400 italic text-center py-8">No records available.</p>
+                <p className="text-xs text-stone-400 italic text-center py-8">
+                  No records available.
+                </p>
               ) : (
                 [...notesModal.data].reverse().map((item, idx) => (
-                  <div key={idx} className={`p-3 rounded-xl border ${notesModal.type === 'complaints' ? 'bg-rose-50/30 border-rose-100' : notesModal.type === 'warnings' ? 'bg-amber-50/30 border-amber-100' : 'bg-emerald-50/30 border-emerald-100'}`}>
-                    <p className="text-xs text-stone-700 leading-relaxed">
-                      {typeof item === "string" ? item : item.message || item.reason || item.note || "Record logged"}
+                  <div
+                    key={item.id ?? idx}
+                    className={`p-3 rounded-xl border ${
+                      notesModal.type === "complaints"
+                        ? "bg-rose-50/30 border-rose-100"
+                        : notesModal.type === "warnings"
+                        ? "bg-amber-50/30 border-amber-100"
+                        : "bg-emerald-50/30 border-emerald-100"
+                    }`}
+                  >
+                    <div className="flex items-start justify-between gap-2 mb-1">
+                      <p className="text-xs font-semibold text-stone-800">
+                        {item.title || "Untitled"}
+                      </p>
+                      {item.status === "resolved" && (
+                        <span className="shrink-0 text-[9px] font-bold uppercase tracking-wider text-emerald-700 bg-emerald-50 border border-emerald-100 px-1.5 py-0.5 rounded">
+                          Resolved
+                        </span>
+                      )}
+                    </div>
+                    <p className="text-xs text-stone-600 leading-relaxed">
+                      {item.content ||
+                        item.message ||
+                        item.reason ||
+                        item.note ||
+                        "—"}
                     </p>
+                    {item.severity && (
+                      <p className="mt-1 text-[10px] text-stone-500">
+                        Severity:{" "}
+                        <span className="font-medium capitalize">
+                          {item.severity}
+                        </span>
+                      </p>
+                    )}
+                    {item.resolution_note && (
+                      <p className="mt-1.5 text-[10px] text-stone-500 italic">
+                        Resolution: {item.resolution_note}
+                      </p>
+                    )}
+                    {item.issued_at && (
+                      <p className="mt-1 text-[9px] text-stone-400">
+                        {format(parseISO(item.issued_at), "dd MMM yyyy")}
+                      </p>
+                    )}
                   </div>
                 ))
               )}
@@ -1572,7 +2552,10 @@ const EmployeeDashboard = () => {
 
             <div className="px-4 py-3 border-t border-stone-100 flex items-center justify-between text-xs text-stone-400">
               <span>{notesModal.data.length} total entries</span>
-              <button onClick={() => setNotesModal({ ...notesModal, isOpen: false })} className="px-3 py-1.5 bg-stone-800 hover:bg-stone-900 text-white font-medium rounded-xl text-xs transition-colors cursor-pointer">
+              <button
+                onClick={() => setNotesModal({ ...notesModal, isOpen: false })}
+                className="px-3 py-1.5 bg-stone-800 hover:bg-stone-900 text-white font-medium rounded-xl text-xs transition-colors cursor-pointer"
+              >
                 Close
               </button>
             </div>
@@ -1590,8 +2573,12 @@ const EmployeeDashboard = () => {
                   <History className="w-4 h-4" />
                 </div>
                 <div>
-                  <h3 className="font-display text-sm font-bold text-stone-800">All Project Logs</h3>
-                  <p className="text-[10px] text-stone-400">Complete history of assigned projects</p>
+                  <h3 className="font-display text-sm font-bold text-stone-800">
+                    All Project Logs
+                  </h3>
+                  <p className="text-[10px] text-stone-400">
+                    Complete history of assigned projects
+                  </p>
                 </div>
               </div>
               <button
@@ -1604,22 +2591,44 @@ const EmployeeDashboard = () => {
 
             <div className="p-4 overflow-y-auto db-scroll space-y-2 flex-1">
               {allEmployeeProjects.length === 0 ? (
-                <p className="text-xs text-stone-400 italic text-center py-8">No project logs available.</p>
+                <p className="text-xs text-stone-400 italic text-center py-8">
+                  No project logs available.
+                </p>
               ) : (
                 allEmployeeProjects.map((item) => {
                   const isActive = item.status === "active";
                   return (
-                    <div key={item.id} className={`p-3 rounded-xl border ${isActive ? "bg-teal-50/40 border-teal-100" : "bg-stone-50 border-stone-100"}`}>
+                    <div
+                      key={item.id}
+                      className={`p-3 rounded-xl border ${
+                        isActive
+                          ? "bg-teal-50/40 border-teal-100"
+                          : "bg-stone-50 border-stone-100"
+                      }`}
+                    >
                       <div className="flex items-center justify-between gap-2 mb-1">
                         <div className="flex items-center gap-2 min-w-0">
-                          <span className={`px-2 py-0.5 text-[8.5px] font-bold uppercase rounded-md shrink-0 ${isActive ? "bg-teal-700 text-white" : "bg-stone-200 text-stone-600"}`}>
+                          <span
+                            className={`px-2 py-0.5 text-[8.5px] font-bold uppercase rounded-md shrink-0 ${
+                              isActive
+                                ? "bg-teal-700 text-white"
+                                : "bg-stone-200 text-stone-600"
+                            }`}
+                          >
                             {isActive ? "Active" : "Completed"}
                           </span>
-                          <h4 className="font-bold text-stone-800 text-xs truncate">{item.name}</h4>
+                          <h4 className="font-bold text-stone-800 text-xs truncate">
+                            {item.name}
+                          </h4>
                         </div>
-                        <span className="text-[9px] text-stone-400 font-data shrink-0">{item.startDate} — {item.endDate}</span>
+                        <span className="text-[9px] text-stone-400 font-data shrink-0">
+                          {item.startDate} — {item.endDate}
+                        </span>
                       </div>
-                      <p className="text-[10px] text-stone-500">Role: <strong className="text-stone-700">{item.role}</strong></p>
+                      <p className="text-[10px] text-stone-500">
+                        Role:{" "}
+                        <strong className="text-stone-700">{item.role}</strong>
+                      </p>
                     </div>
                   );
                 })
@@ -1628,7 +2637,10 @@ const EmployeeDashboard = () => {
 
             <div className="px-4 py-3 border-t border-stone-100 flex items-center justify-between text-xs text-stone-400">
               <span>{allEmployeeProjects.length} total entries</span>
-              <button onClick={() => setShowLogsModal(false)} className="px-3 py-1.5 bg-stone-800 hover:bg-stone-900 text-white font-medium rounded-xl text-xs transition-colors cursor-pointer">
+              <button
+                onClick={() => setShowLogsModal(false)}
+                className="px-3 py-1.5 bg-stone-800 hover:bg-stone-900 text-white font-medium rounded-xl text-xs transition-colors cursor-pointer"
+              >
                 Close
               </button>
             </div>
@@ -1910,36 +2922,88 @@ const EmployeeDashboard = () => {
         <div className="fixed inset-0 z-50 flex items-end sm:items-center justify-center p-0 sm:p-4 bg-stone-900/40 backdrop-blur-sm">
           <div className="bg-white border border-stone-200 rounded-t-2xl sm:rounded-2xl w-full max-w-lg shadow-2xl overflow-hidden flex flex-col max-h-[90vh]">
             <div className="px-4 py-3 border-b border-stone-100 flex items-center justify-between">
-              <h3 className="font-display text-sm font-bold text-stone-800">Edit Profile Information</h3>
-              <button onClick={cancelEdit} className="w-8 h-8 rounded-xl text-stone-400 hover:text-stone-600 hover:bg-stone-100 flex items-center justify-center">
+              <h3 className="font-display text-sm font-bold text-stone-800">
+                Edit Profile Information
+              </h3>
+              <button
+                onClick={cancelEdit}
+                className="w-8 h-8 rounded-xl text-stone-400 hover:text-stone-600 hover:bg-stone-100 flex items-center justify-center"
+              >
                 <X className="w-4 h-4" />
               </button>
             </div>
 
             <div className="p-4 space-y-4 overflow-y-auto">
               <div>
-                <label className="text-[10px] font-bold uppercase tracking-wider text-stone-400">Login Email</label>
-                <input type="email" value={editEmail} onChange={(e) => setEditEmail(e.target.value)} placeholder={`you@${COMPANY_DOMAIN}`} className="mt-1 w-full rounded-xl border border-stone-200 bg-white px-3 py-2 text-xs outline-none focus:border-teal-500 focus:ring-1 focus:ring-teal-500" />
-                <p className="mt-1 text-[10px] text-stone-400">Must end with @{COMPANY_DOMAIN}</p>
-                {emailError && <p className="mt-1 text-[11px] font-medium text-rose-600">{emailError}</p>}
+                <label className="text-[10px] font-bold uppercase tracking-wider text-stone-400">
+                  Login Email
+                </label>
+                <input
+                  type="email"
+                  value={editEmail}
+                  onChange={(e) => setEditEmail(e.target.value)}
+                  placeholder={`you@${COMPANY_DOMAIN}`}
+                  className="mt-1 w-full rounded-xl border border-stone-200 bg-white px-3 py-2 text-xs outline-none focus:border-teal-500 focus:ring-1 focus:ring-teal-500"
+                />
+                <p className="mt-1 text-[10px] text-stone-400">
+                  Must end with @{COMPANY_DOMAIN}
+                </p>
+                {emailError && (
+                  <p className="mt-1 text-[11px] font-medium text-rose-600">
+                    {emailError}
+                  </p>
+                )}
               </div>
               <div>
-                <label className="text-[10px] font-bold uppercase tracking-wider text-stone-400">Phone Number</label>
-                <input type="text" value={editPhone} onChange={(e) => setEditPhone(e.target.value)} placeholder="+91 XXXXX XXXXX" className="mt-1 w-full rounded-xl border border-stone-200 bg-white px-3 py-2 text-xs outline-none focus:border-teal-500 focus:ring-1 focus:ring-teal-500" />
+                <label className="text-[10px] font-bold uppercase tracking-wider text-stone-400">
+                  Phone Number
+                </label>
+                <input
+                  type="text"
+                  value={editPhone}
+                  onChange={(e) => setEditPhone(e.target.value)}
+                  placeholder="+91 XXXXX XXXXX"
+                  className="mt-1 w-full rounded-xl border border-stone-200 bg-white px-3 py-2 text-xs outline-none focus:border-teal-500 focus:ring-1 focus:ring-teal-500"
+                />
               </div>
               <div>
-                <label className="text-[10px] font-bold uppercase tracking-wider text-stone-400">Encord ID</label>
-                <input type="text" value={editEncordId} onChange={(e) => setEditEncordId(e.target.value)} placeholder="john.encord@example.com" className="mt-1 w-full rounded-xl border border-stone-200 bg-white px-3 py-2 text-xs outline-none focus:border-teal-500 focus:ring-1 focus:ring-teal-500" />
+                <label className="text-[10px] font-bold uppercase tracking-wider text-stone-400">
+                  Encord ID
+                </label>
+                <input
+                  type="text"
+                  value={editEncordId}
+                  onChange={(e) => setEditEncordId(e.target.value)}
+                  placeholder="john.encord@example.com"
+                  className="mt-1 w-full rounded-xl border border-stone-200 bg-white px-3 py-2 text-xs outline-none focus:border-teal-500 focus:ring-1 focus:ring-teal-500"
+                />
               </div>
               <div>
-                <label className="text-[10px] font-bold uppercase tracking-wider text-stone-400">Slack Member ID</label>
-                <input type="text" value={editSlackId} onChange={(e) => setEditSlackId(e.target.value)} placeholder="U0123ABC456" className="mt-1 w-full rounded-xl border border-stone-200 bg-white px-3 py-2 text-xs outline-none focus:border-teal-500 focus:ring-1 focus:ring-teal-500" />
+                <label className="text-[10px] font-bold uppercase tracking-wider text-stone-400">
+                  Slack Member ID
+                </label>
+                <input
+                  type="text"
+                  value={editSlackId}
+                  onChange={(e) => setEditSlackId(e.target.value)}
+                  placeholder="U0123ABC456"
+                  className="mt-1 w-full rounded-xl border border-stone-200 bg-white px-3 py-2 text-xs outline-none focus:border-teal-500 focus:ring-1 focus:ring-teal-500"
+                />
               </div>
               <div>
-                <label className="text-[10px] font-bold uppercase tracking-wider text-stone-400 mb-1.5 block">Skills &amp; Competencies</label>
-                <SkillsMultiSelect selected={editSkills} onChange={setEditSkills} options={skillsList} isLoading={skillsLoading} />
+                <label className="text-[10px] font-bold uppercase tracking-wider text-stone-400 mb-1.5 block">
+                  Skills &amp; Competencies
+                </label>
+                <SkillsMultiSelect
+                  selected={editSkills}
+                  onChange={setEditSkills}
+                  options={skillsList}
+                  isLoading={skillsLoading}
+                />
               </div>
-              {saveError && <p className="text-xs font-medium text-rose-600">{saveError}</p>}
+              {saveError && (
+                <p className="text-xs font-medium text-rose-600">{saveError}</p>
+              )}
             </div>
 
             <div className="px-4 py-3 border-t border-stone-100 bg-stone-50/60 flex items-center justify-end gap-2">
@@ -1951,7 +3015,9 @@ const EmployeeDashboard = () => {
               </button>
               <button
                 onClick={handleSave}
-                disabled={saveMutation.isPending || changeEmailMutation.isPending}
+                disabled={
+                  saveMutation.isPending || changeEmailMutation.isPending
+                }
                 className="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-lg bg-teal-600 text-white text-xs font-semibold hover:bg-teal-700 disabled:opacity-60"
               >
                 {saveMutation.isPending || changeEmailMutation.isPending ? (
@@ -1970,4 +3036,3 @@ const EmployeeDashboard = () => {
 };
 
 export default EmployeeDashboard;
-
