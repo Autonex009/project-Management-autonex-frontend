@@ -20,7 +20,7 @@ const AnalyticsDashboard = lazy(() => import("./pages/AnalyticsDashboard"));
 const ProjectAnalyticsPage = lazy(() => import("./pages/ProjectAnalyticsPage"));
 const EmployeesPage = lazy(() => import("./pages/EmployeesPage"));
 const ChangeLogPage = lazy(() => import("./pages/ChangeLogPage"));
-const SubProjectsPage = lazy(() => import("./pages/ProjectsPage"));
+import SubProjectsPage from "./pages/ProjectsPage";
 const AllocationsPage = lazy(() => import("./pages/AllocationsPage"));
 const LeavesPage = lazy(() => import("./pages/LeavesPage"));
 const ProjectsPage = lazy(() => import("./pages/ParentProjectsPage"));

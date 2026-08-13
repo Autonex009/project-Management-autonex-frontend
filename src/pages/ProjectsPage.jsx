@@ -602,8 +602,8 @@ const ProjectCard = ({
     <div
       id={id}
       className={`group flex flex-col rounded-lg border bg-white p-5 shadow-sm transition-all duration-200 ${isEditing
-          ? "border-indigo-300 ring-2 ring-indigo-100"
-          : "border-slate-200 hover:shadow-md"
+        ? "border-indigo-300 ring-2 ring-indigo-100"
+        : "border-slate-200 hover:shadow-md"
         } ${highlighted ? "ring-2 ring-indigo-400 ring-offset-2" : ""}`}
     >
       {/* Header */}
@@ -680,8 +680,8 @@ const ProjectCard = ({
                       type="button"
                       onClick={() => onDraftChange("sentiment", on ? "" : val)}
                       className={`rounded px-1.5 py-0.5 text-[11px] font-semibold ring-1 ring-inset ${on
-                          ? `${active} text-white`
-                          : "bg-slate-50 text-slate-500 ring-slate-200 hover:bg-slate-100"
+                        ? `${active} text-white`
+                        : "bg-slate-50 text-slate-500 ring-slate-200 hover:bg-slate-100"
                         }`}
                     >
                       {label}
@@ -694,17 +694,16 @@ const ProjectCard = ({
             <div className="flex items-center gap-1.5">
               {project.priority && (
                 <span
-                  className={`inline-flex items-center rounded-full px-2.5 py-1 text-xs font-bold ${
-                    project.priority === "P0"
-                      ? "bg-red-50 text-red-700"
-                      : project.priority === "P1"
+                  className={`inline-flex items-center rounded-full px-2.5 py-1 text-xs font-bold ${project.priority === "P0"
+                    ? "bg-red-50 text-red-700"
+                    : project.priority === "P1"
                       ? "bg-orange-50 text-orange-700"
                       : project.priority === "P2"
-                      ? "bg-blue-50 text-blue-700"
-                      : project.priority === "P3"
-                      ? "bg-purple-50 text-purple-700"
-                      : "bg-slate-50 text-slate-700"
-                  }`}
+                        ? "bg-blue-50 text-blue-700"
+                        : project.priority === "P3"
+                          ? "bg-purple-50 text-purple-700"
+                          : "bg-slate-50 text-slate-700"
+                    }`}
                 >
                   {project.priority}
                 </span>
@@ -819,7 +818,7 @@ const ProjectCard = ({
                 <span
                   className={
                     allocatedManpower >= requiredManpower &&
-                    requiredManpower > 0
+                      requiredManpower > 0
                       ? "text-emerald-600"
                       : "text-slate-800"
                   }
@@ -916,8 +915,8 @@ const ProjectCard = ({
                 navigate(`${prefix}/analytics/${project.id}`);
               }}
               className={`inline-flex items-center gap-1.5 rounded-lg border px-3 py-1.5 text-xs font-medium transition-colors ${hasEncord
-                  ? "border-slate-200 bg-white text-slate-700 hover:bg-slate-50"
-                  : "cursor-not-allowed border-slate-100 bg-slate-50 text-slate-400"
+                ? "border-slate-200 bg-white text-slate-700 hover:bg-slate-50"
+                : "cursor-not-allowed border-slate-100 bg-slate-50 text-slate-400"
                 }`}
             >
               <BarChart3 className="h-4 w-4" /> Analytics
@@ -1289,7 +1288,7 @@ const ProjectsPage = () => {
   const [formSentiment, setFormSentiment] = useState("");
   const [modalInfoTab, setModalInfoTab] = useState("status"); // Status | Client Sentiment
   const [modalBuildTab, setModalBuildTab] = useState("types"); // Project Types | Team Composition
-  
+
   const {
     selectedOrganization,
     setSelectedOrganization,
@@ -1940,8 +1939,8 @@ const ProjectsPage = () => {
         typeof detail === "string"
           ? detail
           : detail?.message ||
-            (Array.isArray(detail) ? detail[0]?.msg : null) ||
-            "the allocation was rejected";
+          (Array.isArray(detail) ? detail[0]?.msg : null) ||
+          "the allocation was rejected";
       toast.error(
         `Project saved, but the team lead assignment failed: ${reason}`,
       );
@@ -2594,16 +2593,16 @@ const ProjectsPage = () => {
                   }}
                   type="button"
                   className={`inline-flex items-center gap-2 px-4 py-2 text-sm font-semibold border-b-2 -mb-px transition-colors ${isActive
-                      ? "border-indigo-600 text-indigo-600"
-                      : "border-transparent text-slate-500 hover:text-slate-700"
+                    ? "border-indigo-600 text-indigo-600"
+                    : "border-transparent text-slate-500 hover:text-slate-700"
                     }`}
                 >
                   {t.label}
                   {t.key !== "active" && (
                     <span
                       className={`inline-flex items-center justify-center h-5 min-w-[20px] px-1.5 rounded-full text-[11px] font-semibold ${isActive
-                          ? "bg-indigo-100 text-indigo-700"
-                          : "bg-slate-100 text-slate-500"
+                        ? "bg-indigo-100 text-indigo-700"
+                        : "bg-slate-100 text-slate-500"
                         }`}
                     >
                       {t.count}
@@ -2789,11 +2788,10 @@ const ProjectsPage = () => {
             type="button"
             onClick={() => setAutonexOnly((v) => !v)}
             title="Show only projects staffed with an Autonex employee"
-            className={`inline-flex items-center gap-2 rounded-lg border px-3 py-2 text-sm font-medium shadow-sm transition-colors ${
-              autonexOnly
-                ? "border-indigo-600 bg-indigo-600 text-white"
-                : "border-slate-200 bg-white text-slate-600 hover:bg-slate-50"
-            }`}
+            className={`inline-flex items-center gap-2 rounded-lg border px-3 py-2 text-sm font-medium shadow-sm transition-colors ${autonexOnly
+              ? "border-indigo-600 bg-indigo-600 text-white"
+              : "border-slate-200 bg-white text-slate-600 hover:bg-slate-50"
+              }`}
           >
             <Users className={`w-4 h-4 ${autonexOnly ? "text-white" : "text-slate-400"}`} />
             Autonex
@@ -2948,7 +2946,7 @@ const ProjectsPage = () => {
                   selectedTeamLead,
                   selectedStatus,
                   selectedPriority,
-              ].some((v) => v !== "all") && (
+                ].some((v) => v !== "all") && (
                     <button
                       onClick={() => {
                         setSelectedOrganization("all");
@@ -3027,8 +3025,80 @@ const ProjectsPage = () => {
           {[...Array(6)].map((_, index) => (
             <div
               key={index}
-              className="h-72 rounded-lg border border-slate-200 bg-white animate-pulse"
-            />
+              className="flex flex-col justify-between rounded-lg border border-slate-200 bg-white p-5 shadow-xs min-h-[340px]"
+            >
+              {/* Header: Title Accent + Name/Org + Status Pills */}
+              <div className="flex items-start justify-between gap-3">
+                <div className="flex min-w-0 flex-1 items-start gap-2.5">
+                  {/* Left accent bar */}
+                  <span className="mt-0.5 h-9 w-1 shrink-0 rounded-full animate-shimmer" />
+                  <div className="min-h-[3.9rem] min-w-0 flex-1 space-y-2">
+                    {/* Project name placeholder */}
+                    <div className="h-3.5 w-3/4 rounded animate-shimmer" />
+                    {/* Parent org placeholder */}
+                    <div className="h-2.5 w-1/3 rounded animate-shimmer" />
+                  </div>
+                </div>
+
+                {/* Right side status / priority pills */}
+                <div className="flex shrink-0 flex-col items-end gap-1.5">
+                  <div className="flex items-center gap-1">
+                    <div className="h-4.5 w-7 rounded-full animate-shimmer" />
+                    <div className="h-4.5 w-14 rounded-full animate-shimmer" />
+                    <div className="h-4.5 w-9 rounded-full animate-shimmer" />
+                  </div>
+                  <div className="h-2.5 w-16 rounded animate-shimmer" />
+                </div>
+              </div>
+
+              <div className="my-2 border-t border-slate-100" />
+
+              {/* PM / Team lead / Type / Vendor (2x2 grid) */}
+              <div className="grid grid-cols-2 gap-x-4 gap-y-2.5">
+                <div className="space-y-1">
+                  <div className="h-2 w-16 rounded animate-shimmer" />
+                  <div className="h-3 w-24 rounded animate-shimmer" />
+                </div>
+                <div className="space-y-1">
+                  <div className="h-2 w-14 rounded animate-shimmer" />
+                  <div className="h-3 w-8 rounded animate-shimmer" />
+                </div>
+                <div className="space-y-1">
+                  <div className="h-2 w-10 rounded animate-shimmer" />
+                  <div className="h-3 w-28 rounded animate-shimmer" />
+                </div>
+                <div className="space-y-1">
+                  <div className="h-2 w-12 rounded animate-shimmer" />
+                  <div className="h-3 w-20 rounded animate-shimmer" />
+                </div>
+              </div>
+
+              {/* Delivery figures box */}
+              <div className="mt-3 mb-3 rounded-md bg-slate-50/60 p-3.5 ring-1 ring-slate-200/60">
+                <div className="grid grid-cols-2 gap-x-4 gap-y-2.5">
+                  <div className="space-y-1">
+                    <div className="h-2 w-20 rounded animate-shimmer" />
+                    <div className="h-3 w-14 rounded animate-shimmer" />
+                  </div>
+                  <div className="space-y-1">
+                    <div className="h-2 w-20 rounded animate-shimmer" />
+                    <div className="h-3 w-14 rounded animate-shimmer" />
+                  </div>
+                </div>
+              </div>
+
+              {/* Footer bar */}
+              <div className="mt-auto flex items-center justify-between border-t border-slate-100 pt-2.5">
+                <div className="flex gap-1.5">
+                  <div className="h-6.5 w-16 rounded-md animate-shimmer" />
+                  <div className="h-6.5 w-14 rounded-md animate-shimmer" />
+                </div>
+                <div className="flex gap-1">
+                  <div className="h-6 w-6 rounded-md animate-shimmer" />
+                  <div className="h-6 w-6 rounded-md animate-shimmer" />
+                </div>
+              </div>
+            </div>
           ))}
         </div>
       ) : filteredProjects.length === 0 ? (
@@ -3165,8 +3235,8 @@ const ProjectsPage = () => {
                         key={p}
                         onClick={() => setCurrentPage(p)}
                         className={`px-3 py-1.5 text-sm rounded-lg border transition-colors ${currentPage === p
-                            ? "bg-indigo-600 border-indigo-600 text-white font-medium"
-                            : "border-slate-200 text-slate-600 hover:bg-slate-50"
+                          ? "bg-indigo-600 border-indigo-600 text-white font-medium"
+                          : "border-slate-200 text-slate-600 hover:bg-slate-50"
                           }`}
                       >
                         {p}
@@ -3815,24 +3885,24 @@ const ProjectsPage = () => {
                     ]
                       .filter(Boolean)
                       .map(([field, label]) => (
-                      <div key={field}>
-                        <label className="block text-[11px] font-medium text-slate-500 mb-1 truncate">
-                          {label}
-                        </label>
-                        <input
-                          type="number"
-                          name={field}
-                          min="0"
-                          defaultValue={
-                            (editingProject || copyingProject)?.[field] ?? ""
-                          }
-                          onChange={() => setManpowerTrigger(v => v + 1)}
-                          onWheel={(e) => e.target.blur()}
-                          className="input"
-                          placeholder="0"
-                        />
-                      </div>
-                    ))}
+                        <div key={field}>
+                          <label className="block text-[11px] font-medium text-slate-500 mb-1 truncate">
+                            {label}
+                          </label>
+                          <input
+                            type="number"
+                            name={field}
+                            min="0"
+                            defaultValue={
+                              (editingProject || copyingProject)?.[field] ?? ""
+                            }
+                            onChange={() => setManpowerTrigger(v => v + 1)}
+                            onWheel={(e) => e.target.blur()}
+                            className="input"
+                            placeholder="0"
+                          />
+                        </div>
+                      ))}
                     {/* Derived from the two pickers above rather than typed. They were
                         editable numbers that could disagree with the people actually
                         chosen — a project could name three leads and claim one. */}
