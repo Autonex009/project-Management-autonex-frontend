@@ -19,6 +19,7 @@ import {
   AlertTriangle,
   Calendar,
   Check,
+  ChevronLeft,
   ChevronRight,
   ChevronDown, 
   FolderKanban,
@@ -232,7 +233,14 @@ const EmployeeDashboard = () => {
   const [profileTab, setProfileTab] = useState("attendance");
   const [bottomTab, setBottomTab] = useState("notes");
   const [notesModal, setNotesModal] = useState({ isOpen: false, type: null, title: "", data: [] });
+  const [attendanceModalTab, setAttendanceModalTab] = useState(null);
+  const [modalSelectedMonth, setModalSelectedMonth] = useState(new Date());
   const todayStr = useMemo(() => format(new Date(), "yyyy-MM-dd"), []);
+
+  const handleOpenAttendanceModal = (tabKey) => {
+    setModalSelectedMonth(new Date());
+    setAttendanceModalTab(tabKey);
+  };
 
   const localUser = JSON.parse(localStorage.getItem("user") || "{}");
   const isAdmin = localUser.role === "admin";
@@ -273,6 +281,34 @@ const EmployeeDashboard = () => {
     queryFn: () => wfhApi.getAll({ employee_id: employeeId }),
     enabled: !!employeeId,
   });
+
+  const modalMonthYear = useMemo(() => {
+    return { year: modalSelectedMonth.getFullYear(), month: modalSelectedMonth.getMonth() };
+  }, [modalSelectedMonth]);
+
+  const modalWfhList = useMemo(() => {
+    const { year, month } = modalMonthYear;
+    return myWfh.filter((wfh) => {
+      if (!wfh.wfh_date) return false;
+      const start = new Date(`${wfh.wfh_date}T00:00:00`);
+      const end = wfh.end_date ? new Date(`${wfh.end_date}T00:00:00`) : start;
+      const mStart = new Date(year, month, 1);
+      const mEnd = new Date(year, month + 1, 0, 23, 59, 59);
+      return start <= mEnd && end >= mStart;
+    });
+  }, [myWfh, modalMonthYear]);
+
+  const modalLeavesList = useMemo(() => {
+    const { year, month } = modalMonthYear;
+    return allLeaves.filter((leave) => {
+      if (!leave.start_date) return false;
+      const start = new Date(`${leave.start_date}T00:00:00`);
+      const end = leave.end_date ? new Date(`${leave.end_date}T00:00:00`) : start;
+      const mStart = new Date(year, month, 1);
+      const mEnd = new Date(year, month + 1, 0, 23, 59, 59);
+      return start <= mEnd && end >= mStart;
+    });
+  }, [allLeaves, modalMonthYear]);
 
   const { data: perfReviews = [] } = useQuery({
     queryKey: ["employee-perf-reviews", employeeId],
@@ -916,12 +952,14 @@ const EmployeeDashboard = () => {
                       label: "WFH",
                       remaining: leavesAndWfhStats.wfhRemaining,
                       quota: leavesAndWfhStats.wfhQuota,
+                      tabKey: "wfh",
                     },
                     {
                       icon: <Calendar className="w-3.5 h-3.5 text-emerald-600" />,
                       label: "Paid",
                       remaining: leavesAndWfhStats.paidRemaining,
                       quota: leavesAndWfhStats.paidQuota,
+                      tabKey: "paid",
                     },
                     {
                       icon: <HeartPulse className="w-3.5 h-3.5 text-amber-600" />,
@@ -932,11 +970,14 @@ const EmployeeDashboard = () => {
                       quota: leavesAndWfhStats.isInternOrContractor
                         ? "—"
                         : leavesAndWfhStats.casualQuota,
+                      tabKey: "casual_sick",
                     },
-                  ].map(({ icon, label, remaining, quota }) => (
+                  ].map(({ icon, label, remaining, quota, tabKey }) => (
                     <div
                       key={label}
-                      className="flex flex-col items-center gap-0.5 border border-stone-200 rounded-xl pt-2 pb-1 shadow-sm bg-white"
+                      onClick={() => handleOpenAttendanceModal(tabKey)}
+                      title={`Click to view ${label} records`}
+                      className="flex flex-col items-center gap-0.5 border border-stone-200 rounded-xl pt-2 pb-1 bg-white cursor-pointer hover:border-stone-300 transition-colors"
                     >
                       <div
                         className={`w-7 h-7 rounded-full flex items-center justify-center ${
@@ -1588,6 +1629,275 @@ const EmployeeDashboard = () => {
             <div className="px-4 py-3 border-t border-stone-100 flex items-center justify-between text-xs text-stone-400">
               <span>{allEmployeeProjects.length} total entries</span>
               <button onClick={() => setShowLogsModal(false)} className="px-3 py-1.5 bg-stone-800 hover:bg-stone-900 text-white font-medium rounded-xl text-xs transition-colors cursor-pointer">
+                Close
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* ════════════ ATTENDANCE / LEAVE DETAILS MODAL ════════════ */}
+      {attendanceModalTab && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-stone-900/40 backdrop-blur-sm animate-in fade-in duration-150">
+          <div className="bg-white border border-stone-200 rounded-2xl w-[580px] sm:w-[620px] h-[520px] shadow-2xl overflow-hidden flex flex-col">
+            <div className="px-5 py-4 border-b border-stone-100 flex items-center justify-between bg-stone-50/50 flex-shrink-0">
+              <div className="flex items-center gap-3">
+                <div className="w-9 h-9 rounded-xl bg-emerald-50 text-emerald-600 flex items-center justify-center font-semibold border border-emerald-100">
+                  {attendanceModalTab === "wfh" ? (
+                    <Home className="w-4 h-4 text-emerald-600" />
+                  ) : attendanceModalTab === "paid" ? (
+                    <Calendar className="w-4 h-4 text-emerald-600" />
+                  ) : (
+                    <HeartPulse className="w-4 h-4 text-amber-600" />
+                  )}
+                </div>
+                <div>
+                  <h3 className="font-display text-sm font-bold text-stone-800 flex items-center gap-2">
+                    Attendance & Leave Records
+                    <span className="text-xs font-normal text-stone-500">
+                      • {employee?.full_name || "Employee"}
+                    </span>
+                  </h3>
+                  <p className="text-[11px] text-stone-500 mt-0.5">
+                    View detailed history of WFH and leave applications
+                  </p>
+                </div>
+              </div>
+
+              {/* Month Navigator Controls & Close button */}
+              <div className="flex items-center gap-3">
+                <div className="flex items-center justify-between w-[130px] shrink-0 bg-stone-100/80 border border-stone-200/80 p-0.5 rounded-full text-xs font-semibold text-stone-700 shadow-2xs">
+                  <button
+                    disabled={
+                      modalSelectedMonth.getFullYear() < 2025 ||
+                      (modalSelectedMonth.getFullYear() === 2025 &&
+                        modalSelectedMonth.getMonth() <= 7)
+                    }
+                    onClick={() =>
+                      setModalSelectedMonth(
+                        (prev) =>
+                          new Date(prev.getFullYear(), prev.getMonth() - 1, 1)
+                      )
+                    }
+                    className="w-6 h-6 rounded-full flex items-center justify-center shrink-0 hover:bg-white hover:text-stone-900 transition-colors cursor-pointer disabled:opacity-30 disabled:cursor-not-allowed disabled:hover:bg-transparent disabled:hover:text-stone-400"
+                    title="Previous month"
+                  >
+                    <ChevronLeft className="w-3.5 h-3.5" />
+                  </button>
+                  <span className="text-center flex-1 text-[11px] font-bold tracking-wide uppercase text-stone-700 select-none truncate">
+                    {format(modalSelectedMonth, "MMM yyyy")}
+                  </span>
+                  <button
+                    disabled={
+                      modalSelectedMonth.getFullYear() > new Date().getFullYear() ||
+                      (modalSelectedMonth.getFullYear() === new Date().getFullYear() &&
+                        modalSelectedMonth.getMonth() >= new Date().getMonth())
+                    }
+                    onClick={() =>
+                      setModalSelectedMonth(
+                        (prev) =>
+                          new Date(prev.getFullYear(), prev.getMonth() + 1, 1)
+                      )
+                    }
+                    className="w-6 h-6 rounded-full flex items-center justify-center shrink-0 hover:bg-white hover:text-stone-900 transition-colors cursor-pointer disabled:opacity-30 disabled:cursor-not-allowed disabled:hover:bg-transparent disabled:hover:text-stone-400"
+                    title="Next month"
+                  >
+                    <ChevronRight className="w-3.5 h-3.5" />
+                  </button>
+                </div>
+                <button
+                  onClick={() => setAttendanceModalTab(null)}
+                  className="w-8 h-8 rounded-xl text-stone-400 hover:text-stone-600 hover:bg-stone-100 flex items-center justify-center transition-colors cursor-pointer"
+                >
+                  <X className="w-4 h-4" />
+                </button>
+              </div>
+            </div>
+
+            {/* Modal Tabs */}
+            <div className="flex border-b border-stone-100 bg-stone-50/30 px-5 pt-3 gap-2 flex-shrink-0">
+              {[
+                {
+                  key: "wfh",
+                  label: "WFH Requests",
+                  count: modalWfhList.length,
+                  icon: <Home className="w-3.5 h-3.5" />,
+                },
+                {
+                  key: "paid",
+                  label: "Paid Leaves",
+                  count: modalLeavesList.filter(
+                    (l) => normalizeLeaveType(l.leave_type) === "paid"
+                  ).length,
+                  icon: <Calendar className="w-3.5 h-3.5" />,
+                },
+                {
+                  key: "casual_sick",
+                  label: "Sick / Casual Leaves",
+                  count: modalLeavesList.filter(
+                    (l) => normalizeLeaveType(l.leave_type) === "casual_sick"
+                  ).length,
+                  icon: <HeartPulse className="w-3.5 h-3.5" />,
+                },
+              ].map((tab) => (
+                <button
+                  key={tab.key}
+                  onClick={() => setAttendanceModalTab(tab.key)}
+                  className={`flex items-center gap-2 px-3 py-2 text-xs font-semibold rounded-t-xl border-b-2 transition-all cursor-pointer ${
+                    attendanceModalTab === tab.key
+                      ? "border-emerald-600 text-emerald-700 bg-white shadow-xs"
+                      : "border-transparent text-stone-500 hover:text-stone-700 hover:bg-stone-100/50"
+                  }`}
+                >
+                  {tab.icon}
+                  {tab.label}
+                  <span
+                    className={`px-1.5 py-0.5 text-[10px] font-bold rounded-full ${
+                      attendanceModalTab === tab.key
+                        ? "bg-emerald-100 text-emerald-700"
+                        : "bg-stone-100 text-stone-600"
+                    }`}
+                  >
+                    {tab.count}
+                  </span>
+                </button>
+              ))}
+            </div>
+
+            {/* Modal Body */}
+            <div className="p-5 overflow-y-auto flex-1">
+              {attendanceModalTab === "wfh" && (
+                <div>
+                  {modalWfhList.length === 0 ? (
+                    <div className="text-center py-10 text-stone-400">
+                      <Home className="w-8 h-8 mx-auto mb-2 opacity-40 text-stone-400" />
+                      <p className="text-xs font-medium">
+                        No WFH requests recorded for {format(modalSelectedMonth, "MMMM yyyy")}.
+                      </p>
+                    </div>
+                  ) : (
+                    <div className="space-y-2.5">
+                      {modalWfhList.map((wfh) => (
+                        <div
+                          key={wfh.id}
+                          className="p-3.5 rounded-xl border border-stone-100 bg-stone-50/50 hover:bg-stone-50 transition-colors flex items-center justify-between gap-4"
+                        >
+                          <div className="space-y-1">
+                            <div className="flex items-center gap-2">
+                              <span className="text-xs font-bold text-stone-800">
+                                {wfh.wfh_date}
+                                {wfh.end_date && wfh.end_date !== wfh.wfh_date
+                                  ? ` to ${wfh.end_date}`
+                                  : ""}
+                              </span>
+                              <span
+                                className={`text-[10px] font-bold uppercase px-2 py-0.5 rounded-full ${
+                                  (wfh.status || "pending").toLowerCase() ===
+                                  "approved"
+                                    ? "bg-emerald-100 text-emerald-700"
+                                    : (wfh.status || "pending").toLowerCase() ===
+                                      "rejected"
+                                    ? "bg-rose-100 text-rose-700"
+                                    : "bg-amber-100 text-amber-700"
+                                }`}
+                              >
+                                {wfh.status || "Pending"}
+                              </span>
+                            </div>
+                            <p className="text-xs text-stone-600">
+                              {wfh.reason || "No reason specified"}
+                            </p>
+                          </div>
+                        </div>
+                      ))}
+                    </div>
+                  )}
+                </div>
+              )}
+
+              {(attendanceModalTab === "paid" ||
+                attendanceModalTab === "casual_sick") && (
+                <div>
+                  {modalLeavesList.filter(
+                    (l) =>
+                      normalizeLeaveType(l.leave_type) === attendanceModalTab
+                  ).length === 0 ? (
+                    <div className="text-center py-10 text-stone-400">
+                      <Calendar className="w-8 h-8 mx-auto mb-2 opacity-40 text-stone-400" />
+                      <p className="text-xs font-medium">
+                        No {attendanceModalTab === "paid" ? "Paid" : "Sick/Casual"} leave records found for {format(modalSelectedMonth, "MMMM yyyy")}.
+                      </p>
+                    </div>
+                  ) : (
+                    <div className="space-y-2.5">
+                      {modalLeavesList
+                        .filter(
+                          (l) =>
+                            normalizeLeaveType(l.leave_type) ===
+                            attendanceModalTab
+                        )
+                        .map((leave) => (
+                          <div
+                            key={leave.id}
+                            className="p-3.5 rounded-xl border border-stone-100 bg-stone-50/50 hover:bg-stone-50 transition-colors flex items-center justify-between gap-4"
+                          >
+                            <div className="space-y-1">
+                              <div className="flex items-center gap-2">
+                                <span className="text-xs font-bold text-stone-800">
+                                  {leave.start_date || "—"}
+                                  {leave.end_date &&
+                                  leave.end_date !== leave.start_date
+                                    ? ` to ${leave.end_date}`
+                                    : ""}
+                                </span>
+                                {leave.is_half_day && (
+                                  <span className="text-[10px] bg-indigo-50 text-indigo-700 font-semibold px-2 py-0.5 rounded-md">
+                                    Half Day
+                                  </span>
+                                )}
+                                <span
+                                  className={`text-[10px] font-bold uppercase px-2 py-0.5 rounded-full ${
+                                    (leave.status || "pending").toLowerCase() ===
+                                    "approved"
+                                      ? "bg-emerald-100 text-emerald-700"
+                                      : (leave.status || "pending").toLowerCase() ===
+                                        "rejected"
+                                      ? "bg-rose-100 text-rose-700"
+                                      : "bg-amber-100 text-amber-700"
+                                  }`}
+                                >
+                                  {leave.status || "Pending"}
+                                </span>
+                              </div>
+                              <p className="text-xs text-stone-600">
+                                {leave.reason || "No reason specified"}
+                              </p>
+                            </div>
+                            <div className="text-right flex-shrink-0">
+                              <span className="text-xs font-semibold text-stone-500">
+                                {leave.is_half_day
+                                  ? "0.5 day"
+                                  : leave.start_date && leave.end_date
+                                  ? `${getWorkingDayCount(
+                                      leave.start_date,
+                                      leave.end_date
+                                    )} days`
+                                  : "1 day"}
+                              </span>
+                            </div>
+                          </div>
+                        ))}
+                    </div>
+                  )}
+                </div>
+              )}
+            </div>
+
+            <div className="px-5 py-3 border-t border-stone-100 bg-stone-50/50 flex justify-end flex-shrink-0">
+              <button
+                onClick={() => setAttendanceModalTab(null)}
+                className="px-4 py-1.5 text-xs font-semibold text-stone-600 bg-white border border-stone-200 rounded-xl hover:bg-stone-100 transition-colors cursor-pointer"
+              >
                 Close
               </button>
             </div>
