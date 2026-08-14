@@ -7,6 +7,7 @@ import NotificationBell from "../components/NotificationBell";
 import PortalSwitcher from "../components/PortalSwitcher";
 import Breadcrumbs from "../components/ui/Breadcrumbs";
 import { useBreadcrumbTrail } from "../hooks/useBreadcrumbTrail";
+import { usePageDetailTitle } from "../utils/pageDetailTitle";
 import EmployeeSidebar from "./EmployeeSidebar";
 import ChatWidget from "../components/chat/ChatWidget";
 import {
@@ -199,13 +200,34 @@ const EmployeeLayout = () => {
   const resolveCrumb = (pathname) => {
     if (pathname.startsWith("/pm/analytics/"))
       return { name: "Analytics", key: "pm-analytics-detail", isDetail: true };
+    if (pathname.startsWith("/pm/my-team/"))
+      return { name: "Employee", key: "pm-myteam-detail", isDetail: true };
     const item = navItems.find((n) => n.to === pathname);
     if (item) return { name: item.label, key: pathname };
     if (/\/onboarding\/[^/]+$/.test(pathname))
       return { name: "Module", key: "onboarding-module", isDetail: true };
     return { name: "Dashboard", key: `${prefix}/dashboard` };
   };
-  const breadcrumbTrail = useBreadcrumbTrail(resolveCrumb);
+  const rawBreadcrumbTrail = useBreadcrumbTrail(resolveCrumb);
+  const detailTitle = usePageDetailTitle();
+  
+  let breadcrumbTrail = detailTitle
+    ? rawBreadcrumbTrail.map((c) =>
+        c.key === "pm-analytics-detail" || c.key === "pm-myteam-detail" || c.key === "onboarding-module" 
+          ? { ...c, name: detailTitle } : c
+      )
+    : rawBreadcrumbTrail;
+
+  const isEmployeeDetail = breadcrumbTrail[breadcrumbTrail.length - 1]?.key === "pm-myteam-detail";
+  const hasEmployeesParent = breadcrumbTrail.some(c => c.key === "/pm/my-team");
+
+  if (isEmployeeDetail && !hasEmployeesParent) {
+    breadcrumbTrail = [
+      { key: "/pm/dashboard", name: "Dashboard", path: "/pm/dashboard" },
+      { key: "/pm/my-team", name: "My Team", path: "/pm/my-team" },
+      breadcrumbTrail[breadcrumbTrail.length - 1]
+    ];
+  }
 
   const sidebarProps = {
     user,

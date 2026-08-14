@@ -1,4 +1,5 @@
 import React, { useMemo, useState, useEffect, useRef } from "react";
+import { useNavigate } from "react-router-dom";
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
 import {
   allocationApi,
@@ -541,6 +542,7 @@ const RemoveFromProjectModal = ({ data, onClose }) => {
 };
 
 const MyTeamPage = () => {
+  const navigate = useNavigate();
   const user = JSON.parse(localStorage.getItem("user") || "{}");
   const role = localStorage.getItem("role") || user.role || "employee";
   const canManageTeam = role === "pm" || role === "admin";
@@ -882,7 +884,7 @@ const MyTeamPage = () => {
       <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-2">
         
         {/* KPI 1: TEAM SIZE & WORKLOAD */}
-        <div className="bg-white border border-slate-200/70 rounded-xl p-2.5 shadow-[0_1px_2px_rgba(0,0,0,0.03)] flex flex-col justify-between hover:shadow-md transition-all duration-200">
+        <div className="bg-white border border-slate-200/70 rounded-2xl p-4 shadow-[0_1px_2px_rgba(0,0,0,0.03)] flex flex-col justify-between hover:shadow-md transition-all duration-200">
           <div className="flex items-center justify-between gap-2 mb-1.5">
             <div className="flex items-center gap-2 min-w-0">
               <div className="w-6 h-6 rounded-md bg-indigo-50 text-indigo-600 flex items-center justify-center flex-shrink-0">
@@ -897,11 +899,11 @@ const MyTeamPage = () => {
             </div>
           </div>
 
-          <div className="grid grid-cols-3 gap-1 pt-1.5 border-t border-slate-100">
+          <div className="grid grid-cols-3 gap-1.5 pt-2.5 border-t border-slate-100">
             <button
               type="button"
               onClick={() => setCapacityFilter((prev) => (prev === "optimal" ? "" : "optimal"))}
-              className={`py-1 px-1 rounded-lg text-center border transition-all hover:scale-[1.02] cursor-pointer ${
+              className={`py-1.5 px-2 rounded-xl text-center border transition-all hover:scale-[1.02] cursor-pointer ${
                 capacityFilter === "optimal"
                   ? "bg-emerald-100/90 border-emerald-300 ring-1 ring-emerald-500/30"
                   : "bg-emerald-50/60 border-emerald-100/80 hover:bg-emerald-100/60"
@@ -918,7 +920,7 @@ const MyTeamPage = () => {
             <button
               type="button"
               onClick={() => setCapacityFilter((prev) => (prev === "over" ? "" : "over"))}
-              className={`py-1 px-1 rounded-lg text-center border transition-all hover:scale-[1.02] cursor-pointer ${
+              className={`py-1.5 px-2 rounded-xl text-center border transition-all hover:scale-[1.02] cursor-pointer ${
                 capacityFilter === "over"
                   ? "bg-rose-100/90 border-rose-300 ring-1 ring-rose-500/30"
                   : "bg-rose-50/60 border-rose-100/80 hover:bg-rose-100/60"
@@ -935,7 +937,7 @@ const MyTeamPage = () => {
             <button
               type="button"
               onClick={() => setCapacityFilter((prev) => (prev === "unassigned" ? "" : "unassigned"))}
-              className={`py-1 px-1 rounded-lg text-center border transition-all hover:scale-[1.02] cursor-pointer ${
+              className={`py-1.5 px-2 rounded-xl text-center border transition-all hover:scale-[1.02] cursor-pointer ${
                 capacityFilter === "unassigned"
                   ? "bg-amber-100/90 border-amber-300 ring-1 ring-amber-500/30"
                   : "bg-amber-50/60 border-amber-100/80 hover:bg-amber-100/60"
@@ -952,8 +954,8 @@ const MyTeamPage = () => {
         </div>
 
         {/* KPI 2: PROJECT DELIVERY HEALTH */}
-        <div className="bg-white border border-slate-200/70 rounded-xl p-2.5 shadow-[0_1px_2px_rgba(0,0,0,0.03)] flex flex-col justify-between hover:shadow-md transition-all duration-200">
-          <div className="flex items-center gap-2 mb-1.5 min-h-[24px]">
+        <div className="bg-white border border-slate-200/70 rounded-2xl p-4 shadow-[0_1px_2px_rgba(0,0,0,0.03)] flex flex-col justify-between hover:shadow-md transition-all duration-200">
+          <div className="flex items-center gap-2 mb-3 min-h-[24px]">
             <div className="w-6 h-6 rounded-md bg-blue-50 text-blue-600 flex items-center justify-center flex-shrink-0">
               <FolderKanban className="w-3.5 h-3.5" />
             </div>
@@ -962,11 +964,11 @@ const MyTeamPage = () => {
             </div>
           </div>
 
-          <div className="grid grid-cols-3 gap-1 pt-1.5 border-t border-slate-100">
+          <div className="grid grid-cols-3 gap-1.5 pt-2.5 border-t border-slate-100">
             <button
               type="button"
               onClick={() => setProjectStatusFilter((prev) => (prev === "active" ? "" : "active"))}
-              className={`py-1 px-1 rounded-lg text-center border transition-all hover:scale-[1.02] cursor-pointer ${
+              className={`py-1.5 px-2 rounded-xl text-center border transition-all hover:scale-[1.02] cursor-pointer ${
                 projectStatusFilter === "active"
                   ? "bg-blue-100/90 border-blue-300 ring-1 ring-blue-500/30"
                   : "bg-blue-50/60 border-blue-100/80 hover:bg-blue-100/60"
@@ -983,7 +985,7 @@ const MyTeamPage = () => {
             <button
               type="button"
               onClick={() => setProjectStatusFilter((prev) => (prev === "on-hold" ? "" : "on-hold"))}
-              className={`py-1 px-1 rounded-lg text-center border transition-all hover:scale-[1.02] cursor-pointer ${
+              className={`py-1.5 px-2 rounded-xl text-center border transition-all hover:scale-[1.02] cursor-pointer ${
                 projectStatusFilter === "on-hold"
                   ? "bg-amber-100/90 border-amber-300 ring-1 ring-amber-500/30"
                   : "bg-amber-50/60 border-amber-100/80 hover:bg-amber-100/60"
@@ -1000,7 +1002,7 @@ const MyTeamPage = () => {
             <button
               type="button"
               onClick={() => setProjectStatusFilter((prev) => (prev === "completed" ? "" : "completed"))}
-              className={`py-1 px-1 rounded-lg text-center border transition-all hover:scale-[1.02] cursor-pointer ${
+              className={`py-1.5 px-2 rounded-xl text-center border transition-all hover:scale-[1.02] cursor-pointer ${
                 projectStatusFilter === "completed"
                   ? "bg-indigo-100/90 border-indigo-300 ring-1 ring-indigo-500/30"
                   : "bg-indigo-50/60 border-indigo-100/80 hover:bg-indigo-100/60"
@@ -1017,8 +1019,8 @@ const MyTeamPage = () => {
         </div>
 
         {/* KPI 3: DAILY AVAILABILITY */}
-        <div className="bg-white border border-slate-200/70 rounded-xl p-2.5 shadow-[0_1px_2px_rgba(0,0,0,0.03)] flex flex-col justify-between hover:shadow-md transition-all duration-200">
-          <div className="flex items-center gap-2 mb-1.5 min-h-[24px]">
+        <div className="bg-white border border-slate-200/70 rounded-2xl p-4 shadow-[0_1px_2px_rgba(0,0,0,0.03)] flex flex-col justify-between hover:shadow-md transition-all duration-200">
+          <div className="flex items-center gap-2 mb-3 min-h-[24px]">
             <div className="w-6 h-6 rounded-md bg-emerald-50 text-emerald-600 flex items-center justify-center flex-shrink-0">
               <CalendarCheck className="w-3.5 h-3.5" />
             </div>
@@ -1027,11 +1029,11 @@ const MyTeamPage = () => {
             </div>
           </div>
 
-          <div className="grid grid-cols-3 gap-1 pt-1.5 border-t border-slate-100">
+          <div className="grid grid-cols-3 gap-1.5 pt-2.5 border-t border-slate-100">
             <button
               type="button"
               onClick={() => setAttendanceFilter((prev) => (prev === "wfo" ? "" : "wfo"))}
-              className={`py-1 px-1 rounded-lg text-center border transition-all hover:scale-[1.02] cursor-pointer ${
+              className={`py-1.5 px-2 rounded-xl text-center border transition-all hover:scale-[1.02] cursor-pointer ${
                 attendanceFilter === "wfo"
                   ? "bg-emerald-100/90 border-emerald-300 ring-1 ring-emerald-500/30"
                   : "bg-emerald-50/60 border-emerald-100/80 hover:bg-emerald-100/60"
@@ -1048,7 +1050,7 @@ const MyTeamPage = () => {
             <button
               type="button"
               onClick={() => setAttendanceFilter((prev) => (prev === "wfh" ? "" : "wfh"))}
-              className={`py-1 px-1 rounded-lg text-center border transition-all hover:scale-[1.02] cursor-pointer ${
+              className={`py-1.5 px-2 rounded-xl text-center border transition-all hover:scale-[1.02] cursor-pointer ${
                 attendanceFilter === "wfh"
                   ? "bg-cyan-100/90 border-cyan-300 ring-1 ring-cyan-500/30"
                   : "bg-cyan-50/60 border-cyan-100/80 hover:bg-cyan-100/60"
@@ -1065,7 +1067,7 @@ const MyTeamPage = () => {
             <button
               type="button"
               onClick={() => setAttendanceFilter((prev) => (prev === "leave" ? "" : "leave"))}
-              className={`py-1 px-1 rounded-lg text-center border transition-all hover:scale-[1.02] cursor-pointer ${
+              className={`py-1.5 px-2 rounded-xl text-center border transition-all hover:scale-[1.02] cursor-pointer ${
                 attendanceFilter === "leave"
                   ? "bg-amber-100/90 border-amber-300 ring-1 ring-amber-500/30"
                   : "bg-amber-50/60 border-amber-100/80 hover:bg-amber-100/60"
@@ -1082,8 +1084,8 @@ const MyTeamPage = () => {
         </div>
 
         {/* KPI 4: ROLE BALANCE */}
-        <div className="bg-white border border-slate-200/70 rounded-xl p-2.5 shadow-[0_1px_2px_rgba(0,0,0,0.03)] flex flex-col justify-between hover:shadow-md transition-all duration-200">
-          <div className="flex items-center gap-2 mb-1.5 min-h-[24px]">
+        <div className="bg-white border border-slate-200/70 rounded-2xl p-4 shadow-[0_1px_2px_rgba(0,0,0,0.03)] flex flex-col justify-between hover:shadow-md transition-all duration-200">
+          <div className="flex items-center gap-2 mb-3 min-h-[24px]">
             <div className="w-6 h-6 rounded-md bg-purple-50 text-purple-600 flex items-center justify-center flex-shrink-0">
               <Award className="w-3.5 h-3.5" />
             </div>
@@ -1092,11 +1094,11 @@ const MyTeamPage = () => {
             </div>
           </div>
 
-          <div className="grid grid-cols-2 gap-1 pt-1.5 border-t border-slate-100">
+          <div className="grid grid-cols-2 gap-1.5 pt-2.5 border-t border-slate-100">
             <button
               type="button"
               onClick={() => setRoleFilterKey((prev) => (prev === "TL" ? "" : "TL"))}
-              className={`py-1 px-1 rounded-lg text-center border transition-all hover:scale-[1.02] cursor-pointer ${
+              className={`py-1.5 px-2 rounded-xl text-center border transition-all hover:scale-[1.02] cursor-pointer ${
                 roleFilterKey === "TL"
                   ? "bg-purple-100/90 border-purple-300 ring-1 ring-purple-500/30"
                   : "bg-purple-50/60 border-purple-100/80 hover:bg-purple-100/60"
@@ -1113,7 +1115,7 @@ const MyTeamPage = () => {
             <button
               type="button"
               onClick={() => setRoleFilterKey((prev) => (prev === "Annotator" ? "" : "Annotator"))}
-              className={`py-1 px-1 rounded-lg text-center border transition-all hover:scale-[1.02] cursor-pointer ${
+              className={`py-1.5 px-2 rounded-xl text-center border transition-all hover:scale-[1.02] cursor-pointer ${
                 roleFilterKey === "Annotator"
                   ? "bg-sky-100/90 border-sky-300 ring-1 ring-sky-500/30"
                   : "bg-sky-50/60 border-sky-100/80 hover:bg-sky-100/60"
@@ -1131,20 +1133,20 @@ const MyTeamPage = () => {
 
       </div>
 
-      {/* Project Tabs + Search Bar on the SAME line */}
-      <div className="flex flex-col gap-2.5 sm:flex-row sm:items-center sm:justify-between">
+      {/* Project Tabs + Search Bar */}
+      <div className="flex flex-col gap-2.5 sm:flex-row sm:items-center sm:justify-between border-b border-slate-200">
         {/* Project Tabs Strip */}
-        <div className="flex items-center gap-1.5 overflow-x-auto pb-1 sm:pb-0 no-scrollbar">
+        <div className="flex overflow-x-auto overflow-y-hidden no-scrollbar">
           <button
             type="button"
             onClick={() => setProjectFilter("all")}
-            className={`flex items-center gap-1.5 px-3.5 py-1.5 rounded-xl text-xs font-bold transition-all whitespace-nowrap cursor-pointer ${
+            className={`px-4 py-2 text-sm font-semibold border-b-2 -mb-px transition-colors whitespace-nowrap ${
               projectFilter === "all"
-                ? "bg-slate-900 text-white shadow-sm"
-                : "bg-slate-100/90 text-slate-600 hover:bg-slate-200/80 hover:text-slate-900"
+                ? "border-indigo-600 text-indigo-600"
+                : "border-transparent text-slate-500 hover:text-slate-700"
             }`}
           >
-            <span>All Projects</span>
+            All Projects
           </button>
 
           {scopedProjects.map((p) => {
@@ -1155,18 +1157,18 @@ const MyTeamPage = () => {
                 key={p.id}
                 type="button"
                 onClick={() => setProjectFilter(String(p.id))}
-                className={`flex items-center gap-1.5 px-3 py-1.5 rounded-xl text-xs font-semibold transition-all whitespace-nowrap cursor-pointer ${
+                className={`px-4 py-2 text-sm font-semibold border-b-2 -mb-px transition-colors whitespace-nowrap flex items-center gap-2 ${
                   isActive
-                    ? "bg-indigo-600 text-white shadow-sm ring-2 ring-indigo-500/20"
-                    : "bg-white text-slate-700 border border-slate-200/80 hover:bg-indigo-50/70 hover:border-indigo-200 hover:text-indigo-700"
+                    ? "border-indigo-600 text-indigo-600"
+                    : "border-transparent text-slate-500 hover:text-slate-700"
                 }`}
               >
                 <span>{p.name}</span>
                 <span
-                  className={`px-1.5 py-0.5 rounded-full text-[10px] font-extrabold ${
+                  className={`rounded-md px-1.5 py-0.5 text-xs font-semibold tabular-nums ${
                     isActive
-                      ? "bg-indigo-500 text-white"
-                      : "bg-slate-100 text-slate-600"
+                      ? "bg-indigo-50 text-indigo-600"
+                      : "bg-slate-100 text-slate-500"
                   }`}
                 >
                   {count}
@@ -1179,18 +1181,18 @@ const MyTeamPage = () => {
             <button
               type="button"
               onClick={() => setProjectFilter("unassigned")}
-              className={`flex items-center gap-1.5 px-3 py-1.5 rounded-xl text-xs font-semibold transition-all whitespace-nowrap cursor-pointer ${
+              className={`px-4 py-2 text-sm font-semibold border-b-2 -mb-px transition-colors whitespace-nowrap flex items-center gap-2 ${
                 projectFilter === "unassigned"
-                  ? "bg-amber-600 text-white shadow-sm ring-2 ring-amber-500/20"
-                  : "bg-amber-50/90 text-amber-800 border border-amber-200/80 hover:bg-amber-100/80"
+                  ? "border-amber-600 text-amber-600"
+                  : "border-transparent text-slate-500 hover:text-slate-700"
               }`}
             >
               <span>Unassigned / Bench</span>
               <span
-                className={`px-1.5 py-0.5 rounded-full text-[10px] font-extrabold ${
+                className={`rounded-md px-1.5 py-0.5 text-xs font-semibold tabular-nums ${
                   projectFilter === "unassigned"
-                    ? "bg-amber-700 text-white"
-                    : "bg-amber-200/80 text-amber-900"
+                    ? "bg-amber-50 text-amber-600"
+                    : "bg-slate-100 text-slate-500"
                 }`}
               >
                 {projectMemberCounts.get("unassigned")}
@@ -1199,8 +1201,8 @@ const MyTeamPage = () => {
           )}
         </div>
 
-        {/* Search Bar & Clear Filters on the right side of the same row */}
-        <div className="flex items-center gap-2 shrink-0">
+        {/* Global Search box in the header */}
+        <div className="flex items-center gap-2 pb-2 sm:pb-0 shrink-0">
           <div className="relative">
             <input
               type="text"
@@ -1234,6 +1236,7 @@ const MyTeamPage = () => {
       <Table
         variant="untitled"
         allowOverflow
+        onRowClick={(row) => navigate(`/pm/my-team/${row.id}`)}
         loading={isLoading}
         skeletonRows={10}
         columns={[
@@ -1584,3 +1587,4 @@ const MyTeamPage = () => {
 };
 
 export default MyTeamPage;
+

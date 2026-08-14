@@ -170,7 +170,7 @@ const AdminCompanySettingsPage = () => {
   if (loading) {
     return (
       <div className="flex items-center justify-center min-h-[400px]">
-        <div className="flex items-center gap-3 text-slate-400">
+        <div className="flex items-center gap-3 text-stone-400">
           <Loader2 className="w-5 h-5 animate-spin" />
           <span className="text-sm font-medium">Loading settings...</span>
         </div>
@@ -180,114 +180,117 @@ const AdminCompanySettingsPage = () => {
 
   return (
     <>
-      <div className="space-y-6 max-w-4xl">
+      <div className="space-y-6 w-full">
 
 
         {/* General Information Card */}
         <form
           onSubmit={handleSaveGeneral}
-          className="bg-white border border-slate-200/60 rounded-2xl shadow-sm overflow-hidden"
+          className="bg-white border border-stone-200 rounded-2xl shadow-sm overflow-hidden"
         >
-          <div className="bg-gradient-to-r from-emerald-50 to-teal-50 border-b border-emerald-100/60 px-6 py-4">
-            <h2 className="text-base font-bold text-slate-800 flex items-center gap-2">
-              <Building2 className="w-5 h-5 text-emerald-500" />
-              General Information
-            </h2>
-            <p className="text-xs text-slate-500 mt-0.5">
-              Update the office location and company perks displayed to
-              employees.
-            </p>
-          </div>
-
-          <div className="p-6 space-y-5">
+          <div className="bg-stone-50/50 border-b border-stone-200 px-6 py-4 flex items-center justify-between">
             <div>
-              <label className="flex items-center gap-2 text-sm font-semibold text-slate-700 mb-1.5">
-                <MapPin className="w-4 h-4 text-rose-500" />
-                Office Address
-              </label>
-              <textarea
-                value={generalSettings.office_address}
-                onChange={(e) =>
-                  setGeneralSettings({
-                    ...generalSettings,
-                    office_address: e.target.value,
-                  })
-                }
-                placeholder="Enter full office address..."
-                rows={3}
-                className="w-full px-4 py-2.5 border border-slate-200 rounded-xl text-sm focus:ring-2 focus:ring-emerald-100 focus:border-emerald-400 outline-none transition-all"
-              />
-            </div>
-
-            <div>
-              <label className="block text-sm font-semibold text-slate-700 mb-1.5">
-                Google Maps Link
-              </label>
-              <input
-                type="text"
-                value={generalSettings.google_maps_link}
-                onChange={(e) =>
-                  setGeneralSettings({
-                    ...generalSettings,
-                    google_maps_link: e.target.value,
-                  })
-                }
-                placeholder="https://maps.google.com/..."
-                className="w-full px-4 py-2.5 border border-slate-200 rounded-xl text-sm focus:ring-2 focus:ring-emerald-100 focus:border-emerald-400 outline-none transition-all"
-              />
-            </div>
-
-            <div>
-              <label className="flex items-center gap-2 text-sm font-semibold text-slate-700 mb-1.5">
-                <Sparkles className="w-4 h-4 text-emerald-500" />
-                Employee Perks & Benefits (One per line)
-              </label>
-              <textarea
-                value={generalSettings.company_perks}
-                onChange={(e) =>
-                  setGeneralSettings({
-                    ...generalSettings,
-                    company_perks: e.target.value,
-                  })
-                }
-                placeholder="Flexible working hours&#10;Health insurance coverage&#10;..."
-                rows={6}
-                className="w-full px-4 py-2.5 border border-slate-200 rounded-xl text-sm focus:ring-2 focus:ring-emerald-100 focus:border-emerald-400 outline-none transition-all"
-              />
-              <p className="text-xs text-slate-400 mt-1">
-                Put each perk on a new line to display them as a list.
+              <h2 className="text-base font-display font-bold text-stone-800 flex items-center gap-2">
+                <Building2 className="w-4 h-4 text-blue-600" />
+                General Information
+              </h2>
+              <p className="text-xs text-stone-500 mt-0.5">
+                Update the office location and company perks displayed to employees.
               </p>
             </div>
-          </div>
-
-          <div className="px-6 py-4 bg-slate-50/50 border-t border-slate-100 flex justify-end">
             <Button
               type="submit"
-              variant="success"
-              size="lg"
+              variant="primary"
+              size="sm"
               disabled={savingGeneral}
               isLoading={savingGeneral}
             >
               {!savingGeneral && <Save className="w-4 h-4" />}
-              Save General Settings
+              Save Changes
             </Button>
+          </div>
+
+          <div className="p-6">
+            <div className="grid grid-cols-1 lg:grid-cols-2 gap-8">
+              {/* Left Column: Location Details */}
+              <div className="space-y-6">
+                <div>
+                  <label className="flex items-center gap-1.5 text-xs font-semibold text-stone-700 mb-2">
+                    <MapPin className="w-3.5 h-3.5 text-stone-400" />
+                    Office Address
+                  </label>
+                  <textarea
+                    value={generalSettings.office_address}
+                    onChange={(e) =>
+                      setGeneralSettings({
+                        ...generalSettings,
+                        office_address: e.target.value,
+                      })
+                    }
+                    placeholder="Enter full office address..."
+                    rows={4}
+                    className="w-full px-4 py-2.5 bg-stone-50 border border-stone-200 rounded-xl text-sm text-stone-700 focus:bg-white focus:ring-2 focus:ring-blue-100 focus:border-blue-400 outline-none transition-all placeholder:text-stone-400 resize-none"
+                  />
+                </div>
+
+                <div>
+                  <label className="block text-xs font-semibold text-stone-700 mb-2">
+                    Google Maps Link
+                  </label>
+                  <input
+                    type="text"
+                    value={generalSettings.google_maps_link}
+                    onChange={(e) =>
+                      setGeneralSettings({
+                        ...generalSettings,
+                        google_maps_link: e.target.value,
+                      })
+                    }
+                    placeholder="https://maps.google.com/..."
+                    className="w-full px-4 py-2.5 bg-stone-50 border border-stone-200 rounded-xl text-sm text-stone-700 focus:bg-white focus:ring-2 focus:ring-blue-100 focus:border-blue-400 outline-none transition-all placeholder:text-stone-400"
+                  />
+                </div>
+              </div>
+
+              {/* Right Column: Perks */}
+              <div className="flex flex-col">
+                <label className="flex items-center gap-1.5 text-xs font-semibold text-stone-700 mb-2">
+                  <Sparkles className="w-3.5 h-3.5 text-amber-500" />
+                  Employee Perks & Benefits
+                </label>
+                <textarea
+                  value={generalSettings.company_perks}
+                  onChange={(e) =>
+                    setGeneralSettings({
+                      ...generalSettings,
+                      company_perks: e.target.value,
+                    })
+                  }
+                  placeholder="Flexible working hours&#10;Health insurance coverage&#10;..."
+                  className="w-full flex-1 px-4 py-2.5 bg-stone-50 border border-stone-200 rounded-xl text-sm text-stone-700 focus:bg-white focus:ring-2 focus:ring-blue-100 focus:border-blue-400 outline-none transition-all placeholder:text-stone-400 resize-none min-h-[140px]"
+                />
+                <p className="text-[10px] font-medium text-stone-400 mt-1.5 ml-1">
+                  Enter one perk per line. Displayed as a list to employees.
+                </p>
+              </div>
+            </div>
           </div>
         </form>
 
         {/* WiFi Networks List Card */}
-        <div className="bg-white border border-slate-200/60 rounded-2xl shadow-sm overflow-hidden">
-          <div className="bg-gradient-to-r from-blue-50 to-indigo-50 border-b border-blue-100/60 px-6 py-4 flex items-center justify-between">
+        <div className="bg-white border border-stone-200 rounded-2xl shadow-sm overflow-hidden">
+          <div className="bg-stone-50/50 border-b border-stone-200 px-6 py-4 flex items-center justify-between">
             <div>
-              <h2 className="text-base font-bold text-slate-800 flex items-center gap-2">
-                <Wifi className="w-5 h-5 text-blue-500" />
+              <h2 className="text-base font-display font-bold text-stone-800 flex items-center gap-2">
+                <Wifi className="w-4 h-4 text-blue-600" />
                 Office WiFi Networks
               </h2>
-              <p className="text-xs text-slate-500 mt-0.5">
+              <p className="text-xs text-stone-500 mt-0.5">
                 Manage multiple wireless networks available at the office.
               </p>
             </div>
             {!isFormOpen && (
-              <Button variant="blue" onClick={openAddForm}>
+              <Button variant="primary" size="sm" onClick={openAddForm}>
                 <Plus className="w-4 h-4" />
                 Add Network
               </Button>
@@ -295,17 +298,17 @@ const AdminCompanySettingsPage = () => {
           </div>
 
           {isFormOpen ? (
-            <div className="p-6 bg-slate-50 border-b border-slate-100">
+            <div className="p-6 bg-stone-50 border-b border-stone-100">
               <form
                 onSubmit={handleSaveWifi}
-                className="bg-white border border-slate-200 rounded-xl p-5 shadow-sm"
+                className="bg-white border border-stone-200 rounded-xl p-5 shadow-sm"
               >
-                <h3 className="text-sm font-bold text-slate-800 mb-4 flex items-center gap-2">
+                <h3 className="text-sm font-bold text-stone-800 mb-4 flex items-center gap-2">
                   {editingId ? "Edit WiFi Network" : "Add New WiFi Network"}
                 </h3>
                 <div className="grid grid-cols-1 sm:grid-cols-2 gap-4 mb-4">
                   <div>
-                    <label className="block text-xs font-semibold text-slate-700 mb-1.5">
+                    <label className="block text-xs font-semibold text-stone-700 mb-1.5">
                       Network Name (SSID) *
                     </label>
                     <input
@@ -315,12 +318,12 @@ const AdminCompanySettingsPage = () => {
                         setFormData({ ...formData, name: e.target.value })
                       }
                       placeholder="e.g. Autonex-5G"
-                      className="w-full px-3 py-2 border border-slate-200 rounded-lg text-sm focus:ring-2 focus:ring-blue-100 focus:border-blue-400 outline-none transition-all"
+                      className="w-full px-3 py-2 border border-stone-200 rounded-lg text-sm focus:ring-2 focus:ring-blue-100 focus:border-blue-400 outline-none transition-all"
                       required
                     />
                   </div>
                   <div>
-                    <label className="block text-xs font-semibold text-slate-700 mb-1.5">
+                    <label className="block text-xs font-semibold text-stone-700 mb-1.5">
                       Password
                     </label>
                     <input
@@ -330,11 +333,11 @@ const AdminCompanySettingsPage = () => {
                         setFormData({ ...formData, password: e.target.value })
                       }
                       placeholder="Leave blank for open network"
-                      className="w-full px-3 py-2 border border-slate-200 rounded-lg text-sm font-mono focus:ring-2 focus:ring-blue-100 focus:border-blue-400 outline-none transition-all"
+                      className="w-full px-3 py-2 border border-stone-200 rounded-lg text-sm font-mono focus:ring-2 focus:ring-blue-100 focus:border-blue-400 outline-none transition-all"
                     />
                   </div>
                 </div>
-                <div className="flex justify-end gap-2 pt-2 border-t border-slate-100">
+                <div className="flex justify-end gap-2 pt-2 border-t border-stone-100">
                   <Button
                     type="button"
                     variant="cancel"
@@ -345,9 +348,9 @@ const AdminCompanySettingsPage = () => {
                   </Button>
                   <Button
                     type="submit"
+                    variant="primary"
                     disabled={savingWifi}
                     isLoading={savingWifi}
-                    className="bg-blue-600 hover:bg-blue-700"
                   >
                     {!savingWifi && <Save className="w-4 h-4" />}
                     {editingId ? "Save Changes" : "Add Network"}
@@ -357,26 +360,26 @@ const AdminCompanySettingsPage = () => {
             </div>
           ) : null}
 
-          <div className="divide-y divide-slate-100">
+          <div className="divide-y divide-stone-100">
             {networks.length === 0 ? (
-              <div className="p-8 text-center text-slate-500 text-sm">
+              <div className="p-8 text-center text-stone-500 text-sm">
                 No WiFi networks configured yet.
               </div>
             ) : (
               networks.map((network) => (
                 <div
                   key={network.id}
-                  className="flex items-center justify-between p-4 hover:bg-slate-50 transition-colors group"
+                  className="flex items-center justify-between p-4 hover:bg-stone-50 transition-colors group"
                 >
                   <div className="flex items-center gap-4">
                     <div className="w-10 h-10 rounded-full bg-blue-50 flex items-center justify-center text-blue-500">
                       <Wifi className="w-5 h-5" />
                     </div>
                     <div>
-                      <p className="text-sm font-bold text-slate-800">
+                      <p className="text-sm font-bold text-stone-800">
                         {network.name}
                       </p>
-                      <p className="text-xs text-slate-500 mt-0.5 font-mono">
+                      <p className="text-xs text-stone-500 mt-0.5 font-mono">
                         {network.password
                           ? `Password: ${network.password}`
                           : "Open Network (No Password)"}
@@ -386,7 +389,7 @@ const AdminCompanySettingsPage = () => {
                   <div className="flex items-center gap-1 opacity-0 group-hover:opacity-100 transition-opacity">
                     <button
                       onClick={() => openEditForm(network)}
-                      className="p-2 text-slate-400 hover:text-blue-600 hover:bg-blue-50 rounded-lg transition-colors"
+                      className="p-2 text-stone-400 hover:text-blue-600 hover:bg-blue-50 rounded-lg transition-colors"
                       title="Edit"
                       disabled={isFormOpen}
                     >
@@ -394,7 +397,7 @@ const AdminCompanySettingsPage = () => {
                     </button>
                     <button
                       onClick={() => setWifiDeleteConfirm(network.id)}
-                      className="p-2 text-slate-400 hover:text-red-600 hover:bg-red-50 rounded-lg transition-colors"
+                      className="p-2 text-stone-400 hover:text-red-600 hover:bg-red-50 rounded-lg transition-colors"
                       title="Delete"
                       disabled={deletingId === network.id || isFormOpen}
                     >
