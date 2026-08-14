@@ -147,6 +147,9 @@ const ModuleView = () => {
     toast.success("Video completed! You can now take the quiz.", {
       icon: "✅",
     });
+    if (currentSection?.questions && currentSection.questions.length > 0) {
+      setActiveTab("quiz");
+    }
   };
 
   const parseOptions = (options) => {
@@ -296,7 +299,7 @@ const ModuleView = () => {
   };
 
   const totalSections = moduleData.sections.length;
-  const totalCompleted = completedSections.size;
+  const totalCompleted = moduleData.sections.filter(s => completedSections.has(s.id)).length;
   const overallProgress =
     totalSections === 0
       ? 0
