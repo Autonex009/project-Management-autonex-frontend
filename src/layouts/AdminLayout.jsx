@@ -54,11 +54,24 @@ const AdminLayout = () => {
   const detailTitle = usePageDetailTitle();
   // Replace a generic detail crumb (e.g. "Analytics") with the live page title
   // (e.g. the project name) once the detail page has loaded it.
-  const breadcrumbTrail = detailTitle
+  let breadcrumbTrail = detailTitle
     ? rawBreadcrumbTrail.map((c) =>
       c.key === "admin-analytics-detail" || c.key === "admin-employees-detail" ? { ...c, name: detailTitle } : c,
     )
     : rawBreadcrumbTrail;
+
+  // If we're on the employee detail page and missing the parent "Employees" crumb (e.g. page reload), inject them
+  const isEmployeeDetail = breadcrumbTrail[breadcrumbTrail.length - 1]?.key === "admin-employees-detail";
+  const hasEmployeesParent = breadcrumbTrail.some(c => c.key === "/admin/employees");
+
+  if (isEmployeeDetail && !hasEmployeesParent) {
+    breadcrumbTrail = [
+      { key: "/admin/dashboard", name: "Autonex", path: "/admin/dashboard" },
+      { key: "/admin/employees", name: "Employees", path: "/admin/employees" },
+      breadcrumbTrail[breadcrumbTrail.length - 1]
+    ];
+  }
+
   const queryClient = useQueryClient();
   const [sidebarOpen, setSidebarOpen] = useState(false); // mobile drawer
   const [collapsed, setCollapsed] = useState(false); // desktop collapse
@@ -265,7 +278,7 @@ const AdminLayout = () => {
               <PanelLeft className="w-4 h-4" />
             </button>
             <Breadcrumbs
-              items={breadcrumbTrail}
+              items={breadcrumbTrail.filter((item) => item.key !== "/admin/dashboard")}
               homeHref="/admin/dashboard"
               homeLabel="Autonex"
               homeIcon={

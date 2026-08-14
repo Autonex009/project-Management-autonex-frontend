@@ -229,6 +229,7 @@ function App() {
             <Route path="leaderboard" element={<LeaderboardPage />} />
             <Route path="allocations" element={<AllocationsPage />} />
             <Route path="my-team" element={<MyTeamPage />} />
+            <Route path="my-team/:id" element={<EmployeeDashboard />} />
             <Route path="performance" element={<PerformanceReviewsPage />} />
             <Route path="self-evaluation" element={<SelfEvaluationPage />} />
             <Route path="leaves" element={<PMLeavesPage />} />

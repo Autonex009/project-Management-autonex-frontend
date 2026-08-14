@@ -189,13 +189,13 @@ const SkillsMultiSelect = ({ selected, onChange, options, isLoading }) => {
         {selected.map((skill) => (
           <span
             key={skill}
-            className="inline-flex items-center gap-1 rounded-md border border-teal-200 bg-teal-50 px-2 py-0.5 text-xs font-semibold text-teal-800"
+            className="inline-flex items-center gap-1 rounded-md border border-teal-200 bg-indigo-50 px-2 py-0.5 text-xs font-semibold text-teal-800"
           >
             {skill}
             <button
               type="button"
               onClick={() => toggle(skill)}
-              className="rounded text-teal-600 hover:bg-teal-200 hover:text-teal-900"
+              className="rounded text-indigo-600 hover:bg-teal-200 hover:text-teal-900"
             >
               <X className="h-3 w-3" />
             </button>
@@ -216,6 +216,7 @@ const SkillsMultiSelect = ({ selected, onChange, options, isLoading }) => {
         />
       </button>
 
+      
       {open && (
         <div className="absolute left-0 right-0 z-30 mt-1 max-h-48 overflow-y-auto rounded-xl border border-stone-200 bg-white py-1 shadow-lg">
           {isLoading ? (
@@ -232,7 +233,7 @@ const SkillsMultiSelect = ({ selected, onChange, options, isLoading }) => {
                   onClick={() => toggle(skill.name)}
                   className={`flex w-full items-center gap-2 px-3 py-1.5 text-left text-xs transition-colors ${
                     isSelected
-                      ? "bg-teal-50 font-semibold text-teal-800"
+                      ? "bg-indigo-50 font-semibold text-teal-800"
                       : "hover:bg-stone-50 text-stone-700"
                   }`}
                 >
@@ -286,6 +287,7 @@ const EmployeeDashboard = () => {
   const localUser = JSON.parse(localStorage.getItem("user") || "{}");
   const isAdmin = localUser.role === "admin";
   const employeeId = params.id || localUser.employee_id || localUser.id || 1;
+  const isSelf = !params.id || String(params.id) === String(localUser.employee_id || localUser.id);
 
   /* ── Queries ─────────────────────────────────────── */
   const { data: account } = useQuery({
@@ -1068,18 +1070,17 @@ const EmployeeDashboard = () => {
               )}
             </div>
 
-            <div className="flex items-center justify-center gap-1.5 text-[10px] text-stone-700 font-semibold w-full mb-1.5 px-0.5">
-              <Calendar className="w-3.5 h-3.5 text-stone-400 shrink-0" />
-              <span className="truncate text-center">
-                {display(profile.joiningDate)}
-              </span>
-            </div>
 
-            <div className="flex items-center justify-center gap-1.5 text-[10px] text-stone-500 font-medium w-full mb-2 px-0.5">
+            {/* Date */}
+            <div className="flex items-center justify-start gap-1.5 text-[10px] text-stone-700 font-semibold w-full mb-1.5 px-0.5">
+              <Calendar className="w-3.5 h-3.5 text-stone-400 shrink-0" />
+              <span className="truncate">{display(profile.joiningDate)}</span>
+            </div>
+            
+            {/* Phone */}
+            <div className="flex items-center justify-start gap-1.5 text-[10px] text-stone-500 font-medium w-full mb-2 px-0.5">
               <Phone className="w-3.5 h-3.5 text-stone-400 shrink-0" />
-              <span className="truncate text-center">
-                {profile.phone || "No phone"}
-              </span>
+              <span className="truncate">{profile.phone || "No phone"}</span>
             </div>
 
             <div className="w-full h-px bg-stone-100 mb-2" />
@@ -1093,7 +1094,7 @@ const EmployeeDashboard = () => {
                   {profile.skills.slice(0, 3).map((skill, idx) => (
                     <span
                       key={idx}
-                      className="bg-emerald-50/70 text-stone-700 px-2 py-0.5 rounded-full text-[9px] font-medium border border-emerald-100/50 leading-tight break-words max-w-full"
+                      className="bg-indigo-50/70 text-stone-700 px-2 py-0.5 rounded-full text-[9px] font-medium border border-indigo-100/50 leading-tight break-words max-w-full"
                     >
                       {skill}
                     </span>
@@ -1110,7 +1111,7 @@ const EmployeeDashboard = () => {
                 {display(profile.name, "Employee")}
               </h1>
               {profile.badge && (
-                <span className="text-[9px] font-bold uppercase tracking-wider text-emerald-700 bg-emerald-50 px-2 py-0.5 rounded border border-emerald-100">
+                <span className="text-[9px] font-semibold uppercase tracking-wider text-indigo-600 bg-indigo-50 px-2 py-0.5 rounded border border-indigo-200">
                   {profile.badge}
                 </span>
               )}
@@ -1160,7 +1161,7 @@ const EmployeeDashboard = () => {
                   onClick={() => setProfileTab("attendance")}
                   className={`flex items-center gap-1.5 pb-1 border-b-[2px] font-semibold text-[10px] transition-colors ${
                     profileTab === "attendance"
-                      ? "border-emerald-500 text-emerald-600"
+                      ? "border-indigo-500 text-indigo-600"
                       : "border-transparent text-stone-400 hover:text-stone-600"
                   }`}
                 >
@@ -1171,7 +1172,7 @@ const EmployeeDashboard = () => {
                   onClick={() => setProfileTab("notes")}
                   className={`flex items-center gap-1.5 pb-1 border-b-[2px] font-semibold text-[10px] transition-colors ${
                     profileTab === "notes"
-                      ? "border-emerald-500 text-emerald-600"
+                      ? "border-indigo-500 text-indigo-600"
                       : "border-transparent text-stone-400 hover:text-stone-600"
                   }`}
                 >
@@ -1183,14 +1184,14 @@ const EmployeeDashboard = () => {
                 <div className="grid grid-cols-3 gap-2">
                   {[
                     {
-                      icon: <Home className="w-3.5 h-3.5 text-emerald-600" />,
+                      icon: <Home className="w-3.5 h-3.5 text-indigo-600" />,
                       label: "WFH",
                       remaining: leavesAndWfhStats.wfhRemaining,
                       quota: leavesAndWfhStats.wfhQuota,
                       tabKey: "wfh",
                     },
                     {
-                      icon: <Calendar className="w-3.5 h-3.5 text-emerald-600" />,
+                      icon: <Calendar className="w-3.5 h-3.5 text-indigo-600" />,
                       label: "Paid",
                       remaining: leavesAndWfhStats.paidRemaining,
                       quota: leavesAndWfhStats.paidQuota,
@@ -1212,11 +1213,11 @@ const EmployeeDashboard = () => {
                       key={label}
                       onClick={() => handleOpenAttendanceModal(tabKey)}
                       title={`Click to view ${label} records`}
-                      className="flex flex-col items-center gap-0.5 border border-stone-200 rounded-xl pt-2 pb-1 bg-white cursor-pointer hover:border-stone-300 transition-colors"
+                      className="flex flex-col items-center gap-0.5 border border-stone-200 rounded-xl pt-2 pb-1 bg-white shadow-sm cursor-pointer hover:border-stone-300 transition-colors"
                     >
                       <div
                         className={`w-7 h-7 rounded-full flex items-center justify-center ${
-                          label === "Sick" ? "bg-orange-50" : "bg-emerald-50"
+                          label === "Sick" ? "bg-orange-50" : "bg-indigo-50"
                         }`}
                       >
                         {icon}
@@ -1255,10 +1256,10 @@ const EmployeeDashboard = () => {
                       color: "text-amber-600",
                     },
                     {
-                      icon: <Award className="w-3.5 h-3.5 text-emerald-600" />,
+                      icon: <Award className="w-3.5 h-3.5 text-indigo-600" />,
                       label: "Recognition",
                       value: recognitionsList.length,
-                      color: "text-emerald-600",
+                      color: "text-indigo-600",
                     },
                   ].map(({ icon, label, value, color }) => (
                     <div
@@ -1268,7 +1269,7 @@ const EmployeeDashboard = () => {
                       <div
                         className={`w-7 h-7 rounded-full flex items-center justify-center ${
                           label === "Recognition"
-                            ? "bg-emerald-50"
+                            ? "bg-indigo-50"
                             : label === "Warnings"
                             ? "bg-amber-50"
                             : "bg-rose-50"
@@ -1301,7 +1302,7 @@ const EmployeeDashboard = () => {
               Badges
             </h2>
             <div className="text-[10px] font-medium text-stone-500">
-              <span className="text-emerald-600 font-bold">
+              <span className="text-indigo-600 font-bold">
                 {earnedBadgeCount}/{achievementBadges.length}
               </span>{" "}
               badges earned
@@ -1314,20 +1315,11 @@ const EmployeeDashboard = () => {
                 key={badge.id}
                 className="relative flex flex-col items-center justify-between text-center p-2 rounded-2xl border border-stone-200 bg-white shadow-sm h-full"
               >
-                {/* status / rank / count pill */}
                 <div className="absolute top-2 right-2 z-10">
                   {badge.earned ? (
-                    badge.badgeText ? (
-                      <div className="min-w-[18px] h-4 px-1 rounded-full bg-emerald-500 flex items-center justify-center border border-white">
-                        <span className="text-[8px] font-bold text-white leading-none">
-                          {badge.badgeText}
-                        </span>
-                      </div>
-                    ) : (
-                      <div className="w-3.5 h-3.5 rounded-full bg-emerald-500 flex items-center justify-center border border-white">
-                        <Check className="w-2.5 h-2.5 text-white stroke-[3]" />
-                      </div>
-                    )
+                    <div className="w-3.5 h-3.5 rounded-full bg-indigo-50 flex items-center justify-center border border-indigo-200">
+                      <Check className="w-2.5 h-2.5 text-indigo-500 stroke-[3]" />
+                    </div>
                   ) : (
                     <div className="w-3.5 h-3.5 rounded-full bg-stone-100 flex items-center justify-center border border-white">
                       <Lock className="w-2 h-2 text-stone-400" />
@@ -1370,8 +1362,8 @@ const EmployeeDashboard = () => {
                   <span className="text-[10px] font-semibold text-stone-500 leading-tight max-w-[50%]">
                     Prev Day Rank
                   </span>
-                  <div className="w-6 h-6 rounded-full bg-emerald-50 flex items-center justify-center shrink-0">
-                    <TrendingUp className="w-3.5 h-3.5 text-emerald-600" />
+                  <div className="w-6 h-6 rounded-full bg-indigo-50 flex items-center justify-center shrink-0">
+                    <TrendingUp className="w-3.5 h-3.5 text-indigo-600" />
                   </div>
                 </div>
                 <div className="flex items-end justify-between mt-2.5">
@@ -1380,7 +1372,7 @@ const EmployeeDashboard = () => {
                       {dailyRank ? `#${dailyRank}` : "–"}
                     </span>
                   </div>
-                  <div className="flex items-center gap-0.5 text-[8.5px] font-semibold text-emerald-600 -mb-0.5">
+                  <div className="flex items-center gap-0.5 text-[8.5px] font-semibold text-indigo-600 -mb-0.5">
                     {dailyRank ? (
                       <>
                         <span className="text-[10px]">↑</span>
@@ -1494,7 +1486,8 @@ const EmployeeDashboard = () => {
       ══════════════════════════════════════════ */}
       <div className="grid grid-cols-1 lg:grid-cols-12 gap-3 items-stretch">
         {/* ───────── PRODUCTIVITY TREND (col-7) ───────── */}
-        <div className="lg:col-span-7 bg-white border border-stone-200 rounded-2xl p-4 flex flex-col gap-3 min-h-[260px] shadow-[0_1px_4px_rgba(28,25,23,0.06)]">
+        <div className="lg:col-span-7 bg-white border border-stone-200 rounded-2xl p-4 flex flex-col gap-3 h-[260px] shadow-[0_1px_4px_rgba(28,25,23,0.06)]">
+          {/* Header */}
           <div className="flex items-start justify-between gap-2">
             <div>
               <h3 className="font-display text-sm font-bold text-stone-800">
@@ -1505,7 +1498,7 @@ const EmployeeDashboard = () => {
               </p>
             </div>
             <div className="text-right shrink-0">
-              <span className="font-data text-lg font-extrabold text-teal-700 leading-none">
+              <span className="font-data text-lg font-extrabold text-indigo-700 leading-none">
                 {totalDailyHours}h
               </span>
               <span className="text-[9px] font-medium text-stone-400 block mt-0.5">
@@ -1533,31 +1526,24 @@ const EmployeeDashboard = () => {
                 }%`,
                 color:
                   activityStats.deltaPct >= 0
-                    ? "text-emerald-600"
+                    ? "text-indigo-600"
                     : "text-rose-500",
               },
             ].map(({ label, value, color }) => (
-              <div
-                key={label}
-                className="bg-stone-50 border border-stone-100 rounded-xl px-3 py-2 text-center"
-              >
-                <span className="text-[9px] font-bold uppercase text-stone-400 block">
-                  {label}
-                </span>
-                <span className={`font-data text-sm font-bold ${color} block mt-0.5`}>
-                  {value}
-                </span>
+              <div key={label} className="bg-white border border-stone-200 rounded-xl px-3 py-2 text-center">
+                <span className="text-[9px] font-bold uppercase text-stone-400 block">{label}</span>
+                <span className={`font-data text-sm font-bold ${color} block mt-0.5`}>{value}</span>
               </div>
             ))}
           </div>
 
           <div className="flex-1 min-h-[100px]">
             {dailyData.length === 0 ? (
-              <div className="h-full flex items-center justify-center text-xs text-stone-400 bg-stone-50 rounded-xl border border-stone-100">
+              <div className="h-full flex items-center justify-center text-xs text-stone-400 bg-white rounded-xl border border-stone-100">
                 No activity recorded yet this month
               </div>
             ) : (
-              <div className="relative bg-stone-50/60 border border-stone-100 rounded-xl p-2 h-full">
+              <div className="relative bg-white/60 border border-stone-100 rounded-xl p-2 h-full">
                 <div className="flex h-full">
                   <div className="flex flex-col justify-between h-full pr-2 text-[8px] text-stone-400 shrink-0 font-data">
                     {[
@@ -1696,57 +1682,42 @@ const EmployeeDashboard = () => {
         </div>
 
         {/* ───────── PROJECT STATUS (col-5) ───────── */}
-        <div className="lg:col-span-5 bg-white border border-stone-200 rounded-2xl p-4 flex flex-col gap-3 shadow-[0_1px_4px_rgba(28,25,23,0.06)]">
+        <div className="lg:col-span-5 bg-white border border-stone-200 rounded-2xl p-4 flex flex-col gap-3 h-[260px] shadow-[0_1px_4px_rgba(28,25,23,0.06)]">
+          {/* Header */}
           <div className="flex items-center justify-between">
             <div className="flex items-center gap-2">
-              <FolderKanban className="w-4 h-4 text-teal-600" />
-              <h3 className="font-display text-sm font-bold text-stone-800">
-                Project Status
-              </h3>
+              <FolderKanban className="w-4 h-4 text-indigo-600" />
+              <h3 className="font-display text-sm font-bold text-stone-800">Project Status</h3>
             </div>
             <button
               onClick={() => setShowLogsModal(true)}
-              className="flex items-center gap-1 text-[10px] font-semibold text-teal-700 hover:text-teal-800 bg-teal-50 hover:bg-teal-100 border border-teal-100 px-2 py-1 rounded-lg transition-colors cursor-pointer"
+              className="flex items-center gap-1 text-[10px] font-semibold text-indigo-700 hover:text-indigo-800 bg-indigo-50 hover:bg-indigo-100 border border-indigo-100 px-2 py-1 rounded-lg transition-colors cursor-pointer"
             >
               <History className="w-3 h-3" /> Logs
             </button>
           </div>
 
-          <div className="flex-1 flex flex-col gap-1.5 overflow-y-auto db-scroll">
+          {/* Project list — fills available height, scrolls for more */}
+          <div className="flex-1 min-h-0 flex flex-col gap-1.5 overflow-y-auto db-scroll">
             {allEmployeeProjects.length === 0 ? (
               <div className="flex-1 flex items-center justify-center text-xs text-stone-400 italic">
                 No projects assigned currently.
               </div>
             ) : (
               allEmployeeProjects.slice(0, 6).map((proj) => (
-                <div
-                  key={proj.id}
-                  className="flex items-center gap-3 p-2.5 rounded-xl border border-stone-100 bg-stone-50 hover:bg-stone-100/60 transition-colors"
-                >
-                  <span className="w-8 h-8 rounded-lg bg-teal-100 text-teal-700 flex items-center justify-center font-extrabold text-[11px] shrink-0">
+                <div key={proj.id} className="flex items-center gap-2 p-1.5 rounded-lg border border-stone-200 bg-white hover:bg-stone-100/60 transition-colors">
+                  <span className="w-7 h-7 rounded-md bg-indigo-100 text-indigo-700 flex items-center justify-center font-extrabold text-[10px] shrink-0">
                     {proj.symbol}
                   </span>
                   <div className="flex-1 min-w-0">
-                    <p className="font-bold text-stone-800 text-xs truncate">
-                      {proj.name}
-                    </p>
-                    <p className="text-[10px] text-stone-500 truncate">
-                      {proj.role}
-                    </p>
+                    <p className="font-bold text-stone-800 text-[11px] truncate">{proj.name}</p>
+                    <p className="text-[9px] text-stone-500 truncate mt-0.5">{proj.role}</p>
                   </div>
                   <div className="text-right shrink-0">
-                    <span
-                      className={`inline-block px-2 py-0.5 text-[8.5px] font-bold uppercase rounded-md ${
-                        proj.status === "active"
-                          ? "bg-teal-700 text-white"
-                          : "bg-stone-200 text-stone-500"
-                      }`}
-                    >
+                    <span className={`inline-block px-1.5 py-0.5 text-[8px] font-semibold uppercase rounded-sm ${proj.status === "active" ? "bg-indigo-50 text-indigo-600 border border-indigo-200" : "bg-stone-100 text-stone-400 border border-stone-200"}`}>
                       {proj.status === "active" ? "Active" : "Done"}
                     </span>
-                    <p className="text-[9px] text-stone-400 font-data mt-0.5">
-                      {proj.startDate}
-                    </p>
+                    <p className="text-[8px] text-stone-400 font-data mt-0.5">{proj.startDate}</p>
                   </div>
                 </div>
               ))
@@ -1775,7 +1746,7 @@ const EmployeeDashboard = () => {
                 onClick={() => setBottomTab("notes")}
                 className={`flex items-center gap-1.5 pb-2 -mb-[3px] border-b-[2px] font-semibold text-[13px] transition-colors ${
                   bottomTab === "notes"
-                    ? "border-stone-800 text-stone-900"
+                    ? "border-indigo-500 text-indigo-600"
                     : "border-transparent text-stone-400 hover:text-stone-600"
                 }`}
               >
@@ -1786,41 +1757,30 @@ const EmployeeDashboard = () => {
                 onClick={() => setBottomTab("performance")}
                 className={`flex items-center gap-1.5 pb-2 -mb-[3px] border-b-[2px] font-semibold text-[13px] transition-colors ${
                   bottomTab === "performance"
-                    ? "border-stone-800 text-stone-900"
+                    ? "border-indigo-500 text-indigo-600"
                     : "border-transparent text-stone-400 hover:text-stone-600"
                 }`}
               >
                 <TrendingUp className="w-4 h-4" /> Performance History
               </button>
             </div>
+          {/* Tab body */}
+          {bottomTab === "notes" ? (
+            <div className="grid grid-cols-3 gap-3 flex-1">
+              {/* Complaints */}
+              <div className="flex flex-col bg-white border border-stone-200 rounded-xl p-2.5">
+                <div className="flex items-center justify-between gap-1.5 mb-2">
+                  <div className="flex items-center gap-1.5">
+                    <AlertCircle className="w-3.5 h-3.5 text-rose-500 shrink-0" />
+                    <h3 className="text-[10px] font-bold text-stone-700 uppercase tracking-wider">Complaints</h3>
+                  </div>
+                  <div className="flex items-center gap-1.5">
+                    <button onClick={() => setNotesModal({ isOpen: true, type: 'complaints', title: 'Complaints History', data: complaintsList })} className="flex items-center gap-1 text-[9px] font-semibold text-stone-500 hover:text-stone-800 bg-stone-100 hover:bg-stone-200 border border-stone-200 px-1.5 py-0.5 rounded transition-colors cursor-pointer">
+                      <History className="w-2.5 h-2.5" /> History
+                    </button>
 
-            {bottomTab === "notes" ? (
-              <div className="grid grid-cols-3 gap-3 flex-1">
-                {/* ── Complaints ── */}
-                <div className="flex flex-col bg-stone-50 border border-stone-200 rounded-xl p-2.5">
-                  <div className="flex items-center justify-between gap-1.5 mb-2">
-                    <div className="flex items-center gap-1.5">
-                      <AlertCircle className="w-3.5 h-3.5 text-rose-500 shrink-0" />
-                      <h3 className="text-[10px] font-bold text-stone-700 uppercase tracking-wider">
-                        Complaints
-                      </h3>
-                    </div>
-                    <div className="flex items-center gap-1.5">
-                      <button
-                        onClick={() =>
-                          setNotesModal({
-                            isOpen: true,
-                            type: "complaints",
-                            title: "Complaints History",
-                            data: complaintsList,
-                          })
-                        }
-                        className="flex items-center gap-1 text-[9px] font-semibold text-stone-500 hover:text-stone-800 bg-stone-100 hover:bg-stone-200 border border-stone-200 px-1.5 py-0.5 rounded transition-colors cursor-pointer"
-                      >
-                        <History className="w-2.5 h-2.5" /> History
-                      </button>
 
-                      {canManageNotes && (
+                      {canManageNotes && !isSelf && (
                         <button
                           type="button"
                           onClick={() => {
@@ -1848,7 +1808,6 @@ const EmployeeDashboard = () => {
                       <>
                         {[...openComplaints]
                           .reverse()
-                          .slice(0, 4)
                           .map((item, idx) => (
                             <div
                               key={item.id ?? idx}
@@ -1865,7 +1824,7 @@ const EmployeeDashboard = () => {
                                     "Complaint recorded"}
                               </p>
 
-                              {canManageNotes && item.id && (
+                              {canManageNotes && !isSelf && item.id && (
                                 <div className="flex items-center gap-0.5 shrink-0 opacity-0 group-hover:opacity-100 transition-all">
                                   <button
                                     type="button"
@@ -1882,7 +1841,7 @@ const EmployeeDashboard = () => {
                                       }
                                     }}
                                     disabled={resolveNoteMutation.isPending}
-                                    className="p-0.5 rounded text-stone-400 hover:text-emerald-600 hover:bg-emerald-50"
+                                    className="p-0.5 rounded text-stone-400 hover:text-indigo-600 hover:bg-indigo-50"
                                   >
                                     <Check className="w-3 h-3" />
                                   </button>
@@ -1909,11 +1868,6 @@ const EmployeeDashboard = () => {
                             </div>
                           ))}
 
-                        {openComplaints.length > 4 && (
-                          <button className="text-[9.5px] font-semibold text-teal-600 hover:underline w-full text-left mt-0.5">
-                            See {openComplaints.length - 4} more…
-                          </button>
-                        )}
                       </>
                     ) : (
                       <p className="text-[10px] text-stone-400 italic">
@@ -1923,31 +1877,20 @@ const EmployeeDashboard = () => {
                   </div>
                 </div>
 
-                {/* ── Warnings ── */}
-                <div className="flex flex-col bg-stone-50 border border-stone-200 rounded-xl p-2.5">
-                  <div className="flex items-center justify-between gap-1.5 mb-2">
-                    <div className="flex items-center gap-1.5">
-                      <AlertTriangle className="w-3.5 h-3.5 text-amber-500 shrink-0" />
-                      <h3 className="text-[10px] font-bold text-stone-700 uppercase tracking-wider">
-                        Warnings
-                      </h3>
-                    </div>
-                    <div className="flex items-center gap-1.5">
-                      <button
-                        onClick={() =>
-                          setNotesModal({
-                            isOpen: true,
-                            type: "warnings",
-                            title: "Warnings History",
-                            data: warningsList,
-                          })
-                        }
-                        className="flex items-center gap-1 text-[9px] font-semibold text-stone-500 hover:text-stone-800 bg-stone-100 hover:bg-stone-200 border border-stone-200 px-1.5 py-0.5 rounded transition-colors cursor-pointer"
-                      >
-                        <History className="w-2.5 h-2.5" /> History
-                      </button>
+              {/* Warnings */}
+              <div className="flex flex-col bg-white border border-stone-200 rounded-xl p-2.5">
+                <div className="flex items-center justify-between gap-1.5 mb-2">
+                  <div className="flex items-center gap-1.5">
+                    <AlertTriangle className="w-3.5 h-3.5 text-amber-500 shrink-0" />
+                    <h3 className="text-[10px] font-bold text-stone-700 uppercase tracking-wider">Warnings</h3>
+                  </div>
+                  <div className="flex items-center gap-1.5">
+                    <button onClick={() => setNotesModal({ isOpen: true, type: 'warnings', title: 'Warnings History', data: warningsList })} className="flex items-center gap-1 text-[9px] font-semibold text-stone-500 hover:text-stone-800 bg-stone-100 hover:bg-stone-200 border border-stone-200 px-1.5 py-0.5 rounded transition-colors cursor-pointer">
+                      <History className="w-2.5 h-2.5" /> History
+                    </button>
 
-                      {canManageNotes && (
+
+                      {canManageNotes && !isSelf && (
                         <button
                           type="button"
                           onClick={() => {
@@ -1975,7 +1918,6 @@ const EmployeeDashboard = () => {
                       <>
                         {[...openWarnings]
                           .reverse()
-                          .slice(0, 4)
                           .map((item, idx) => (
                             <div
                               key={item.id ?? idx}
@@ -1992,7 +1934,7 @@ const EmployeeDashboard = () => {
                                     "Warning issued"}
                               </p>
 
-                              {canManageNotes && item.id && (
+                              {canManageNotes && !isSelf && item.id && (
                                 <div className="flex items-center gap-0.5 shrink-0 opacity-0 group-hover:opacity-100 transition-all">
                                   <button
                                     type="button"
@@ -2009,7 +1951,7 @@ const EmployeeDashboard = () => {
                                       }
                                     }}
                                     disabled={resolveNoteMutation.isPending}
-                                    className="p-0.5 rounded text-stone-400 hover:text-emerald-600 hover:bg-emerald-50"
+                                    className="p-0.5 rounded text-stone-400 hover:text-indigo-600 hover:bg-indigo-50"
                                   >
                                     <Check className="w-3 h-3" />
                                   </button>
@@ -2034,11 +1976,6 @@ const EmployeeDashboard = () => {
                             </div>
                           ))}
 
-                        {openWarnings.length > 4 && (
-                          <button className="text-[9.5px] font-semibold text-teal-600 hover:underline w-full text-left mt-0.5">
-                            See {openWarnings.length - 4} more…
-                          </button>
-                        )}
                       </>
                     ) : (
                       <p className="text-[10px] text-stone-400 italic">
@@ -2048,31 +1985,20 @@ const EmployeeDashboard = () => {
                   </div>
                 </div>
 
-                {/* ── Recognition ── */}
-                <div className="flex flex-col bg-stone-50 border border-stone-200 rounded-xl p-2.5">
-                  <div className="flex items-center justify-between gap-1.5 mb-2">
-                    <div className="flex items-center gap-1.5">
-                      <Award className="w-3.5 h-3.5 text-emerald-600 shrink-0" />
-                      <h3 className="text-[10px] font-bold text-stone-700 uppercase tracking-wider">
-                        Recognition
-                      </h3>
-                    </div>
-                    <div className="flex items-center gap-1.5">
-                      <button
-                        onClick={() =>
-                          setNotesModal({
-                            isOpen: true,
-                            type: "recognitions",
-                            title: "Recognition History",
-                            data: recognitionsList,
-                          })
-                        }
-                        className="flex items-center gap-1 text-[9px] font-semibold text-stone-500 hover:text-stone-800 bg-stone-100 hover:bg-stone-200 border border-stone-200 px-1.5 py-0.5 rounded transition-colors cursor-pointer"
-                      >
-                        <History className="w-2.5 h-2.5" /> History
-                      </button>
+              {/* Recognition */}
+              <div className="flex flex-col bg-white border border-stone-200 rounded-xl p-2.5">
+                <div className="flex items-center justify-between gap-1.5 mb-2">
+                  <div className="flex items-center gap-1.5">
+                    <Award className="w-3.5 h-3.5 text-indigo-600 shrink-0" />
+                    <h3 className="text-[10px] font-bold text-stone-700 uppercase tracking-wider">Recognition</h3>
+                  </div>
+                  <div className="flex items-center gap-1.5">
+                    <button onClick={() => setNotesModal({ isOpen: true, type: 'recognitions', title: 'Recognition History', data: recognitionsList })} className="flex items-center gap-1 text-[9px] font-semibold text-stone-500 hover:text-stone-800 bg-stone-100 hover:bg-stone-200 border border-stone-200 px-1.5 py-0.5 rounded transition-colors cursor-pointer">
+                      <History className="w-2.5 h-2.5" /> History
+                    </button>
 
-                      {canManageNotes && (
+
+                      {canManageNotes && !isSelf && (
                         <button
                           type="button"
                           onClick={() => {
@@ -2100,11 +2026,10 @@ const EmployeeDashboard = () => {
                       <>
                         {[...openRecognitions]
                           .reverse()
-                          .slice(0, 4)
                           .map((item, idx) => (
                             <div
                               key={item.id ?? idx}
-                              className="group relative flex items-start gap-1.5 bg-emerald-50/50 border border-emerald-100/70 p-1.5 rounded-lg"
+                              className="group relative flex items-start gap-1.5 bg-indigo-50/50 border border-indigo-100/70 p-1.5 rounded-lg"
                             >
                               <p className="text-[10px] text-stone-600 leading-snug flex-1 min-w-0">
                                 {item.title
@@ -2117,7 +2042,7 @@ const EmployeeDashboard = () => {
                                     "Recognition received"}
                               </p>
 
-                              {canManageNotes && item.id && (
+                              {canManageNotes && !isSelf && item.id && (
                                 <div className="flex items-center gap-0.5 shrink-0 opacity-0 group-hover:opacity-100 transition-all">
                                   <button
                                     type="button"
@@ -2134,7 +2059,7 @@ const EmployeeDashboard = () => {
                                       }
                                     }}
                                     disabled={resolveNoteMutation.isPending}
-                                    className="p-0.5 rounded text-stone-400 hover:text-emerald-600 hover:bg-emerald-50"
+                                    className="p-0.5 rounded text-stone-400 hover:text-indigo-600 hover:bg-indigo-50"
                                   >
                                     <Check className="w-3 h-3" />
                                   </button>
@@ -2161,11 +2086,6 @@ const EmployeeDashboard = () => {
                             </div>
                           ))}
 
-                        {openRecognitions.length > 4 && (
-                          <button className="text-[9.5px] font-semibold text-teal-600 hover:underline w-full text-left mt-0.5">
-                            See {openRecognitions.length - 4} more…
-                          </button>
-                        )}
                       </>
                     ) : (
                       <p className="text-[10px] text-stone-400 italic">
@@ -2179,23 +2099,13 @@ const EmployeeDashboard = () => {
               <div className="flex flex-col gap-2 flex-1 overflow-y-auto db-scroll">
                 {perfReviews.length > 0 ? (
                   [...perfReviews].reverse().map((review, idx) => {
-                    const rts =
-                      review.parameter_values
-                        ?.map((p) => p.pm_rating)
-                        .filter((r) => r != null) || [];
-                    const rAvg = rts.length
-                      ? (rts.reduce((s, v) => s + v, 0) / rts.length).toFixed(1)
-                      : null;
+                    const rts = review.parameter_values?.map((p) => p.pm_rating).filter((r) => r != null) || [];
+                    const rAvg = rts.length ? (rts.reduce((s, v) => s + v, 0) / rts.length).toFixed(1) : null;
                     return (
-                      <div
-                        key={idx}
-                        className="flex items-start gap-3 bg-stone-50 border border-stone-100 rounded-xl p-3"
-                      >
+                      <div key={idx} className="flex items-start gap-3 bg-white border border-stone-100 rounded-xl p-3">
                         <div className="flex-1 min-w-0">
                           <div className="flex items-center gap-2 mb-1">
-                            <span className="text-[11px] font-bold text-stone-800">
-                              {review.period || "Review"}
-                            </span>
+                            <span className="text-[11px] font-bold text-stone-800">{review.period || "Review"}</span>
                             {rAvg && (
                               <span className="flex items-center gap-0.5 text-[9px] font-bold text-amber-700 bg-amber-50 border border-amber-100 px-1.5 py-0.5 rounded-md">
                                 <Star className="w-2.5 h-2.5 fill-amber-400 text-amber-400" />{" "}
@@ -2223,10 +2133,11 @@ const EmployeeDashboard = () => {
         {/* ───────── AWARDS (col-4) ───────── */}
         <div className="lg:col-span-4 bg-white border border-stone-200 rounded-2xl p-4 flex flex-col gap-3 shadow-[0_1px_4px_rgba(28,25,23,0.06)]">
           <div className="flex items-center gap-2 border-b border-stone-100 pb-3">
-            <Award className="w-4 h-4 text-emerald-600" />
+            <Award className="w-4 h-4 text-indigo-600" />
             <h3 className="font-display text-sm font-bold text-stone-800">
               Awards
             </h3>
+
           </div>
 
           <div className="flex flex-col gap-2 flex-1 overflow-y-auto db-scroll">
@@ -2250,7 +2161,7 @@ const EmployeeDashboard = () => {
                 title: "Perfect Attendance",
                 date: "June 2026",
                 earned: false,
-                color: "text-emerald-500",
+                color: "text-indigo-500",
               },
             ].map(({ icon: Icon, title, date, earned, color }) => (
               <div
@@ -2306,7 +2217,7 @@ const EmployeeDashboard = () => {
                       ? "bg-rose-50 text-rose-600"
                       : addNoteModal.type === "warning"
                       ? "bg-amber-50 text-amber-600"
-                      : "bg-emerald-50 text-emerald-600"
+                      : "bg-indigo-50 text-indigo-600"
                   }`}
                 >
                   {addNoteModal.type === "complaint" ? (
@@ -2351,7 +2262,7 @@ const EmployeeDashboard = () => {
                     setNoteForm((f) => ({ ...f, title: e.target.value }))
                   }
                   placeholder="Short title…"
-                  className="mt-1 w-full rounded-xl border border-stone-200 bg-white px-3 py-2 text-xs outline-none focus:border-teal-500 focus:ring-1 focus:ring-teal-500"
+                  className="mt-1 w-full rounded-xl border border-stone-200 bg-white px-3 py-2 text-xs outline-none focus:border-indigo-500 focus:ring-1 focus:ring-indigo-500"
                 />
               </div>
 
@@ -2366,7 +2277,7 @@ const EmployeeDashboard = () => {
                   }
                   rows={4}
                   placeholder="Describe the issue or recognition…"
-                  className="mt-1 w-full rounded-xl border border-stone-200 bg-white px-3 py-2 text-xs outline-none focus:border-teal-500 focus:ring-1 focus:ring-teal-500 resize-none"
+                  className="mt-1 w-full rounded-xl border border-stone-200 bg-white px-3 py-2 text-xs outline-none focus:border-indigo-500 focus:ring-1 focus:ring-indigo-500 resize-none"
                 />
               </div>
 
@@ -2390,7 +2301,7 @@ const EmployeeDashboard = () => {
                               ? "bg-rose-50 border-rose-300 text-rose-700"
                               : s === "medium"
                               ? "bg-amber-50 border-amber-300 text-amber-700"
-                              : "bg-emerald-50 border-emerald-300 text-emerald-700"
+                              : "bg-indigo-50 border-emerald-300 text-emerald-700"
                             : "bg-white border-stone-200 text-stone-500 hover:bg-stone-50"
                         }`}
                       >
@@ -2434,7 +2345,7 @@ const EmployeeDashboard = () => {
                   });
                 }}
                 disabled={createNoteMutation.isPending}
-                className="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-lg bg-teal-600 text-white text-xs font-semibold hover:bg-teal-700 disabled:opacity-60"
+                className="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-lg bg-teal-600 text-white text-xs font-semibold hover:bg-indigo-600 disabled:opacity-60"
               >
                 {createNoteMutation.isPending ? (
                   <Loader2 className="w-3.5 h-3.5 animate-spin" />
@@ -2465,7 +2376,7 @@ const EmployeeDashboard = () => {
                       ? "bg-rose-50 text-rose-600"
                       : notesModal.type === "warnings"
                       ? "bg-amber-50 text-amber-600"
-                      : "bg-emerald-50 text-emerald-600"
+                      : "bg-indigo-50 text-indigo-600"
                   }`}
                 >
                   {notesModal.type === "complaints" ? (
@@ -2507,7 +2418,7 @@ const EmployeeDashboard = () => {
                         ? "bg-rose-50/30 border-rose-100"
                         : notesModal.type === "warnings"
                         ? "bg-amber-50/30 border-amber-100"
-                        : "bg-emerald-50/30 border-emerald-100"
+                        : "bg-indigo-50/30 border-indigo-100"
                     }`}
                   >
                     <div className="flex items-start justify-between gap-2 mb-1">
@@ -2515,7 +2426,7 @@ const EmployeeDashboard = () => {
                         {item.title || "Untitled"}
                       </p>
                       {item.status === "resolved" && (
-                        <span className="shrink-0 text-[9px] font-bold uppercase tracking-wider text-emerald-700 bg-emerald-50 border border-emerald-100 px-1.5 py-0.5 rounded">
+                        <span className="shrink-0 text-[9px] font-bold uppercase tracking-wider text-emerald-700 bg-indigo-50 border border-indigo-100 px-1.5 py-0.5 rounded">
                           Resolved
                         </span>
                       )}
@@ -2567,9 +2478,9 @@ const EmployeeDashboard = () => {
       {showLogsModal && (
         <div className="fixed inset-0 z-50 flex items-end sm:items-center justify-center p-0 sm:p-4 bg-stone-900/40 backdrop-blur-sm">
           <div className="bg-white border border-stone-200 rounded-t-2xl sm:rounded-2xl w-full max-w-xl shadow-2xl overflow-hidden flex flex-col max-h-[90vh] sm:max-h-[85vh]">
-            <div className="px-4 py-3 border-b border-stone-100 flex items-center justify-between">
+            <div className="px-4 py-3 border-b border-stone-100 flex items-center justify-between bg-white/50">
               <div className="flex items-center gap-2.5">
-                <div className="w-8 h-8 rounded-xl bg-teal-50 text-teal-700 flex items-center justify-center">
+                <div className="w-8 h-8 rounded-xl bg-indigo-100/50 text-indigo-600 border border-indigo-200/50 flex items-center justify-center shadow-sm">
                   <History className="w-4 h-4" />
                 </div>
                 <div>
@@ -2583,7 +2494,7 @@ const EmployeeDashboard = () => {
               </div>
               <button
                 onClick={() => setShowLogsModal(false)}
-                className="w-8 h-8 rounded-xl text-stone-400 hover:text-stone-600 hover:bg-stone-100 flex items-center justify-center transition-colors cursor-pointer"
+                className="w-8 h-8 rounded-xl text-stone-400 hover:text-stone-600 hover:bg-stone-200/50 flex items-center justify-center transition-colors cursor-pointer"
               >
                 <X className="w-4 h-4" />
               </button>
@@ -2591,9 +2502,13 @@ const EmployeeDashboard = () => {
 
             <div className="p-4 overflow-y-auto db-scroll space-y-2 flex-1">
               {allEmployeeProjects.length === 0 ? (
-                <p className="text-xs text-stone-400 italic text-center py-8">
-                  No project logs available.
-                </p>
+                <div className="flex flex-col items-center justify-center py-10 text-center">
+                  <div className="w-12 h-12 rounded-full bg-stone-100 flex items-center justify-center mb-3">
+                    <History className="w-5 h-5 text-stone-400" />
+                  </div>
+                  <p className="text-xs font-semibold text-stone-600">No project logs available.</p>
+                  <p className="text-[10px] text-stone-400 mt-1">Assignments will appear here once allocated.</p>
+                </div>
               ) : (
                 allEmployeeProjects.map((item) => {
                   const isActive = item.status === "active";
@@ -2602,7 +2517,7 @@ const EmployeeDashboard = () => {
                       key={item.id}
                       className={`p-3 rounded-xl border ${
                         isActive
-                          ? "bg-teal-50/40 border-teal-100"
+                          ? "bg-indigo-50/40 border-indigo-100"
                           : "bg-stone-50 border-stone-100"
                       }`}
                     >
@@ -2611,7 +2526,7 @@ const EmployeeDashboard = () => {
                           <span
                             className={`px-2 py-0.5 text-[8.5px] font-bold uppercase rounded-md shrink-0 ${
                               isActive
-                                ? "bg-teal-700 text-white"
+                                ? "bg-indigo-600 text-white"
                                 : "bg-stone-200 text-stone-600"
                             }`}
                           >
@@ -2635,12 +2550,11 @@ const EmployeeDashboard = () => {
               )}
             </div>
 
-            <div className="px-4 py-3 border-t border-stone-100 flex items-center justify-between text-xs text-stone-400">
-              <span>{allEmployeeProjects.length} total entries</span>
-              <button
-                onClick={() => setShowLogsModal(false)}
-                className="px-3 py-1.5 bg-stone-800 hover:bg-stone-900 text-white font-medium rounded-xl text-xs transition-colors cursor-pointer"
-              >
+            <div className="px-4 py-3 border-t border-stone-100 bg-white flex items-center justify-between">
+              <span className="text-xs font-semibold text-stone-500">
+                {allEmployeeProjects.length} total assignment{allEmployeeProjects.length !== 1 ? 's' : ''}
+              </span>
+              <button onClick={() => setShowLogsModal(false)} className="px-4 py-1.5 bg-indigo-600 hover:bg-indigo-700 text-white font-semibold rounded-lg text-xs transition-colors shadow-sm cursor-pointer">
                 Close
               </button>
             </div>
@@ -2654,11 +2568,11 @@ const EmployeeDashboard = () => {
           <div className="bg-white border border-stone-200 rounded-2xl w-[580px] sm:w-[620px] h-[520px] shadow-2xl overflow-hidden flex flex-col">
             <div className="px-5 py-4 border-b border-stone-100 flex items-center justify-between bg-stone-50/50 flex-shrink-0">
               <div className="flex items-center gap-3">
-                <div className="w-9 h-9 rounded-xl bg-emerald-50 text-emerald-600 flex items-center justify-center font-semibold border border-emerald-100">
+                <div className="w-9 h-9 rounded-xl bg-indigo-50 text-indigo-600 flex items-center justify-center font-semibold border border-indigo-100">
                   {attendanceModalTab === "wfh" ? (
-                    <Home className="w-4 h-4 text-emerald-600" />
+                    <Home className="w-4 h-4 text-indigo-600" />
                   ) : attendanceModalTab === "paid" ? (
-                    <Calendar className="w-4 h-4 text-emerald-600" />
+                    <Calendar className="w-4 h-4 text-indigo-600" />
                   ) : (
                     <HeartPulse className="w-4 h-4 text-amber-600" />
                   )}
@@ -2757,7 +2671,7 @@ const EmployeeDashboard = () => {
                   onClick={() => setAttendanceModalTab(tab.key)}
                   className={`flex items-center gap-2 px-3 py-2 text-xs font-semibold rounded-t-xl border-b-2 transition-all cursor-pointer ${
                     attendanceModalTab === tab.key
-                      ? "border-emerald-600 text-emerald-700 bg-white shadow-xs"
+                      ? "border-indigo-600 text-indigo-700 bg-white shadow-xs"
                       : "border-transparent text-stone-500 hover:text-stone-700 hover:bg-stone-100/50"
                   }`}
                 >
@@ -2766,7 +2680,7 @@ const EmployeeDashboard = () => {
                   <span
                     className={`px-1.5 py-0.5 text-[10px] font-bold rounded-full ${
                       attendanceModalTab === tab.key
-                        ? "bg-emerald-100 text-emerald-700"
+                        ? "bg-indigo-100 text-indigo-700"
                         : "bg-stone-100 text-stone-600"
                     }`}
                   >
@@ -2806,7 +2720,7 @@ const EmployeeDashboard = () => {
                                 className={`text-[10px] font-bold uppercase px-2 py-0.5 rounded-full ${
                                   (wfh.status || "pending").toLowerCase() ===
                                   "approved"
-                                    ? "bg-emerald-100 text-emerald-700"
+                                    ? "bg-indigo-100 text-indigo-700"
                                     : (wfh.status || "pending").toLowerCase() ===
                                       "rejected"
                                     ? "bg-rose-100 text-rose-700"
@@ -2871,7 +2785,7 @@ const EmployeeDashboard = () => {
                                   className={`text-[10px] font-bold uppercase px-2 py-0.5 rounded-full ${
                                     (leave.status || "pending").toLowerCase() ===
                                     "approved"
-                                      ? "bg-emerald-100 text-emerald-700"
+                                      ? "bg-indigo-100 text-indigo-700"
                                       : (leave.status || "pending").toLowerCase() ===
                                         "rejected"
                                       ? "bg-rose-100 text-rose-700"
@@ -2943,7 +2857,7 @@ const EmployeeDashboard = () => {
                   value={editEmail}
                   onChange={(e) => setEditEmail(e.target.value)}
                   placeholder={`you@${COMPANY_DOMAIN}`}
-                  className="mt-1 w-full rounded-xl border border-stone-200 bg-white px-3 py-2 text-xs outline-none focus:border-teal-500 focus:ring-1 focus:ring-teal-500"
+                  className="mt-1 w-full rounded-xl border border-stone-200 bg-white px-3 py-2 text-xs outline-none focus:border-indigo-500 focus:ring-1 focus:ring-indigo-500"
                 />
                 <p className="mt-1 text-[10px] text-stone-400">
                   Must end with @{COMPANY_DOMAIN}
@@ -2963,7 +2877,7 @@ const EmployeeDashboard = () => {
                   value={editPhone}
                   onChange={(e) => setEditPhone(e.target.value)}
                   placeholder="+91 XXXXX XXXXX"
-                  className="mt-1 w-full rounded-xl border border-stone-200 bg-white px-3 py-2 text-xs outline-none focus:border-teal-500 focus:ring-1 focus:ring-teal-500"
+                  className="mt-1 w-full rounded-xl border border-stone-200 bg-white px-3 py-2 text-xs outline-none focus:border-indigo-500 focus:ring-1 focus:ring-indigo-500"
                 />
               </div>
               <div>
@@ -2975,7 +2889,7 @@ const EmployeeDashboard = () => {
                   value={editEncordId}
                   onChange={(e) => setEditEncordId(e.target.value)}
                   placeholder="john.encord@example.com"
-                  className="mt-1 w-full rounded-xl border border-stone-200 bg-white px-3 py-2 text-xs outline-none focus:border-teal-500 focus:ring-1 focus:ring-teal-500"
+                  className="mt-1 w-full rounded-xl border border-stone-200 bg-white px-3 py-2 text-xs outline-none focus:border-indigo-500 focus:ring-1 focus:ring-indigo-500"
                 />
               </div>
               <div>
@@ -2987,7 +2901,7 @@ const EmployeeDashboard = () => {
                   value={editSlackId}
                   onChange={(e) => setEditSlackId(e.target.value)}
                   placeholder="U0123ABC456"
-                  className="mt-1 w-full rounded-xl border border-stone-200 bg-white px-3 py-2 text-xs outline-none focus:border-teal-500 focus:ring-1 focus:ring-teal-500"
+                  className="mt-1 w-full rounded-xl border border-stone-200 bg-white px-3 py-2 text-xs outline-none focus:border-indigo-500 focus:ring-1 focus:ring-indigo-500"
                 />
               </div>
               <div>
@@ -3006,7 +2920,7 @@ const EmployeeDashboard = () => {
               )}
             </div>
 
-            <div className="px-4 py-3 border-t border-stone-100 bg-stone-50/60 flex items-center justify-end gap-2">
+            <div className="px-4 py-3 border-t border-stone-100 bg-white/60 flex items-center justify-end gap-2">
               <button
                 onClick={cancelEdit}
                 className="px-3 py-1.5 rounded-lg border border-stone-200 text-xs font-semibold text-stone-600 hover:bg-stone-100"
@@ -3018,7 +2932,7 @@ const EmployeeDashboard = () => {
                 disabled={
                   saveMutation.isPending || changeEmailMutation.isPending
                 }
-                className="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-lg bg-teal-600 text-white text-xs font-semibold hover:bg-teal-700 disabled:opacity-60"
+                className="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-lg bg-teal-600 text-white text-xs font-semibold hover:bg-indigo-600 disabled:opacity-60"
               >
                 {saveMutation.isPending || changeEmailMutation.isPending ? (
                   <Loader2 className="w-3.5 h-3.5 animate-spin" />
