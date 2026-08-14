@@ -10,7 +10,6 @@ import {
   FileText,
   Layers,
   UserCog,
-  UserRound,
   Users,
   Users2,
   TrendingUp,
@@ -201,9 +200,17 @@ const EmployeeSidebar = ({
       <div className="shrink-0 p-2.5 border-t border-slate-200 flex items-center justify-between gap-2">
         {/* Profile */}
         <div className="group relative">
-          <button
-            type="button"
-            className="h-9 w-9 flex items-center justify-center overflow-hidden rounded-lg border border-slate-200 bg-white "
+          <NavLink
+            to={`${prefix}/profile`}
+            onClick={handleNavigate}
+            title="Profile"
+            className={`h-9 w-9 flex items-center justify-center overflow-hidden rounded-lg border transition-all ${
+              isRowActive(`${prefix}/profile`)
+                ? isPm
+                  ? "border-blue-500 ring-2 ring-blue-500/20 bg-white shadow-sm"
+                  : "border-emerald-500 ring-2 ring-emerald-500/20 bg-white shadow-sm"
+                : "border-slate-200 bg-white hover:border-slate-300 hover:bg-slate-50"
+            }`}
           >
             <UserAvatar
               src={avatarUrl}
@@ -212,7 +219,7 @@ const EmployeeSidebar = ({
               className="h-full w-full rounded-lg"
               fallbackClassName="rounded-lg border-0 bg-transparent text-slate-500 font-bold text-sm"
             />
-          </button>
+          </NavLink>
           <div className="absolute bottom-full left-0 mb-2 bg-slate-900 text-white text-xs px-2.5 py-1.5 rounded-lg border border-slate-700 opacity-0 group-hover:opacity-100 transition-opacity duration-200 whitespace-nowrap pointer-events-none z-50 shadow-xl">
             {account?.email || user?.email || ""} · {roleLabel(role)}
           </div>
@@ -220,14 +227,6 @@ const EmployeeSidebar = ({
 
         {/* Actions */}
         <div className="flex items-center gap-1.5">
-          <NavLink
-            to={`${prefix}/profile`}
-            onClick={handleNavigate}
-            title="Profile"
-            className={`${iconBtn} ${isRowActive(`${prefix}/profile`) ? (isPm ? "text-blue-600 bg-white shadow-sm " : "text-emerald-600 bg-white shadow-sm ") : ""}`}
-          >
-            <UserRound className="w-4 h-4" />
-          </NavLink>
           <button
             onClick={onLogout}
             title="Sign Out"

@@ -149,9 +149,8 @@ const StatCard = ({
 
   const iconTile = Icon && (
     <span
-      className={`flex shrink-0 items-center justify-center bg-gradient-to-br ${iconTone} text-white shadow-sm ${
-        compact || inline ? "h-8 w-8 rounded-lg" : "h-9 w-9 rounded-xl"
-      }`}
+      className={`flex shrink-0 items-center justify-center bg-gradient-to-br ${iconTone} text-white shadow-sm ${compact || inline ? "h-8 w-8 rounded-lg" : "h-9 w-9 rounded-xl"
+        }`}
     >
       <Icon className={compact || inline ? "h-4 w-4" : "h-[18px] w-[18px]"} />
     </span>
@@ -159,9 +158,8 @@ const StatCard = ({
 
   const chevron = hasBreakdown && (
     <ChevronDown
-      className={`ml-auto h-3.5 w-3.5 shrink-0 text-slate-300 transition-[transform,color] duration-150 group-hover:text-slate-400 ${
-        open ? "rotate-180 text-slate-400" : ""
-      }`}
+      className={`ml-auto h-3.5 w-3.5 shrink-0 text-slate-300 transition-[transform,color] duration-150 group-hover:text-slate-400 ${open ? "rotate-180 text-slate-400" : ""
+        }`}
     />
   );
 
@@ -205,9 +203,8 @@ const StatCard = ({
       role={interactive ? "button" : undefined}
       tabIndex={interactive ? 0 : undefined}
       aria-expanded={hasBreakdown ? open : undefined}
-      className={`group relative rounded-xl border bg-white ${inline ? "px-3.5 py-3" : compact ? "px-3 py-2.5" : "p-3"} shadow-[0_1px_2px_rgba(0,0,0,0.03)] transition-colors focus:outline-none focus-visible:ring-2 focus-visible:ring-indigo-500/40 ${
-        pinned ? "border-slate-300" : "border-slate-200 hover:border-slate-300"
-      } ${interactive ? "cursor-pointer" : ""}`}
+      className={`group relative rounded-xl border bg-white ${inline ? "px-3.5 py-3" : compact ? "px-3 py-2.5" : "p-3"} shadow-[0_1px_2px_rgba(0,0,0,0.03)] transition-colors focus:outline-none focus-visible:ring-2 focus-visible:ring-indigo-500/40 ${pinned ? "border-slate-300" : "border-slate-200 hover:border-slate-300"
+        } ${interactive ? "cursor-pointer" : ""}`}
     >
       {inline ? (
         // Icon left, number over its caption on the right — the whole card is one
@@ -279,9 +276,8 @@ const StatCard = ({
         // Outer wrapper is a transparent bridge across the 8px gap so moving the
         // pointer from the card into the popover never crosses a dead zone.
         <div
-          className={`absolute left-1/2 z-50 ${above ? "bottom-full pb-2" : "top-full pt-2"} ${
-            open ? "" : "pointer-events-none"
-          }`}
+          className={`absolute left-1/2 z-50 ${above ? "bottom-full pb-2" : "top-full pt-2"} ${open ? "" : "pointer-events-none"
+            }`}
           style={{ transform: `translateX(calc(-50% + ${shiftX}px))` }}
         >
           <div
@@ -289,9 +285,8 @@ const StatCard = ({
             role="dialog"
             aria-label={`${title} breakdown`}
             onClick={(e) => e.stopPropagation()}
-            className={`w-[17rem] overflow-hidden rounded-xl border border-slate-200/80 bg-white shadow-[0_1px_2px_rgba(15,23,42,0.04),0_2px_6px_-2px_rgba(15,23,42,0.06),0_12px_28px_-8px_rgba(15,23,42,0.14)] ring-1 ring-slate-900/[0.03] transition-[opacity,transform] duration-150 ease-out ${
-              above ? "origin-bottom" : "origin-top"
-            } ${open ? "translate-y-0 scale-100 opacity-100" : `${above ? "translate-y-1" : "-translate-y-1"} scale-[0.97] opacity-0`}`}
+            className={`w-[17rem] overflow-hidden rounded-xl border border-slate-200/80 bg-white shadow-[0_1px_2px_rgba(15,23,42,0.04),0_2px_6px_-2px_rgba(15,23,42,0.06),0_12px_28px_-8px_rgba(15,23,42,0.14)] ring-1 ring-slate-900/[0.03] transition-[opacity,transform] duration-150 ease-out ${above ? "origin-bottom" : "origin-top"
+              } ${open ? "translate-y-0 scale-100 opacity-100" : `${above ? "translate-y-1" : "-translate-y-1"} scale-[0.97] opacity-0`}`}
           >
             <div className="flex items-baseline justify-between gap-2 px-3 pb-2 pt-2.5">
               <p className="truncate text-[13px] font-semibold text-slate-900">
@@ -314,11 +309,10 @@ const StatCard = ({
                     role="tab"
                     aria-selected={i === tabIndex}
                     onClick={() => setActiveTab(i)}
-                    className={`flex-1 rounded-md px-2 py-1 text-[11px] font-semibold transition-colors ${
-                      i === tabIndex
-                        ? "bg-white text-slate-900 shadow-sm ring-1 ring-slate-200/70"
-                        : "text-slate-500 hover:text-slate-800"
-                    }`}
+                    className={`flex-1 rounded-md px-2 py-1 text-[11px] font-semibold transition-colors ${i === tabIndex
+                      ? "bg-white text-slate-900 shadow-sm ring-1 ring-slate-200/70"
+                      : "text-slate-500 hover:text-slate-800"
+                      }`}
                   >
                     {tab.label}
                   </button>

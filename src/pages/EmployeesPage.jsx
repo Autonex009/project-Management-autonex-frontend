@@ -1,6 +1,6 @@
 import { useState, useRef, useEffect } from "react";
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
-import { useSearchParams } from "react-router-dom";
+import { useSearchParams, Link } from "react-router-dom";
 import {
   employeeApi,
   skillApi,
@@ -2299,12 +2299,13 @@ const EmployeesPage = () => {
                     size="md"
                   />
                   <div className="group relative min-w-0">
-                    <div
-                      className="text-[13.5px] font-semibold text-slate-900 truncate leading-tight"
+                    <Link
+                      to={`/admin/employees/${row.id}`}
+                      className="text-[13.5px] font-semibold text-slate-900 truncate leading-tight hover:text-indigo-600 hover:underline cursor-pointer"
                       title={value}
                     >
                       {shortName}
-                    </div>
+                    </Link>
                     <div
                       onClick={(e) => {
                         e.stopPropagation();

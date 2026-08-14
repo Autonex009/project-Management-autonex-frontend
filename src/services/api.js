@@ -132,10 +132,10 @@ export const analyticsApi = {
     api.get("/analytics/leaderboard", { params }).then((res) => res.data),
   // Employee self-service: the signed-in user's own Encord hours/day (last N days),
   // optionally scoped to their current sub-project (adds a per-day team average).
-  getMyEncordActivity: ({ days = 7, sub_project_id } = {}) =>
+  getMyEncordActivity: ({ days = 7, sub_project_id, employee_id } = {}) =>
     api
       .get("/analytics/me/encord-activity", {
-        params: { days, ...(sub_project_id ? { sub_project_id } : {}) },
+        params: { days, ...(sub_project_id ? { sub_project_id } : {}), ...(employee_id ? { employee_id } : {}) },
       })
       .then((res) => res.data),
   // Manual Encord pull (admin) — optional { date_from, date_to }
@@ -667,6 +667,25 @@ export const wifiNetworksApi = {
   update: (id, data) =>
     api.put(`/wifi-networks/${id}`, data).then((res) => res.data),
   delete: (id) => api.delete(`/wifi-networks/${id}`).then((res) => res.data),
+};
+
+// === Complaints, Warnings and Recognition ===
+export const employeeNotesApi = {
+  getByEmployee: (employeeId, params = {}) =>
+    api.get(`/employee-notes/by-employee/${employeeId}`, { params }).then((r) => r.data),
+
+  create: (payload) =>
+    api.post("/employee-notes", payload).then((r) => r.data),
+
+  resolve: (id, payload) =>
+    api.post(`/employee-notes/${id}/resolve`, payload).then((r) => r.data),
+  delete: (id) =>
+    api.delete(`/employee-notes/${id}`).then((r) => r.data),
+};
+
+export const badgesApi = {
+  getByEmployee: (employeeId, params = {}) =>
+    api.get(`/employee-badges/by-employee/${employeeId}`, { params }),
 };
 
 export default api;
