@@ -18,7 +18,7 @@ import Modal from "../../components/ui/Modal";
 import { onboardingApi } from "../../services/api";
 import toast from "react-hot-toast";
 import YouTube from "react-youtube";
-
+import { setPageDetailTitle } from "../../utils/pageDetailTitle";
 const ModuleView = () => {
   const { moduleId } = useParams();
   const navigate = useNavigate();
@@ -96,6 +96,13 @@ const ModuleView = () => {
       })
       .finally(() => setLoading(false));
   }, [userId, moduleId]);
+
+  useEffect(() => {
+    if (moduleData) {
+      setPageDetailTitle(moduleData.order ? `Module ${moduleData.order}` : "Module");
+    }
+    return () => setPageDetailTitle(null);
+  }, [moduleData]);
 
   if (loading) {
     return (
@@ -331,6 +338,7 @@ const ModuleView = () => {
               <ArrowLeft className="w-4 h-4" />
             </button>
             <span className="text-xs uppercase tracking-widest font-bold">
+              {moduleData.order ? `Module ${moduleData.order} - ` : ""}
               {moduleData.title}
             </span>
             <span className="h-px w-6 bg-slate-300"></span>
