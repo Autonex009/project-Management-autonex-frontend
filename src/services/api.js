@@ -43,7 +43,6 @@ api.interceptors.response.use(
   },
 );
 
-// === Projects API (Main Projects - formerly Parent Projects) ===
 export const projectApi = {
   getAll: () => api.get("/projects").then((res) => res.data),
   getOne: (id) => api.get(`/projects/${id}`).then((res) => res.data),

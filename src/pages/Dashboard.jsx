@@ -742,6 +742,7 @@ const Dashboard = () => {
               </Button>
             }
             loading={projectsLoading}
+            data={projectAnalyses}
             rowClassName={(row) =>
               row?.project?.encord_project_hash
                 ? "group cursor-pointer"
