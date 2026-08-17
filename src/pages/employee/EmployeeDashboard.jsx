@@ -1,6 +1,6 @@
 import React, { useMemo, useState, useRef, useEffect } from "react";
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
-import { useParams, Link } from "react-router-dom";
+import { useParams, Link, useNavigate, useLocation } from "react-router-dom";
 
 import {
   allocationApi,
@@ -19,6 +19,7 @@ import {
 import {
   AlertCircle,
   AlertTriangle,
+  ArrowLeft,
   Calendar,
   Check,
   ChevronLeft,
@@ -257,9 +258,36 @@ const SkillsMultiSelect = ({ selected, onChange, options, isLoading }) => {
   );
 };
 
+const formatPhoneNumber = (phone) => {
+  if (!phone) return "";
+  const str = String(phone).trim();
+  if (!str) return "";
+
+  if (str.startsWith("+91") || str.startsWith("+ 91")) {
+    return str;
+  }
+
+  const cleanDigits = str.replace(/\D/g, "");
+  if (cleanDigits.length === 12 && cleanDigits.startsWith("91")) {
+    return `+91 ${cleanDigits.slice(2)}`;
+  }
+
+  if (cleanDigits.length === 10) {
+    return `+91 ${cleanDigits}`;
+  }
+
+  if (str.startsWith("91")) {
+    return `+${str}`;
+  }
+
+  return `+91 ${str}`;
+};
+
 const EmployeeDashboard = () => {
   const queryClient = useQueryClient();
   const params = useParams();
+  const navigate = useNavigate();
+  const location = useLocation();
   const [showFullFeedback, setShowFullFeedback] = useState(false);
   const [imgError, setImgError] = useState(false);
   const [showLogsModal, setShowLogsModal] = useState(false);
@@ -288,6 +316,17 @@ const EmployeeDashboard = () => {
   const isAdmin = localUser.role === "admin";
   const employeeId = params.id || localUser.employee_id || localUser.id || 1;
   const isSelf = !params.id || String(params.id) === String(localUser.employee_id || localUser.id);
+  const isPortalView = location.pathname.startsWith("/admin") || location.pathname.startsWith("/pm");
+  const showBackButton = isPortalView && (!!params.id || !isSelf);
+
+  // Scroll to top on navigation / employee ID change
+  useEffect(() => {
+    window.scrollTo({ top: 0, left: 0, behavior: "instant" });
+    const mainEl = document.querySelector("main");
+    if (mainEl) {
+      mainEl.scrollTop = 0;
+    }
+  }, [employeeId, params.id]);
 
   /* ── Queries ─────────────────────────────────────── */
   const { data: account } = useQuery({
@@ -473,7 +512,8 @@ const EmployeeDashboard = () => {
     const initials = getNameInitials(name);
 
     const email = employee?.email || account?.email || localUser.email || "";
-    const phone = employee?.phone || account?.phone || "";
+    const rawPhone = employee?.phone || account?.phone || "";
+    const phone = formatPhoneNumber(rawPhone);
     const encordId = employee?.encord_id || "";
     const slackUserId = employee?.slack_user_id || "";
     const skills = employee?.skills || account?.skills || localUser.skills || [];
@@ -891,6 +931,18 @@ const EmployeeDashboard = () => {
           ? employeeBadges.items
           : [];
 
+    const getBadgeInfo = (codes) => {
+      const codeArr = Array.isArray(codes) ? codes : [codes];
+      const foundIdx = list.findIndex((b) => codeArr.includes(b.badge_code));
+      if (foundIdx === -1) return { earned: false, awardedAt: null, listIndex: 999 };
+      const item = list[foundIdx];
+      return {
+        earned: true,
+        awardedAt: item.awarded_at || item.created_at || item.issued_at || null,
+        listIndex: foundIdx,
+      };
+    };
+
     const has = (code) => list.some((b) => b.badge_code === code);
 
     // Best weekly rank
@@ -915,77 +967,112 @@ const EmployeeDashboard = () => {
     // Yearly: one badge + count
     const yearlyCount = list.filter((b) => b.badge_code === "yearly_milestone").length;
 
-    return DISPLAY_SLOTS.map((slot) => {
+    const rawBadges = DISPLAY_SLOTS.map((slot) => {
       const base = BADGE_CONFIG[slot];
 
       if (slot === "hrs_50_week") {
+        const info = getBadgeInfo("hrs_50_week");
         return {
           id: slot,
           label: base.label,
           meta: base.meta,
           image: base.image,
-          earned: has("hrs_50_week"),
+          earned: info.earned,
+          awardedAt: info.awardedAt,
+          listIndex: info.listIndex,
           badgeText: null,
         };
       }
 
       if (slot === "hrs_200_month") {
+        const info = getBadgeInfo("hrs_200_month");
         return {
           id: slot,
           label: base.label,
           meta: base.meta,
           image: base.image,
-          earned: has("hrs_200_month"),
+          earned: info.earned,
+          awardedAt: info.awardedAt,
+          listIndex: info.listIndex,
           badgeText: null,
         };
       }
 
       if (slot === "weekly_top") {
+        const info = getBadgeInfo(["weekly_top_1", "weekly_top_2", "weekly_top_3"]);
         return {
           id: slot,
           label: base.label,
           meta: weeklyRank ? `#${weeklyRank}` : base.meta,
           image: base.image,
           earned: weeklyRank != null,
+          awardedAt: info.awardedAt,
+          listIndex: info.listIndex,
           badgeText: weeklyRank ? `#${weeklyRank}` : null,
         };
       }
 
       if (slot === "monthly_top") {
+        const info = getBadgeInfo(["monthly_top_1", "monthly_top_2", "monthly_top_3"]);
         return {
           id: slot,
           label: base.label,
           meta: monthlyRankBadge ? `#${monthlyRankBadge}` : base.meta,
           image: base.image,
           earned: monthlyRankBadge != null,
+          awardedAt: info.awardedAt,
+          listIndex: info.listIndex,
           badgeText: monthlyRankBadge ? `#${monthlyRankBadge}` : null,
         };
       }
 
       if (slot === "tenure") {
+        const info = getBadgeInfo(["tenure_6_months", "tenure_3_months"]);
         return {
           id: slot,
           label: tenureLabel,
           meta: tenureEarned ? "Completed" : base.meta,
           image: tenureImage,
           earned: tenureEarned,
+          awardedAt: info.awardedAt,
+          listIndex: info.listIndex,
           badgeText: null,
         };
       }
 
       if (slot === "yearly_milestone") {
+        const info = getBadgeInfo("yearly_milestone");
         return {
           id: slot,
           label: base.label,
           meta: yearlyCount > 0 ? `${yearlyCount} yr${yearlyCount > 1 ? "s" : ""}` : base.meta,
           image: base.image,
           earned: yearlyCount > 0,
+          awardedAt: info.awardedAt,
+          listIndex: info.listIndex,
           badgeText: yearlyCount > 1 ? `×${yearlyCount}` : yearlyCount === 1 ? "1" : null,
         };
       }
 
       return null;
     }).filter(Boolean);
+
+    // Sort: active/earned badges move to the front of the line (leftmost)
+    // Within active badges, order by newest awarded timestamp / list index first
+    return rawBadges.sort((a, b) => {
+      if (a.earned !== b.earned) {
+        return a.earned ? -1 : 1;
+      }
+      if (a.earned && b.earned) {
+        if (a.awardedAt && b.awardedAt) {
+          const tA = new Date(a.awardedAt).getTime();
+          const tB = new Date(b.awardedAt).getTime();
+          if (tA !== tB) return tB - tA;
+        }
+        return a.listIndex - b.listIndex;
+      }
+      return 0;
+    });
   }, [employeeBadges]);
 
   const earnedBadgeCount = achievementBadges.filter((b) => b.earned).length;
@@ -1048,6 +1135,26 @@ const EmployeeDashboard = () => {
                   drop-shadow(0 0 1.5px rgba(13, 148, 136, 0.25));
         }
       `}</style>
+      {showBackButton && (
+        <div className="flex items-center justify-between">
+          <button
+            type="button"
+            onClick={() => {
+              if (location.pathname.startsWith("/admin")) {
+                navigate("/admin/employees");
+              } else if (location.pathname.startsWith("/pm")) {
+                navigate("/pm/my-team");
+              } else {
+                navigate(-1);
+              }
+            }}
+            className="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-xs font-semibold text-stone-700 bg-white border border-stone-200 hover:bg-stone-50 hover:text-stone-900 shadow-sm transition-all cursor-pointer"
+          >
+            <ArrowLeft className="w-3.5 h-3.5 text-stone-500" />
+            <span>Back to {location.pathname.startsWith("/admin") ? "Employees" : "My Team"}</span>
+          </button>
+        </div>
+      )}
 
       {/* ════════════════ TOP SECTION ════════════════ */}
       <div className="grid grid-cols-1 lg:grid-cols-12 gap-2 sm:gap-3 items-stretch">
@@ -1071,16 +1178,20 @@ const EmployeeDashboard = () => {
             </div>
 
 
-            {/* Date */}
-            <div className="flex items-center justify-start gap-1.5 text-[10px] text-stone-700 font-semibold w-full mb-1.5 px-0.5">
-              <Calendar className="w-3.5 h-3.5 text-stone-400 shrink-0" />
-              <span className="truncate">{display(profile.joiningDate)}</span>
+            {/* Role */}
+            <div className="flex items-center justify-start gap-1.5 text-[10px] text-stone-500 font-medium w-full mb-1.5 px-0.5">
+              <User className="w-3.5 h-3.5 text-stone-400 shrink-0" />
+              <span className="truncate">
+                Role: <span className="font-bold text-stone-800">{display(profile.jobTitle, "Annotator/Reviewer")}</span>
+              </span>
             </div>
-            
-            {/* Phone */}
+
+            {/* Date */}
             <div className="flex items-center justify-start gap-1.5 text-[10px] text-stone-500 font-medium w-full mb-2 px-0.5">
-              <Phone className="w-3.5 h-3.5 text-stone-400 shrink-0" />
-              <span className="truncate">{profile.phone || "No phone"}</span>
+              <Calendar className="w-3.5 h-3.5 text-stone-400 shrink-0" />
+              <span className="truncate">
+                DOJ: <span className="font-semibold text-stone-700">{display(profile.joiningDate)}</span>
+              </span>
             </div>
 
             <div className="w-full h-px bg-stone-100 mb-2" />
@@ -1129,11 +1240,21 @@ const EmployeeDashboard = () => {
                 </span>
               </div>
               <div className="flex items-center gap-2 truncate">
+                <Phone className="w-3.5 h-3.5 text-stone-400 shrink-0" />
+                <span
+                  className={
+                    profile.phone ? "text-stone-700" : "text-stone-400 italic"
+                  }
+                >
+                  {profile.phone || "No phone"}
+                </span>
+              </div>
+              <div className="flex items-center gap-2 truncate">
                 <span className="w-3.5 h-3.5 flex items-center justify-center text-[8px] font-bold border border-stone-400 rounded-sm text-stone-500 shrink-0">
                   E
                 </span>
                 <span className="text-stone-500">
-                  EncordId:{" "}
+                  Encord ID:{" "}
                   {profile.encordId ? (
                     <span className="text-stone-700">{profile.encordId}</span>
                   ) : (
@@ -1141,156 +1262,74 @@ const EmployeeDashboard = () => {
                   )}
                 </span>
               </div>
-              <div className="flex items-center gap-2 truncate">
-                <User className="w-3.5 h-3.5 text-stone-400 shrink-0" />
-                <span className="text-stone-500">
-                  Role:{" "}
-                  <span className="text-stone-700">
-                    {display(profile.jobTitle, "Annotator/Reviewer")}
-                  </span>
-                </span>
-              </div>
             </div>
 
             <div className="w-full h-px bg-stone-100 mb-2" />
 
-            <div className="flex flex-col gap-4 mt-1">
-              <div className="flex gap-4">
-                <button
-                  type="button"
-                  onClick={() => setProfileTab("attendance")}
-                  className={`flex items-center gap-1.5 pb-1 border-b-[2px] font-semibold text-[10px] transition-colors ${
-                    profileTab === "attendance"
-                      ? "border-indigo-500 text-indigo-600"
-                      : "border-transparent text-stone-400 hover:text-stone-600"
-                  }`}
-                >
-                  <Calendar className="w-3.5 h-3.5" /> Attendance
-                </button>
-                <button
-                  type="button"
-                  onClick={() => setProfileTab("notes")}
-                  className={`flex items-center gap-1.5 pb-1 border-b-[2px] font-semibold text-[10px] transition-colors ${
-                    profileTab === "notes"
-                      ? "border-indigo-500 text-indigo-600"
-                      : "border-transparent text-stone-400 hover:text-stone-600"
-                  }`}
-                >
-                  <FileText className="w-3.5 h-3.5" /> Notes
-                </button>
+            <div className="flex flex-col gap-2.5 mt-1">
+              <div className="flex items-center justify-end">
+                <div className="flex items-center gap-1.5 pb-0.5 border-b-[2px] border-indigo-500 font-semibold text-[10px] text-indigo-600">
+                  <Calendar className="w-3.5 h-3.5" /> Leaves
+                </div>
               </div>
 
-              {profileTab === "attendance" ? (
-                <div className="grid grid-cols-3 gap-2">
-                  {[
-                    {
-                      icon: <Home className="w-3.5 h-3.5 text-indigo-600" />,
-                      label: "WFH",
-                      remaining: leavesAndWfhStats.wfhRemaining,
-                      quota: leavesAndWfhStats.wfhQuota,
-                      tabKey: "wfh",
-                    },
-                    {
-                      icon: <Calendar className="w-3.5 h-3.5 text-indigo-600" />,
-                      label: "Paid",
-                      remaining: leavesAndWfhStats.paidRemaining,
-                      quota: leavesAndWfhStats.paidQuota,
-                      tabKey: "paid",
-                    },
-                    {
-                      icon: <HeartPulse className="w-3.5 h-3.5 text-amber-600" />,
-                      label: "Sick",
-                      remaining: leavesAndWfhStats.isInternOrContractor
-                        ? "—"
-                        : leavesAndWfhStats.casualRemaining,
-                      quota: leavesAndWfhStats.isInternOrContractor
-                        ? "—"
-                        : leavesAndWfhStats.casualQuota,
-                      tabKey: "casual_sick",
-                    },
-                  ].map(({ icon, label, remaining, quota, tabKey }) => (
+              <div className="grid grid-cols-3 gap-2">
+                {[
+                  {
+                    icon: <Home className="w-3.5 h-3.5 text-indigo-600" />,
+                    label: "WFH",
+                    remaining: leavesAndWfhStats.wfhRemaining,
+                    quota: leavesAndWfhStats.wfhQuota,
+                    tabKey: "wfh",
+                  },
+                  {
+                    icon: <Calendar className="w-3.5 h-3.5 text-indigo-600" />,
+                    label: "Paid",
+                    remaining: leavesAndWfhStats.paidRemaining,
+                    quota: leavesAndWfhStats.paidQuota,
+                    tabKey: "paid",
+                  },
+                  {
+                    icon: <HeartPulse className="w-3.5 h-3.5 text-amber-600" />,
+                    label: "Sick",
+                    remaining: leavesAndWfhStats.isInternOrContractor
+                      ? "—"
+                      : leavesAndWfhStats.casualRemaining,
+                    quota: leavesAndWfhStats.isInternOrContractor
+                      ? "—"
+                      : leavesAndWfhStats.casualQuota,
+                    tabKey: "casual_sick",
+                  },
+                ].map(({ icon, label, remaining, quota, tabKey }) => (
+                  <div
+                    key={label}
+                    onClick={() => handleOpenAttendanceModal(tabKey)}
+                    title={`Click to view ${label} records`}
+                    className="flex flex-col items-center gap-0.5 border border-stone-200 rounded-xl pt-2 pb-1 bg-white shadow-sm cursor-pointer hover:border-stone-300 transition-colors"
+                  >
                     <div
-                      key={label}
-                      onClick={() => handleOpenAttendanceModal(tabKey)}
-                      title={`Click to view ${label} records`}
-                      className="flex flex-col items-center gap-0.5 border border-stone-200 rounded-xl pt-2 pb-1 bg-white shadow-sm cursor-pointer hover:border-stone-300 transition-colors"
+                      className={`w-7 h-7 rounded-full flex items-center justify-center ${
+                        label === "Sick" ? "bg-orange-50" : "bg-indigo-50"
+                      }`}
                     >
-                      <div
-                        className={`w-7 h-7 rounded-full flex items-center justify-center ${
-                          label === "Sick" ? "bg-orange-50" : "bg-indigo-50"
-                        }`}
-                      >
-                        {icon}
-                      </div>
-                      <div className="text-center">
-                        <div className="font-data text-lg font-extrabold text-stone-800 leading-none flex items-baseline justify-center gap-0.5">
-                          <span>{remaining}</span>
-                          {quota !== "—" && (
-                            <span className="text-xs font-semibold text-stone-400">
-                              / {quota}
-                            </span>
-                          )}
-                        </div>
-                        <span className="text-[9px] font-medium text-stone-400 mt-0.5 block uppercase tracking-wider">
-                          {label}
-                        </span>
-                      </div>
+                      {icon}
                     </div>
-                  ))}
-                </div>
-              ) : (
-                <div className="grid grid-cols-3 gap-2">
-                  {[
-                    {
-                      icon: <AlertCircle className="w-3.5 h-3.5 text-rose-500" />,
-                      label: "Complaints",
-                      value: complaintsCount,
-                      color: "text-rose-600",
-                    },
-                    {
-                      icon: (
-                        <AlertTriangle className="w-3.5 h-3.5 text-amber-500" />
-                      ),
-                      label: "Warnings",
-                      value: warningsCount,
-                      color: "text-amber-600",
-                    },
-                    {
-                      icon: <Award className="w-3.5 h-3.5 text-indigo-600" />,
-                      label: "Recognition",
-                      value: recognitionsList.length,
-                      color: "text-indigo-600",
-                    },
-                  ].map(({ icon, label, value, color }) => (
-                    <div
-                      key={label}
-                      className="flex flex-col items-center gap-0.5 border border-stone-200 rounded-xl pt-2 pb-1 shadow-sm bg-white"
-                    >
-                      <div
-                        className={`w-7 h-7 rounded-full flex items-center justify-center ${
-                          label === "Recognition"
-                            ? "bg-indigo-50"
-                            : label === "Warnings"
-                            ? "bg-amber-50"
-                            : "bg-rose-50"
-                        }`}
-                      >
-                        {icon}
+                    <div className="text-center">
+                      <div className="font-data text-lg font-extrabold text-stone-800 leading-none flex items-baseline justify-center gap-0.5">
+                        <span>{remaining}</span>
+                        {quota !== "—" && (
+                          <span className="text-xs font-semibold text-stone-400">
+                            / {quota}
+                          </span>
+                        )}
                       </div>
-                      <div className="text-center">
-                        <span
-                          className={`font-data text-lg font-extrabold leading-none block ${color}`}
-                        >
-                          {value}
-                        </span>
-                        <span className="text-[9px] font-medium text-stone-400 mt-0.5 block uppercase tracking-wider">
-                          {label}
-                        </span>
-                      </div>
+                      <span className="text-[9px] font-medium text-stone-400 mt-0.5 block uppercase tracking-wider">
+                        {label}
+                      </span>
                     </div>
-                  ))}
-                </div>
-              )}
+                  </div>
+                ))}
+              </div>
             </div>
           </div>
         </div>
@@ -1773,6 +1812,9 @@ const EmployeeDashboard = () => {
                   <div className="flex items-center gap-1.5">
                     <AlertCircle className="w-3.5 h-3.5 text-rose-500 shrink-0" />
                     <h3 className="text-[10px] font-bold text-stone-700 uppercase tracking-wider">Complaints</h3>
+                    <span className="px-1.5 py-0.5 text-[10px] font-extrabold rounded-full bg-rose-50 text-rose-600 border border-rose-200/80 leading-none ml-0.5">
+                      {complaintsCount}
+                    </span>
                   </div>
                   <div className="flex items-center gap-1.5">
                     <button onClick={() => setNotesModal({ isOpen: true, type: 'complaints', title: 'Complaints History', data: complaintsList })} className="flex items-center gap-1 text-[9px] font-semibold text-stone-500 hover:text-stone-800 bg-stone-100 hover:bg-stone-200 border border-stone-200 px-1.5 py-0.5 rounded transition-colors cursor-pointer">
@@ -1883,6 +1925,9 @@ const EmployeeDashboard = () => {
                   <div className="flex items-center gap-1.5">
                     <AlertTriangle className="w-3.5 h-3.5 text-amber-500 shrink-0" />
                     <h3 className="text-[10px] font-bold text-stone-700 uppercase tracking-wider">Warnings</h3>
+                    <span className="px-1.5 py-0.5 text-[10px] font-extrabold rounded-full bg-amber-50 text-amber-600 border border-amber-200/80 leading-none ml-0.5">
+                      {warningsCount}
+                    </span>
                   </div>
                   <div className="flex items-center gap-1.5">
                     <button onClick={() => setNotesModal({ isOpen: true, type: 'warnings', title: 'Warnings History', data: warningsList })} className="flex items-center gap-1 text-[9px] font-semibold text-stone-500 hover:text-stone-800 bg-stone-100 hover:bg-stone-200 border border-stone-200 px-1.5 py-0.5 rounded transition-colors cursor-pointer">
@@ -1991,6 +2036,9 @@ const EmployeeDashboard = () => {
                   <div className="flex items-center gap-1.5">
                     <Award className="w-3.5 h-3.5 text-indigo-600 shrink-0" />
                     <h3 className="text-[10px] font-bold text-stone-700 uppercase tracking-wider">Recognition</h3>
+                    <span className="px-1.5 py-0.5 text-[10px] font-extrabold rounded-full bg-indigo-50 text-indigo-600 border border-indigo-200/80 leading-none ml-0.5">
+                      {recognitionsList.length}
+                    </span>
                   </div>
                   <div className="flex items-center gap-1.5">
                     <button onClick={() => setNotesModal({ isOpen: true, type: 'recognitions', title: 'Recognition History', data: recognitionsList })} className="flex items-center gap-1 text-[9px] font-semibold text-stone-500 hover:text-stone-800 bg-stone-100 hover:bg-stone-200 border border-stone-200 px-1.5 py-0.5 rounded transition-colors cursor-pointer">

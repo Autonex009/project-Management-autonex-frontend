@@ -1314,7 +1314,19 @@ const MyTeamPage = () => {
             label: "Contact No.",
             width: "w-[14%] min-w-[130px]",
             render: (_, row) => {
-              const phoneNum = row.phone || row.contact_number || row.mobile;
+              const rawPhone = row.phone || row.contact_number || row.mobile;
+              const formatPhoneNumber = (phone) => {
+                if (!phone) return "";
+                const str = String(phone).trim();
+                if (!str) return "";
+                if (str.startsWith("+91") || str.startsWith("+ 91")) return str;
+                const cleanDigits = str.replace(/\D/g, "");
+                if (cleanDigits.length === 12 && cleanDigits.startsWith("91")) return `+91 ${cleanDigits.slice(2)}`;
+                if (cleanDigits.length === 10) return `+91 ${cleanDigits}`;
+                if (str.startsWith("91")) return `+${str}`;
+                return `+91 ${str}`;
+              };
+              const phoneNum = formatPhoneNumber(rawPhone);
               if (!phoneNum) {
                 return <span className="text-[13px] text-slate-400">—</span>;
               }
