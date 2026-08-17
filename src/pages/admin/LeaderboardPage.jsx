@@ -1650,10 +1650,12 @@ const LeaderboardPage = () => {
                     ? `No records for ${activeWeek.label}`
                     : `No daily records for ${activeDay.isToday ? "today" : activeDay.label}`}
                 </h4>
-                <p className="text-xs text-slate-500">
+                <p className="text-xs text-slate-500 max-w-sm mx-auto">
                   {viewMode === "weekly"
                     ? "No team members logged platform hours during this week."
-                    : `No team members logged platform hours on ${activeDay.isToday ? "today" : activeDay.label}.`}
+                    : activeDay.isToday
+                    ? "Today's data is still being compiled and will reflect on the leaderboard tomorrow."
+                    : `No team members logged platform hours on ${activeDay.label}.`}
                 </p>
               </div>
             ) : (

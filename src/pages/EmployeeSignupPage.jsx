@@ -10,6 +10,7 @@ import {
   MailCheck,
   ShieldCheck,
   AlertTriangle,
+  Info,
 } from "lucide-react";
 import toast from "react-hot-toast";
 import { signupRequestApi } from "../services/api";
@@ -162,15 +163,23 @@ const EmployeeSignupPage = () => {
           accent="employee"
           eyebrow="Employee Onboarding"
           title="Join the Autonex team"
-          description="Start by confirming your work email. We'll send you a link to the signup form so your account is always tied to an address you can actually reach."
-          highlights={[
+          description="Start by confirming your email. We'll send you a link to the signup form so your account is always tied to an address you can actually reach."
+          flowSteps={[
             {
-              title: "Verified Email",
-              copy: "The signup form opens from your inbox — no typo'd addresses.",
+              title: "Sign up request",
+              copy: "Submit your email, and you will get a link for sign up.",
             },
             {
-              title: "Quick Review",
-              copy: "Admin reviews requests within one business day.",
+              title: "Admin approval",
+              copy: "After approval, you will get a link with a temporary password in your same email.",
+            },
+            {
+              title: "Change password",
+              copy: "Log in using your temporary password, then change it using the reset password button.",
+            },
+            {
+              title: "Sign in",
+              copy: "Log into your employee portal securely.",
             },
           ]}
         />
@@ -241,7 +250,7 @@ const EmployeeSignupPage = () => {
               <form onSubmit={handleSendLink} className="space-y-5">
                 <div>
                   <label className="block text-sm font-medium text-slate-700 mb-1.5">
-                    Work Email <span className="text-red-500">*</span>
+                    Email <span className="text-red-500">*</span>
                   </label>
                   <div className="relative">
                     <Mail className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-slate-400" />
@@ -255,10 +264,13 @@ const EmployeeSignupPage = () => {
                       className={INPUT_CLASS}
                     />
                   </div>
-                  <p className="mt-2 text-xs text-slate-400">
-                    We'll email you a link to the signup form. Your account will
-                    use this exact address, so double-check it.
-                  </p>
+                  <div className="mt-3 flex items-start gap-2.5 rounded-xl border border-blue-200 bg-blue-50/80 p-3 shadow-sm">
+                    <Info className="h-5 w-5 shrink-0 text-blue-600 mt-0.5" />
+                    <p className="text-sm font-semibold text-blue-900 leading-relaxed">
+                      We'll email you a link to the signup form. Your account will
+                      use this exact address, so double-check it.
+                    </p>
+                  </div>
                 </div>
 
                 <button
@@ -367,7 +379,7 @@ const EmployeeSignupPage = () => {
                 and the server ignores any email sent in the body anyway. */}
             <div>
               <label className="block text-sm font-medium text-slate-700 mb-1.5">
-                Work Email
+                Email
               </label>
               <div className="flex items-center gap-2 rounded-xl border border-emerald-200 bg-emerald-50/60 py-2.5 px-3">
                 <ShieldCheck className="h-4 w-4 shrink-0 text-emerald-600" />

@@ -326,13 +326,13 @@ const NewlyOnboardedPage = ({ embedded = false }) => {
                                 Per-Module Breakdown
                               </p>
                               <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-3">
-                                {c.moduleStats.map((ms) => (
+                                {c.moduleStats.map((ms, idx) => (
                                   <div
                                     key={ms.moduleId}
                                     className="bg-white rounded-xl border border-slate-200 p-4 shadow-sm"
                                   >
                                     <p className="text-sm font-bold text-slate-800 truncate mb-2">
-                                      {ms.moduleTitle}
+                                      Module {idx + 1}: {ms.moduleTitle}
                                     </p>
                                     <div className="flex items-center justify-between text-xs mb-1.5 font-medium">
                                       <span className="text-slate-500">

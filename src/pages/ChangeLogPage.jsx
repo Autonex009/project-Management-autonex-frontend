@@ -78,9 +78,9 @@ export default function ChangeLogPage() {
     ...(category !== "All" ? { category } : {}),
     ...(actorRole !== "All"
       ? {
-          actor_role:
-            actorRole === "Team Lead" ? "team_lead" : actorRole.toLowerCase(),
-        }
+        actor_role:
+          actorRole === "Team Lead" ? "team_lead" : actorRole.toLowerCase(),
+      }
       : {}),
     ...(dateFrom ? { date_from: dateFrom } : {}),
     ...(dateTo ? { date_to: dateTo } : {}),
@@ -270,13 +270,13 @@ export default function ChangeLogPage() {
   };
 
   return (
-    <div className="bg-white min-h-screen p-6 space-y-6">
+    <div className="space-y-3">
 
-      {/* Toolbar & Controls (Strictly Single Horizontal Line) */}
-      <div className="flex items-center justify-between gap-3 overflow-x-auto pb-1 select-none">
+      {/* Toolbar & Controls */}
+      <div className="flex flex-wrap items-center justify-between gap-3 overflow-visible pb-1 select-none">
 
         {/* LEFT: Role tabs */}
-        <div className="flex items-center gap-1 bg-slate-100/70 rounded-lg p-1 shrink-0">
+        <div className="inline-flex items-center rounded-lg border border-slate-200 bg-slate-50 p-0.5 w-fit shrink-0">
           {roleOptions.map(({ value, label }) => {
             const isActive = actorRole === value;
             return (
@@ -284,9 +284,9 @@ export default function ChangeLogPage() {
                 key={value}
                 type="button"
                 onClick={() => { setActorRole(value); setPage(1); }}
-                className={`px-2.5 sm:px-3 py-1 rounded-md text-xs sm:text-sm font-medium transition-all whitespace-nowrap ${isActive
-                    ? "bg-white text-indigo-700 shadow-sm ring-1 ring-slate-200/80 font-semibold"
-                    : "text-slate-500 hover:text-slate-800 hover:bg-white/60"
+                className={`inline-flex items-center gap-1.5 px-3.5 py-1.5 text-[13px] font-semibold rounded-md transition-all whitespace-nowrap ${isActive
+                  ? "bg-white text-slate-900 shadow-sm ring-1 ring-slate-200/70"
+                  : "text-slate-500 hover:text-slate-800"
                   }`}
               >
                 {label}
@@ -309,59 +309,74 @@ export default function ChangeLogPage() {
             <Search className="absolute right-2.5 top-2.5 h-4 w-4 text-slate-400 pointer-events-none" />
           </div>
 
-          {/* Filter by Time dropdown */}
-          <Dropdown
-            className="w-[195px] sm:w-[215px] shrink-0"
-            options={TIME_FILTER_OPTIONS}
-            value={timeFilter}
-            onChange={handleTimeFilterChange}
-          />
-
-          {/* Custom date range selector */}
-          {showCustomDateModal && (
-            <div className="w-56 sm:w-60 shrink-0">
-              <DatePicker
-                type="range"
-                startDate={dateFrom}
-                endDate={dateTo}
-                onRangeChange={({ startDate, endDate }) => {
-                  setDateFrom(startDate);
-                  setDateTo(endDate);
-                  setPage(1);
-                }}
-                placeholder="Select date range"
+          {/* Extreme Right: Search, Time, Category & Refresh */}
+          <div className="flex flex-wrap items-center gap-3 ml-auto">
+            {/* Filter by keyword search box */}
+            <div className="relative">
+              <input
+                type="text"
+                value={searchInput}
+                onChange={(e) => setSearchInput(e.target.value)}
+                placeholder="Filter by keyword"
+                className="w-56 rounded-md border border-slate-300 bg-white px-3 py-1.5 text-sm text-slate-800 placeholder:text-slate-400 focus:border-blue-500 focus:outline-none focus:ring-1 focus:ring-blue-500"
               />
+              <Search className="absolute right-2.5 top-2.5 h-4 w-4 text-slate-400 pointer-events-none" />
             </div>
-          )}
 
-          {/* Category filter */}
-          <Dropdown
-            className="w-36 sm:w-44 shrink-0"
-            options={categoryOptions}
-            value={category}
-            onChange={(v) => {
-              setCategory(v);
-              setPage(1);
-            }}
-          />
+            {/* Filter by Time dropdown */}
+            <Dropdown
+              className="w-[195px] sm:w-[215px] shrink-0"
+              options={TIME_FILTER_OPTIONS}
+              value={timeFilter}
+              onChange={handleTimeFilterChange}
+            />
 
-          {/* Refresh */}
-          <button
-            type="button"
-            onClick={() => refetch()}
-            title="Refresh audit log"
-            className="inline-flex items-center gap-1.5 text-sm font-medium text-slate-700 hover:text-blue-600 transition-colors shrink-0 whitespace-nowrap"
-          >
-            <RefreshCw className={`h-4 w-4 text-slate-500 ${isFetching ? "animate-spin" : ""}`} />
-            Refresh
-          </button>
+            {/* Custom date range selector inline to the right of Filter by Time */}
+            {showCustomDateModal && (
+              <div className="w-60 shrink-0">
+                <DatePicker
+                  type="range"
+                  startDate={dateFrom}
+                  endDate={dateTo}
+                  onRangeChange={({ startDate, endDate }) => {
+                    setDateFrom(startDate);
+                    setDateTo(endDate);
+                    setPage(1);
+                  }}
+                  placeholder="Select date range"
+                />
+              </div>
+            )}
+
+            {/* Category filter */}
+            <Dropdown
+              className="w-44 shrink-0"
+              options={categoryOptions}
+              value={category}
+              onChange={(v) => {
+                setCategory(v);
+                setPage(1);
+              }}
+            />
+
+            {/* Refresh button */}
+            <button
+              type="button"
+              onClick={() => refetch()}
+              title="Refresh audit log"
+              className="inline-flex items-center gap-1.5 text-sm font-medium text-slate-700 hover:text-blue-600 transition-colors ml-1 cursor-pointer"
+            >
+              <RefreshCw className={`h-4 w-4 text-slate-500 ${isFetching ? "animate-spin" : ""}`} />
+              Refresh
+            </button>
+          </div>
         </div>
       </div>
 
       {/* Main Audit Log Table */}
       <Table
         variant="untitled"
-        loading={isLoading}
+        loading={isFetching}
         skeletonRows={8}
         expandedRowId={expandedId}
         onRowClick={(row) => setExpandedId(expandedId === row.id ? null : row.id)}
@@ -416,6 +431,15 @@ export default function ChangeLogPage() {
                     </div>
                   </>
                 )}
+
+                {/* IP Address */}
+                <span className="text-slate-300">|</span>
+                <div className="flex items-center gap-1.5">
+                  <span className="font-semibold text-slate-600">IP:</span>
+                  <span className="font-mono text-[11.5px] font-semibold text-slate-800 bg-slate-100/90 px-1.5 py-0.5 rounded border border-slate-200/80">
+                    {row.ip || "127.0.0.1"}
+                  </span>
+                </div>
               </div>
 
               {/* Concise Field Changes Table (rendered only when field details exist) */}
@@ -463,8 +487,8 @@ export default function ChangeLogPage() {
         columns={[
           {
             key: "created_at",
-            label: "Time",
-            width: "w-[12%]",
+            label: "Timestamp",
+            width: "w-[16%]",
             render: (val) => {
               const f = formatTimestamp(val);
               return (
@@ -476,8 +500,8 @@ export default function ChangeLogPage() {
           },
           {
             key: "actor",
-            label: "User",
-            width: "w-[18%]",
+            label: "Performed By",
+            width: "w-[15%]",
             render: (actor) => {
               const name = formatDisplayName(actor?.name) || actor?.name || "Administrator";
               return (
@@ -499,8 +523,8 @@ export default function ChangeLogPage() {
           },
           {
             key: "category",
-            label: "Event type",
-            width: "w-[10%]",
+            label: "Module Category",
+            width: "w-[14%]",
             render: (val) => {
               const catName = val ? val.charAt(0).toUpperCase() + val.slice(1) : "General";
               const badgeStyle = getCategoryBadgeClass(val);
@@ -516,8 +540,8 @@ export default function ChangeLogPage() {
           },
           {
             key: "summary",
-            label: "Change",
-            width: "w-[36%]",
+            label: "Action Summary",
+            width: "w-[34%]",
             render: (summary, row) => {
               const cleaned = cleanSummaryText(summary || row.action, row.subject_name) || "Settings modified";
               return (
@@ -532,7 +556,7 @@ export default function ChangeLogPage() {
           },
           {
             key: "item_affected",
-            label: "Item affected",
+            label: "Target Record",
             width: "w-[13%]",
             render: (_, row) => {
               const subject = formatDisplayName(row.subject_name) || row.subject_name;
