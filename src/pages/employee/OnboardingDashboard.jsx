@@ -197,9 +197,13 @@ const OnboardingDashboard = () => {
           ) : (
             <ul className="divide-y divide-slate-100">
               {modules.map((m, idx) => {
-                const isCompleted = m.progress === 100;
-                const isStarted = m.progress > 0 && m.progress < 100;
-                const isLocked = m.locked;
+                const displayProgress = Math.min(100, Math.max(0, m.progress || 0));
+                const isCompleted = displayProgress === 100;
+                const isStarted = displayProgress > 0 && displayProgress < 100;
+                
+                // Override backend locking just in case it fails due to progress > 100%
+                const prevProgress = idx === 0 ? 100 : Math.min(100, Math.max(0, modules[idx - 1].progress || 0));
+                const isLocked = prevProgress < 100;
 
                 return (
                   <li
@@ -261,13 +265,13 @@ const OnboardingDashboard = () => {
                                 isLocked ? "text-slate-400" : "text-slate-700"
                               }
                             >
-                              {m.progress}%
+                              {displayProgress}%
                             </span>
                           </div>
                           <div className="h-1.5 w-full max-w-[120px] bg-slate-100 rounded-full overflow-hidden">
                             <div
                               className={`h-full rounded-full ${isLocked ? "bg-slate-300" : "bg-emerald-500"}`}
-                              style={{ width: `${m.progress}%` }}
+                              style={{ width: `${displayProgress}%` }}
                             ></div>
                           </div>
                         </div>

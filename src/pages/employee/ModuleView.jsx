@@ -18,7 +18,7 @@ import Modal from "../../components/ui/Modal";
 import { onboardingApi } from "../../services/api";
 import toast from "react-hot-toast";
 import YouTube from "react-youtube";
-
+import { setPageDetailTitle } from "../../utils/pageDetailTitle";
 const ModuleView = () => {
   const { moduleId } = useParams();
   const navigate = useNavigate();
@@ -97,6 +97,13 @@ const ModuleView = () => {
       .finally(() => setLoading(false));
   }, [userId, moduleId]);
 
+  useEffect(() => {
+    if (moduleData) {
+      setPageDetailTitle(moduleData.order ? `Module ${moduleData.order}` : "Module");
+    }
+    return () => setPageDetailTitle(null);
+  }, [moduleData]);
+
   if (loading) {
     return (
       <div className="flex items-center justify-center min-h-[400px] text-slate-500 font-medium">
@@ -147,6 +154,9 @@ const ModuleView = () => {
     toast.success("Video completed! You can now take the quiz.", {
       icon: "✅",
     });
+    if (currentSection?.questions && currentSection.questions.length > 0) {
+      setActiveTab("quiz");
+    }
   };
 
   const parseOptions = (options) => {
@@ -296,7 +306,7 @@ const ModuleView = () => {
   };
 
   const totalSections = moduleData.sections.length;
-  const totalCompleted = completedSections.size;
+  const totalCompleted = moduleData.sections.filter(s => completedSections.has(s.id)).length;
   const overallProgress =
     totalSections === 0
       ? 0
@@ -328,6 +338,7 @@ const ModuleView = () => {
               <ArrowLeft className="w-4 h-4" />
             </button>
             <span className="text-xs uppercase tracking-widest font-bold">
+              {moduleData.order ? `Module ${moduleData.order} - ` : ""}
               {moduleData.title}
             </span>
             <span className="h-px w-6 bg-slate-300"></span>
