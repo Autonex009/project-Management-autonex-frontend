@@ -1,15 +1,16 @@
 import { useMemo, useState, useRef, useEffect } from "react";
 import { useParams, useNavigate, useLocation } from "react-router-dom";
 import { useQuery } from "@tanstack/react-query";
-import { analyticsApi } from "../services/api";
+import { analyticsApi, allocationApi, employeeApi } from "../services/api";
 import { setPageDetailTitle } from "../utils/pageDetailTitle";
-import {
-  MetricCard,
-  Card,
-  CardHeader,
-  CardContent,
-} from "../components/ui/Card";
 import Spinner from "../components/ui/LoadingSpinner";
+import AnalyticsTabNav from "../components/analytics/AnalyticsTabNav";
+import DailyPlatformHoursChart from "../components/analytics/DailyPlatformHoursChart";
+import StageDistributionChart from "../components/analytics/StageDistributionChart";
+import PlannedVsActualChart from "../components/analytics/PlannedVsActualChart";
+import ProjectTeamRosterTable from "../components/analytics/ProjectTeamRosterTable";
+import GlassKpiCard from "../components/analytics/GlassKpiCard";
+import AnnotatorComparisonChart from "../components/analytics/AnnotatorComparisonChart";
 import {
   Clock,
   Users,
@@ -19,6 +20,11 @@ import {
   ChevronDown,
   CheckSquare,
   Square,
+  BarChart2,
+  Zap,
+  CheckCircle2,
+  XCircle,
+  Sparkles,
 } from "lucide-react";
 import { format, parseISO } from "date-fns";
 import {
@@ -29,46 +35,31 @@ import {
   YAxis,
   CartesianGrid,
   Tooltip,
-  Legend,
-  ReferenceLine,
 } from "recharts";
 
-// Build a "nice" Y axis: 4 even ticks that cover the data, and the middle tick
-// (mid) which we draw as a bold reference line. Scales per project — 6h when the
-// axis tops at 12, 10h at 20, etc.
-function niceAxis(values) {
-  const rawMax = Math.max(0, ...values);
-  if (rawMax <= 0) return { max: 4, ticks: [0, 1, 2, 3, 4], mid: 2 };
-  const target = rawMax / 4;
-  const exp = Math.pow(10, Math.floor(Math.log10(target)));
-  const f = target / exp;
-  const niceF = f <= 1 ? 1 : f <= 2 ? 2 : f <= 3 ? 3 : f <= 5 ? 5 : 10;
-  const step = niceF * exp;
-  return {
-    max: step * 4,
-    ticks: [0, step, step * 2, step * 3, step * 4],
-    mid: step * 2,
-  };
-}
-
-// Categorical palette (validated reference order — identity, fixed, never cycled)
 const SERIES = [
-  "#2a78d6",
-  "#1baf7a",
-  "#eda100",
-  "#008300",
-  "#4a3aa7",
-  "#e34948",
-  "#e87ba4",
-  "#eb6834",
+  "#2563eb",
+  "#059669",
+  "#d97706",
+  "#7c3aed",
+  "#dc2626",
+  "#db2777",
+  "#ea580c",
+  "#0284c7",
 ];
-const INK_MUTED = "#898781";
-const GRID = "#e1e0d9";
+const INK_MUTED = "#94a3b8";
+const GRID = "#f1f5f9";
 
 const RANGES = [
   { key: "week", label: "Last 7 days" },
   { key: "month", label: "This month" },
-  { key: "custom", label: "Custom" },
+  { key: "custom", label: "Custom Range" },
+];
+
+const PROJECT_TABS = [
+  { id: "execution", label: "Execution & Variance", icon: BarChart2 },
+  { id: "throughput", label: "Workflow & Throughput", icon: Zap },
+  { id: "roster", label: "Team Roster & Utilization", icon: Users },
 ];
 
 const iso = (d) => d.toISOString().slice(0, 10);
@@ -83,7 +74,6 @@ function computeRange(mode, custom) {
   if (mode === "custom" && custom.from && custom.to) {
     return { date_from: custom.from, date_to: custom.to };
   }
-  // month-to-date
   return {
     date_from: iso(new Date(today.getFullYear(), today.getMonth(), 1)),
     date_to: iso(today),
@@ -98,56 +88,20 @@ const shortDate = (s) => {
   }
 };
 
-// Dynamic annotator grouping. Encord bakes a cohort/vendor tag somewhere into
-// each email — a fragment of the local part ("kappa" in annotator31_kappa@…,
-// "epsilon" in epsilon_annotator6@…) or the domain ("picklerobot" in
-// stanley@picklerobot.com). We discover those tags at runtime by tokenizing every
-// email; any token shared by MORE THAN 2 annotators becomes its own filter, and
-// anything rarer falls into "Other". No vendor list is hardcoded — see buildGroups().
-// The only special-cased token is "theta": that's our own team, shown as "Autonex".
 const STOP_TOKENS = new Set([
-  "annotator",
-  "encord",
-  "gmail",
-  "outlook",
-  "yahoo",
-  "hotmail",
-  "com",
-  "net",
-  "org",
-  "www",
-  "mail",
-  "test",
-  "user",
-  "team",
-  "admin",
+  "annotator", "encord", "gmail", "outlook", "yahoo", "hotmail",
+  "com", "net", "org", "www", "mail", "test", "user", "team", "admin",
 ]);
-const GROUP_MIN = 3; // token must appear in > 2 distinct annotators
-const OURS_TOKEN = "theta"; // our own team
-const GROUP_LABELS = {
-  theta: "Autonex",
-  picklerobot: "PickleRobot",
-  agilityrobotics: "Agility Robotics",
-};
-const groupLabel = (key) =>
-  GROUP_LABELS[key] || key.charAt(0).toUpperCase() + key.slice(1);
+const OURS_TOKEN = "theta";
 
-// Pull candidate tag tokens from one email: alphabetic fragments of the local part
-// (split on digits/dots/underscores) plus the second-level domain, minus generic
-// stopwords and anything shorter than 3 chars.
 const tokenizeEmail = (email) => {
   const [local = "", domain = ""] = (email || "").toLowerCase().split("@");
   const parts = local.split(/[^a-z]+/);
   const labels = domain.split(".").filter(Boolean);
-  if (labels.length >= 2) parts.push(labels[labels.length - 2]); // SLD, e.g. "picklerobot"
-  return [...new Set(parts)].filter(
-    (t) => t.length >= 3 && !STOP_TOKENS.has(t),
-  );
+  if (labels.length >= 2) parts.push(labels[labels.length - 2]);
+  return [...new Set(parts)].filter((t) => t.length >= 3 && !STOP_TOKENS.has(t));
 };
 
-// Given the annotator list, returns a groupOf(email) classifier and the tab list.
-// We only split into our own team (Autonex = the "theta" token) and everyone else
-// ("Others"). Tab order is fixed: Autonex, All, Others.
 const buildGroups = (annotators) => {
   const isOurs = (email) => tokenizeEmail(email).includes(OURS_TOKEN);
   const groupOf = (email) => (isOurs(email) ? OURS_TOKEN : "other");
@@ -167,12 +121,12 @@ const ProjectAnalyticsPage = () => {
   const location = useLocation();
   const basePath = location.pathname.startsWith("/pm") ? "/pm" : "/admin";
 
+  const [activePanel, setActivePanel] = useState("execution");
   const [rangeMode, setRangeMode] = useState("month");
   const [custom, setCustom] = useState({ from: "", to: "" });
-  const [selected, setSelected] = useState(null); // null = default to everyone
-  const [orgFilter, setOrgFilter] = useState("all"); // 'all' | org key
-  const [annotatorOpen, setAnnotatorOpen] = useState(false); // annotator picker dropdown
-  const [legendExpanded, setLegendExpanded] = useState(false); // one-row legend vs full
+  const [selected, setSelected] = useState(null);
+  const [orgFilter, setOrgFilter] = useState("all");
+  const [annotatorOpen, setAnnotatorOpen] = useState(false);
   const annotatorRef = useRef(null);
 
   useEffect(() => {
@@ -184,36 +138,32 @@ const ProjectAnalyticsPage = () => {
     return () => document.removeEventListener("mousedown", handler);
   }, []);
 
-  const params = useMemo(
-    () => computeRange(rangeMode, custom),
-    [rangeMode, custom],
-  );
+  const params = useMemo(() => computeRange(rangeMode, custom), [rangeMode, custom]);
 
   const { data, isLoading, isError } = useQuery({
-    queryKey: [
-      "project-analytics",
-      mainProjectId,
-      params.date_from,
-      params.date_to,
-    ],
+    queryKey: ["project-analytics", mainProjectId, params.date_from, params.date_to],
     queryFn: () => analyticsApi.getProjectAnalytics(mainProjectId, params),
     enabled: !!mainProjectId,
-    // Encord data refreshes once a day; refetch on mount/focus rather than polling.
     refetchOnWindowFocus: true,
   });
 
+  const { data: allocations = [] } = useQuery({
+    queryKey: ["allocations"],
+    queryFn: allocationApi.getAll,
+  });
+
+  const { data: employees = [] } = useQuery({
+    queryKey: ["employees"],
+    queryFn: employeeApi.getAll,
+  });
+
   const annotators = data?.annotators || [];
-  // Feed the project name to the breadcrumb (replaces the generic "Analytics" crumb).
+
   useEffect(() => {
     if (data?.name) setPageDetailTitle(data.name);
     return () => setPageDetailTitle(null);
   }, [data?.name]);
-  // Y-axis + bold middle reference line for the platform-hours chart.
-  const hoursAxis = useMemo(
-    () => niceAxis((data?.daily || []).map((d) => d.platform_hours || 0)),
-    [data],
-  );
-  // default selection: everyone
+
   const allEmails = annotators.map((a) => a.user_email);
   const activeSel = selected ?? allEmails;
   const colorFor = (email) =>
@@ -222,47 +172,32 @@ const ProjectAnalyticsPage = () => {
   const toggle = (email) => {
     const base = selected ?? allEmails;
     setSelected(
-      base.includes(email) ? base.filter((e) => e !== email) : [...base, email],
+      base.includes(email) ? base.filter((e) => e !== email) : [...base, email]
     );
   };
 
-  // Groups + tabs are derived from the data itself (see buildGroups). Recomputed
-  // whenever the annotator set changes (range / project switch).
-  const { groupOf, tabs: orgTabs } = useMemo(
-    () => buildGroups(annotators),
-    [annotators],
-  );
-
-  // If the active tab vanished after a data change, fall back to "All" without
-  // needing an effect to reset state.
-  const effectiveFilter = orgTabs.some((t) => t.key === orgFilter)
-    ? orgFilter
-    : "all";
+  const { groupOf, tabs: orgTabs } = useMemo(() => buildGroups(annotators), [annotators]);
+  const effectiveFilter = orgTabs.some((t) => t.key === orgFilter) ? orgFilter : "all";
 
   const visibleAnnotators =
     effectiveFilter === "all"
       ? annotators
       : annotators.filter((a) => groupOf(a.user_email) === effectiveFilter);
 
-  // Select / deselect all annotators in the currently visible group.
   const visibleEmails = visibleAnnotators.map((a) => a.user_email);
   const allVisibleOn =
-    visibleEmails.length > 0 &&
-    visibleEmails.every((e) => activeSel.includes(e));
+    visibleEmails.length > 0 && visibleEmails.every((e) => activeSel.includes(e));
   const selectAllVisible = () =>
     setSelected([...new Set([...activeSel, ...visibleEmails])]);
   const deselectAllVisible = () =>
     setSelected(activeSel.filter((e) => !visibleEmails.includes(e)));
 
-  // Switching group tab also switches the chart selection to that group's members.
   const changeGroup = (key) => {
     setOrgFilter(key);
     const emails =
       key === "all"
         ? allEmails
-        : annotators
-            .filter((a) => groupOf(a.user_email) === key)
-            .map((a) => a.user_email);
+        : annotators.filter((a) => groupOf(a.user_email) === key).map((a) => a.user_email);
     setSelected(emails);
   };
 
@@ -271,7 +206,7 @@ const ProjectAnalyticsPage = () => {
     const lookup = {};
     annotators.forEach((a) => {
       lookup[a.user_email] = Object.fromEntries(
-        a.daily.map((p) => [p.date, p.hours]),
+        a.daily.map((p) => [p.date, p.hours])
       );
     });
     return data.daily.map((d) => {
@@ -282,14 +217,61 @@ const ProjectAnalyticsPage = () => {
         row[e] = v;
         if (v > 0) active.push(v);
       });
-      // Average across the annotators who actually worked that day (bold line).
       row.__avg = active.length
-        ? Math.round((active.reduce((a, b) => a + b, 0) / active.length) * 100) /
-          100
+        ? Math.round((active.reduce((a, b) => a + b, 0) / active.length) * 100) / 100
         : null;
       return row;
     });
   }, [data, annotators, activeSel]);
+
+  const stageData = useMemo(() => {
+    if (!data?.month) return [];
+    return [
+      { stage: "Annotation", hours: data.month.annotation_hours || data.month.platform_hours || 0 },
+      { stage: "Review", hours: data.month.review_hours || 0 },
+    ].filter((s) => s.hours > 0);
+  }, [data]);
+
+  const teamRosterData = useMemo(() => {
+    const projectAllocations = allocations.filter(
+      (a) => String(a.sub_project_id) === String(mainProjectId)
+    );
+
+    const empMap = {};
+    employees.forEach((e) => {
+      empMap[e.email?.toLowerCase()] = e;
+      empMap[e.id] = e;
+    });
+
+    return annotators.map((a) => {
+      const emp = empMap[a.user_email?.toLowerCase()] || {};
+      const alloc = projectAllocations.find(
+        (al) => al.employee_id === emp.id || String(al.sub_project_id) === String(mainProjectId)
+      );
+
+      return {
+        id: emp.id || a.user_email,
+        name: emp.name || a.employee_name || a.user_email,
+        email: a.user_email,
+        avatar_url: emp.avatar_url,
+        role: alloc?.role || "Annotator",
+        planned_hours: alloc ? (alloc.hours_per_day || 0) * 20 : 80,
+        actual_hours: a.total_hours || 0,
+        tasks_submitted: a.tasks_submitted || 0,
+        labels_created: a.labels_created || 0,
+      };
+    });
+  }, [annotators, allocations, employees, mainProjectId]);
+
+  const projectPlannedVsActual = useMemo(() => {
+    if (!data?.daily) return [];
+    const dailyAllocationTarget = 4;
+    return data.daily.map((d) => ({
+      label: d.date,
+      plannedHours: dailyAllocationTarget,
+      actualHours: d.platform_hours || 0,
+    }));
+  }, [data]);
 
   if (isLoading)
     return (
@@ -297,419 +279,153 @@ const ProjectAnalyticsPage = () => {
         <Spinner size="lg" color="indigo" />
       </div>
     );
+
   if (isError || !data)
     return (
-      <div className="p-8 text-center text-slate-500">
-        Could not load analytics.
+      <div className="p-8 text-center text-slate-500 font-medium">
+        Could not load analytics for this project.
       </div>
     );
 
   return (
     <div className="space-y-6">
-      <div>
+      {/* Back Button Bar */}
+      <div className="flex items-center justify-between pb-2 border-b border-slate-200/80">
         <button
+          type="button"
           onClick={() => navigate(`${basePath}/analytics`)}
-          className="inline-flex items-center gap-1 text-sm text-slate-500 hover:text-slate-700 mb-2"
+          className="inline-flex items-center gap-1.5 text-xs font-bold text-slate-500 hover:text-indigo-600 transition-colors cursor-pointer"
         >
-          <ChevronLeft className="w-4 h-4" /> Analytics
+          <ChevronLeft className="w-4 h-4" /> Back to Global Dashboard
         </button>
-        <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3">
-          <div>
-            <div className="flex flex-wrap items-center gap-2">
-              <h1 className="text-lg font-semibold text-slate-900">
-                {data.name}
-              </h1>
-              {data.pm_names?.length > 0 && (
-                <span className="inline-flex items-center gap-1 rounded-full bg-indigo-50 px-2.5 py-0.5 text-xs font-medium text-indigo-700">
-                  PM: {data.pm_names.join(", ")}
-                </span>
-              )}
-            </div>
-            <p className="text-slate-500 text-sm mt-1">
-              {data.client ? `${data.client} · ` : ""}Autonex team · Encord platform activity ·{" "}
-              {data.range.from} → {data.range.to}
-            </p>
+
+        <span className="text-xs font-bold text-slate-700 bg-slate-100 px-3 py-1 rounded-full border border-slate-200/80">
+          {data.name}
+        </span>
+      </div>
+
+      {/* ── PANEL 1: EXECUTION & VARIANCE ───────────────────────────────── */}
+      {activePanel === "execution" && (
+        <div className="space-y-6">
+          <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-5 gap-3.5">
+            <GlassKpiCard icon={Clock} label="Platform Hours" value={`${data.month.platform_hours}h`} subtitle="Selected range" tone="indigo" />
+            <GlassKpiCard icon={Gauge} label="Annotation Avg" value={`${data.month.avg_hours_per_annotator}h`} subtitle="Per active annotator" tone="emerald" />
+            <GlassKpiCard icon={Gauge} label="Avg Hr / Person" value={`${data.month.avg_hours_per_person ?? 0}h`} subtitle="Per person in project" tone="sky" />
+            <GlassKpiCard
+              icon={Users}
+              label="Active Annotators"
+              value={data.fixed?.today?.active_annotators ?? 0}
+              subtitle={data.fixed?.today?.date ? `As of ${shortDate(data.fixed.today.date)}` : ">1h annotation"}
+              tone="violet"
+            />
+            <GlassKpiCard icon={Gauge} label="Platform / Person" value={`${data.fixed?.today?.avg_hours_per_annotator ?? 0}h`} subtitle="Daily average" tone="amber" />
           </div>
-          <div className="inline-flex items-center rounded-lg border border-slate-200 bg-slate-50 p-0.5 w-fit">
-            {RANGES.map((r) => (
-              <button
-                key={r.key}
-                onClick={() => setRangeMode(r.key)}
-                className={`px-3 py-1.5 text-[13px] font-semibold rounded-md transition-all whitespace-nowrap ${
-                  rangeMode === r.key
-                    ? "bg-white text-slate-900 shadow-sm ring-1 ring-slate-200/70"
-                    : "text-slate-500 hover:text-slate-800"
-                }`}
-              >
-                {r.label}
-              </button>
-            ))}
+
+          {/* Navigation Tabs & Range Selection Bar (BELOW KPI CARDS - NO HORIZONTAL SCROLL) */}
+          <div className="flex items-center justify-between gap-2 pb-3 border-b border-slate-200/80">
+            <AnalyticsTabNav tabs={PROJECT_TABS} activeTab={activePanel} onChange={setActivePanel} />
+
+            <div className="inline-flex items-center gap-0.5 p-1 bg-slate-100/90 rounded-xl border border-slate-200/80 select-none shrink-0">
+              {RANGES.map((r) => (
+                <button
+                  key={r.key}
+                  onClick={() => setRangeMode(r.key)}
+                  className={`px-2.5 py-1 rounded-lg text-xs font-semibold transition-all duration-150 cursor-pointer whitespace-nowrap ${
+                    rangeMode === r.key
+                      ? "bg-white text-indigo-600 shadow-sm ring-1 ring-slate-200/70 font-bold"
+                      : "text-slate-600 hover:text-slate-900 hover:bg-slate-200/50"
+                  }`}
+                >
+                  {r.label}
+                </button>
+              ))}
+            </div>
+          </div>
+
+          {rangeMode === "custom" && (
+            <div className="flex items-center gap-2 text-xs p-3 rounded-xl bg-slate-50 border border-slate-200">
+              <input
+                type="date"
+                value={custom.from}
+                onChange={(e) => setCustom((c) => ({ ...c, from: e.target.value }))}
+                className="input text-xs text-slate-900 bg-white"
+              />
+              <span className="text-slate-400">→</span>
+              <input
+                type="date"
+                value={custom.to}
+                onChange={(e) => setCustom((c) => ({ ...c, to: e.target.value }))}
+                className="input text-xs text-slate-900 bg-white"
+              />
+            </div>
+          )}
+
+          <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
+            <div className="rounded-3xl border border-slate-200/80 bg-white/90 backdrop-blur-md p-6 shadow-sm flex flex-col justify-between">
+              <div className="mb-4">
+                <h3 className="text-base font-black text-slate-900">Daily Platform Execution Trend</h3>
+                <p className="text-xs text-slate-400 font-medium">Autonex team active editor time across the project</p>
+              </div>
+              <DailyPlatformHoursChart
+                isGlobal={false}
+                data={data?.daily}
+                height={250}
+                color="#2563eb"
+                selectedProject={{ name: data?.name }}
+              />
+            </div>
+
+            <div className="rounded-3xl border border-slate-200/80 bg-white/90 backdrop-blur-md p-6 shadow-sm flex flex-col justify-between">
+              <div className="mb-4">
+                <h3 className="text-base font-black text-slate-900">Daily Allocation Target vs. Logged Execution</h3>
+                <p className="text-xs text-slate-400 font-medium">Comparing daily scheduled baseline hours against actual Encord logged hours</p>
+              </div>
+              <PlannedVsActualChart data={projectPlannedVsActual} height={250} />
+            </div>
           </div>
         </div>
-        {rangeMode === "custom" && (
-          <div className="flex items-center gap-2 mt-3">
-            <input
-              type="date"
-              value={custom.from}
-              onChange={(e) =>
-                setCustom((c) => ({ ...c, from: e.target.value }))
-              }
-              className="input"
-            />
-            <span className="text-slate-400">→</span>
-            <input
-              type="date"
-              value={custom.to}
-              onChange={(e) => setCustom((c) => ({ ...c, to: e.target.value }))}
-              className="input"
-            />
-          </div>
-        )}
-      </div>
+      )}
 
-      {/* KPI tiles — range-based (top toggle) + latest-day snapshot, all one row */}
-      <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-5 gap-4">
-        <MetricCard
-          title="Platform Hours"
-          value={`${data.month.platform_hours}h`}
-          subtitle="selected range"
-          icon={Clock}
-        />
-        <MetricCard
-          title="Annotation Avg"
-          value={`${data.month.avg_hours_per_annotator}h`}
-          subtitle="per active annotator"
-          icon={Gauge}
-        />
-        <MetricCard
-          title="Avg Hr / Person"
-          value={`${data.month.avg_hours_per_person ?? 0}h`}
-          subtitle="per person in project"
-          icon={Gauge}
-        />
-        <MetricCard
-          title="Active Annotators — Today"
-          value={data.fixed?.today?.active_annotators ?? 0}
-          subtitle={
-            data.fixed?.today?.date
-              ? `as of ${shortDate(data.fixed.today.date)}`
-              : ">1h annotation time"
-          }
-          icon={Users}
-        />
-        <MetricCard
-          title="Platform / Annotator — Today"
-          value={`${data.fixed?.today?.avg_hours_per_annotator ?? 0}h`}
-          subtitle={
-            data.fixed?.today?.date
-              ? `as of ${shortDate(data.fixed.today.date)}`
-              : "avg hrs per annotator"
-          }
-          icon={Gauge}
-        />
-      </div>
+      {/* ── PANEL 2: WORKFLOW & THROUGHPUT ──────────────────────────────── */}
+      {activePanel === "throughput" && (
+        <div className="space-y-6">
+          <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
+            <div className="lg:col-span-1 rounded-3xl border border-slate-200/80 bg-white/90 backdrop-blur-md p-6 shadow-sm">
+              <h3 className="text-base font-black text-slate-900 mb-1">Workflow Stage Split</h3>
+              <p className="text-xs text-slate-400 font-medium mb-3">Annotation vs Review split</p>
+              <StageDistributionChart data={stageData} height={220} />
+            </div>
 
-      {/* Overview: single series (blue), no legend — title names it */}
-      <Card>
-        <CardHeader
-          title="Platform hours per day"
-          subtitle="Autonex team active editor time across the project"
-        />
-        <CardContent>
-          <div className="h-72">
-            <ResponsiveContainer width="100%" height="100%">
-              <LineChart
-                data={data.daily}
-                margin={{ top: 8, right: 16, bottom: 4, left: -8 }}
-              >
-                <CartesianGrid stroke={GRID} vertical={false} />
-                <XAxis
-                  dataKey="date"
-                  tickFormatter={shortDate}
-                  tick={{ fill: INK_MUTED, fontSize: 12 }}
-                  axisLine={{ stroke: GRID }}
-                  tickLine={false}
-                  minTickGap={24}
-                />
-                <YAxis
-                  tick={{ fill: INK_MUTED, fontSize: 12 }}
-                  axisLine={false}
-                  tickLine={false}
-                  width={40}
-                  unit="h"
-                  domain={[0, hoursAxis.max]}
-                  ticks={hoursAxis.ticks}
-                />
-                {/* Bold middle reference line (half of the axis max). */}
-                <ReferenceLine
-                  y={hoursAxis.mid}
-                  stroke="#94a3b8"
-                  strokeWidth={1.5}
-                />
-                <Tooltip
-                  labelFormatter={shortDate}
-                  formatter={(v) => [`${v}h`, "Platform hours"]}
-                />
-                <Line
-                  type="monotone"
-                  dataKey="platform_hours"
-                  name="Platform hours"
-                  stroke={SERIES[0]}
-                  strokeWidth={2}
-                  dot={{ r: 3 }}
-                  activeDot={{ r: 5 }}
-                />
-              </LineChart>
-            </ResponsiveContainer>
-          </div>
-        </CardContent>
-      </Card>
-
-      {/* Annotator comparison: multi-series with legend */}
-      <Card>
-        <CardHeader
-          title="Annotator comparison"
-          subtitle="Daily platform hours per annotator — select who to compare"
-        />
-        <CardContent>
-          {annotators.length === 0 ? (
-            <p className="py-8 text-center text-sm text-slate-400">
-              No annotator activity in this range.
-            </p>
-          ) : (
-            <>
-              {/* Controls: group filter (segmented) + annotator picker dropdown */}
-              <div className="flex flex-wrap items-center gap-2 mb-4">
-                {/* Org filter — segmented-pill layout. theta = Autonex; everyone else = Others */}
-                <div className="inline-flex items-center rounded-lg border border-slate-200 bg-slate-50 p-0.5 w-fit">
-                  {orgTabs.map((t) => (
-                    <button
-                      key={t.key}
-                      onClick={() => changeGroup(t.key)}
-                      className={`inline-flex items-center gap-1.5 px-3 py-1.5 text-[13px] font-semibold rounded-md transition-all whitespace-nowrap ${
-                        effectiveFilter === t.key
-                          ? "bg-white text-slate-900 shadow-sm ring-1 ring-slate-200/70"
-                          : "text-slate-500 hover:text-slate-800"
-                      }`}
-                    >
-                      {t.label}
-                      <span
-                        className={
-                          effectiveFilter === t.key
-                            ? "text-indigo-600"
-                            : "text-slate-400"
-                        }
-                      >
-                        {t.count}
-                      </span>
-                    </button>
-                  ))}
-                </div>
-
-                {/* Annotator picker — names/emails hidden behind this dropdown by default */}
-                <div ref={annotatorRef} className="relative ml-auto">
-                  <button
-                    type="button"
-                    onClick={() => setAnnotatorOpen((o) => !o)}
-                    className="inline-flex items-center gap-2 h-9 px-3 rounded-lg border border-slate-200 bg-white text-[13px] font-medium text-slate-700 hover:bg-slate-50 transition-colors"
-                  >
-                    <Users className="w-4 h-4 text-slate-400" />
-                    Annotators
-                    <span className="inline-flex items-center justify-center h-4 min-w-4 px-1 rounded-full bg-indigo-600 text-white text-[10px] font-semibold">
-                      {activeSel.length}
-                    </span>
-                    <ChevronDown
-                      className={`w-4 h-4 text-slate-400 transition-transform ${annotatorOpen ? "rotate-180" : ""}`}
-                    />
-                  </button>
-                  {annotatorOpen && (
-                    <div className="absolute right-0 mt-1.5 z-40 w-80 max-w-[90vw] rounded-xl border border-slate-200 bg-white p-3 shadow-xl">
-                      <div className="mb-2 flex items-center justify-between">
-                        <span className="text-[11px] font-semibold uppercase tracking-wide text-slate-400">
-                          {orgTabs.find((t) => t.key === effectiveFilter)
-                            ?.label || "All"}{" "}
-                          · {visibleAnnotators.length}
-                        </span>
-                        <button
-                          type="button"
-                          onClick={
-                            allVisibleOn ? deselectAllVisible : selectAllVisible
-                          }
-                          className="inline-flex items-center gap-1 text-xs font-medium text-indigo-600 hover:text-indigo-700"
-                        >
-                          {allVisibleOn ? (
-                            <Square className="w-3.5 h-3.5" />
-                          ) : (
-                            <CheckSquare className="w-3.5 h-3.5" />
-                          )}
-                          {allVisibleOn ? "Deselect all" : "Select all"}
-                        </button>
-                      </div>
-                      {visibleAnnotators.length === 0 ? (
-                        <p className="py-3 text-sm text-slate-400">
-                          No annotators in this group.
-                        </p>
-                      ) : (
-                        <div className="flex max-h-64 flex-col gap-1 overflow-y-auto pr-1">
-                          {visibleAnnotators.map((a) => {
-                            const on = activeSel.includes(a.user_email);
-                            return (
-                              <button
-                                key={a.user_email}
-                                onClick={() => toggle(a.user_email)}
-                                className={`flex items-center gap-2 rounded-lg px-2 py-1.5 text-left text-[13px] transition-colors ${on ? "bg-slate-50" : "hover:bg-slate-50"}`}
-                              >
-                                {on ? (
-                                  <CheckSquare className="w-4 h-4 shrink-0 text-indigo-600" />
-                                ) : (
-                                  <Square className="w-4 h-4 shrink-0 text-slate-300" />
-                                )}
-                                <span
-                                  className="h-2 w-2 shrink-0 rounded-full"
-                                  style={{
-                                    backgroundColor: colorFor(a.user_email),
-                                  }}
-                                />
-                                {/* Wraps rather than truncates: an unlinked
-                                    annotator is identified only by their Encord
-                                    email, so an ellipsis can hide the one part
-                                    that tells them apart. */}
-                                <span className="min-w-0 flex-1 break-words text-slate-700">
-                                  {a.employee_name || a.user_email}
-                                </span>
-                                <span className="shrink-0 tabular-nums text-slate-400">
-                                  {a.total_hours}h
-                                </span>
-                              </button>
-                            );
-                          })}
-                        </div>
-                      )}
-                    </div>
-                  )}
-                </div>
+            <div className="lg:col-span-2 rounded-3xl border border-slate-200/80 bg-white/90 backdrop-blur-md p-6 shadow-sm">
+              <div className="mb-4">
+                <h3 className="text-base font-black text-slate-900">Annotator Activity Heatmap Matrix</h3>
+                <p className="text-xs text-slate-400 font-medium">Daily editor hours intensity grid across team members</p>
               </div>
-              <div className="h-72">
-                <ResponsiveContainer width="100%" height="100%">
-                  <LineChart
-                    data={comparisonData}
-                    margin={{ top: 8, right: 16, bottom: 4, left: -8 }}
-                  >
-                    <CartesianGrid stroke={GRID} vertical={false} />
-                    <XAxis
-                      dataKey="date"
-                      tickFormatter={shortDate}
-                      tick={{ fill: INK_MUTED, fontSize: 12 }}
-                      axisLine={{ stroke: GRID }}
-                      tickLine={false}
-                      minTickGap={24}
-                    />
-                    <YAxis
-                      tick={{ fill: INK_MUTED, fontSize: 12 }}
-                      axisLine={false}
-                      tickLine={false}
-                      width={40}
-                      unit="h"
-                    />
-                    <Tooltip
-                      labelFormatter={shortDate}
-                      formatter={(v, n) => [`${v}h`, n]}
-                    />
-                    {activeSel.map((email) => (
-                      <Line
-                        key={email}
-                        type="monotone"
-                        dataKey={email}
-                        name={
-                          annotators.find((a) => a.user_email === email)
-                            ?.employee_name || email
-                        }
-                        stroke={colorFor(email)}
-                        strokeWidth={2}
-                        dot={false}
-                        activeDot={{ r: 5 }}
-                      />
-                    ))}
-                    {/* Bold average line across the compared annotators. */}
-                    <Line
-                      type="monotone"
-                      dataKey="__avg"
-                      name="Average"
-                      stroke="#0f172a"
-                      strokeWidth={3.5}
-                      strokeDasharray="6 4"
-                      dot={false}
-                      activeDot={{ r: 5 }}
-                      connectNulls
-                    />
-                  </LineChart>
-                </ResponsiveContainer>
-              </div>
-
-              {/* Custom legend — one row by default, "Show all" reveals the rest */}
-              {activeSel.length > 0 && (
-                <div className="mt-3 border-t border-slate-100 pt-3">
-                  <div
-                    className={`flex flex-wrap gap-x-4 gap-y-1.5 ${legendExpanded ? "" : "max-h-6 overflow-hidden"}`}
-                  >
-                    <span className="inline-flex items-center gap-1.5 whitespace-nowrap text-xs font-semibold text-slate-800">
-                      <span className="h-0 w-4 shrink-0 border-t-2 border-dashed border-slate-900" />
-                      Average
-                    </span>
-                    {activeSel.map((email) => {
-                      const a = annotators.find((x) => x.user_email === email);
-                      return (
-                        <span
-                          key={email}
-                          className="inline-flex items-center gap-1.5 whitespace-nowrap text-xs text-slate-600"
-                        >
-                          <span
-                            className="h-2.5 w-2.5 shrink-0 rounded-full"
-                            style={{ backgroundColor: colorFor(email) }}
-                          />
-                          {a?.employee_name || email}
-                        </span>
-                      );
-                    })}
-                  </div>
-                  {activeSel.length > 6 && (
-                    <button
-                      type="button"
-                      onClick={() => setLegendExpanded((v) => !v)}
-                      className="mt-1.5 inline-flex items-center gap-1 text-xs font-medium text-indigo-600 hover:text-indigo-700"
-                    >
-                      {legendExpanded
-                        ? "Show less"
-                        : `Show all ${activeSel.length}`}
-                      <ChevronDown
-                        className={`h-3.5 w-3.5 transition-transform ${legendExpanded ? "rotate-180" : ""}`}
-                      />
-                    </button>
-                  )}
-                </div>
-              )}
-            </>
-          )}
-        </CardContent>
-      </Card>
-
-      {/* Sentiment (read-only for admin; PM edits on Organizations) */}
-      <Card>
-        <CardHeader
-          title="Project Sentiment"
-          subtitle="Maintained by the project's PM"
-        />
-        <CardContent>
-          <div className="flex items-start gap-3">
-            <MessageSquare className="w-5 h-5 text-slate-400 mt-0.5 shrink-0" />
-            <p className="text-sm text-slate-700 whitespace-pre-wrap">
-              {data.sentiment || (
-                <span className="text-slate-400">No sentiment set yet.</span>
-              )}
-            </p>
+              <AnnotatorComparisonChart annotators={annotators} dailyData={data?.daily || []} />
+            </div>
           </div>
-        </CardContent>
-      </Card>
+        </div>
+      )}
+
+      {/* ── PANEL 3: TEAM ROSTER & UTILIZATION ──────────────────────────── */}
+      {activePanel === "roster" && (
+        <div className="space-y-6">
+          <div className="space-y-3">
+            <h3 className="text-base font-black text-slate-900">Project Team Utilization & Output Roster</h3>
+            <ProjectTeamRosterTable roster={teamRosterData} isLoading={isLoading} />
+          </div>
+
+          <div className="rounded-3xl border border-slate-200/80 bg-white/90 backdrop-blur-md p-6 shadow-sm space-y-2">
+            <h3 className="text-base font-black text-slate-900">PM Project Delivery Notes & Sentiment</h3>
+            <div className="flex items-start gap-3 pt-2">
+              <MessageSquare className="w-5 h-5 text-slate-400 mt-0.5 shrink-0" />
+              <p className="text-xs text-slate-700 whitespace-pre-wrap leading-relaxed font-medium">
+                {data.sentiment || <span className="text-slate-400">No sentiment notes recorded yet for this project.</span>}
+              </p>
+            </div>
+          </div>
+        </div>
+      )}
     </div>
   );
 };
