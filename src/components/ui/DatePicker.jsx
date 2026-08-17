@@ -97,6 +97,8 @@ export default function DatePicker({
   name,
   required,
   accentColor = "emerald",
+  customTrigger,
+  disableFuture = false,
   ...props
 }) {
   const accent = ACCENT_STYLES[accentColor] || ACCENT_STYLES.emerald;
@@ -127,7 +129,7 @@ export default function DatePicker({
   }, [startDate, endDate, value, type]);
 
   const parsedMinDate = parseDateInput(minDate, type);
-  const parsedMaxDate = parseDateInput(maxDate, type);
+  const parsedMaxDate = parseDateInput(maxDate || (disableFuture ? new Date() : null), type);
 
   const [currentView, setCurrentView] = useState(
     parsedDate || rangeStart || new Date()
@@ -479,33 +481,39 @@ export default function DatePicker({
       )}
 
       {/* Trigger Button */}
-      <button
-        type="button"
-        onClick={handleToggleOpen}
-        className={`w-full h-9 pl-9 pr-3 rounded-lg border text-[13px] text-left transition-all shadow-sm focus:outline-none flex items-center justify-between ${error
-            ? "border-red-400 bg-red-50 text-red-700 focus:ring-4 focus:ring-red-500/10"
-            : isOpen
-              ? accent.triggerOpen
-              : "border-slate-200 bg-white hover:border-slate-300 text-slate-700 hover:text-slate-900"
-          }`}
-        {...props}
-      >
-        <div
-          className={`absolute left-3 top-1/2 -translate-y-1/2 pointer-events-none transition-colors ${isOpen ? accent.iconOpen : "text-slate-400"
-            }`}
-        >
-          <CalendarIcon className="w-4 h-4" />
+      {customTrigger ? (
+        <div onClick={handleToggleOpen} className="inline-block cursor-pointer">
+          {customTrigger({ isOpen, displayValue })}
         </div>
-        <span className={displayValue ? "" : "text-slate-400"}>
-          {displayValue ||
-            placeholder ||
-            (type === "range"
-              ? "Select leave dates"
-              : type === "month"
-                ? "Select month"
-                : "Select date")}
-        </span>
-      </button>
+      ) : (
+        <button
+          type="button"
+          onClick={handleToggleOpen}
+          className={`w-full h-9 pl-9 pr-3 rounded-lg border text-[13px] text-left transition-all shadow-sm focus:outline-none flex items-center justify-between ${error
+              ? "border-red-400 bg-red-50 text-red-700 focus:ring-4 focus:ring-red-500/10"
+              : isOpen
+                ? accent.triggerOpen
+                : "border-slate-200 bg-white hover:border-slate-300 text-slate-700 hover:text-slate-900"
+            }`}
+          {...props}
+        >
+          <div
+            className={`absolute left-3 top-1/2 -translate-y-1/2 pointer-events-none transition-colors ${isOpen ? accent.iconOpen : "text-slate-400"
+              }`}
+          >
+            <CalendarIcon className="w-4 h-4" />
+          </div>
+          <span className={displayValue ? "" : "text-slate-400"}>
+            {displayValue ||
+              placeholder ||
+              (type === "range"
+                ? "Select leave dates"
+                : type === "month"
+                  ? "Select month"
+                  : "Select date")}
+          </span>
+        </button>
+      )}
 
       {/* Popover via React Portal */}
       {isOpen &&
