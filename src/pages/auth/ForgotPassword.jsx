@@ -118,7 +118,7 @@ const ForgotPassword = () => {
         accent={theme.accent}
         eyebrow={theme.eyebrow}
         title={theme.title}
-        description="Enter your work email and we'll send a secure password reset link to your inbox."
+        description="Enter your email and we'll send a secure password reset link to your inbox."
         highlights={[
           {
             title: "Email Delivery",
@@ -173,7 +173,7 @@ const ForgotPassword = () => {
               <label
                 className={`mb-1.5 block text-sm font-medium ${theme.label}`}
               >
-                Work Email
+                Email
               </label>
               <div className="relative">
                 <Mail className="absolute left-3 top-1/2 h-5 w-5 -translate-y-1/2 text-slate-400" />
