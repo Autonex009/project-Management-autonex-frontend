@@ -270,31 +270,43 @@ export default function ChangeLogPage() {
   };
 
   return (
-    <div className="bg-white min-h-screen p-6 space-y-6">
+    <div className="space-y-3">
+
       {/* Toolbar & Controls */}
-      <div className="space-y-4">
-        <div className="flex flex-wrap items-center justify-between gap-4">
-          {/* Extreme Left: Role filter (Segmented Tab Table) */}
-          <div className="inline-flex items-center h-[34px] p-0.5 bg-slate-100/90 rounded-md border border-slate-300 text-xs font-medium shrink-0 gap-0.5">
-            {roleOptions.map((role) => {
-              const isSelected = actorRole === role.value;
-              return (
-                <button
-                  key={role.value}
-                  type="button"
-                  onClick={() => {
-                    setActorRole(role.value);
-                    setPage(1);
-                  }}
-                  className={`h-full px-2.5 flex items-center justify-center rounded text-xs transition-all duration-150 cursor-pointer ${isSelected
-                      ? "bg-white text-blue-600 font-bold shadow-xs border border-slate-200/80"
-                      : "text-slate-600 hover:text-slate-900 hover:bg-slate-200/50 font-medium"
-                    }`}
-                >
-                  {role.label}
-                </button>
-              );
-            })}
+      <div className="flex flex-wrap items-center justify-between gap-3 overflow-visible pb-1 select-none">
+
+        {/* LEFT: Role tabs */}
+        <div className="inline-flex items-center rounded-lg border border-slate-200 bg-slate-50 p-0.5 w-fit shrink-0">
+          {roleOptions.map(({ value, label }) => {
+            const isActive = actorRole === value;
+            return (
+              <button
+                key={value}
+                type="button"
+                onClick={() => { setActorRole(value); setPage(1); }}
+                className={`inline-flex items-center gap-1.5 px-3.5 py-1.5 text-[13px] font-semibold rounded-md transition-all whitespace-nowrap ${isActive
+                  ? "bg-white text-slate-900 shadow-sm ring-1 ring-slate-200/70"
+                  : "text-slate-500 hover:text-slate-800"
+                  }`}
+              >
+                {label}
+              </button>
+            );
+          })}
+        </div>
+
+        {/* RIGHT: Search + filters + refresh */}
+        <div className="flex items-center gap-2.5 shrink-0">
+          {/* Filter by keyword search box */}
+          <div className="relative shrink-0">
+            <input
+              type="text"
+              value={searchInput}
+              onChange={(e) => setSearchInput(e.target.value)}
+              placeholder="Filter by keyword"
+              className="w-48 sm:w-56 rounded-md border border-slate-300 bg-white px-3 py-1.5 text-sm text-slate-800 placeholder:text-slate-400 focus:border-blue-500 focus:outline-none focus:ring-1 focus:ring-blue-500"
+            />
+            <Search className="absolute right-2.5 top-2.5 h-4 w-4 text-slate-400 pointer-events-none" />
           </div>
 
           {/* Extreme Right: Search, Time, Category & Refresh */}
@@ -364,7 +376,7 @@ export default function ChangeLogPage() {
       {/* Main Audit Log Table */}
       <Table
         variant="untitled"
-        loading={isLoading}
+        loading={isFetching}
         skeletonRows={8}
         expandedRowId={expandedId}
         onRowClick={(row) => setExpandedId(expandedId === row.id ? null : row.id)}

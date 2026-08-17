@@ -84,10 +84,22 @@ const EmployeeLogin = () => {
         eyebrow="Personal Workspace"
         title="Step into a cleaner Autonex employee experience."
         description="Track your work, manage requests, and move through your daily flow in a portal that now feels unmistakably Autonex."
-        highlights={[
+        flowSteps={[
           {
-            title: "Focused Workspace",
-            copy: "Projects, leaves, and guidelines come together in a single calmer flow.",
+            title: "Sign up request",
+            copy: "Submit your email, and you will get a link for sign up.",
+          },
+          {
+            title: "Admin approval",
+            copy: "After approval, you will get a link with a temporary password in your same email.",
+          },
+          {
+            title: "Change password",
+            copy: "Log in using your temporary password, then change it using the reset password button.",
+          },
+          {
+            title: "Sign in",
+            copy: "Log into your employee portal securely.",
           },
         ]}
       />
@@ -112,7 +124,7 @@ const EmployeeLogin = () => {
 
             <div>
               <label className="mb-1.5 block text-sm font-medium text-slate-700">
-                Work Email
+                Email
               </label>
               <div className="relative">
                 <Mail className="absolute left-3 top-1/2 h-5 w-5 -translate-y-1/2 text-slate-400" />
