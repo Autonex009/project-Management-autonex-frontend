@@ -1,37 +1,14 @@
 import React, { useMemo, useState } from "react";
-import { PieChart, Pie, Cell, ResponsiveContainer, Tooltip } from "recharts";
+import { PieChart, Pie, Cell, ResponsiveContainer } from "recharts";
 import { Zap, Clock } from "lucide-react";
 
 const COLOR_PALETTE = [
-  { main: "#4f46e5", dot: "bg-indigo-600" },
+  { main: "#2563eb", dot: "bg-blue-600" },
   { main: "#0284c7", dot: "bg-sky-500" },
   { main: "#0d9488", dot: "bg-teal-500" },
   { main: "#d97706", dot: "bg-amber-500" },
   { main: "#8b5cf6", dot: "bg-violet-500" },
 ];
-
-const CustomTooltip = ({ active, payload }) => {
-  if (active && payload && payload.length) {
-    const data = payload[0].payload;
-    return (
-      <div className="rounded-xl border border-slate-200 bg-white p-2.5 shadow-2xl text-xs space-y-1 z-50 pointer-events-none">
-        <div className="font-bold text-slate-900 flex items-center gap-1.5">
-          <span className="w-2 h-2 rounded-full" style={{ backgroundColor: payload[0].color }} />
-          {data.fullName}
-        </div>
-        <div className="flex items-center justify-between gap-4 font-mono text-[11px]">
-          <span className="text-slate-500">Platform Hours:</span>
-          <span className="font-black text-indigo-600">{data.hours.toLocaleString()}h</span>
-        </div>
-        <div className="flex items-center justify-between gap-4 font-mono text-[11px]">
-          <span className="text-slate-500">Volume Share:</span>
-          <span className="font-bold text-slate-700">{data.share}%</span>
-        </div>
-      </div>
-    );
-  }
-  return null;
-};
 
 const ProjectVelocityBarChart = ({ data = [], onSelectProject, height = 240 }) => {
   const [activeIndex, setActiveIndex] = useState(null);
@@ -66,7 +43,7 @@ const ProjectVelocityBarChart = ({ data = [], onSelectProject, height = 240 }) =
   if (!topProjects || topProjects.length === 0) {
     return (
       <div
-        className="flex items-center justify-center text-xs text-slate-400 font-medium"
+        className="flex items-center justify-center text-xs text-stone-400 font-medium"
         style={{ height }}
       >
         No project execution data available
@@ -80,11 +57,6 @@ const ProjectVelocityBarChart = ({ data = [], onSelectProject, height = 240 }) =
       <div className="w-[45%] h-full relative flex items-center justify-center">
         <ResponsiveContainer width="100%" height={210}>
           <PieChart>
-            <Tooltip
-              content={<CustomTooltip />}
-              isAnimationActive={false}
-              wrapperStyle={{ zIndex: 100, pointerEvents: "none" }}
-            />
             <Pie
               data={topProjects}
               dataKey="value"
@@ -118,21 +90,21 @@ const ProjectVelocityBarChart = ({ data = [], onSelectProject, height = 240 }) =
         <div className="absolute inset-0 flex flex-col items-center justify-center pointer-events-none text-center z-0 px-2">
           {activeIndex !== null ? (
             <>
-              <Clock className="w-4 h-4 text-indigo-600 mb-0.5" />
-              <span className="text-[9px] uppercase font-black tracking-wider text-slate-400">
+              <Clock className="w-4 h-4 text-blue-600 mb-0.5" />
+              <span className="text-[9px] uppercase font-bold tracking-wider text-stone-400">
                 Volume Share
               </span>
-              <span className="text-sm font-black text-slate-900 font-mono leading-none mt-0.5">
+              <span className="text-sm font-black text-stone-900 font-mono leading-none mt-0.5">
                 {topProjects[activeIndex]?.share}%
               </span>
             </>
           ) : (
             <>
-              <Zap className="w-4 h-4 text-indigo-600 mb-0.5" />
-              <span className="text-[9px] uppercase font-black tracking-wider text-slate-400">
+              <Zap className="w-4 h-4 text-blue-600 mb-0.5" />
+              <span className="text-[9px] uppercase font-bold tracking-wider text-stone-400">
                 Total Logged
               </span>
-              <span className="text-xs font-black text-slate-900 font-mono leading-none mt-0.5">
+              <span className="text-xs font-black text-stone-900 font-mono leading-none mt-0.5">
                 {Math.round(totalHours).toLocaleString()}h
               </span>
             </>
@@ -152,18 +124,20 @@ const ProjectVelocityBarChart = ({ data = [], onSelectProject, height = 240 }) =
               onClick={() => onSelectProject && onSelectProject(p.id)}
               className={`flex items-center justify-between p-2 rounded-xl border transition-all duration-150 cursor-pointer ${
                 isSelected
-                  ? "bg-slate-900 text-white border-slate-900 shadow-md translate-x-0.5"
-                  : "bg-slate-50/70 text-slate-800 border-slate-100 hover:bg-white hover:border-slate-200"
+                  ? "bg-blue-600 text-white border-blue-600 shadow-sm translate-x-0.5"
+                  : "bg-stone-50/70 text-stone-800 border-stone-200/70 hover:bg-white hover:border-stone-300"
               }`}
             >
               {/* Left Pod: Color Dot + Name */}
               <div className="flex items-center gap-2 min-w-0 flex-1 pr-2">
                 <span
-                  className={`w-2.5 h-2.5 rounded-full shrink-0 ${p.colorTheme.dot}`}
+                  className={`w-2.5 h-2.5 rounded-full shrink-0 ${p.colorTheme.dot} ${
+                    isSelected ? "ring-1 ring-white/70" : ""
+                  }`}
                 />
                 <span
                   className={`text-xs font-bold truncate min-w-0 flex-1 ${
-                    isSelected ? "text-white" : "text-slate-800"
+                    isSelected ? "text-white" : "text-stone-800"
                   }`}
                   title={p.fullName}
                 >
@@ -175,7 +149,7 @@ const ProjectVelocityBarChart = ({ data = [], onSelectProject, height = 240 }) =
               <div className="shrink-0 font-mono text-[11px] pl-2 text-right">
                 <span
                   className={`font-black ${
-                    isSelected ? "text-indigo-300" : "text-slate-900"
+                    isSelected ? "text-white" : "text-stone-900"
                   }`}
                 >
                   {p.hours.toLocaleString()}h

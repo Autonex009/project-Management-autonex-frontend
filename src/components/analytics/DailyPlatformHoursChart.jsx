@@ -302,20 +302,20 @@ const DailyPlatformHoursChart = ({
               <FolderKanban className="w-5 h-5" />
             </div>
             <div>
-              <h3 className="text-base font-black text-slate-900 leading-snug">
+              <h3 className="text-base font-bold text-stone-900 leading-snug">
                 Project-Wise Execution Breakdown
               </h3>
-              <p className="text-xs font-semibold text-slate-500 font-mono">
+              <p className="text-xs font-semibold text-stone-500 font-mono">
                 {selectedDayData ? formattedModalDate(selectedDayData.date) : ""}
               </p>
             </div>
           </div>
         </Modal.Header>
 
-        <Modal.Body className="space-y-3">
+        <Modal.Body className="space-y-2.5">
           {/* Summary Metric Header */}
-          <div className="flex items-center justify-between p-3 rounded-xl bg-slate-50 border border-slate-100/90 font-mono text-xs">
-            <span className="text-slate-500 font-medium">Total Logged Execution:</span>
+          <div className="flex items-center justify-between p-2.5 rounded-xl bg-stone-50 border border-stone-200 font-mono text-xs">
+            <span className="text-stone-500 font-medium">Total Logged Execution:</span>
             <span className="font-black text-indigo-600 text-sm">
               {selectedDayData ? (selectedDayData.hours ?? selectedDayData.platform_hours ?? 0) : 0}h
             </span>
@@ -326,18 +326,18 @@ const DailyPlatformHoursChart = ({
             {currentBreakdown.map((item, idx) => (
               <div
                 key={item.name + idx}
-                className="p-2.5 rounded-xl border border-slate-100 bg-white shadow-2xs hover:bg-slate-50/60 transition-colors space-y-1.5"
+                className="p-2.5 rounded-xl border border-stone-200 bg-white shadow-xs hover:bg-stone-50/60 transition-colors space-y-1.5"
               >
                 <div className="flex items-center justify-between gap-2 text-xs">
                   <div className="flex items-center gap-2 min-w-0">
                     <span className="w-5 h-5 rounded-md bg-indigo-50 text-indigo-700 font-mono font-bold text-[10px] flex items-center justify-center shrink-0">
                       #{idx + 1}
                     </span>
-                    <span className="font-bold text-slate-800 truncate" title={item.name}>
+                    <span className="font-bold text-stone-800 truncate" title={item.name}>
                       {item.name}
                     </span>
                     {item.client && (
-                      <span className="text-[9px] font-mono px-1.5 py-0.2 rounded-md bg-slate-100 text-slate-500 shrink-0">
+                      <span className="text-[9px] font-mono px-1.5 py-0.2 rounded-md bg-stone-100 text-stone-500 shrink-0">
                         {item.client}
                       </span>
                     )}
@@ -350,7 +350,7 @@ const DailyPlatformHoursChart = ({
                 </div>
 
                 {/* Progress Bar */}
-                <div className="w-full bg-slate-100 rounded-full h-1.5 overflow-hidden flex items-center">
+                <div className="w-full bg-stone-100 rounded-full h-1.5 overflow-hidden flex items-center">
                   <div
                     className="h-full bg-gradient-to-r from-indigo-500 to-purple-500 rounded-full transition-all duration-500"
                     style={{ width: `${item.pct}%` }}
