@@ -1669,9 +1669,15 @@ const EmployeeDashboard = () => {
                         </p>
                       </div>
                     )}
-                    <div className="flex justify-between mt-0.5 text-[7.5px] text-stone-400 font-medium font-data">
+                    <div className="relative w-full mt-0.5 h-3">
                       {chartGeometry.points.map((p, i) => (
-                        <span key={i}>{format(parseISO(p.date), "d")}</span>
+                        <span
+                          key={i}
+                          className="absolute top-0 text-[7.5px] text-stone-400 font-medium font-data -translate-x-1/2 whitespace-nowrap"
+                          style={{ left: `${(p.x / CHART_W) * 100}%` }}
+                        >
+                          {format(parseISO(p.date), "d")}
+                        </span>
                       ))}
                     </div>
                   </div>

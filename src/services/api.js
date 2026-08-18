@@ -210,6 +210,16 @@ export const allocationApi = {
     api.get(`/allocations/by-project/${projectId}`).then((res) => res.data),
   getByEmployee: (employeeId) =>
     api.get(`/allocations/by-employee/${employeeId}`).then((res) => res.data),
+  getPage: ({ page = 1, pageSize = 10, search = "" } = {}) =>
+    api
+      .get("/allocations/page", { params: { page, page_size: pageSize, search } })
+      .then((res) => res.data),
+
+  getProjectDetail: (projectId) =>
+    api.get(`/allocations/project/${projectId}/detail`).then((res) => res.data),
+
+  getEmployeeProjects: () =>
+    api.get("/allocations/employee-projects").then((res) => res.data),
 };
 
 export const leaveApi = {
@@ -247,6 +257,10 @@ export const leaveApi = {
     api.post(`/leaves/${id}/apply-to-razorpay`).then((res) => res.data),
   getCalendar: (month) =>
     api.get("/leaves/calendar", { params: { month } }).then((res) => res.data),
+  getPage: (params = {}) =>
+    api.get("/leaves/page", { params }).then((res) => res.data),
+
+  getKpi: () => api.get("/leaves/kpi").then((res) => res.data),
 };
 
 // === Audit Log API (admin only) ===
@@ -345,6 +359,8 @@ export const wfhApi = {
       })
       .then((res) => res.data),
   delete: (id) => api.delete(`/wfh/${id}`).then((res) => res.data),
+  getPage: (params = {}) =>
+    api.get("/wfh/page", { params }).then((res) => res.data),
 };
 
 export const skillsApi = {
@@ -405,6 +421,27 @@ export const guidelineApi = {
     api.put(`/guidelines/${id}`, data).then((res) => res.data),
   delete: (id) => api.delete(`/guidelines/${id}`).then((res) => res.data),
 };
+
+guidelineApi.getPage = ({
+  page = 1,
+  pageSize = 12,
+  search = "",
+  mainProjectId = "",
+  subProjectId = "",
+  uploadedBy = "",
+} = {}) =>
+  api
+    .get("/guidelines/page", {
+      params: {
+        page,
+        page_size: pageSize,
+        search: search || undefined,
+        main_project_id: mainProjectId || undefined,
+        sub_project_id: subProjectId || undefined,
+        uploaded_by: uploadedBy || undefined,
+      },
+    })
+    .then((res) => res.data);
 
 // === Payroll API ===
 // The payroll passcode (entered on the Payroll page) is sent with every payroll
