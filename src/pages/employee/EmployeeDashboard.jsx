@@ -1135,43 +1135,23 @@ const EmployeeDashboard = () => {
                   drop-shadow(0 0 1.5px rgba(13, 148, 136, 0.25));
         }
       `}</style>
-      {showBackButton && (
-        <div className="flex items-center justify-between">
-          <button
-            type="button"
-            onClick={() => {
-              if (location.pathname.startsWith("/admin")) {
-                navigate("/admin/employees");
-              } else if (location.pathname.startsWith("/pm")) {
-                navigate("/pm/my-team");
-              } else {
-                navigate(-1);
-              }
-            }}
-            className="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-xs font-semibold text-stone-700 bg-white border border-stone-200 hover:bg-stone-50 hover:text-stone-900 shadow-sm transition-all cursor-pointer"
-          >
-            <ArrowLeft className="w-3.5 h-3.5 text-stone-500" />
-            <span>Back to {location.pathname.startsWith("/admin") ? "Employees" : "My Team"}</span>
-          </button>
-        </div>
-      )}
 
       {/* ════════════════ TOP SECTION ════════════════ */}
       <div className="grid grid-cols-1 lg:grid-cols-12 gap-2 sm:gap-3 items-stretch">
         {/* ──────────── PROFILE CARD ──────────── */}
-        <div className="lg:col-span-5 rounded-xl border border-stone-200 p-3 shadow-sm bg-white flex gap-2.5">
+        <div className="lg:col-span-5 rounded-xl border border-stone-200 p-3 shadow-sm bg-white flex gap-3">
           {/* Left Column: Avatar, Date, Phone, Skills */}
-          <div className="flex flex-col shrink-0 w-[120px]">
-            <div className="relative mb-3 mx-auto">
+          <div className="flex flex-col items-center shrink-0 w-[155px]">
+            <div className="relative mb-2.5 flex justify-center w-full">
               {profile.avatarUrl && !imgError ? (
                 <img
                   src={profile.avatarUrl}
                   alt={profile.name}
                   onError={() => setImgError(true)}
-                  className="w-24 h-24 rounded-full object-cover border border-stone-100 shadow-sm"
+                  className="w-28 h-28 rounded-full object-cover border border-stone-100 shadow-sm"
                 />
               ) : (
-                <div className="w-24 h-24 rounded-full bg-gradient-to-br from-emerald-50 to-stone-100 border border-stone-100 text-emerald-800 font-bold text-3xl flex items-center justify-center shadow-sm uppercase">
+                <div className="w-28 h-28 rounded-full bg-gradient-to-br from-emerald-50 to-stone-100 border border-stone-100 text-emerald-800 font-bold text-4xl flex items-center justify-center shadow-sm uppercase">
                   {profile.initials}
                 </div>
               )}
@@ -1179,33 +1159,23 @@ const EmployeeDashboard = () => {
 
 
             {/* Role */}
-            <div className="flex items-center justify-start gap-1.5 text-[10px] text-stone-500 font-medium w-full mb-1.5 px-0.5">
+            <div className="flex items-center justify-center gap-1.5 text-[11px] text-stone-500 w-full mb-2 whitespace-nowrap text-center">
               <User className="w-3.5 h-3.5 text-stone-400 shrink-0" />
-              <span className="truncate">
-                Role: <span className="font-bold text-stone-800">{display(profile.jobTitle, "Annotator/Reviewer")}</span>
+              <span className="whitespace-nowrap">
+                Role: <span className="font-normal text-stone-700">{display(profile.jobTitle, "Annotator/Reviewer")}</span>
               </span>
             </div>
-
-            {/* Date */}
-            <div className="flex items-center justify-start gap-1.5 text-[10px] text-stone-500 font-medium w-full mb-2 px-0.5">
-              <Calendar className="w-3.5 h-3.5 text-stone-400 shrink-0" />
-              <span className="truncate">
-                DOJ: <span className="font-semibold text-stone-700">{display(profile.joiningDate)}</span>
-              </span>
-            </div>
-
-            <div className="w-full h-px bg-stone-100 mb-2" />
 
             {profile.skills?.length > 0 && (
-              <div className="flex flex-col gap-1 w-full mt-1">
-                <span className="text-[9px] font-bold text-stone-400 uppercase tracking-wider ml-0.5">
+              <div className="flex flex-col items-center gap-1 w-full mt-0.5">
+                <span className="text-[9px] font-bold text-stone-400 uppercase tracking-wider text-center">
                   Skills
                 </span>
-                <div className="flex flex-wrap gap-1.5 w-full">
+                <div className="flex flex-wrap gap-1.5 w-full justify-center">
                   {profile.skills.slice(0, 3).map((skill, idx) => (
                     <span
                       key={idx}
-                      className="bg-indigo-50/70 text-stone-700 px-2 py-0.5 rounded-full text-[9px] font-medium border border-indigo-100/50 leading-tight break-words max-w-full"
+                      className="bg-indigo-50/70 text-stone-700 px-2 py-0.5 rounded-full text-[9px] font-medium border border-indigo-100/50 leading-tight break-words max-w-full text-center"
                     >
                       {skill}
                     </span>
@@ -1216,61 +1186,76 @@ const EmployeeDashboard = () => {
           </div>
 
           {/* Right Column */}
-          <div className="flex-1 min-w-0 flex flex-col pt-1">
-            <div className="flex items-center gap-2 flex-wrap mb-2.5">
-              <h1 className="font-display text-[16px] font-bold text-stone-900 truncate leading-none">
-                {display(profile.name, "Employee")}
-              </h1>
-              {profile.badge && (
-                <span className="text-[9px] font-semibold uppercase tracking-wider text-indigo-600 bg-indigo-50 px-2 py-0.5 rounded border border-indigo-200">
-                  {profile.badge}
-                </span>
-              )}
-            </div>
-
-            <div className="text-[11px] text-stone-600 space-y-1.5 mb-3">
-              <div className="flex items-center gap-2 truncate">
-                <Mail className="w-3.5 h-3.5 text-stone-400 shrink-0" />
-                <span
-                  className={
-                    profile.email ? "text-stone-700" : "text-stone-400 italic"
-                  }
-                >
-                  {display(profile.email)}
-                </span>
+          <div className="flex-1 min-w-0 flex flex-col justify-between pt-1">
+            <div>
+              <div className="flex items-center gap-2 flex-wrap mb-2.5">
+                <h1 className="font-display text-[16px] font-bold text-stone-900 truncate leading-none">
+                  {display(profile.name, "Employee")}
+                </h1>
+                {profile.badge && (
+                  <span className="text-[9px] font-semibold uppercase tracking-wider text-indigo-600 bg-indigo-50 px-2 py-0.5 rounded border border-indigo-200">
+                    {profile.badge}
+                  </span>
+                )}
               </div>
-              <div className="flex items-center gap-2 truncate">
-                <Phone className="w-3.5 h-3.5 text-stone-400 shrink-0" />
-                <span
-                  className={
-                    profile.phone ? "text-stone-700" : "text-stone-400 italic"
-                  }
-                >
-                  {profile.phone || "No phone"}
-                </span>
-              </div>
-              <div className="flex items-center gap-2 truncate">
-                <span className="w-3.5 h-3.5 flex items-center justify-center text-[8px] font-bold border border-stone-400 rounded-sm text-stone-500 shrink-0">
-                  E
-                </span>
-                <span className="text-stone-500">
-                  Encord ID:{" "}
-                  {profile.encordId ? (
-                    <span className="text-stone-700">{profile.encordId}</span>
-                  ) : (
-                    <span className="text-stone-400 italic">Not updated</span>
-                  )}
-                </span>
-              </div>
-            </div>
 
-            <div className="w-full h-px bg-stone-100 mb-2" />
-
-            <div className="flex flex-col gap-2.5 mt-1">
-              <div className="flex items-center justify-end">
-                <div className="flex items-center gap-1.5 pb-0.5 border-b-[2px] border-indigo-500 font-semibold text-[10px] text-indigo-600">
-                  <Calendar className="w-3.5 h-3.5" /> Leaves
+              <div className="text-[11px] text-stone-600 space-y-1.5 mb-2">
+                <div className="flex items-center gap-2 truncate">
+                  <Mail className="w-3.5 h-3.5 text-stone-400 shrink-0" />
+                  <span className="text-stone-500">
+                    Email:{" "}
+                    <span
+                      className={
+                        profile.email ? "text-stone-700 font-normal" : "text-stone-400 italic"
+                      }
+                    >
+                      {display(profile.email)}
+                    </span>
+                  </span>
                 </div>
+                <div className="flex items-center gap-2 truncate">
+                  <Phone className="w-3.5 h-3.5 text-stone-400 shrink-0" />
+                  <span className="text-stone-500">
+                    Contact:{" "}
+                    <span
+                      className={
+                        profile.phone ? "text-stone-700 font-normal" : "text-stone-400 italic"
+                      }
+                    >
+                      {profile.phone || "No phone"}
+                    </span>
+                  </span>
+                </div>
+                <div className="flex items-center gap-2 truncate">
+                  <span className="w-3.5 h-3.5 flex items-center justify-center text-[8px] font-bold border border-stone-400 rounded-sm text-stone-500 shrink-0">
+                    E
+                  </span>
+                  <span className="text-stone-500">
+                    Encord ID:{" "}
+                    {profile.encordId ? (
+                      <span className="text-stone-700">{profile.encordId}</span>
+                    ) : (
+                      <span className="text-stone-400 italic">Not updated</span>
+                    )}
+                  </span>
+                </div>
+                <div className="flex items-center gap-2 truncate">
+                  <Calendar className="w-3.5 h-3.5 text-stone-400 shrink-0" />
+                  <span className="text-stone-500">
+                    DOJ:{" "}
+                    <span className="text-stone-700 font-normal">
+                      {display(profile.joiningDate)}
+                    </span>
+                  </span>
+                </div>
+              </div>
+            </div>
+
+            <div className="flex flex-col gap-1.5 mt-auto">
+              <div className="flex items-center justify-end">
+                <h3 className="font-display text-[15px] font-extrabold text-stone-900">
+                  Leaves
+                </h3>
               </div>
 
               <div className="grid grid-cols-3 gap-2">
