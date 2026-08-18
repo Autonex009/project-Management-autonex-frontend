@@ -259,14 +259,15 @@ const SelfEvaluationPage = () => {
   });
   const { data: projects = [] } = useQuery({
     queryKey: ["sub-projects"],
-    queryFn: subProjectApi.getAll,
+    queryFn: () => subProjectApi.getAll(),
     enabled: !isPm,
   });
-  const { data: myEvals = [], isLoading: evalsLoading } = useQuery({
+  const { data: myEvalsData, isLoading: evalsLoading } = useQuery({
     queryKey: ["my-perf-evals", employeeId],
     queryFn: () => perfEvalApi.getAll({ employee_id: employeeId }),
     enabled: !!employeeId,
   });
+  const myEvals = myEvalsData?.items || [];
 
   const myProjects = useMemo(() => {
     const ids = new Set(allocations.map((a) => a.sub_project_id));

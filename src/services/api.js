@@ -59,6 +59,8 @@ export const projectApi = {
 // === Sub-Projects API (formerly Projects) ===
 export const subProjectApi = {
   getAll: () => api.get("/sub-projects").then((res) => res.data),
+  getPaginated: (params) => api.get("/sub-projects/paginated", { params }).then((res) => res.data),
+  getKpi: () => api.get("/sub-projects/kpi").then((res) => res.data),
   getOne: (id) => api.get(`/sub-projects/${id}`).then((res) => res.data),
   create: (data) => api.post("/sub-projects", data).then((res) => res.data),
   update: (id, data) =>
@@ -99,6 +101,8 @@ export const recommendationsApi = {
 
 // === Encord Analytics API ===
 export const analyticsApi = {
+  getDashboardKpis: () =>
+    api.get("/analytics/dashboard-kpis").then((res) => res.data),
   getProjectAnalytics: (mainProjectId, params) =>
     api
       .get(`/analytics/project/${mainProjectId}`, { params })
@@ -150,6 +154,10 @@ export const parentProjectApi = projectApi;
 
 export const employeeApi = {
   getAll: (params) => api.get("/employees", { params }).then((res) => res.data),
+  getPaginated: (params) => api.get("/employees/paginated", { params }).then((res) => res.data),
+  getTeamKpi: () => api.get("/employees/team-kpi").then((res) => res.data),
+  getTeamData: () => api.get("/employees/team-data").then((res) => res.data),
+  getStats: () => api.get("/employees/stats").then((res) => res.data),
   getOne: (id) => api.get(`/employees/${id}`).then((res) => res.data),
   create: (data) => api.post("/employees", data).then((res) => res.data),
   update: (id, data) =>
@@ -722,6 +730,8 @@ export const employeeNotesApi = {
 export const badgesApi = {
   getByEmployee: (employeeId, params = {}) =>
     api.get(`/employee-badges/by-employee/${employeeId}`, { params }),
+  getLogs: (employeeId) =>
+    api.get('/employee-badge-logs', { params: { employee_id: employeeId } }),
 };
 
 export default api;

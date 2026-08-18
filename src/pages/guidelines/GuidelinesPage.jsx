@@ -90,7 +90,7 @@ const GuidelinesPage = () => {
   // filter dropdown (always visible) and the create/edit form's org selector.
   const { data: mainProjects = [], isLoading: mainProjectsLoading } = useQuery({
     queryKey: ["main-projects"],
-    queryFn: projectApi.getAll,
+    queryFn: () => projectApi.getAll(),
   });
 
   // ── CHANGED: sub-projects are only needed to populate the "Project"

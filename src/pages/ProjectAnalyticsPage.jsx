@@ -163,12 +163,12 @@ const ProjectAnalyticsPage = () => {
 
   const { data: allocations = [] } = useQuery({
     queryKey: ["allocations"],
-    queryFn: allocationApi.getAll,
+    queryFn: () => allocationApi.getAll(),
   });
 
   const { data: employees = [] } = useQuery({
     queryKey: ["employees"],
-    queryFn: employeeApi.getAll,
+    queryFn: () => employeeApi.getAll(),
   });
 
   const annotators = data?.annotators || [];

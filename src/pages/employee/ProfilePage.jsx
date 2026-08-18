@@ -325,7 +325,7 @@ const ProfilePage = () => {
 
   const { data: skillsList = [], isLoading: skillsLoading } = useQuery({
     queryKey: ["skills-list"],
-    queryFn: skillsApi.getAll,
+    queryFn: () => skillsApi.getAll(),
   });
 
   const isLoading = accountLoading || employeeLoading;

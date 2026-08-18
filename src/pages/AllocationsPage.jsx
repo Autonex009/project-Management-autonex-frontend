@@ -123,7 +123,7 @@ const AllocationsPage = () => {
   // Lightweight list of every project, for the "Select Project" dropdown only.
   const { data: projects = [] } = useQuery({
     queryKey: ["sub-projects"],
-    queryFn: subProjectApi.getAll,
+    queryFn: () => subProjectApi.getAll(),
   });
 
   // ── CHANGED: full employee roster and the "who's on another project"

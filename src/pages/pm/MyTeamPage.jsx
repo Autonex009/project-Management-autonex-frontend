@@ -563,46 +563,23 @@ const MyTeamPage = () => {
   const [assignModalEmployee, setAssignModalEmployee] = useState(null);
   const [perfNoteEmployee, setPerfNoteEmployee] = useState(null);
 
-  const { data: parentProjects = [], isLoading: parentLoading } = useQuery({
-    queryKey: ["parent-projects"],
-    queryFn: parentProjectApi.getAll,
-  });
-  const { data: projects = [], isLoading: projectsLoading } = useQuery({
-    queryKey: ["sub-projects"],
-    queryFn: subProjectApi.getAll,
-  });
-  const { data: employees = [], isLoading: employeesLoading } = useQuery({
-    queryKey: ["employees"],
-    queryFn: employeeApi.getAll,
-  });
-  const { data: allocations = [], isLoading: allocationsLoading } = useQuery({
-    queryKey: ["allocations"],
-    queryFn: allocationApi.getAll,
-  });
-
   const todayStr = todayLocalISO();
+  const { data: teamData, isLoading: teamDataLoading } = useQuery({
+    queryKey: ["team-data"],
+    queryFn: () => employeeApi.getTeamData(),
+  });
+  
   const { data: leavesToday = [], isLoading: leavesLoading } = useQuery({
     queryKey: ["leaves", "today", todayStr],
     queryFn: () => leaveApi.getAll({ start_date: todayStr, end_date: todayStr }),
   });
 
-  const isLoading =
-    projectsLoading || employeesLoading || allocationsLoading || parentLoading || leavesLoading;
+  const isLoading = teamDataLoading || leavesLoading;
+  
+  const employees = teamData?.employees || [];
+  const scopedProjects = teamData?.projects || [];
+  const scopedAllocations = teamData?.allocations || [];
 
-  // Resolve PM scoped projects & allocations
-  const scopedProjects = useMemo(
-    () => getPmSubProjects(projects, parentProjects, pmEmployeeId, allocations),
-    [projects, parentProjects, pmEmployeeId, allocations]
-  );
-  const scopedProjectIds = useMemo(
-    () => new Set(scopedProjects.map((p) => p.id)),
-    [scopedProjects]
-  );
-
-  const scopedAllocations = useMemo(
-    () => allocations.filter((a) => scopedProjectIds.has(a.sub_project_id)),
-    [allocations, scopedProjectIds]
-  );
 
   // Map employee -> projects inside PM scope
   const employeeProjectMap = useMemo(() => {

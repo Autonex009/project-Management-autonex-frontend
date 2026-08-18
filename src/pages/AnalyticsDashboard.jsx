@@ -160,12 +160,12 @@ const AnalyticsDashboard = () => {
 
   const { data: allProjects = [] } = useQuery({
     queryKey: ["sub-projects"],
-    queryFn: subProjectApi.getAll,
+    queryFn: () => subProjectApi.getAll(),
   });
 
   const { data: allocations = [] } = useQuery({
     queryKey: ["allocations"],
-    queryFn: allocationApi.getAll,
+    queryFn: () => allocationApi.getAll(),
   });
 
   // Audit of Unlinked Projects
