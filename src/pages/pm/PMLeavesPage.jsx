@@ -151,27 +151,30 @@ const PMLeavesPage = () => {
     "Approved — one-off exception",
   ];
 
+  const { data: allLeaves = [], isLoading } = useQuery({
+    queryKey: ["leaves"],
+    queryFn: () => leaveApi.getAll(),
+  });
+  const { data: allocations = [], isLoading: allocationsLoading } = useQuery({
+    queryKey: ["allocations"],
+    queryFn: allocationApi.getAll,
+  });
+  const { data: employees = [], isLoading: employeesLoading } = useQuery({
+    queryKey: ["employees"],
+    queryFn: employeeApi.getAll,
+  });
+  const { data: projects = [] } = useQuery({
+    queryKey: ["sub-projects"],
+    queryFn: subProjectApi.getAll,
+  });
   const { data: parentProjects = [] } = useQuery({
     queryKey: ["parent-projects"],
-    queryFn: () => parentProjectApi.getAll(),
+    queryFn: parentProjectApi.getAll,
   });
-
-  const { data: teamData, isLoading: teamDataLoading } = useQuery({
-    queryKey: ["team-data"],
-    queryFn: () => employeeApi.getTeamData(),
+  const { data: wfhRequests = [], isLoading: wfhLoading } = useQuery({
+    queryKey: ["wfh"],
+    queryFn: () => wfhApi.getAll(),
   });
-  
-  const allLeaves = teamData?.leaves || [];
-  const allocations = teamData?.allocations || [];
-  const employees = teamData?.employees || [];
-  const projects = teamData?.projects || [];
-  const wfhRequests = teamData?.wfh_requests || [];
-  
-  const isLoading = teamDataLoading;
-  const allocationsLoading = teamDataLoading;
-  const employeesLoading = teamDataLoading;
-  const wfhLoading = teamDataLoading;
-
 
   // ── PM scope ─────────────────────────────────────────────────────
   const scopedProjects = getPmSubProjects(

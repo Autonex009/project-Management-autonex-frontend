@@ -331,7 +331,7 @@ const StatCard = ({
                       {section.title}
                     </p>
                   )}
-                  {(!section.rows || !Array.isArray(section.rows)) ? (console.error('Invalid section.rows:', section), null) : section.rows.map((row) => (
+                  {section.rows.map((row) => (
                     <div
                       key={row.label}
                       className="flex items-center justify-between gap-3 rounded-md px-1.5 py-1 transition-colors hover:bg-slate-50"
@@ -340,7 +340,7 @@ const StatCard = ({
                         {row.label}
                       </span>
                       <span className="shrink-0 font-mono text-[13px] font-semibold tabular-nums text-slate-900">
-                        {row.value ?? row.count}
+                        {row.value}
                       </span>
                     </div>
                   ))}

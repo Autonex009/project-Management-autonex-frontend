@@ -25,7 +25,7 @@ const PMProjectsPage = () => {
 
   const { data: parentProjects = [], isLoading } = useQuery({
     queryKey: ["parent-projects"],
-    queryFn: () => parentProjectApi.getAll(),
+    queryFn: parentProjectApi.getAll,
   });
 
   const scopedProjects = getPmProjects(parentProjects, pmEmployeeId);

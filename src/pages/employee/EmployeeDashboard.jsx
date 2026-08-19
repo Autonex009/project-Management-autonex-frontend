@@ -1,6 +1,6 @@
 import React, { useMemo, useState, useRef, useEffect } from "react";
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
-import { useParams, Link, useNavigate, useLocation } from "react-router-dom";
+import { useParams, Link } from "react-router-dom";
 
 import {
   allocationApi,
@@ -19,7 +19,6 @@ import {
 import {
   AlertCircle,
   AlertTriangle,
-  ArrowLeft,
   Calendar,
   Check,
   ChevronLeft,
@@ -73,15 +72,10 @@ import { setPageDetailTitle } from "../../utils/pageDetailTitle";
 
 import fiftyHoursBadge from "../../components/badges/50hrs.png";
 import twoHundredHoursBadge from "../../components/badges/200hrs.png";
-import weeklyTop1Badge from "../../components/badges/weekly_1.png";
-import weeklyTop2Badge from "../../components/badges/weekly_2.png";
-import weeklyTop3Badge from "../../components/badges/weekly_3.png";
-import monthlyTop1Badge from "../../components/badges/monthly_1.png";
-import monthlyTop2Badge from "../../components/badges/monthly_2.png";
-import monthlyTop3Badge from "../../components/badges/monthly_3.png";
+import weeklyTopBadge from "../../components/badges/weekly_2.png";
+import monthlyTopBadge from "../../components/badges/monthly_1.png";
 import threeMonthsBadge from "../../components/badges/3months.png";
 import sixMonthsBadge from "../../components/badges/6months.png";
-import yearlyBadge from "../../components/badges/yearly.png";
 
 /* ── Helpers ────────────────────────────────────────── */
 function getNameInitials(name) {
@@ -140,42 +134,12 @@ const BADGE_CONFIG = {
   weekly_top: {
     label: "Weekly Top",
     meta: "Performer",
-    image: weeklyTop1Badge,
+    image: weeklyTopBadge,
   },
   monthly_top: {
     label: "Monthly Top",
     meta: "Performer",
-    image: monthlyTop1Badge,
-  },
-  weekly_top_1: {
-    label: "Weekly Top",
-    meta: "Performer",
-    image: weeklyTop1Badge,
-  },
-  weekly_top_2: {
-    label: "Weekly Top",
-    meta: "Performer",
-    image: weeklyTop2Badge,
-  },
-  weekly_top_3: {
-    label: "Weekly Top",
-    meta: "Performer",
-    image: weeklyTop3Badge,
-  },
-  monthly_top_1: {
-    label: "Monthly Top",
-    meta: "Performer",
-    image: monthlyTop1Badge,
-  },
-  monthly_top_2: {
-    label: "Monthly Top",
-    meta: "Performer",
-    image: monthlyTop2Badge,
-  },
-  monthly_top_3: {
-    label: "Monthly Top",
-    meta: "Performer",
-    image: monthlyTop3Badge,
+    image: monthlyTopBadge,
   },
   tenure: {
     label: "Tenure",
@@ -185,7 +149,7 @@ const BADGE_CONFIG = {
   yearly_milestone: {
     label: "Yearly",
     meta: "Milestone",
-    image: yearlyBadge,
+    image: sixMonthsBadge, // swap when you have a yearly image
   },
 };
 
@@ -293,40 +257,12 @@ const SkillsMultiSelect = ({ selected, onChange, options, isLoading }) => {
   );
 };
 
-const formatPhoneNumber = (phone) => {
-  if (!phone) return "";
-  const str = String(phone).trim();
-  if (!str) return "";
-
-  if (str.startsWith("+91") || str.startsWith("+ 91")) {
-    return str;
-  }
-
-  const cleanDigits = str.replace(/\D/g, "");
-  if (cleanDigits.length === 12 && cleanDigits.startsWith("91")) {
-    return `+91 ${cleanDigits.slice(2)}`;
-  }
-
-  if (cleanDigits.length === 10) {
-    return `+91 ${cleanDigits}`;
-  }
-
-  if (str.startsWith("91")) {
-    return `+${str}`;
-  }
-
-  return `+91 ${str}`;
-};
-
 const EmployeeDashboard = () => {
   const queryClient = useQueryClient();
   const params = useParams();
-  const navigate = useNavigate();
-  const location = useLocation();
   const [showFullFeedback, setShowFullFeedback] = useState(false);
   const [imgError, setImgError] = useState(false);
   const [showLogsModal, setShowLogsModal] = useState(false);
-  const [showBadgeLogsModal, setShowBadgeLogsModal] = useState(false);
   const [editEmail, setEditEmail] = useState("");
   const [emailError, setEmailError] = useState("");
   const [profileTab, setProfileTab] = useState("attendance");
@@ -349,21 +285,9 @@ const EmployeeDashboard = () => {
   };
 
   const localUser = JSON.parse(localStorage.getItem("user") || "{}");
-  const userRole = localStorage.getItem("role") || localUser.role || "employee";
-  const isAdmin = userRole === "admin";
+  const isAdmin = localUser.role === "admin";
   const employeeId = params.id || localUser.employee_id || localUser.id || 1;
   const isSelf = !params.id || String(params.id) === String(localUser.employee_id || localUser.id);
-  const isPortalView = location.pathname.startsWith("/admin") || location.pathname.startsWith("/pm");
-  const showBackButton = isPortalView && (!!params.id || !isSelf);
-
-  // Scroll to top on navigation / employee ID change
-  useEffect(() => {
-    window.scrollTo({ top: 0, left: 0, behavior: "instant" });
-    const mainEl = document.querySelector("main");
-    if (mainEl) {
-      mainEl.scrollTop = 0;
-    }
-  }, [employeeId, params.id]);
 
   /* ── Queries ─────────────────────────────────────── */
   const { data: account } = useQuery({
@@ -386,7 +310,7 @@ const EmployeeDashboard = () => {
 
   const { data: projects = [] } = useQuery({
     queryKey: ["sub-projects"],
-    queryFn: () => subProjectApi.getAll(),
+    queryFn: subProjectApi.getAll,
   });
 
   const { data: allLeaves = [] } = useQuery({
@@ -429,12 +353,11 @@ const EmployeeDashboard = () => {
     });
   }, [allLeaves, modalMonthYear]);
 
-  const { data: perfReviewsData } = useQuery({
+  const { data: perfReviews = [] } = useQuery({
     queryKey: ["employee-perf-reviews", employeeId],
     queryFn: () => perfEvalApi.getAll({ employee_id: employeeId }),
     enabled: !!employeeId,
   });
-  const perfReviews = perfReviewsData?.items || [];
 
   const { data: dailyLeaderboard } = useQuery({
     queryKey: ["leaderboard-day"],
@@ -451,7 +374,7 @@ const EmployeeDashboard = () => {
 
   const { data: skillsList = [], isLoading: skillsLoading } = useQuery({
     queryKey: ["skills-list"],
-    queryFn: () => skillsApi.getAll(),
+    queryFn: skillsApi.getAll,
   });
 
   /* ── Employee Notes (complaints / warnings / recognitions) ── */
@@ -475,22 +398,6 @@ const EmployeeDashboard = () => {
             : [];
     },
     enabled: !!employeeId,
-  });
-
-  const { data: badgeLogs = [], isLoading: badgeLogsLoading } = useQuery({
-    queryKey: ["employee-badge-logs", employeeId],
-    queryFn: async () => {
-      const res = await badgesApi.getLogs(employeeId);
-      const payload = res?.data !== undefined ? res.data : res;
-      return Array.isArray(payload)
-        ? payload
-        : Array.isArray(payload?.data)
-          ? payload.data
-          : Array.isArray(payload?.items)
-            ? payload.items
-            : [];
-    },
-    enabled: !!employeeId && showBadgeLogsModal,
   });
 
   const createNoteMutation = useMutation({
@@ -566,8 +473,7 @@ const EmployeeDashboard = () => {
     const initials = getNameInitials(name);
 
     const email = employee?.email || account?.email || localUser.email || "";
-    const rawPhone = employee?.phone || account?.phone || "";
-    const phone = formatPhoneNumber(rawPhone);
+    const phone = employee?.phone || account?.phone || "";
     const encordId = employee?.encord_id || "";
     const slackUserId = employee?.slack_user_id || "";
     const skills = employee?.skills || account?.skills || localUser.skills || [];
@@ -765,7 +671,7 @@ const EmployeeDashboard = () => {
         const isActive = project?.project_status === "active";
         return {
           id: alloc.id,
-          name: alloc.project_name || alloc.sub_project_name || project?.name || "Project",
+          name: project?.name || "Project",
           role:
             (alloc.role_tags || []).join(", ") || profile.jobTitle || "Developer",
           status: isActive ? "active" : "completed",
@@ -775,7 +681,7 @@ const EmployeeDashboard = () => {
           endDate: alloc.active_end_date
             ? format(parseISO(alloc.active_end_date), "dd MMM yyyy")
             : "Ongoing",
-          symbol: (alloc.project_name || alloc.sub_project_name || project?.name || "P")[0].toUpperCase(),
+          symbol: (project?.name || "P")[0].toUpperCase(),
         };
       })
       .sort((a, b) => (a.status === "active" ? -1 : 1));
@@ -985,18 +891,6 @@ const EmployeeDashboard = () => {
           ? employeeBadges.items
           : [];
 
-    const getBadgeInfo = (codes) => {
-      const codeArr = Array.isArray(codes) ? codes : [codes];
-      const foundIdx = list.findIndex((b) => codeArr.includes(b.badge_code));
-      if (foundIdx === -1) return { earned: false, awardedAt: null, listIndex: 999 };
-      const item = list[foundIdx];
-      return {
-        earned: true,
-        awardedAt: item.awarded_at || item.created_at || item.issued_at || null,
-        listIndex: foundIdx,
-      };
-    };
-
     const has = (code) => list.some((b) => b.badge_code === code);
 
     // Best weekly rank
@@ -1021,114 +915,77 @@ const EmployeeDashboard = () => {
     // Yearly: one badge + count
     const yearlyCount = list.filter((b) => b.badge_code === "yearly_milestone").length;
 
-    const rawBadges = DISPLAY_SLOTS.map((slot) => {
+    return DISPLAY_SLOTS.map((slot) => {
       const base = BADGE_CONFIG[slot];
 
       if (slot === "hrs_50_week") {
-        const info = getBadgeInfo("hrs_50_week");
         return {
           id: slot,
           label: base.label,
           meta: base.meta,
           image: base.image,
-          earned: info.earned,
-          awardedAt: info.awardedAt,
-          listIndex: info.listIndex,
+          earned: has("hrs_50_week"),
           badgeText: null,
         };
       }
 
       if (slot === "hrs_200_month") {
-        const info = getBadgeInfo("hrs_200_month");
         return {
           id: slot,
           label: base.label,
           meta: base.meta,
           image: base.image,
-          earned: info.earned,
-          awardedAt: info.awardedAt,
-          listIndex: info.listIndex,
+          earned: has("hrs_200_month"),
           badgeText: null,
         };
       }
 
       if (slot === "weekly_top") {
-        const info = getBadgeInfo(["weekly_top_1", "weekly_top_2", "weekly_top_3"]);
-        const dynamicImage = weeklyRank ? BADGE_CONFIG[`weekly_top_${weeklyRank}`]?.image : base.image;
         return {
           id: slot,
           label: base.label,
           meta: weeklyRank ? `#${weeklyRank}` : base.meta,
-          image: dynamicImage,
+          image: base.image,
           earned: weeklyRank != null,
-          awardedAt: info.awardedAt,
-          listIndex: info.listIndex,
           badgeText: weeklyRank ? `#${weeklyRank}` : null,
         };
       }
 
       if (slot === "monthly_top") {
-        const info = getBadgeInfo(["monthly_top_1", "monthly_top_2", "monthly_top_3"]);
-        const dynamicImage = monthlyRankBadge ? BADGE_CONFIG[`monthly_top_${monthlyRankBadge}`]?.image : base.image;
         return {
           id: slot,
           label: base.label,
           meta: monthlyRankBadge ? `#${monthlyRankBadge}` : base.meta,
-          image: dynamicImage,
+          image: base.image,
           earned: monthlyRankBadge != null,
-          awardedAt: info.awardedAt,
-          listIndex: info.listIndex,
           badgeText: monthlyRankBadge ? `#${monthlyRankBadge}` : null,
         };
       }
 
       if (slot === "tenure") {
-        const info = getBadgeInfo(["tenure_6_months", "tenure_3_months"]);
         return {
           id: slot,
           label: tenureLabel,
           meta: tenureEarned ? "Completed" : base.meta,
           image: tenureImage,
           earned: tenureEarned,
-          awardedAt: info.awardedAt,
-          listIndex: info.listIndex,
           badgeText: null,
         };
       }
 
       if (slot === "yearly_milestone") {
-        const info = getBadgeInfo("yearly_milestone");
         return {
           id: slot,
           label: base.label,
           meta: yearlyCount > 0 ? `${yearlyCount} yr${yearlyCount > 1 ? "s" : ""}` : base.meta,
           image: base.image,
           earned: yearlyCount > 0,
-          awardedAt: info.awardedAt,
-          listIndex: info.listIndex,
           badgeText: yearlyCount > 1 ? `×${yearlyCount}` : yearlyCount === 1 ? "1" : null,
         };
       }
 
       return null;
     }).filter(Boolean);
-
-    // Sort: active/earned badges move to the front of the line (leftmost)
-    // Within active badges, order by newest awarded timestamp / list index first
-    return rawBadges.sort((a, b) => {
-      if (a.earned !== b.earned) {
-        return a.earned ? -1 : 1;
-      }
-      if (a.earned && b.earned) {
-        if (a.awardedAt && b.awardedAt) {
-          const tA = new Date(a.awardedAt).getTime();
-          const tB = new Date(b.awardedAt).getTime();
-          if (tA !== tB) return tB - tA;
-        }
-        return a.listIndex - b.listIndex;
-      }
-      return 0;
-    });
   }, [employeeBadges]);
 
   const earnedBadgeCount = achievementBadges.filter((b) => b.earned).length;
@@ -1171,10 +1028,9 @@ const EmployeeDashboard = () => {
   const warningsCount = openWarnings.length;
 
   const canManageNotes =
-    userRole === "admin" ||
-    userRole === "pm" ||
-    userRole === "team_lead" ||
-    userRole === "hr";
+    localUser.role === "admin" ||
+    localUser.role === "pm" ||
+    localUser.role === "hr";
 
   return (
     <div
@@ -1196,43 +1052,49 @@ const EmployeeDashboard = () => {
       {/* ════════════════ TOP SECTION ════════════════ */}
       <div className="grid grid-cols-1 lg:grid-cols-12 gap-2 sm:gap-3 items-stretch">
         {/* ──────────── PROFILE CARD ──────────── */}
-        <div className="lg:col-span-5 rounded-xl border border-stone-200 p-3 shadow-sm bg-white flex gap-3">
+        <div className="lg:col-span-5 rounded-xl border border-stone-200 p-3 shadow-sm bg-white flex gap-2.5">
           {/* Left Column: Avatar, Date, Phone, Skills */}
-          <div className="flex flex-col items-center shrink-0 w-[155px]">
-            <div className="relative mb-2.5 flex justify-center w-full">
+          <div className="flex flex-col shrink-0 w-[120px]">
+            <div className="relative mb-3 mx-auto">
               {profile.avatarUrl && !imgError ? (
                 <img
                   src={profile.avatarUrl}
                   alt={profile.name}
                   onError={() => setImgError(true)}
-                  className="w-28 h-28 rounded-full object-cover border border-stone-100 shadow-sm"
+                  className="w-24 h-24 rounded-full object-cover border border-stone-100 shadow-sm"
                 />
               ) : (
-                <div className="w-28 h-28 rounded-full bg-gradient-to-br from-emerald-50 to-stone-100 border border-stone-100 text-emerald-800 font-bold text-4xl flex items-center justify-center shadow-sm uppercase">
+                <div className="w-24 h-24 rounded-full bg-gradient-to-br from-emerald-50 to-stone-100 border border-stone-100 text-emerald-800 font-bold text-3xl flex items-center justify-center shadow-sm uppercase">
                   {profile.initials}
                 </div>
               )}
             </div>
 
 
-            {/* Role */}
-            <div className="flex items-center justify-center gap-1.5 text-[11px] text-stone-500 w-full mb-2 whitespace-nowrap text-center">
-              <User className="w-3.5 h-3.5 text-stone-400 shrink-0" />
-              <span className="whitespace-nowrap">
-                Role: <span className="font-normal text-stone-700">{display(profile.jobTitle, "Annotator/Reviewer")}</span>
-              </span>
+            {/* Date */}
+            <div className="flex items-center justify-start gap-1.5 text-[10px] text-stone-700 font-semibold w-full mb-1.5 px-0.5">
+              <Calendar className="w-3.5 h-3.5 text-stone-400 shrink-0" />
+              <span className="truncate">{display(profile.joiningDate)}</span>
+            </div>
+            
+            {/* Phone */}
+            <div className="flex items-center justify-start gap-1.5 text-[10px] text-stone-500 font-medium w-full mb-2 px-0.5">
+              <Phone className="w-3.5 h-3.5 text-stone-400 shrink-0" />
+              <span className="truncate">{profile.phone || "No phone"}</span>
             </div>
 
+            <div className="w-full h-px bg-stone-100 mb-2" />
+
             {profile.skills?.length > 0 && (
-              <div className="flex flex-col items-center gap-1 w-full mt-0.5">
-                <span className="text-[9px] font-bold text-stone-400 uppercase tracking-wider text-center">
+              <div className="flex flex-col gap-1 w-full mt-1">
+                <span className="text-[9px] font-bold text-stone-400 uppercase tracking-wider ml-0.5">
                   Skills
                 </span>
-                <div className="flex flex-wrap gap-1.5 w-full justify-center">
+                <div className="flex flex-wrap gap-1.5 w-full">
                   {profile.skills.slice(0, 3).map((skill, idx) => (
                     <span
                       key={idx}
-                      className="bg-indigo-50/70 text-stone-700 px-2 py-0.5 rounded-full text-[9px] font-medium border border-indigo-100/50 leading-tight break-words max-w-full text-center"
+                      className="bg-indigo-50/70 text-stone-700 px-2 py-0.5 rounded-full text-[9px] font-medium border border-indigo-100/50 leading-tight break-words max-w-full"
                     >
                       {skill}
                     </span>
@@ -1243,135 +1105,192 @@ const EmployeeDashboard = () => {
           </div>
 
           {/* Right Column */}
-          <div className="flex-1 min-w-0 flex flex-col justify-between pt-1">
-            <div>
-              <div className="flex items-center gap-2 flex-wrap mb-2.5">
-                <h1 className="font-display text-[16px] font-bold text-stone-900 truncate leading-none">
-                  {display(profile.name, "Employee")}
-                </h1>
-                {profile.badge && (
-                  <span className="text-[9px] font-semibold uppercase tracking-wider text-indigo-600 bg-indigo-50 px-2 py-0.5 rounded border border-indigo-200">
-                    {profile.badge}
-                  </span>
-                )}
-              </div>
+          <div className="flex-1 min-w-0 flex flex-col pt-1">
+            <div className="flex items-center gap-2 flex-wrap mb-2.5">
+              <h1 className="font-display text-[16px] font-bold text-stone-900 truncate leading-none">
+                {display(profile.name, "Employee")}
+              </h1>
+              {profile.badge && (
+                <span className="text-[9px] font-semibold uppercase tracking-wider text-indigo-600 bg-indigo-50 px-2 py-0.5 rounded border border-indigo-200">
+                  {profile.badge}
+                </span>
+              )}
+            </div>
 
-              <div className="text-[11px] text-stone-600 space-y-1.5 mb-2">
-                <div className="flex items-center gap-2 truncate">
-                  <Mail className="w-3.5 h-3.5 text-stone-400 shrink-0" />
-                  <span className="text-stone-500">
-                    Email:{" "}
-                    <span
-                      className={
-                        profile.email ? "text-stone-700 font-normal" : "text-stone-400 italic"
-                      }
-                    >
-                      {display(profile.email)}
-                    </span>
+            <div className="text-[11px] text-stone-600 space-y-1.5 mb-3">
+              <div className="flex items-center gap-2 truncate">
+                <Mail className="w-3.5 h-3.5 text-stone-400 shrink-0" />
+                <span
+                  className={
+                    profile.email ? "text-stone-700" : "text-stone-400 italic"
+                  }
+                >
+                  {display(profile.email)}
+                </span>
+              </div>
+              <div className="flex items-center gap-2 truncate">
+                <span className="w-3.5 h-3.5 flex items-center justify-center text-[8px] font-bold border border-stone-400 rounded-sm text-stone-500 shrink-0">
+                  E
+                </span>
+                <span className="text-stone-500">
+                  EncordId:{" "}
+                  {profile.encordId ? (
+                    <span className="text-stone-700">{profile.encordId}</span>
+                  ) : (
+                    <span className="text-stone-400 italic">Not updated</span>
+                  )}
+                </span>
+              </div>
+              <div className="flex items-center gap-2 truncate">
+                <User className="w-3.5 h-3.5 text-stone-400 shrink-0" />
+                <span className="text-stone-500">
+                  Role:{" "}
+                  <span className="text-stone-700">
+                    {display(profile.jobTitle, "Annotator/Reviewer")}
                   </span>
-                </div>
-                <div className="flex items-center gap-2 truncate">
-                  <Phone className="w-3.5 h-3.5 text-stone-400 shrink-0" />
-                  <span className="text-stone-500">
-                    Contact:{" "}
-                    <span
-                      className={
-                        profile.phone ? "text-stone-700 font-normal" : "text-stone-400 italic"
-                      }
-                    >
-                      {profile.phone || "No phone"}
-                    </span>
-                  </span>
-                </div>
-                <div className="flex items-center gap-2 truncate">
-                  <span className="w-3.5 h-3.5 flex items-center justify-center text-[8px] font-bold border border-stone-400 rounded-sm text-stone-500 shrink-0">
-                    E
-                  </span>
-                  <span className="text-stone-500">
-                    Encord ID:{" "}
-                    {profile.encordId ? (
-                      <span className="text-stone-700">{profile.encordId}</span>
-                    ) : (
-                      <span className="text-stone-400 italic">Not updated</span>
-                    )}
-                  </span>
-                </div>
-                <div className="flex items-center gap-2 truncate">
-                  <Calendar className="w-3.5 h-3.5 text-stone-400 shrink-0" />
-                  <span className="text-stone-500">
-                    DOJ:{" "}
-                    <span className="text-stone-700 font-normal">
-                      {display(profile.joiningDate)}
-                    </span>
-                  </span>
-                </div>
+                </span>
               </div>
             </div>
 
-            <div className="flex flex-col gap-1.5 mt-auto">
-              <div className="flex items-center justify-end">
-                <h3 className="font-display text-[15px] font-extrabold text-stone-900">
-                  Leaves
-                </h3>
+            <div className="w-full h-px bg-stone-100 mb-2" />
+
+            <div className="flex flex-col gap-4 mt-1">
+              <div className="flex gap-4">
+                <button
+                  type="button"
+                  onClick={() => setProfileTab("attendance")}
+                  className={`flex items-center gap-1.5 pb-1 border-b-[2px] font-semibold text-[10px] transition-colors ${
+                    profileTab === "attendance"
+                      ? "border-indigo-500 text-indigo-600"
+                      : "border-transparent text-stone-400 hover:text-stone-600"
+                  }`}
+                >
+                  <Calendar className="w-3.5 h-3.5" /> Attendance
+                </button>
+                <button
+                  type="button"
+                  onClick={() => setProfileTab("notes")}
+                  className={`flex items-center gap-1.5 pb-1 border-b-[2px] font-semibold text-[10px] transition-colors ${
+                    profileTab === "notes"
+                      ? "border-indigo-500 text-indigo-600"
+                      : "border-transparent text-stone-400 hover:text-stone-600"
+                  }`}
+                >
+                  <FileText className="w-3.5 h-3.5" /> Notes
+                </button>
               </div>
 
-              <div className="grid grid-cols-3 gap-2">
-                {[
-                  {
-                    icon: <Home className="w-3.5 h-3.5 text-indigo-600" />,
-                    label: "WFH",
-                    remaining: leavesAndWfhStats.wfhRemaining,
-                    quota: leavesAndWfhStats.wfhQuota,
-                    tabKey: "wfh",
-                  },
-                  {
-                    icon: <Calendar className="w-3.5 h-3.5 text-indigo-600" />,
-                    label: "Paid",
-                    remaining: leavesAndWfhStats.paidRemaining,
-                    quota: leavesAndWfhStats.paidQuota,
-                    tabKey: "paid",
-                  },
-                  {
-                    icon: <HeartPulse className="w-3.5 h-3.5 text-amber-600" />,
-                    label: "Sick",
-                    remaining: leavesAndWfhStats.isInternOrContractor
-                      ? "—"
-                      : leavesAndWfhStats.casualRemaining,
-                    quota: leavesAndWfhStats.isInternOrContractor
-                      ? "—"
-                      : leavesAndWfhStats.casualQuota,
-                    tabKey: "casual_sick",
-                  },
-                ].map(({ icon, label, remaining, quota, tabKey }) => (
-                  <div
-                    key={label}
-                    onClick={() => handleOpenAttendanceModal(tabKey)}
-                    title={`Click to view ${label} records`}
-                    className="flex flex-col items-center gap-0.5 border border-stone-200 rounded-xl pt-2 pb-1 bg-white shadow-sm cursor-pointer hover:border-stone-300 transition-colors"
-                  >
+              {profileTab === "attendance" ? (
+                <div className="grid grid-cols-3 gap-2">
+                  {[
+                    {
+                      icon: <Home className="w-3.5 h-3.5 text-indigo-600" />,
+                      label: "WFH",
+                      remaining: leavesAndWfhStats.wfhRemaining,
+                      quota: leavesAndWfhStats.wfhQuota,
+                      tabKey: "wfh",
+                    },
+                    {
+                      icon: <Calendar className="w-3.5 h-3.5 text-indigo-600" />,
+                      label: "Paid",
+                      remaining: leavesAndWfhStats.paidRemaining,
+                      quota: leavesAndWfhStats.paidQuota,
+                      tabKey: "paid",
+                    },
+                    {
+                      icon: <HeartPulse className="w-3.5 h-3.5 text-amber-600" />,
+                      label: "Sick",
+                      remaining: leavesAndWfhStats.isInternOrContractor
+                        ? "—"
+                        : leavesAndWfhStats.casualRemaining,
+                      quota: leavesAndWfhStats.isInternOrContractor
+                        ? "—"
+                        : leavesAndWfhStats.casualQuota,
+                      tabKey: "casual_sick",
+                    },
+                  ].map(({ icon, label, remaining, quota, tabKey }) => (
                     <div
-                      className={`w-7 h-7 rounded-full flex items-center justify-center ${
-                        label === "Sick" ? "bg-orange-50" : "bg-indigo-50"
-                      }`}
+                      key={label}
+                      onClick={() => handleOpenAttendanceModal(tabKey)}
+                      title={`Click to view ${label} records`}
+                      className="flex flex-col items-center gap-0.5 border border-stone-200 rounded-xl pt-2 pb-1 bg-white shadow-sm cursor-pointer hover:border-stone-300 transition-colors"
                     >
-                      {icon}
-                    </div>
-                    <div className="text-center">
-                      <div className="font-data text-lg font-extrabold text-stone-800 leading-none flex items-baseline justify-center gap-0.5">
-                        <span>{remaining}</span>
-                        {quota !== "—" && (
-                          <span className="text-xs font-semibold text-stone-400">
-                            / {quota}
-                          </span>
-                        )}
+                      <div
+                        className={`w-7 h-7 rounded-full flex items-center justify-center ${
+                          label === "Sick" ? "bg-orange-50" : "bg-indigo-50"
+                        }`}
+                      >
+                        {icon}
                       </div>
-                      <span className="text-[9px] font-medium text-stone-400 mt-0.5 block uppercase tracking-wider">
-                        {label}
-                      </span>
+                      <div className="text-center">
+                        <div className="font-data text-lg font-extrabold text-stone-800 leading-none flex items-baseline justify-center gap-0.5">
+                          <span>{remaining}</span>
+                          {quota !== "—" && (
+                            <span className="text-xs font-semibold text-stone-400">
+                              / {quota}
+                            </span>
+                          )}
+                        </div>
+                        <span className="text-[9px] font-medium text-stone-400 mt-0.5 block uppercase tracking-wider">
+                          {label}
+                        </span>
+                      </div>
                     </div>
-                  </div>
-                ))}
-              </div>
+                  ))}
+                </div>
+              ) : (
+                <div className="grid grid-cols-3 gap-2">
+                  {[
+                    {
+                      icon: <AlertCircle className="w-3.5 h-3.5 text-rose-500" />,
+                      label: "Complaints",
+                      value: complaintsCount,
+                      color: "text-rose-600",
+                    },
+                    {
+                      icon: (
+                        <AlertTriangle className="w-3.5 h-3.5 text-amber-500" />
+                      ),
+                      label: "Warnings",
+                      value: warningsCount,
+                      color: "text-amber-600",
+                    },
+                    {
+                      icon: <Award className="w-3.5 h-3.5 text-indigo-600" />,
+                      label: "Recognition",
+                      value: recognitionsList.length,
+                      color: "text-indigo-600",
+                    },
+                  ].map(({ icon, label, value, color }) => (
+                    <div
+                      key={label}
+                      className="flex flex-col items-center gap-0.5 border border-stone-200 rounded-xl pt-2 pb-1 shadow-sm bg-white"
+                    >
+                      <div
+                        className={`w-7 h-7 rounded-full flex items-center justify-center ${
+                          label === "Recognition"
+                            ? "bg-indigo-50"
+                            : label === "Warnings"
+                            ? "bg-amber-50"
+                            : "bg-rose-50"
+                        }`}
+                      >
+                        {icon}
+                      </div>
+                      <div className="text-center">
+                        <span
+                          className={`font-data text-lg font-extrabold leading-none block ${color}`}
+                        >
+                          {value}
+                        </span>
+                        <span className="text-[9px] font-medium text-stone-400 mt-0.5 block uppercase tracking-wider">
+                          {label}
+                        </span>
+                      </div>
+                    </div>
+                  ))}
+                </div>
+              )}
             </div>
           </div>
         </div>
@@ -1379,17 +1298,9 @@ const EmployeeDashboard = () => {
         {/* ───────── BADGE (col-7) ───────── */}
         <div className="lg:col-span-7 bg-white border border-stone-200 rounded-xl p-3 flex flex-col gap-2 shadow-[0_1px_4px_rgba(28,25,23,0.06)]">
           <div className="flex items-center justify-between pb-1">
-            <div className="flex items-center gap-2">
-              <h2 className="font-display text-[15px] font-extrabold text-stone-900">
-                Badges
-              </h2>
-              <button
-                onClick={() => setShowBadgeLogsModal(true)}
-                className="text-[10px] font-semibold text-indigo-600 hover:text-indigo-800 transition-colors"
-              >
-                Logs
-              </button>
-            </div>
+            <h2 className="font-display text-[15px] font-extrabold text-stone-900">
+              Badges
+            </h2>
             <div className="text-[10px] font-medium text-stone-500">
               <span className="text-indigo-600 font-bold">
                 {earnedBadgeCount}/{achievementBadges.length}
@@ -1758,15 +1669,9 @@ const EmployeeDashboard = () => {
                         </p>
                       </div>
                     )}
-                    <div className="relative w-full mt-0.5 h-3">
+                    <div className="flex justify-between mt-0.5 text-[7.5px] text-stone-400 font-medium font-data">
                       {chartGeometry.points.map((p, i) => (
-                        <span
-                          key={i}
-                          className="absolute top-0 text-[7.5px] text-stone-400 font-medium font-data -translate-x-1/2 whitespace-nowrap"
-                          style={{ left: `${(p.x / CHART_W) * 100}%` }}
-                        >
-                          {format(parseISO(p.date), "d")}
-                        </span>
+                        <span key={i}>{format(parseISO(p.date), "d")}</span>
                       ))}
                     </div>
                   </div>
@@ -1868,9 +1773,6 @@ const EmployeeDashboard = () => {
                   <div className="flex items-center gap-1.5">
                     <AlertCircle className="w-3.5 h-3.5 text-rose-500 shrink-0" />
                     <h3 className="text-[10px] font-bold text-stone-700 uppercase tracking-wider">Complaints</h3>
-                    <span className="px-1.5 py-0.5 text-[10px] font-extrabold rounded-full bg-rose-50 text-rose-600 border border-rose-200/80 leading-none ml-0.5">
-                      {complaintsCount}
-                    </span>
                   </div>
                   <div className="flex items-center gap-1.5">
                     <button onClick={() => setNotesModal({ isOpen: true, type: 'complaints', title: 'Complaints History', data: complaintsList })} className="flex items-center gap-1 text-[9px] font-semibold text-stone-500 hover:text-stone-800 bg-stone-100 hover:bg-stone-200 border border-stone-200 px-1.5 py-0.5 rounded transition-colors cursor-pointer">
@@ -1981,9 +1883,6 @@ const EmployeeDashboard = () => {
                   <div className="flex items-center gap-1.5">
                     <AlertTriangle className="w-3.5 h-3.5 text-amber-500 shrink-0" />
                     <h3 className="text-[10px] font-bold text-stone-700 uppercase tracking-wider">Warnings</h3>
-                    <span className="px-1.5 py-0.5 text-[10px] font-extrabold rounded-full bg-amber-50 text-amber-600 border border-amber-200/80 leading-none ml-0.5">
-                      {warningsCount}
-                    </span>
                   </div>
                   <div className="flex items-center gap-1.5">
                     <button onClick={() => setNotesModal({ isOpen: true, type: 'warnings', title: 'Warnings History', data: warningsList })} className="flex items-center gap-1 text-[9px] font-semibold text-stone-500 hover:text-stone-800 bg-stone-100 hover:bg-stone-200 border border-stone-200 px-1.5 py-0.5 rounded transition-colors cursor-pointer">
@@ -2092,9 +1991,6 @@ const EmployeeDashboard = () => {
                   <div className="flex items-center gap-1.5">
                     <Award className="w-3.5 h-3.5 text-indigo-600 shrink-0" />
                     <h3 className="text-[10px] font-bold text-stone-700 uppercase tracking-wider">Recognition</h3>
-                    <span className="px-1.5 py-0.5 text-[10px] font-extrabold rounded-full bg-indigo-50 text-indigo-600 border border-indigo-200/80 leading-none ml-0.5">
-                      {recognitionsList.length}
-                    </span>
                   </div>
                   <div className="flex items-center gap-1.5">
                     <button onClick={() => setNotesModal({ isOpen: true, type: 'recognitions', title: 'Recognition History', data: recognitionsList })} className="flex items-center gap-1 text-[9px] font-semibold text-stone-500 hover:text-stone-800 bg-stone-100 hover:bg-stone-200 border border-stone-200 px-1.5 py-0.5 rounded transition-colors cursor-pointer">
@@ -2250,14 +2146,14 @@ const EmployeeDashboard = () => {
                 icon: Trophy,
                 title: "Top Performer",
                 date: "August 2026",
-                earned: false,
+                earned: true,
                 color: "text-amber-500",
               },
               {
                 icon: Star,
                 title: "Quality Champion",
                 date: "July 2026",
-                earned: false,
+                earned: true,
                 color: "text-amber-500",
               },
               {
@@ -2666,94 +2562,6 @@ const EmployeeDashboard = () => {
         </div>
       )}
 
-      {showBadgeLogsModal && (
-        <div className="fixed inset-0 z-50 flex items-end sm:items-center justify-center p-0 sm:p-4 bg-stone-900/40 backdrop-blur-sm">
-          <div className="bg-white border border-stone-200 rounded-t-2xl sm:rounded-2xl w-full max-w-xl shadow-2xl overflow-hidden flex flex-col max-h-[90vh] sm:max-h-[85vh]">
-            <div className="px-4 py-3 border-b border-stone-100 flex items-center justify-between bg-white/50">
-              <div className="flex items-center gap-2.5">
-                <div className="w-8 h-8 rounded-xl bg-indigo-100/50 text-indigo-600 border border-indigo-200/50 flex items-center justify-center shadow-sm">
-                  <BadgeCheck className="w-4 h-4" />
-                </div>
-                <div>
-                  <h3 className="font-display text-sm font-bold text-stone-800">
-                    Badge History
-                  </h3>
-                  <p className="text-[10px] text-stone-400">
-                    History of earned badges and milestones
-                  </p>
-                </div>
-              </div>
-              <button
-                onClick={() => setShowBadgeLogsModal(false)}
-                className="w-8 h-8 rounded-xl text-stone-400 hover:text-stone-600 hover:bg-stone-200/50 flex items-center justify-center transition-colors cursor-pointer"
-              >
-                <X className="w-4 h-4" />
-              </button>
-            </div>
-
-            <div className="p-4 overflow-y-auto db-scroll space-y-2 flex-1">
-              {badgeLogsLoading ? (
-                <div className="flex items-center justify-center py-10">
-                  <span className="text-xs text-stone-400">Loading logs...</span>
-                </div>
-              ) : badgeLogs.length === 0 ? (
-                <div className="flex flex-col items-center justify-center py-10 text-center">
-                  <div className="w-12 h-12 rounded-full bg-stone-100 flex items-center justify-center mb-3">
-                    <BadgeCheck className="w-5 h-5 text-stone-400" />
-                  </div>
-                  <p className="text-xs font-semibold text-stone-600">No badge logs available.</p>
-                  <p className="text-[10px] text-stone-400 mt-1">Badge achievements will appear here.</p>
-                </div>
-              ) : (
-                badgeLogs.map((log) => {
-                  return (
-                    <div
-                      key={log.id}
-                      className="p-3 rounded-xl border bg-stone-50 border-stone-100 flex items-center gap-3"
-                    >
-                      <div className="w-10 h-10 rounded-full bg-white border border-stone-200 shadow-sm flex items-center justify-center shrink-0">
-                        <img 
-                           src={
-                             log.badge_code === "tenure_6_months" ? sixMonthsBadge :
-                             log.badge_code === "tenure_3_months" ? threeMonthsBadge :
-                             BADGE_CONFIG[log.badge_code]?.image || threeMonthsBadge
-                           } 
-                           alt={log.badge_name || log.badge_code} 
-                           className="w-6 h-6 object-contain" 
-                        />
-                      </div>
-                      <div className="flex flex-col flex-1 min-w-0">
-                        <div className="flex items-center justify-between mb-0.5">
-                          <h4 className="font-bold text-stone-800 text-xs truncate">
-                            {log.badge_name || log.badge_code}
-                          </h4>
-                          <span className="text-[9px] text-stone-400 font-data shrink-0 ml-2">
-                            {display(log.created_at?.split('T')[0])}
-                          </span>
-                        </div>
-                        <p className="text-[10px] text-stone-500">
-                          Action: <strong className="text-indigo-600 capitalize">{log.action}</strong>
-                          {log.period_start && log.period_end && ` • ${log.period_start} to ${log.period_end}`}
-                        </p>
-                      </div>
-                    </div>
-                  );
-                })
-              )}
-            </div>
-
-            <div className="px-4 py-3 border-t border-stone-100 bg-white flex items-center justify-between">
-              <span className="text-xs font-semibold text-stone-500">
-                {badgeLogs.length} total record{badgeLogs.length !== 1 ? 's' : ''}
-              </span>
-              <button onClick={() => setShowBadgeLogsModal(false)} className="px-4 py-1.5 bg-indigo-600 hover:bg-indigo-700 text-white font-semibold rounded-lg text-xs transition-colors shadow-sm cursor-pointer">
-                Close
-              </button>
-            </div>
-          </div>
-        </div>
-      )}
-
       {/* ════════════ ATTENDANCE / LEAVE DETAILS MODAL ════════════ */}
       {attendanceModalTab && (
         <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-stone-900/40 backdrop-blur-sm animate-in fade-in duration-150">
@@ -3142,8 +2950,3 @@ const EmployeeDashboard = () => {
 };
 
 export default EmployeeDashboard;
-
-
-
-
-

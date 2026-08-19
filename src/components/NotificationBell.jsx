@@ -244,14 +244,18 @@ const NotificationBell = () => {
         }
         aria-expanded={open}
       >
-        <Bell className="h-5 w-5" />
+        {/* No hover rotate: the badge stayed put while the glyph tilted under it. */}
+        <Bell className="h-[18px] w-[18px]" />
         {unreadCount > 0 && (
+          // A 6px dot centred ON the bell's outline, at the top-right shoulder —
+          // viewBox (18,8), which is exactly where lucide's own BellDot puts it,
+          // mapped through the 18px render inside this 36px button. A count here
+          // was a chip of text competing with the icon; the exact number lives in
+          // the panel, and in this button's aria-label.
           <span
             aria-hidden="true"
-            className="pointer-events-none absolute right-[3px] top-[3px] flex h-[14px] min-w-[14px] items-center justify-center rounded-full bg-rose-500 px-1 text-[8px] font-medium leading-[0] tracking-normal text-white ring-[1.5px] ring-white"
-          >
-            <span className="mt-[1px] block">{unreadCount > 9 ? '9+' : unreadCount}</span>
-          </span>
+            className="pointer-events-none absolute right-[10px] top-[9px] h-1.5 w-1.5 rounded-full bg-rose-500 ring-[1.5px] ring-white"
+          />
         )}
       </button>
 
