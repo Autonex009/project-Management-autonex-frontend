@@ -154,6 +154,7 @@ export const parentProjectApi = projectApi;
 
 export const employeeApi = {
   getAll: (params) => api.get("/employees", { params }).then((res) => res.data),
+  getSlim: (params) => api.get("/employees/slim", { params }).then((res) => res.data),
   getPaginated: (params) => api.get("/employees/paginated", { params }).then((res) => res.data),
   getTeamKpi: () => api.get("/employees/team-kpi").then((res) => res.data),
   getTeamData: () => api.get("/employees/team-data").then((res) => res.data),
@@ -201,6 +202,7 @@ export const employeeApi = {
 
 export const allocationApi = {
   getAll: () => api.get("/allocations").then((res) => res.data),
+  getSlim: () => api.get("/allocations/slim").then((res) => res.data),
   create: (data) => api.post("/allocations", data).then((res) => res.data),
   update: (id, data) =>
     api.put(`/allocations/${id}`, data).then((res) => res.data),
@@ -232,6 +234,7 @@ export const allocationApi = {
 
 export const leaveApi = {
   getAll: (params) => api.get("/leaves", { params }).then((res) => res.data),
+  getTodayIds: () => api.get("/leaves/today-ids").then((res) => res.data),
   create: (data) => api.post("/leaves", data).then((res) => res.data),
   update: (id, data) => api.put(`/leaves/${id}`, data).then((res) => res.data),
   delete: (id) => api.delete(`/leaves/${id}`).then((res) => res.data),
@@ -336,6 +339,7 @@ export const signupRequestApi = {
 
 export const wfhApi = {
   getAll: (params) => api.get("/wfh", { params }).then((res) => res.data),
+  getTodayIds: () => api.get("/wfh/today-ids").then((res) => res.data),
   create: (data) => api.post("/wfh", data).then((res) => res.data),
   update: (id, data) => api.put(`/wfh/${id}`, data).then((res) => res.data),
   approve: (id, approvedBy, remark) =>

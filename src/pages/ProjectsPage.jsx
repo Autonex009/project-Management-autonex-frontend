@@ -1412,11 +1412,11 @@ const ProjectsPage = () => {
   // project cards, otherwise they show as 0 or empty until the modal opens.
   const { data: employees = [] } = useQuery({
     queryKey: ["employees"],
-    queryFn: () => employeeApi.getAll(),
+    queryFn: () => employeeApi.getSlim(),
   });
   const { data: formerEmployees = [] } = useQuery({
     queryKey: ["employees", "archived"],
-    queryFn: () => employeeApi.getAll({ status: "archived" }),
+    queryFn: () => employeeApi.getSlim({ status: "archived" }),
   });
   const employeeIndex = useMemo(() => {
     return new Map(employees.map((e) => [String(e.id), e]));
@@ -1450,17 +1450,17 @@ const ProjectsPage = () => {
 
   const { data: allocations = [] } = useQuery({
     queryKey: ["allocations"],
-    queryFn: () => allocationApi.getAll(),
+    queryFn: () => allocationApi.getSlim(),
     staleTime: 5 * 60 * 1000,
   });
   const { data: leaves = [] } = useQuery({
     queryKey: ["leaves"],
-    queryFn: () => leaveApi.getAll(),
+    queryFn: () => leaveApi.getTodayIds(),
     staleTime: 5 * 60 * 1000,
   });
   const { data: wfh = [] } = useQuery({
     queryKey: ["wfh"],
-    queryFn: () => wfhApi.getAll(),
+    queryFn: () => wfhApi.getTodayIds(),
     staleTime: 5 * 60 * 1000,
   });
   const { data: guidelinesData = [] } = useQuery({
@@ -1477,32 +1477,9 @@ const ProjectsPage = () => {
   }, []);
 
   // Employees on approved leave today.
-  const leaveEmployeeIds = useMemo(() => {
-    const ids = new Set();
-    leaves.forEach((l) => {
-      if (
-        (l.status || "").toLowerCase() === "approved" &&
-        String(l.start_date).slice(0, 10) <= todayStr &&
-        String(l.end_date).slice(0, 10) >= todayStr
-      ) {
-        ids.add(l.employee_id);
-      }
-    });
-    return ids;
-  }, [leaves, todayStr]);
+  const leaveEmployeeIds = useMemo(() => new Set(leaves || []), [leaves]);
 
-  const wfhTodayIds = useMemo(() => {
-    const ids = new Set();
-    wfh.forEach((w) => {
-      if (
-        (w.status || "").toLowerCase() === "approved" &&
-        String(w.wfh_date).slice(0, 10) === todayStr
-      ) {
-        ids.add(w.employee_id);
-      }
-    });
-    return ids;
-  }, [wfh, todayStr]);
+  const wfhTodayIds = useMemo(() => new Set(wfh || []), [wfh]);
 
   // Where each employee is TODAY: WFH if that's their standing work model or they
   // have an approved WFH day; otherwise WFO.
