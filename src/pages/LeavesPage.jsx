@@ -126,7 +126,7 @@ const LeavesPage = () => {
   // ── Employees (always needed for names / form / KPI) ─────────────────────
   const { data: employees = [], isLoading: employeesLoading } = useQuery({
     queryKey: ["employees"],
-    queryFn: employeeApi.getAll,
+    queryFn: () => employeeApi.getAll(),
   });
 
   // ── Leaves – server-side page (same pattern as Guidelines) ───────────────

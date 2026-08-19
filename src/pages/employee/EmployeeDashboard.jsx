@@ -73,10 +73,15 @@ import { setPageDetailTitle } from "../../utils/pageDetailTitle";
 
 import fiftyHoursBadge from "../../components/badges/50hrs.png";
 import twoHundredHoursBadge from "../../components/badges/200hrs.png";
-import weeklyTopBadge from "../../components/badges/weekly_2.png";
-import monthlyTopBadge from "../../components/badges/monthly_1.png";
+import weeklyTop1Badge from "../../components/badges/weekly_1.png";
+import weeklyTop2Badge from "../../components/badges/weekly_2.png";
+import weeklyTop3Badge from "../../components/badges/weekly_3.png";
+import monthlyTop1Badge from "../../components/badges/monthly_1.png";
+import monthlyTop2Badge from "../../components/badges/monthly_2.png";
+import monthlyTop3Badge from "../../components/badges/monthly_3.png";
 import threeMonthsBadge from "../../components/badges/3months.png";
 import sixMonthsBadge from "../../components/badges/6months.png";
+import yearlyBadge from "../../components/badges/yearly.png";
 
 /* ── Helpers ────────────────────────────────────────── */
 function getNameInitials(name) {
@@ -135,12 +140,42 @@ const BADGE_CONFIG = {
   weekly_top: {
     label: "Weekly Top",
     meta: "Performer",
-    image: weeklyTopBadge,
+    image: weeklyTop1Badge,
   },
   monthly_top: {
     label: "Monthly Top",
     meta: "Performer",
-    image: monthlyTopBadge,
+    image: monthlyTop1Badge,
+  },
+  weekly_top_1: {
+    label: "Weekly Top",
+    meta: "Performer",
+    image: weeklyTop1Badge,
+  },
+  weekly_top_2: {
+    label: "Weekly Top",
+    meta: "Performer",
+    image: weeklyTop2Badge,
+  },
+  weekly_top_3: {
+    label: "Weekly Top",
+    meta: "Performer",
+    image: weeklyTop3Badge,
+  },
+  monthly_top_1: {
+    label: "Monthly Top",
+    meta: "Performer",
+    image: monthlyTop1Badge,
+  },
+  monthly_top_2: {
+    label: "Monthly Top",
+    meta: "Performer",
+    image: monthlyTop2Badge,
+  },
+  monthly_top_3: {
+    label: "Monthly Top",
+    meta: "Performer",
+    image: monthlyTop3Badge,
   },
   tenure: {
     label: "Tenure",
@@ -150,7 +185,7 @@ const BADGE_CONFIG = {
   yearly_milestone: {
     label: "Yearly",
     meta: "Milestone",
-    image: sixMonthsBadge, // swap when you have a yearly image
+    image: yearlyBadge,
   },
 };
 
@@ -291,6 +326,7 @@ const EmployeeDashboard = () => {
   const [showFullFeedback, setShowFullFeedback] = useState(false);
   const [imgError, setImgError] = useState(false);
   const [showLogsModal, setShowLogsModal] = useState(false);
+  const [showBadgeLogsModal, setShowBadgeLogsModal] = useState(false);
   const [editEmail, setEditEmail] = useState("");
   const [emailError, setEmailError] = useState("");
   const [profileTab, setProfileTab] = useState("attendance");
@@ -313,7 +349,8 @@ const EmployeeDashboard = () => {
   };
 
   const localUser = JSON.parse(localStorage.getItem("user") || "{}");
-  const isAdmin = localUser.role === "admin";
+  const userRole = localStorage.getItem("role") || localUser.role || "employee";
+  const isAdmin = userRole === "admin";
   const employeeId = params.id || localUser.employee_id || localUser.id || 1;
   const isSelf = !params.id || String(params.id) === String(localUser.employee_id || localUser.id);
   const isPortalView = location.pathname.startsWith("/admin") || location.pathname.startsWith("/pm");
@@ -349,7 +386,7 @@ const EmployeeDashboard = () => {
 
   const { data: projects = [] } = useQuery({
     queryKey: ["sub-projects"],
-    queryFn: subProjectApi.getAll,
+    queryFn: () => subProjectApi.getAll(),
   });
 
   const { data: allLeaves = [] } = useQuery({
@@ -392,11 +429,12 @@ const EmployeeDashboard = () => {
     });
   }, [allLeaves, modalMonthYear]);
 
-  const { data: perfReviews = [] } = useQuery({
+  const { data: perfReviewsData } = useQuery({
     queryKey: ["employee-perf-reviews", employeeId],
     queryFn: () => perfEvalApi.getAll({ employee_id: employeeId }),
     enabled: !!employeeId,
   });
+  const perfReviews = perfReviewsData?.items || [];
 
   const { data: dailyLeaderboard } = useQuery({
     queryKey: ["leaderboard-day"],
@@ -413,7 +451,7 @@ const EmployeeDashboard = () => {
 
   const { data: skillsList = [], isLoading: skillsLoading } = useQuery({
     queryKey: ["skills-list"],
-    queryFn: skillsApi.getAll,
+    queryFn: () => skillsApi.getAll(),
   });
 
   /* ── Employee Notes (complaints / warnings / recognitions) ── */
@@ -437,6 +475,22 @@ const EmployeeDashboard = () => {
             : [];
     },
     enabled: !!employeeId,
+  });
+
+  const { data: badgeLogs = [], isLoading: badgeLogsLoading } = useQuery({
+    queryKey: ["employee-badge-logs", employeeId],
+    queryFn: async () => {
+      const res = await badgesApi.getLogs(employeeId);
+      const payload = res?.data !== undefined ? res.data : res;
+      return Array.isArray(payload)
+        ? payload
+        : Array.isArray(payload?.data)
+          ? payload.data
+          : Array.isArray(payload?.items)
+            ? payload.items
+            : [];
+    },
+    enabled: !!employeeId && showBadgeLogsModal,
   });
 
   const createNoteMutation = useMutation({
@@ -711,7 +765,7 @@ const EmployeeDashboard = () => {
         const isActive = project?.project_status === "active";
         return {
           id: alloc.id,
-          name: project?.name || "Project",
+          name: alloc.project_name || alloc.sub_project_name || project?.name || "Project",
           role:
             (alloc.role_tags || []).join(", ") || profile.jobTitle || "Developer",
           status: isActive ? "active" : "completed",
@@ -721,7 +775,7 @@ const EmployeeDashboard = () => {
           endDate: alloc.active_end_date
             ? format(parseISO(alloc.active_end_date), "dd MMM yyyy")
             : "Ongoing",
-          symbol: (project?.name || "P")[0].toUpperCase(),
+          symbol: (alloc.project_name || alloc.sub_project_name || project?.name || "P")[0].toUpperCase(),
         };
       })
       .sort((a, b) => (a.status === "active" ? -1 : 1));
@@ -1000,11 +1054,12 @@ const EmployeeDashboard = () => {
 
       if (slot === "weekly_top") {
         const info = getBadgeInfo(["weekly_top_1", "weekly_top_2", "weekly_top_3"]);
+        const dynamicImage = weeklyRank ? BADGE_CONFIG[`weekly_top_${weeklyRank}`]?.image : base.image;
         return {
           id: slot,
           label: base.label,
           meta: weeklyRank ? `#${weeklyRank}` : base.meta,
-          image: base.image,
+          image: dynamicImage,
           earned: weeklyRank != null,
           awardedAt: info.awardedAt,
           listIndex: info.listIndex,
@@ -1014,11 +1069,12 @@ const EmployeeDashboard = () => {
 
       if (slot === "monthly_top") {
         const info = getBadgeInfo(["monthly_top_1", "monthly_top_2", "monthly_top_3"]);
+        const dynamicImage = monthlyRankBadge ? BADGE_CONFIG[`monthly_top_${monthlyRankBadge}`]?.image : base.image;
         return {
           id: slot,
           label: base.label,
           meta: monthlyRankBadge ? `#${monthlyRankBadge}` : base.meta,
-          image: base.image,
+          image: dynamicImage,
           earned: monthlyRankBadge != null,
           awardedAt: info.awardedAt,
           listIndex: info.listIndex,
@@ -1115,9 +1171,10 @@ const EmployeeDashboard = () => {
   const warningsCount = openWarnings.length;
 
   const canManageNotes =
-    localUser.role === "admin" ||
-    localUser.role === "pm" ||
-    localUser.role === "hr";
+    userRole === "admin" ||
+    userRole === "pm" ||
+    userRole === "team_lead" ||
+    userRole === "hr";
 
   return (
     <div
@@ -1322,9 +1379,17 @@ const EmployeeDashboard = () => {
         {/* ───────── BADGE (col-7) ───────── */}
         <div className="lg:col-span-7 bg-white border border-stone-200 rounded-xl p-3 flex flex-col gap-2 shadow-[0_1px_4px_rgba(28,25,23,0.06)]">
           <div className="flex items-center justify-between pb-1">
-            <h2 className="font-display text-[15px] font-extrabold text-stone-900">
-              Badges
-            </h2>
+            <div className="flex items-center gap-2">
+              <h2 className="font-display text-[15px] font-extrabold text-stone-900">
+                Badges
+              </h2>
+              <button
+                onClick={() => setShowBadgeLogsModal(true)}
+                className="text-[10px] font-semibold text-indigo-600 hover:text-indigo-800 transition-colors"
+              >
+                Logs
+              </button>
+            </div>
             <div className="text-[10px] font-medium text-stone-500">
               <span className="text-indigo-600 font-bold">
                 {earnedBadgeCount}/{achievementBadges.length}
@@ -2185,14 +2250,14 @@ const EmployeeDashboard = () => {
                 icon: Trophy,
                 title: "Top Performer",
                 date: "August 2026",
-                earned: true,
+                earned: false,
                 color: "text-amber-500",
               },
               {
                 icon: Star,
                 title: "Quality Champion",
                 date: "July 2026",
-                earned: true,
+                earned: false,
                 color: "text-amber-500",
               },
               {
@@ -2601,6 +2666,94 @@ const EmployeeDashboard = () => {
         </div>
       )}
 
+      {showBadgeLogsModal && (
+        <div className="fixed inset-0 z-50 flex items-end sm:items-center justify-center p-0 sm:p-4 bg-stone-900/40 backdrop-blur-sm">
+          <div className="bg-white border border-stone-200 rounded-t-2xl sm:rounded-2xl w-full max-w-xl shadow-2xl overflow-hidden flex flex-col max-h-[90vh] sm:max-h-[85vh]">
+            <div className="px-4 py-3 border-b border-stone-100 flex items-center justify-between bg-white/50">
+              <div className="flex items-center gap-2.5">
+                <div className="w-8 h-8 rounded-xl bg-indigo-100/50 text-indigo-600 border border-indigo-200/50 flex items-center justify-center shadow-sm">
+                  <BadgeCheck className="w-4 h-4" />
+                </div>
+                <div>
+                  <h3 className="font-display text-sm font-bold text-stone-800">
+                    Badge History
+                  </h3>
+                  <p className="text-[10px] text-stone-400">
+                    History of earned badges and milestones
+                  </p>
+                </div>
+              </div>
+              <button
+                onClick={() => setShowBadgeLogsModal(false)}
+                className="w-8 h-8 rounded-xl text-stone-400 hover:text-stone-600 hover:bg-stone-200/50 flex items-center justify-center transition-colors cursor-pointer"
+              >
+                <X className="w-4 h-4" />
+              </button>
+            </div>
+
+            <div className="p-4 overflow-y-auto db-scroll space-y-2 flex-1">
+              {badgeLogsLoading ? (
+                <div className="flex items-center justify-center py-10">
+                  <span className="text-xs text-stone-400">Loading logs...</span>
+                </div>
+              ) : badgeLogs.length === 0 ? (
+                <div className="flex flex-col items-center justify-center py-10 text-center">
+                  <div className="w-12 h-12 rounded-full bg-stone-100 flex items-center justify-center mb-3">
+                    <BadgeCheck className="w-5 h-5 text-stone-400" />
+                  </div>
+                  <p className="text-xs font-semibold text-stone-600">No badge logs available.</p>
+                  <p className="text-[10px] text-stone-400 mt-1">Badge achievements will appear here.</p>
+                </div>
+              ) : (
+                badgeLogs.map((log) => {
+                  return (
+                    <div
+                      key={log.id}
+                      className="p-3 rounded-xl border bg-stone-50 border-stone-100 flex items-center gap-3"
+                    >
+                      <div className="w-10 h-10 rounded-full bg-white border border-stone-200 shadow-sm flex items-center justify-center shrink-0">
+                        <img 
+                           src={
+                             log.badge_code === "tenure_6_months" ? sixMonthsBadge :
+                             log.badge_code === "tenure_3_months" ? threeMonthsBadge :
+                             BADGE_CONFIG[log.badge_code]?.image || threeMonthsBadge
+                           } 
+                           alt={log.badge_name || log.badge_code} 
+                           className="w-6 h-6 object-contain" 
+                        />
+                      </div>
+                      <div className="flex flex-col flex-1 min-w-0">
+                        <div className="flex items-center justify-between mb-0.5">
+                          <h4 className="font-bold text-stone-800 text-xs truncate">
+                            {log.badge_name || log.badge_code}
+                          </h4>
+                          <span className="text-[9px] text-stone-400 font-data shrink-0 ml-2">
+                            {display(log.created_at?.split('T')[0])}
+                          </span>
+                        </div>
+                        <p className="text-[10px] text-stone-500">
+                          Action: <strong className="text-indigo-600 capitalize">{log.action}</strong>
+                          {log.period_start && log.period_end && ` • ${log.period_start} to ${log.period_end}`}
+                        </p>
+                      </div>
+                    </div>
+                  );
+                })
+              )}
+            </div>
+
+            <div className="px-4 py-3 border-t border-stone-100 bg-white flex items-center justify-between">
+              <span className="text-xs font-semibold text-stone-500">
+                {badgeLogs.length} total record{badgeLogs.length !== 1 ? 's' : ''}
+              </span>
+              <button onClick={() => setShowBadgeLogsModal(false)} className="px-4 py-1.5 bg-indigo-600 hover:bg-indigo-700 text-white font-semibold rounded-lg text-xs transition-colors shadow-sm cursor-pointer">
+                Close
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
+
       {/* ════════════ ATTENDANCE / LEAVE DETAILS MODAL ════════════ */}
       {attendanceModalTab && (
         <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-stone-900/40 backdrop-blur-sm animate-in fade-in duration-150">
@@ -2989,3 +3142,8 @@ const EmployeeDashboard = () => {
 };
 
 export default EmployeeDashboard;
+
+
+
+
+

@@ -116,32 +116,38 @@ const AdminPerformancePage = () => {
   const user = JSON.parse(localStorage.getItem("user") || "{}");
   const { data: employees = [], isLoading: empLoading } = useQuery({
     queryKey: ["employees"],
-    queryFn: employeeApi.getAll,
+    queryFn: () => employeeApi.getAll(),
   });
   const { data: projects = [], isLoading: projectsLoading } = useQuery({
     queryKey: ["sub-projects"],
-    queryFn: subProjectApi.getAll,
+    queryFn: () => subProjectApi.getAll(),
   });
   const { data: mainProjects = [], isLoading: mainProjectsLoading } = useQuery({
     queryKey: ["parent-projects"],
-    queryFn: parentProjectApi.getAll,
+    queryFn: () => parentProjectApi.getAll(),
     staleTime: 5 * 60 * 1000,
   });
-  // Admin sees ALL evaluations (submitted + reviewed).
-  const { data: evaluations = [], isLoading: evalLoading } = useQuery({
-    queryKey: ["perf-evals", "all"],
-    queryFn: () => perfEvalApi.getAll(),
-  });
-
-  const isLoading = empLoading || evalLoading || projectsLoading || mainProjectsLoading;
-
+  const [perfPage, setPerfPage] = useState(1);
   const [tab, setTab] = useState("employees"); // 'employees' | 'pm'
   const [search, setSearch] = useState("");
   const [roleFilter, setRoleFilter] = useState("all");
   const [expandedEval, setExpandedEval] = useState(null);
   const [bonusOpen, setBonusOpen] = useState(false); // collapsible "Suggested for Bonus" table
   const [bonusPage, setBonusPage] = useState(1);
-  const [perfPage, setPerfPage] = useState(1);
+
+  // Admin sees ALL evaluations (submitted + reviewed).
+  const { data: evaluationsData = {}, isLoading: evalLoading, isFetching: evalFetching } = useQuery({
+    queryKey: ["perf-evals", "paginated", perfPage, PAGE_SIZE],
+    queryFn: () => perfEvalApi.getAll({ page: perfPage, limit: PAGE_SIZE }),
+    placeholderData: (prev) => prev,
+    staleTime: 1000 * 60 * 5, // 5 minutes
+  });
+  
+  const evaluations = evaluationsData?.items || [];
+  const evaluationsTotal = evaluationsData?.total || 0;
+
+  const isLoading = empLoading || evalFetching || projectsLoading || mainProjectsLoading;
+
   useEffect(() => {
     setPerfPage(1);
   }, [search, roleFilter, tab]);
@@ -615,6 +621,7 @@ const AdminPerformancePage = () => {
               allowOverflow
               columns={reviewColumns}
               data={filtered}
+              totalItems={evaluationsTotal}
               currentPage={perfPage}
               pageSize={PAGE_SIZE}
               onPageChange={setPerfPage}

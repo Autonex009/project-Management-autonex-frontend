@@ -44,29 +44,29 @@ const NewlyOnboardedPage = ({ embedded = false }) => {
     isError,
   } = useQuery({
     queryKey: ["newly-onboarded"],
-    queryFn: onboardingApi.getNewlyOnboarded,
+    queryFn: () => onboardingApi.getNewlyOnboarded(),
   });
 
   // Project options for the allocation modal.
   const { data: subProjects = [] } = useQuery({
     queryKey: ["sub-projects"],
-    queryFn: subProjectApi.getAll,
+    queryFn: () => subProjectApi.getAll(),
   });
   const { data: parentProjects = [] } = useQuery({
     queryKey: ["parent-projects"],
-    queryFn: parentProjectApi.getAll,
+    queryFn: () => parentProjectApi.getAll(),
     enabled: isPm,
   });
   const { data: allocations = [] } = useQuery({
     queryKey: ["allocations"],
-    queryFn: allocationApi.getAll,
+    queryFn: () => allocationApi.getAll(),
   });
   // The onboarding payload carries no photo, so the profile pictures come from
   // the employee records — same source and same cache key the Employees page
   // uses, joined on the employeeId each candidate row already carries.
   const { data: employees = [] } = useQuery({
     queryKey: ["employees"],
-    queryFn: employeeApi.getAll,
+    queryFn: () => employeeApi.getAll(),
   });
   const avatarByEmployeeId = useMemo(
     () => new Map(employees.map((e) => [e.id, e.avatar_url])),

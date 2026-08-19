@@ -14,7 +14,7 @@ const EmployeeGuidelinesPage = () => {
   });
   const { data: projects = [], isLoading: projectsLoading } = useQuery({
     queryKey: ["sub-projects"],
-    queryFn: subProjectApi.getAll,
+    queryFn: () => subProjectApi.getAll(),
   });
   const { data: allGuidelines = [], isLoading: guidelinesLoading } = useQuery({
     queryKey: ["guidelines"],
