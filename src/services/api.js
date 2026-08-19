@@ -593,6 +593,7 @@ export const perfEvalApi = {
 
 // === Notifications API ===
 export const notificationApi = {
+  getUnreadSummary: () => api.get("/notifications/unread-summary").then((res) => res.data),
   getAll: (userId) =>
     api
       .get("/notifications", { params: { user_id: userId } })
