@@ -223,7 +223,6 @@ const EmployeeLayout = () => {
 
   if (isEmployeeDetail && !hasEmployeesParent) {
     breadcrumbTrail = [
-      { key: "/pm/dashboard", name: "Dashboard", path: "/pm/dashboard" },
       { key: "/pm/my-team", name: "My Team", path: "/pm/my-team" },
       breadcrumbTrail[breadcrumbTrail.length - 1]
     ];

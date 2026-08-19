@@ -59,6 +59,8 @@ export const projectApi = {
 // === Sub-Projects API (formerly Projects) ===
 export const subProjectApi = {
   getAll: () => api.get("/sub-projects").then((res) => res.data),
+  getPaginated: (params) => api.get("/sub-projects/paginated", { params }).then((res) => res.data),
+  getKpi: () => api.get("/sub-projects/kpi").then((res) => res.data),
   getOne: (id) => api.get(`/sub-projects/${id}`).then((res) => res.data),
   create: (data) => api.post("/sub-projects", data).then((res) => res.data),
   update: (id, data) =>
@@ -99,6 +101,8 @@ export const recommendationsApi = {
 
 // === Encord Analytics API ===
 export const analyticsApi = {
+  getDashboardKpis: () =>
+    api.get("/analytics/dashboard-kpis").then((res) => res.data),
   getProjectAnalytics: (mainProjectId, params) =>
     api
       .get(`/analytics/project/${mainProjectId}`, { params })
@@ -150,6 +154,10 @@ export const parentProjectApi = projectApi;
 
 export const employeeApi = {
   getAll: (params) => api.get("/employees", { params }).then((res) => res.data),
+  getPaginated: (params) => api.get("/employees/paginated", { params }).then((res) => res.data),
+  getTeamKpi: () => api.get("/employees/team-kpi").then((res) => res.data),
+  getTeamData: () => api.get("/employees/team-data").then((res) => res.data),
+  getStats: () => api.get("/employees/stats").then((res) => res.data),
   getOne: (id) => api.get(`/employees/${id}`).then((res) => res.data),
   create: (data) => api.post("/employees", data).then((res) => res.data),
   update: (id, data) =>
@@ -210,6 +218,16 @@ export const allocationApi = {
     api.get(`/allocations/by-project/${projectId}`).then((res) => res.data),
   getByEmployee: (employeeId) =>
     api.get(`/allocations/by-employee/${employeeId}`).then((res) => res.data),
+  getPage: ({ page = 1, pageSize = 10, search = "" } = {}) =>
+    api
+      .get("/allocations/page", { params: { page, page_size: pageSize, search } })
+      .then((res) => res.data),
+
+  getProjectDetail: (projectId) =>
+    api.get(`/allocations/project/${projectId}/detail`).then((res) => res.data),
+
+  getEmployeeProjects: () =>
+    api.get("/allocations/employee-projects").then((res) => res.data),
 };
 
 export const leaveApi = {
@@ -247,6 +265,10 @@ export const leaveApi = {
     api.post(`/leaves/${id}/apply-to-razorpay`).then((res) => res.data),
   getCalendar: (month) =>
     api.get("/leaves/calendar", { params: { month } }).then((res) => res.data),
+  getPage: (params = {}) =>
+    api.get("/leaves/page", { params }).then((res) => res.data),
+
+  getKpi: () => api.get("/leaves/kpi").then((res) => res.data),
 };
 
 // === Audit Log API (admin only) ===
@@ -345,6 +367,8 @@ export const wfhApi = {
       })
       .then((res) => res.data),
   delete: (id) => api.delete(`/wfh/${id}`).then((res) => res.data),
+  getPage: (params = {}) =>
+    api.get("/wfh/page", { params }).then((res) => res.data),
 };
 
 export const skillsApi = {
@@ -405,6 +429,27 @@ export const guidelineApi = {
     api.put(`/guidelines/${id}`, data).then((res) => res.data),
   delete: (id) => api.delete(`/guidelines/${id}`).then((res) => res.data),
 };
+
+guidelineApi.getPage = ({
+  page = 1,
+  pageSize = 12,
+  search = "",
+  mainProjectId = "",
+  subProjectId = "",
+  uploadedBy = "",
+} = {}) =>
+  api
+    .get("/guidelines/page", {
+      params: {
+        page,
+        page_size: pageSize,
+        search: search || undefined,
+        main_project_id: mainProjectId || undefined,
+        sub_project_id: subProjectId || undefined,
+        uploaded_by: uploadedBy || undefined,
+      },
+    })
+    .then((res) => res.data);
 
 // === Payroll API ===
 // The payroll passcode (entered on the Payroll page) is sent with every payroll
@@ -685,6 +730,8 @@ export const employeeNotesApi = {
 export const badgesApi = {
   getByEmployee: (employeeId, params = {}) =>
     api.get(`/employee-badges/by-employee/${employeeId}`, { params }),
+  getLogs: (employeeId) =>
+    api.get('/employee-badge-logs', { params: { employee_id: employeeId } }),
 };
 
 export default api;

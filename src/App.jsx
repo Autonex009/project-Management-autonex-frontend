@@ -4,6 +4,7 @@ import { Routes, Route, Navigate } from "react-router-dom";
 import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
 import { Toaster } from "react-hot-toast";
 import ProtectedRoute from "./routes/ProtectedRoute";
+import ErrorBoundary from "./components/ErrorBoundary";
 
 // Layouts
 import AdminLayout from "./layouts/AdminLayout";
@@ -98,13 +99,16 @@ function App() {
           queries: {
             refetchOnWindowFocus: false,
             retry: 1,
+            staleTime: 1000 * 60 * 5, // Cache data for 5 minutes globally
           },
         },
       }),
   );
 
   return (
-    <QueryClientProvider client={queryClient}>
+    <ErrorBoundary>
+      <div suppressHydrationWarning>
+        <QueryClientProvider client={queryClient}>
       <Toaster
         position="top-right"
         containerStyle={{ zIndex: 100000 }}
@@ -249,7 +253,9 @@ function App() {
           <Route path="*" element={<Navigate to="/login/admin" replace />} />
         </Routes>
       </Suspense>
-    </QueryClientProvider>
+        </QueryClientProvider>
+      </div>
+    </ErrorBoundary>
   );
 }
 
