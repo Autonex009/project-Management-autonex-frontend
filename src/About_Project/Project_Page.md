@@ -1,7 +1,28 @@
 # Frontend Project Page Architecture & Issues
 
 ## Overview
-The `ProjectsPage.jsx` component is the main hub for displaying, filtering, creating, and editing projects in the Autonex PM Portal. It serves multiple user roles (Admin, Project Manager, Team Lead) and is currently one of the largest and most complex files in the frontend repository (at over 3,800 lines of code).
+The `ProjectsPage.jsx` component is the main hub for displaying, filtering, creating, and editing projects in the Autonex PM Portal. It serves multiple user roles (Admin, Project Manager, Team Lead) and is currently one of the largest and most complex files in the frontend repository (at over 2,800 lines of code).
+
+## Architecture & Component Breakdown
+The following components are imported to render the Project Page:
+
+### External UI Components
+- `Button` (`../components/ui/Button.jsx`)
+- `Spinner` (`../components/ui/LoadingSpinner.jsx`)
+- `SearchBar` (`../components/ui/SearchBar.jsx`)
+- `Table` (`../components/ui/Table.jsx`)
+- `Dropdown` (`../components/ui/Dropdown.jsx`)
+- `ConfirmDialog` (`../components/ui/ConfirmDialog.jsx`)
+- `Modal` (`../components/ui/Modal.jsx`)
+- `StatCard` (`../components/dashboard/StatCard.jsx`)
+
+### External Project Components
+- `AllocationPopover` (`../components/AllocationPopover.jsx`)
+- `ProjectCard` (`../components/projects/ProjectCard.jsx`)
+- `SkillMultiSelect` (`../components/projects/ProjectDropdowns.jsx`)
+- `EmployeeMultiSelect` (`../components/projects/ProjectDropdowns.jsx`)
+- `PmMultiSelect` (`../components/projects/ProjectDropdowns.jsx`)
+- `TeamLeadMultiSelect` (`../components/projects/ProjectDropdowns.jsx`)
 
 ## User Role Differences (Admin vs Project Manager)
 The page behaves differently depending on the authenticated user's role:
@@ -17,36 +38,36 @@ The page behaves differently depending on the authenticated user's role:
 
 ## Critical Problems & Technical Debt
 
-### 1. Unnecessary / Heavy API Payloads
-The page fetches massive amounts of data on initial load that are largely unnecessary for the main list view.
-*   **Employees**: Calls `employeeApi.getAll()` and `getAll({ status: "archived" })`, pulling 188KB of full employee profiles (including razorpay IDs, phone numbers, and full skill arrays) just to resolve PM/Lead names and populate dropdowns.
-    *   **Solution**: Needs to switch to `/api/employees/slim`.
-*   **Leaves & WFH**: Calls `leaveApi.getAll()` and `wfhApi.getAll()` which downloads the entire historical record of all leaves and WFH requests in the database (200KB+), just to compute which employees are off *today* for a small UI badge.
-    *   **Solution**: Needs to switch to `/api/leaves/today-ids` and `/api/wfh/today-ids`.
-*   **Allocations**: Downloads all 300+ allocation rows (`allocationApi.getAll()`) to count the current manpower for projects.
-    *   **Solution**: Switch to `/api/allocations/slim` or rely entirely on the backend `capacity` metrics now provided in the paginated response.
-*   **Guidelines**: Pulls down all project guidelines globally, even though they are only viewed one project at a time.
+### 1. Unnecessary / Heavy API Payloads (✅ SOLVED)
+The page fetched massive amounts of data on initial load that were largely unnecessary for the main list view.
+*   ✅ **Employees**: Called `employeeApi.getAll()` and `getAll({ status: "archived" })`, pulling 188KB of full employee profiles.
+    *   **Solution Implemented**: Switched to `/api/employees/slim` (payload dropped from 188KB to 15KB).
+*   ✅ **Leaves & WFH**: Called `leaveApi.getAll()` and `wfhApi.getAll()` downloading 200KB+ of historical records just to compute who is off today.
+    *   **Solution Implemented**: Switched to `/api/leaves/today-ids` and `/api/wfh/today-ids` (payload dropped to <1KB).
+*   ✅ **Allocations**: Downloaded all 300+ allocation rows to count manpower.
+    *   **Solution Implemented**: Switched to `/api/allocations/slim` (payload dropped from 170KB to 20KB) and rely on the backend `capacity` metrics.
+*   **Guidelines**: Pulls down all project guidelines globally, even though they are only viewed one project at a time. (Pending).
 
-### 2. Large Code Redundancy & Duplicity
-*   **Massive File Size**: At 3,850+ lines, the file acts as a monolith. 
-*   **Duplicate Multi-Select Components**: The page defines SkillMultiSelect, EmployeeMultiSelect, TeamLeadMultiSelect, and PmMultiSelect completely inline. These do almost the exact same thing. Furthermore, another MultiSelectDropdown is defined inline over in EmployeesPage.jsx. All of these should be consolidated into a single reusable <MultiSelect /> component inside src/components/ui/.
-*   **Inline Project Card**: The massive ProjectCard component is defined inline instead of living in its own file (src/components/projects/ProjectCard.jsx).
-*   **Modal Duplication**: The "Add Project" and "Edit Project" modals share almost identical form fields, states, and validation logic, but are coded within the same massive component rather than being abstracted into a separate `<ProjectFormModal />` component.
-*   **Inline Components**: Complex UI pieces like `SkillMultiSelect`, `EmployeeMultiSelect`, and `ProjectCard` are defined directly inside or alongside the main file instead of living in `src/components/projects/`.
+### 2. Heavy Code Block & Monolithic Architecture (✅ SOLVED)
+*   ✅ **Massive File Size**: At 3,850+ lines, the file acted as a monolith, making it extremely hard to maintain.
+    *   **Solution Implemented**: Extracted 1,000+ lines of code out of `ProjectsPage.jsx` into separate component files (`ProjectCard.jsx`, `ProjectDropdowns.jsx`) and a global `projectConstants.js` file.
+*   **Modal Duplication**: The "Add Project" and "Edit Project" modals share almost identical form fields, states, and validation logic, but are coded within the same massive component.
+    *   **Solution**: Abstract into a separate `<ProjectFormModal />` component.
 *   **State Management Hell**: Dozens of `useState` hooks are used to track search, filters, pagination, modal states, and form inputs simultaneously.
 
-### 3. Client-Side Processing Overhead
-*   The frontend uses `useMemo` heavily to cross-reference the massive `employees`, `allocations`, and `leaves` arrays to manually calculate whether a project is "balanced" or "overburdened", and who is currently on leave.
-*   Because the backend API `paginated` endpoint now handles this capacity calculation natively in the payload (`capacity.status` and `capacity.recommendation`), the frontend is wasting CPU cycles running redundant checks.
+### 3. Client-Side Processing Overhead (✅ SOLVED)
+*   ✅ **Problem**: The frontend used `useMemo` heavily to cross-reference massive `employees`, `allocations`, and `leaves` arrays to manually calculate whether a project was "balanced" or "overburdened", and who was currently on leave.
+*   ✅ **Solution Implemented**: Stripped out the massive client-side calculations entirely. The frontend now natively trusts the `capacity` object attached directly to the `paginated` API payload, and accepts a raw array of integer IDs for `leaves` and `wfh`.
 
 ### 4. Over-fetching in Modals
 *   The `skills` and `vendors` APIs are fetched even when the modal isn't open (though they have an `enabled` flag, they can clutter the cache).
 
+## Completed Refactoring Actions
+1. ✅ **API Swap**: Replaced heavy `.getAll()` API calls with `.getSlim()` and `.getTodayIds()`.
+2. ✅ **Removed Client-Side Math**: Deleted the complex frontend `leaveEmployeeIds` intersection math. 
+3. ✅ **Component Splitting**: Successfully broke apart the `ProjectsPage.jsx` monolith by extracting `ProjectCard.jsx` and `ProjectDropdowns.jsx`.
+
 ## Recommended Action Plan (Next Steps)
-1. **API Swap**: Find and replace `employeeApi.getAll()`, `allocationApi.getAll()`, etc., with their `.getSlim()` or `.getTodayIds()` counterparts in `src/services/api.js` and `ProjectsPage.jsx`.
-2. **Component Splitting**: Break `ProjectsPage.jsx` into:
-   - `ProjectsPage.jsx` (Main wrapper & query loading)
-   - `ProjectList.jsx` (The grid/table view)
-   - `ProjectCard.jsx` (Extracted card component)
-   - `ProjectFormModal.jsx` (Add/Edit project logic)
-3. **Remove Client-Side Math**: Delete the complex frontend `leaveEmployeeIds` and `wfhEmployeeIds` intersection math. Trust the backend `capacity` object directly.
+1. **Consolidate MultiSelects**: Refactor the separated dropdowns to utilize the brand new generic `<MultiSelect />` component found in `src/components/ui/`.
+2. **Modal Extraction**: Extract the massive "Add/Edit Project" form into `ProjectFormModal.jsx`.
+3. **Lazy Load Queries**: Set `enabled` flags properly on guidelines and vendors so they only fetch when modals are actually opened.
