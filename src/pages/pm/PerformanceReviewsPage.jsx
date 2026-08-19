@@ -119,25 +119,24 @@ const PerformanceReviewsPage = () => {
 
   const { data: parentProjects = [], isLoading: parentProjectsLoading } = useQuery({
     queryKey: ["parent-projects"],
-    queryFn: () => parentProjectApi.getAll(),
+    queryFn: parentProjectApi.getAll,
   });
   const { data: projects = [], isLoading: projectsLoading } = useQuery({
     queryKey: ["sub-projects"],
-    queryFn: () => subProjectApi.getAll(),
+    queryFn: subProjectApi.getAll,
   });
   const { data: employees = [], isLoading: empLoading } = useQuery({
     queryKey: ["employees"],
-    queryFn: () => employeeApi.getAll(),
+    queryFn: employeeApi.getAll,
   });
   const { data: allocations = [], isLoading: allocationsLoading } = useQuery({
     queryKey: ["allocations"],
-    queryFn: () => allocationApi.getAll(),
+    queryFn: allocationApi.getAll,
   });
-  const { data: evaluationsData, isLoading: evalLoading } = useQuery({
+  const { data: evaluations = [], isLoading: evalLoading } = useQuery({
     queryKey: ["perf-evals"],
     queryFn: () => perfEvalApi.getAll(),
   });
-  const evaluations = evaluationsData?.items || [];
 
   const scopedProjects = useMemo(
     () =>

@@ -233,7 +233,7 @@ export const Table = ({
         </table>
       </div>
 
-      {(totalPages > 1 || (serverSide && loading)) && onPageChange && (
+      {!loading && totalPages > 1 && onPageChange && (
         <div className="flex items-center justify-between px-4 py-2.5 border-t border-slate-100 rounded-b-2xl">
           <p className="text-[13px] text-slate-500 ">
             Showing {paginatedData.length === 0 ? 0 : startIndex + 1}–

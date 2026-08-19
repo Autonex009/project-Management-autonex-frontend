@@ -160,7 +160,19 @@ const AdminLayout = () => {
     setPeek(false);
   };
 
-
+  // Fetch data for global search (background)
+  const { data: searchEmployees = [] } = useQuery({
+    key: "employees",
+    queryKey: ["employees"],
+    queryFn: employeeApi.getAll,
+    staleTime: 5 * 60 * 1000,
+  });
+  const { data: searchProjects = [] } = useQuery({
+    key: "sub-projects",
+    queryKey: ["sub-projects"],
+    queryFn: subProjectApi.getAll,
+    staleTime: 5 * 60 * 1000,
+  });
 
   const { data: signupCounts } = useQuery({
     key: "signup-requests-counts",

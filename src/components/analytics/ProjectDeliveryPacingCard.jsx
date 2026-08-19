@@ -171,24 +171,24 @@ const ProjectDeliveryPacingCard = ({
 
     return (
       <>
-        <div className="h-full flex flex-col justify-between space-y-1.5">
+        <div className="h-full flex flex-col justify-between space-y-2">
           {/* Header */}
           <div className="flex items-center justify-between">
-            <div className="flex items-center gap-1.5 text-xs font-bold text-stone-800">
+            <div className="flex items-center gap-1.5 text-xs font-bold text-slate-800">
               <HeartHandshake className="w-3.5 h-3.5 text-indigo-600" />
               <span>Client Sentiment Signals</span>
             </div>
           </div>
 
           {/* Multi-Color SVG Semi-Circular Health Arc Visualizer */}
-          <div className="flex items-center justify-center relative bg-stone-50/50 rounded-xl py-2 px-2.5 border border-stone-200/80 shadow-xs">
+          <div className="flex items-center justify-center relative bg-slate-50/50 rounded-xl py-2 px-3 border border-slate-100/80 shadow-2xs">
             <div className="relative flex flex-col items-center justify-center pt-1">
               <svg width="160" height="84" className="overflow-visible">
                 {/* Background Track */}
                 <path
                   d="M 18 76 A 62 62 0 0 1 142 76"
                   fill="none"
-                  stroke="#e7e5e4"
+                  stroke="#e2e8f0"
                   strokeWidth={arcStroke}
                   strokeLinecap="round"
                 />
@@ -233,7 +233,7 @@ const ProjectDeliveryPacingCard = ({
 
               {/* Arc Center Label */}
               <div className="absolute bottom-1.5 flex flex-col items-center text-center">
-                <span className="text-lg font-mono font-black text-stone-900 leading-none">{healthyPct}%</span>
+                <span className="text-lg font-mono font-black text-slate-900 leading-none">{healthyPct}%</span>
                 <span className="text-[9px] font-extrabold text-emerald-600 uppercase tracking-widest mt-0.5">GOOD</span>
               </div>
             </div>
@@ -248,10 +248,10 @@ const ProjectDeliveryPacingCard = ({
                 setModalSearch("");
                 setActiveCategoryModal("GOOD");
               }}
-              className="p-1.5 rounded-lg bg-emerald-50/60 hover:bg-emerald-100/80 border border-emerald-200/70 transition-all hover:scale-105 cursor-pointer group text-left"
+              className="p-1.5 rounded-xl bg-emerald-50/60 hover:bg-emerald-100/80 border border-emerald-200/70 transition-all hover:scale-105 cursor-pointer group text-left"
               title="Click to view all projects with Good Sentiment"
             >
-              <div className="text-[9px] text-stone-500 font-medium group-hover:text-emerald-800 transition-colors flex items-center justify-between">
+              <div className="text-[9px] text-slate-500 font-medium group-hover:text-emerald-800 transition-colors flex items-center justify-between">
                 <span>Good</span>
                 <ExternalLink className="w-2.5 h-2.5 opacity-0 group-hover:opacity-100 text-emerald-600 transition-opacity" />
               </div>
@@ -265,10 +265,10 @@ const ProjectDeliveryPacingCard = ({
                 setModalSearch("");
                 setActiveCategoryModal("AVG");
               }}
-              className="p-1.5 rounded-lg bg-amber-50/60 hover:bg-amber-100/80 border border-amber-200/70 transition-all hover:scale-105 cursor-pointer group text-left"
+              className="p-1.5 rounded-xl bg-amber-50/60 hover:bg-amber-100/80 border border-amber-200/70 transition-all hover:scale-105 cursor-pointer group text-left"
               title="Click to view all projects with Average Sentiment"
             >
-              <div className="text-[9px] text-stone-500 font-medium group-hover:text-amber-800 transition-colors flex items-center justify-between">
+              <div className="text-[9px] text-slate-500 font-medium group-hover:text-amber-800 transition-colors flex items-center justify-between">
                 <span>Average</span>
                 <ExternalLink className="w-2.5 h-2.5 opacity-0 group-hover:opacity-100 text-amber-600 transition-opacity" />
               </div>
@@ -282,10 +282,10 @@ const ProjectDeliveryPacingCard = ({
                 setModalSearch("");
                 setActiveCategoryModal("POOR");
               }}
-              className="p-1.5 rounded-lg bg-rose-50/60 hover:bg-rose-100/80 border border-rose-200/70 transition-all hover:scale-105 cursor-pointer group text-left"
+              className="p-1.5 rounded-xl bg-rose-50/60 hover:bg-rose-100/80 border border-rose-200/70 transition-all hover:scale-105 cursor-pointer group text-left"
               title="Click to view all projects with Poor / At Risk Sentiment"
             >
-              <div className="text-[9px] text-stone-500 font-medium group-hover:text-rose-800 transition-colors flex items-center justify-between">
+              <div className="text-[9px] text-slate-500 font-medium group-hover:text-rose-800 transition-colors flex items-center justify-between">
                 <span>Poor</span>
                 <ExternalLink className="w-2.5 h-2.5 opacity-0 group-hover:opacity-100 text-rose-600 transition-opacity" />
               </div>
@@ -413,17 +413,18 @@ const ProjectDeliveryPacingCard = ({
   }
 
   return (
-    <div className="h-full flex flex-col justify-between space-y-1.5">
+    <div className="h-full flex flex-col justify-between space-y-2">
       {/* Header Row */}
       <div className="flex items-center justify-between">
-        <div className="flex items-center gap-1.5 text-xs font-bold text-stone-800">
+        <div className="flex items-center gap-1.5 text-xs font-bold text-slate-800">
           <HeartHandshake className="w-3.5 h-3.5 text-indigo-600" />
           <span>Client Sentiment & Health</span>
         </div>
       </div>
 
       {/* Speedometer Gauge Visualizer */}
-      <div className="flex-1 flex flex-col items-center justify-center relative bg-stone-50/50 rounded-xl py-2.5 px-3 border border-stone-200/80 shadow-xs my-1 min-h-[175px]">
+      {/* Speedometer Gauge Visualizer */}
+      <div className="flex-1 flex flex-col items-center justify-center relative bg-slate-50/50 rounded-xl py-3 px-3 border border-slate-100/80 shadow-2xs my-1 min-h-[175px]">
         <div className="relative flex flex-col items-center justify-center w-full">
           <svg width="270" height="150" viewBox="0 0 270 150" className="overflow-visible max-w-full">
             <defs>
@@ -446,7 +447,7 @@ const ProjectDeliveryPacingCard = ({
             <path
               d="M 54 110 A 81 81 0 0 1 216 110"
               fill="none"
-              stroke="#e7e5e4"
+              stroke="#e2e8f0"
               strokeWidth="15"
               strokeLinecap="round"
             />
@@ -460,10 +461,10 @@ const ProjectDeliveryPacingCard = ({
               strokeLinecap="round"
             />
 
-            {/* Gauge Zone Labels */}
-            <text x="34" y="114" fontSize="12" fontWeight="900" fill="#f43f5e" textAnchor="end">POOR</text>
-            <text x="135" y="15" fontSize="12.5" fontWeight="900" fill="#d97706" textAnchor="middle">AVG</text>
-            <text x="236" y="114" fontSize="12" fontWeight="900" fill="#10b981" textAnchor="start">GOOD</text>
+            {/* Gauge Zone Labels - Increased font size & weight */}
+            <text x="34" y="114" fontSize="12.5" fontWeight="900" fill="#f43f5e" textAnchor="end">POOR</text>
+            <text x="135" y="15" fontSize="13" fontWeight="900" fill="#d97706" textAnchor="middle">AVG</text>
+            <text x="236" y="114" fontSize="12.5" fontWeight="900" fill="#10b981" textAnchor="start">GOOD</text>
 
             {/* Dynamic Animated Speedometer Needle */}
             <g
@@ -484,8 +485,8 @@ const ProjectDeliveryPacingCard = ({
             <circle cx="135" cy="110" r="7.5" fill="#0f172a" stroke="#ffffff" strokeWidth="2.5" />
             <circle cx="135" cy="110" r="2.5" fill={needleAccentColor} />
 
-            {/* Subtext under gauge */}
-            <text x="135" y="139" fontSize="10.5" fontWeight="900" fill="#78716c" letterSpacing="1.5" textAnchor="middle">
+            {/* Subtext under gauge - Increased font size & contrast */}
+            <text x="135" y="139" fontSize="11" fontWeight="900" fill="#64748b" letterSpacing="1.5" textAnchor="middle">
               HEALTH INDICATOR
             </text>
           </svg>
@@ -501,12 +502,12 @@ const ProjectDeliveryPacingCard = ({
             ? "bg-emerald-50/70 border-emerald-200/80 text-emerald-700"
             : config.shortLabel === "Poor"
             ? "bg-rose-50/70 border-rose-200/80 text-rose-700"
-            : "bg-stone-50 border-stone-200/80 text-stone-700";
+            : "bg-slate-50 border-slate-200/80 text-slate-700";
 
         return (
-          <div className={`p-2.5 rounded-xl border ${statusStyle} flex items-center justify-between`}>
-            <span className="text-xs font-bold opacity-90">Sentiment Status</span>
-            <span className="font-mono font-black text-sm">
+          <div className={`p-3 rounded-xl border ${statusStyle} flex items-center justify-between`}>
+            <span className="text-sm font-bold opacity-90">Sentiment Status</span>
+            <span className="font-mono font-black text-base">
               {config.shortLabel}
             </span>
           </div>

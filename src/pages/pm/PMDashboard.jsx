@@ -19,14 +19,6 @@ import {
 import { format, parseISO } from "date-fns";
 import { parentProjectApi } from "../../services/api";
 import { getPmEmployeeId, getPmSubProjects } from "../../utils/pmScope";
-import {
-  demotedToLeadIds,
-  resolveProjectPmIds,
-} from "../../utils/roleAccess";
-import {
-  buildEmployeeIndex,
-  manpowerEmployeeIds,
-} from "../../utils/workforce";
 import Table from "../../components/ui/Table";
 import StatCard from "../../components/dashboard/StatCard";
 import { formatDisplayName } from "../../utils/displayName";
@@ -40,48 +32,20 @@ const PMDashboard = () => {
   // Fetch all data
   const { data: projects = [], isLoading: projLoading } = useQuery({
     queryKey: ["sub-projects"],
-    queryFn: () => subProjectApi.getAll(),
-    staleTime: 5 * 60 * 1000,
+    queryFn: subProjectApi.getAll,
   });
   const { data: parentProjects = [] } = useQuery({
     queryKey: ["parent-projects"],
-    queryFn: () => parentProjectApi.getAll(),
-    staleTime: 5 * 60 * 1000,
+    queryFn: parentProjectApi.getAll,
   });
   const { data: employees = [] } = useQuery({
     queryKey: ["employees"],
-    queryFn: () => employeeApi.getAll(),
-    staleTime: 5 * 60 * 1000,
+    queryFn: employeeApi.getAll,
   });
   const { data: allocations = [] } = useQuery({
     queryKey: ["allocations"],
-    queryFn: () => allocationApi.getAll(),
-    staleTime: 5 * 60 * 1000,
+    queryFn: allocationApi.getAll,
   });
-
-  const employeeIndex = useMemo(
-    () => buildEmployeeIndex(employees),
-    [employees],
-  );
-
-  const getTeamLeadIds = (project) => {
-    const demoted = demotedToLeadIds(project, parentProjects, employeeIndex);
-    const existing = project.team_lead_ids || [];
-    return [...new Set([...existing, ...demoted])];
-  };
-
-  const resolvePmIds = (project) =>
-    resolveProjectPmIds(project, parentProjects, employeeIndex);
-
-  const getAllocatedManpower = (project) => {
-    return manpowerEmployeeIds({
-      allocations: allocations.filter((a) => a.sub_project_id === project.id),
-      pmIds: resolvePmIds(project),
-      leadIds: getTeamLeadIds(project),
-      employeeIndex,
-    }).size;
-  };
-
   const { startStr } = useMemo(() => {
     const today = new Date();
     const y = today.getFullYear();
@@ -142,8 +106,8 @@ const PMDashboard = () => {
 
   // At-risk projects (under-staffed)
   const atRiskProjects = activeProjects.filter((p) => {
-    const allocated = getAllocatedManpower(p);
-    return p.required_manpower && allocated < p.required_manpower;
+    const projAllocs = allocations.filter((a) => a.sub_project_id === p.id);
+    return p.required_manpower && projAllocs.length < p.required_manpower;
   });
 
   return (

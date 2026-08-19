@@ -13,7 +13,7 @@ const AnalyticsHeroHeader = ({
   activeJobId = null,
 }) => {
   return (
-    <div className="relative overflow-hidden rounded-2xl bg-white border border-stone-200 p-4 sm:p-5 shadow-[0_1px_4px_rgba(28,25,23,0.06)]">
+    <div className="relative overflow-hidden rounded-3xl bg-white border border-slate-200/80 p-6 sm:p-7 shadow-xs">
       <div className="relative z-10 flex flex-col gap-5 lg:flex-row lg:items-center lg:justify-between">
         {/* Left Column: Title & Live Badge */}
         <div className="space-y-2">

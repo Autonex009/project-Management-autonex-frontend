@@ -106,17 +106,17 @@ const WorkforceRoleInsightCard = ({
     const revDash = (reviewerPct / 100) * circumference;
 
     return (
-      <div className="h-full flex flex-col justify-between space-y-1.5">
+      <div className="h-full flex flex-col justify-between space-y-2">
         {/* Top Header */}
         <div className="flex items-center justify-between">
-          <div className="flex items-center gap-1.5 text-xs font-bold text-stone-800">
+          <div className="flex items-center gap-1.5 text-xs font-bold text-slate-800">
             <Users className="w-3.5 h-3.5 text-indigo-600" />
             <span>Staffing & Role Distribution</span>
           </div>
         </div>
 
         {/* Enlarged SVG Donut Ring Visualizer + Micro Metrics */}
-        <div className="flex items-center justify-around bg-stone-50/60 rounded-xl p-2.5 border border-stone-200/80 shadow-xs">
+        <div className="flex items-center justify-around bg-slate-50/60 rounded-xl p-3 border border-slate-100/80 shadow-2xs">
           {/* SVG Donut */}
           <div className="relative flex items-center justify-center shrink-0">
             <svg width={size} height={size} className="transform -rotate-90">
@@ -125,7 +125,7 @@ const WorkforceRoleInsightCard = ({
                 cx={center}
                 cy={center}
                 r={radius}
-                stroke="#e7e5e4"
+                stroke="#e2e8f0"
                 strokeWidth={strokeWidth}
                 fill="transparent"
               />
@@ -159,18 +159,18 @@ const WorkforceRoleInsightCard = ({
 
             {/* Inner Donut Label */}
             <div className="absolute inset-0 flex flex-col items-center justify-center text-center">
-              <span className="text-base font-mono font-black text-stone-900 leading-none">{totalTeam}</span>
-              <span className="text-[9px] font-bold text-stone-400 mt-0.5">Members</span>
+              <span className="text-base font-mono font-black text-slate-900 leading-none">{totalTeam}</span>
+              <span className="text-[9px] font-bold text-slate-400 mt-0.5">Members</span>
             </div>
           </div>
 
           {/* Right Side Micro Metrics */}
-          <div className="space-y-2 pl-3 border-l border-stone-200/60">
+          <div className="space-y-2.5 pl-3 border-l border-slate-200/60">
             <div className="flex items-center gap-2">
               <div className="w-2.5 h-2.5 rounded-full bg-indigo-600 shrink-0" />
               <div>
-                <div className="text-[10px] text-stone-400 font-medium">Annotators</div>
-                <div className="font-mono font-black text-stone-900 text-sm">
+                <div className="text-[10px] text-slate-400 font-medium">Annotators</div>
+                <div className="font-mono font-black text-slate-900 text-sm">
                   {totalAnnotators} <span className="text-xs font-semibold text-indigo-600">({annotatorPct}%)</span>
                 </div>
               </div>
@@ -179,8 +179,8 @@ const WorkforceRoleInsightCard = ({
             <div className="flex items-center gap-2">
               <div className="w-2.5 h-2.5 rounded-full bg-purple-500 shrink-0" />
               <div>
-                <div className="text-[10px] text-stone-400 font-medium">Reviewers</div>
-                <div className="font-mono font-black text-stone-900 text-sm">
+                <div className="text-[10px] text-slate-400 font-medium">Reviewers</div>
+                <div className="font-mono font-black text-slate-900 text-sm">
                   {totalReviewers} <span className="text-xs font-semibold text-purple-600">({reviewerPct}%)</span>
                 </div>
               </div>
@@ -189,8 +189,8 @@ const WorkforceRoleInsightCard = ({
         </div>
 
         {/* Bottom Status Pill */}
-        <div className="p-1 px-2 rounded-lg bg-indigo-50/50 border border-indigo-100/80 flex items-center justify-between text-[10px] font-mono whitespace-nowrap">
-          <span className="text-stone-500 font-medium shrink-0">Ratio:</span>
+        <div className="p-1.5 px-2 rounded-xl bg-indigo-50/50 border border-indigo-100/80 flex items-center justify-between text-[10px] font-mono whitespace-nowrap">
+          <span className="text-slate-500 font-medium shrink-0">Ratio:</span>
           <span className="font-bold text-indigo-700 shrink-0">1 Reviewer : {ratio} Annotators</span>
         </div>
       </div>
@@ -200,7 +200,7 @@ const WorkforceRoleInsightCard = ({
   // Render PROJECT Scope View (Top Contributors)
   if (!projectData || projectData.top3.length === 0) {
     return (
-      <div className="h-full flex items-center justify-center text-xs text-stone-400 font-medium">
+      <div className="h-full flex items-center justify-center text-xs text-slate-400 font-medium">
         No contributor data available for this project.
       </div>
     );
@@ -208,11 +208,13 @@ const WorkforceRoleInsightCard = ({
 
   const { top3, totalProjectHours, concentrationPct } = projectData;
 
+
+
   return (
-    <div className="h-full flex flex-col justify-between space-y-1.5">
+    <div className="h-full flex flex-col justify-between space-y-2">
       {/* Header Row */}
       <div className="flex items-center justify-between">
-        <div className="flex items-center gap-1.5 text-xs font-bold text-stone-800">
+        <div className="flex items-center gap-1.5 text-xs font-bold text-slate-800">
           <Award className="w-4 h-4 text-amber-500 shrink-0" />
           <span>Top Project Contributors</span>
         </div>
@@ -222,12 +224,12 @@ const WorkforceRoleInsightCard = ({
       </div>
 
       {/* Proportional Output Concentration Stacked Bar */}
-      <div className="bg-stone-50/70 p-2 rounded-xl border border-stone-200/70 space-y-1">
-        <div className="flex items-center justify-between text-[10px] font-mono font-bold text-stone-600">
+      <div className="bg-slate-50/70 p-2 rounded-xl border border-slate-100/90 space-y-1">
+        <div className="flex items-center justify-between text-[10px] font-mono font-bold text-slate-600">
           <span>Output Share Split</span>
           <span className="text-indigo-600">{concentrationPct}% volume</span>
         </div>
-        <div className="w-full bg-stone-200/60 rounded-full h-2 flex overflow-hidden p-0.5">
+        <div className="w-full bg-slate-200/60 rounded-full h-2 flex overflow-hidden p-0.5">
           {top3.map((m, idx) => {
             const pct = totalProjectHours > 0 ? Math.round((m.total_hours / totalProjectHours) * 100) : 0;
             const barColors = ["bg-amber-400", "bg-indigo-500", "bg-purple-500"];
@@ -254,16 +256,16 @@ const WorkforceRoleInsightCard = ({
 
           const STYLES = {
             1: {
-              cardBg: "bg-gradient-to-b from-amber-50 to-amber-100/40 border-amber-300/90 shadow-sm ring-1 ring-amber-400/40 -translate-y-0.5",
+              cardBg: "bg-gradient-to-b from-amber-50 to-amber-100/40 border-amber-300/90 shadow-sm ring-1 ring-amber-400/40 -translate-y-1",
               badgeBg: "bg-amber-500 text-white font-black shadow-xs shadow-amber-500/40",
               avatarRing: "ring-2 ring-amber-400 ring-offset-1",
               hoursText: "text-amber-950 font-mono font-black text-xs",
             },
             2: {
-              cardBg: "bg-stone-50/90 border-stone-200/90 hover:bg-stone-100/60",
-              badgeBg: "bg-stone-500 text-white font-bold",
-              avatarRing: "ring-2 ring-stone-300 ring-offset-1",
-              hoursText: "text-stone-900 font-mono font-bold text-xs",
+              cardBg: "bg-slate-50/90 border-slate-200/90 hover:bg-slate-100/60",
+              badgeBg: "bg-slate-500 text-white font-bold",
+              avatarRing: "ring-2 ring-slate-300 ring-offset-1",
+              hoursText: "text-slate-900 font-mono font-bold text-xs",
             },
             3: {
               cardBg: "bg-amber-900/5 border-amber-700/20 hover:bg-amber-900/10",
@@ -276,35 +278,35 @@ const WorkforceRoleInsightCard = ({
           return (
             <div
               key={member.user_email}
-              className={`p-1.5 rounded-xl border ${STYLES.cardBg} flex flex-col items-center justify-between text-center transition-all duration-300 py-2`}
+              className={`p-2 rounded-2xl border ${STYLES.cardBg} flex flex-col items-center justify-between text-center transition-all duration-300 py-2.5`}
             >
               {/* Rank & Share Header */}
               <div className="w-full flex items-center justify-between gap-1 mb-1">
                 <span className={`text-[9px] px-1.5 py-0.2 rounded-md ${STYLES.badgeBg}`}>
                   #{rank}
                 </span>
-                <span className="text-[9px] font-mono font-bold text-stone-500">
+                <span className="text-[9px] font-mono font-bold text-slate-500">
                   {pct}%
                 </span>
               </div>
 
               {/* Avatar Hub */}
-              <div className={`my-1 ${STYLES.avatarRing} rounded-full`}>
+              <div className={`my-1.5 ${STYLES.avatarRing} rounded-full`}>
                 <UserAvatar name={name} size="xs" />
               </div>
 
               {/* Contributor Meta */}
               <div className="w-full min-w-0 px-0.5">
-                <div className="font-extrabold text-stone-900 text-[11px] truncate leading-tight" title={name}>
+                <div className="font-extrabold text-slate-900 text-[11px] truncate leading-tight" title={name}>
                   {name.split(" ")[0]}
                 </div>
-                <div className="text-[8.5px] text-stone-600 font-semibold uppercase tracking-wider truncate mt-0.5">
+                <div className="text-[8.5px] text-slate-600 font-semibold uppercase tracking-wider truncate mt-0.5">
                   {role}
                 </div>
               </div>
 
               {/* Total Hours Badge */}
-              <div className={`mt-1.5 ${STYLES.hoursText}`}>
+              <div className={`mt-2 ${STYLES.hoursText}`}>
                 {hrs}h
               </div>
             </div>
