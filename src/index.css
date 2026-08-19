@@ -83,4 +83,35 @@
   animation: shimmer 1.6s infinite ease-in-out;
 }
 
+@keyframes borderPulseAmber {
+  0%, 100% {
+    border-color: #f59e0b;
+    box-shadow: 0 0 0 2px rgba(245, 158, 11, 0.35), 0 0 6px rgba(245, 158, 11, 0.35);
+  }
+  50% {
+    border-color: #d97706;
+    box-shadow: 0 0 0 3px rgba(245, 158, 11, 0.85), 0 0 16px rgba(245, 158, 11, 0.75);
+  }
+}
+
+.animate-border-pulse-amber {
+  animation: borderPulseAmber 2s cubic-bezier(0.4, 0, 0.6, 1) infinite;
+}
+
+@keyframes dotPulseAmber {
+  0%, 100% {
+    transform: scale(0.9);
+    box-shadow: 0 0 4px rgba(245, 158, 11, 0.7);
+  }
+  50% {
+    transform: scale(1.2);
+    box-shadow: 0 0 10px rgba(245, 158, 11, 1);
+  }
+}
+
+.animate-dot-pulse-amber {
+  animation: dotPulseAmber 2s cubic-bezier(0.4, 0, 0.6, 1) infinite;
+}
+
+
 

@@ -50,7 +50,7 @@ import { LEAVE_STATUS_TEXT } from "../components/ui/LeaveStatusText";
 import { makeOpensUpward } from "../utils/tableRows";
 import { checkHalfDayTiming } from "../utils/halfDayTiming";
 
-const TABS = ["Leave List", "Calendar", "WFH Requests", "Employee KPI"];
+const TABS = ["Calendar", "Leave List", "WFH Requests", "Employee KPI"];
 const PAGE_SIZE = 10;
 
 const LeavesPage = () => {
@@ -58,7 +58,7 @@ const LeavesPage = () => {
   const [searchParams] = useSearchParams();
   const tabParam = searchParams.get("tab");
   const [activeTab, setActiveTab] = useState(
-    TABS.includes(tabParam) ? tabParam : "Leave List",
+    TABS.includes(tabParam) ? tabParam : "Calendar",
   );
   const queryParam = searchParams.get("q");
   const [currentPage, setCurrentPage] = useState(1);
@@ -156,7 +156,7 @@ const LeavesPage = () => {
     keepPreviousData: true,
   });
 
-    const leaves = leavePageData?.items || [];
+  const leaves = leavePageData?.items || [];
   // Support both the shape we return and the shape Guidelines uses
   const leaveTotalItems =
     leavePageData?.total_items ?? leavePageData?.total ?? 0;
@@ -169,7 +169,7 @@ const LeavesPage = () => {
   const { data: allLeaves = [] } = useQuery({
     queryKey: ["leaves"],
     queryFn: leaveApi.getAll,
-    enabled: activeTab === "Employee KPI" 
+    enabled: activeTab === "Employee KPI"
   });
 
   // ── WFH – server-side page ───────────────────────────────────────────────
@@ -461,11 +461,10 @@ const LeavesPage = () => {
               <button
                 key={tab}
                 onClick={() => handleTabChange(tab)}
-                className={`inline-flex items-center gap-1.5 px-3.5 py-1.5 text-[13px] font-semibold rounded-md transition-all whitespace-nowrap ${
-                  isActive
+                className={`inline-flex items-center gap-1.5 px-3.5 py-1.5 text-[13px] font-semibold rounded-md transition-all whitespace-nowrap ${isActive
                     ? "bg-white text-slate-900 shadow-sm ring-1 ring-slate-200/70"
                     : "text-slate-500 hover:text-slate-800"
-                }`}
+                  }`}
               >
                 {tab === "WFH Requests" ? (
                   <>
@@ -534,14 +533,12 @@ const LeavesPage = () => {
                     <button
                       type="button"
                       onClick={() => setTodayOnly((t) => !t)}
-                      className={`inline-flex h-5 w-9 items-center rounded-full transition-colors ${
-                        todayOnly ? "bg-indigo-600" : "bg-slate-200"
-                      }`}
+                      className={`inline-flex h-5 w-9 items-center rounded-full transition-colors ${todayOnly ? "bg-indigo-600" : "bg-slate-200"
+                        }`}
                     >
                       <span
-                        className={`inline-block h-4 w-4 transform rounded-full bg-white transition-transform ${
-                          todayOnly ? "translate-x-4" : "translate-x-0.5"
-                        }`}
+                        className={`inline-block h-4 w-4 transform rounded-full bg-white transition-transform ${todayOnly ? "translate-x-4" : "translate-x-0.5"
+                          }`}
                       />
                     </button>
                   </div>
@@ -777,7 +774,7 @@ const LeavesPage = () => {
                         <>
                           day (
                           {leave.half_day_slot === "first_half" ||
-                          leave.half_day_slot === "1st Half"
+                            leave.half_day_slot === "1st Half"
                             ? "1st Half"
                             : "2nd Half"}
                           )
@@ -1130,11 +1127,10 @@ const LeavesPage = () => {
                   key={preset}
                   type="button"
                   onClick={() => setWfhRemark(preset)}
-                  className={`px-2.5 py-1 rounded-lg border text-[11px] font-semibold transition-colors ${
-                    wfhRemark === preset
+                  className={`px-2.5 py-1 rounded-lg border text-[11px] font-semibold transition-colors ${wfhRemark === preset
                       ? "bg-indigo-600 text-white border-indigo-600"
                       : "bg-slate-50 text-slate-600 border-slate-200 hover:bg-slate-100"
-                  }`}
+                    }`}
                 >
                   {preset}
                 </button>
@@ -1237,7 +1233,7 @@ const LeavesPage = () => {
             </div>
             <div>
               {selectedLeaveType === "first_half" ||
-              selectedLeaveType === "second_half" ? (
+                selectedLeaveType === "second_half" ? (
                 <div>
                   <label className="block text-sm font-medium text-gray-700 mb-1">
                     Date <span className="text-red-500">*</span>
@@ -1292,37 +1288,37 @@ const LeavesPage = () => {
             </div>
             {(selectedLeaveType === "first_half" ||
               selectedLeaveType === "second_half") && (
-              <div className="rounded-xl border border-indigo-150 bg-indigo-50/50 p-4 text-sm text-indigo-900 space-y-2">
-                <div className="flex items-center gap-1.5 font-semibold text-indigo-950">
-                  <Clock className="w-4 h-4 text-indigo-600" /> Half-day Leave
-                  Policy &amp; Slots
-                </div>
-                <div className="grid grid-cols-1 sm:grid-cols-2 gap-3 text-xs">
-                  <div className="p-2.5 bg-white rounded-lg border border-indigo-100/80">
-                    <p className="font-semibold text-indigo-950">
-                      First Half-day Leave
-                    </p>
-                    <p className="text-slate-600 mt-0.5">
-                      🕒 Slot: 9:00 AM – 2:00 PM
-                    </p>
-                    <p className="text-slate-500 mt-1 font-medium italic">
-                      ⚠️ Apply at least one day in advance.
-                    </p>
+                <div className="rounded-xl border border-indigo-150 bg-indigo-50/50 p-4 text-sm text-indigo-900 space-y-2">
+                  <div className="flex items-center gap-1.5 font-semibold text-indigo-950">
+                    <Clock className="w-4 h-4 text-indigo-600" /> Half-day Leave
+                    Policy &amp; Slots
                   </div>
-                  <div className="p-2.5 bg-white rounded-lg border border-indigo-100/80">
-                    <p className="font-semibold text-indigo-950">
-                      Second Half-day Leave
-                    </p>
-                    <p className="text-slate-600 mt-0.5">
-                      🕒 Slot: 2:00 PM – 7:00 PM
-                    </p>
-                    <p className="text-slate-500 mt-1 font-medium italic">
-                      ⚠️ Apply before 2:00 PM on the same day.
-                    </p>
+                  <div className="grid grid-cols-1 sm:grid-cols-2 gap-3 text-xs">
+                    <div className="p-2.5 bg-white rounded-lg border border-indigo-100/80">
+                      <p className="font-semibold text-indigo-950">
+                        First Half-day Leave
+                      </p>
+                      <p className="text-slate-600 mt-0.5">
+                        🕒 Slot: 9:00 AM – 2:00 PM
+                      </p>
+                      <p className="text-slate-500 mt-1 font-medium italic">
+                        ⚠️ Apply at least one day in advance.
+                      </p>
+                    </div>
+                    <div className="p-2.5 bg-white rounded-lg border border-indigo-100/80">
+                      <p className="font-semibold text-indigo-950">
+                        Second Half-day Leave
+                      </p>
+                      <p className="text-slate-600 mt-0.5">
+                        🕒 Slot: 2:00 PM – 7:00 PM
+                      </p>
+                      <p className="text-slate-500 mt-1 font-medium italic">
+                        ⚠️ Apply before 2:00 PM on the same day.
+                      </p>
+                    </div>
                   </div>
                 </div>
-              </div>
-            )}
+              )}
           </Modal.Body>
           <Modal.Footer>
             <Button
@@ -1364,9 +1360,8 @@ const LeavesPage = () => {
           title="Delete Leave Record"
           message={`Are you sure you want to delete the ${getLeaveTypeLabel(
             deleteTarget.leave_type,
-          )} record for ${getEmployeeName(deleteTarget.employee_id)} (${
-            deleteTarget.start_date
-          } — ${deleteTarget.end_date})?`}
+          )} record for ${getEmployeeName(deleteTarget.employee_id)} (${deleteTarget.start_date
+            } — ${deleteTarget.end_date})?`}
           variant="danger"
           confirmText="Delete"
           cancelText="Cancel"
