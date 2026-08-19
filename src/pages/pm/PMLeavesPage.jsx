@@ -1,4 +1,5 @@
 import { useState, useRef, useEffect } from "react";
+import { useSearchParams } from "react-router-dom";
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
 import {
   leaveApi,
@@ -61,7 +62,7 @@ import {
   canRoleActOnRequests,
 } from "../../utils/roleAccess";
 
-const TABS = ["Leave Requests", "Calendar", "WFH Requests", "Employee KPI"];
+const TABS = ["Calendar", "Leave Requests", "WFH Requests", "Employee KPI"];
 
 // Which roles get the action controls comes from utils/roleAccess — team leads decide for
 // their own team members exactly as a program manager does, and a literal list here has
@@ -101,9 +102,17 @@ const PMLeavesPage = () => {
   const canAct = canRoleActOnRequests(role);
   const employeeId = getPmEmployeeId(user);
 
-  const [activeTab, setActiveTab] = useState("Leave Requests");
+  const [searchParams] = useSearchParams();
+  const tabParam = searchParams.get("tab");
+  const [activeTab, setActiveTab] = useState(
+    TABS.includes(tabParam) ? tabParam : "Calendar",
+  );
   const [currentPage, setCurrentPage] = useState(1);
   const PAGE_SIZE = 10;
+
+  useEffect(() => {
+    if (tabParam && TABS.includes(tabParam)) setActiveTab(tabParam);
+  }, [tabParam]);
 
   // ── Toolbar state ────────────────────────────────────────────────
   const [searchQuery, setSearchQuery] = useState("");

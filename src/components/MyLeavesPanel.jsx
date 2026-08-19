@@ -51,7 +51,7 @@ import OverLimitHoverCard from "./ui/OverLimitHoverCard";
 import LeaveCalendar from "./LeaveCalendar";
 import ConfirmDialog from "./ui/ConfirmDialog";
 
-const TABS = ["My Leaves", "Calendar", "Work From Home"];
+const TABS = ["Calendar", "My Leaves", "Work From Home"];
 
 const today = toLocalISODate(new Date());
 
@@ -252,7 +252,7 @@ const MyLeavesPanel = ({
   const user = JSON.parse(localStorage.getItem("user") || "{}");
   const employeeId = user.employee_id || user.id;
 
-  const [activeTab, setActiveTab] = useState("My Leaves");
+  const [activeTab, setActiveTab] = useState("Calendar");
   const [showLeaveForm, setShowLeaveForm] = useState(false);
   const [showWfhForm, setShowWfhForm] = useState(false);
   const [leaveForm, setLeaveForm] = useState({
@@ -1300,12 +1300,10 @@ const MyLeavesPanel = ({
         </>
       )}
 
-{/* ── Calendar ── */ }
-{
-  activeTab === "Calendar" && (
-    <LeaveCalendar filterEmployeeIds={myEmployeeIdSet} />
-  )
-}
+{/* ── Calendar ── */}
+{activeTab === "Calendar" && (
+  <LeaveCalendar filterEmployeeIds={myEmployeeIdSet} isSelfView={true} />
+)}
 
 {/* ── Work From Home ── */ }
 {
