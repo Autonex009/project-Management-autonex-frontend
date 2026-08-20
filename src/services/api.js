@@ -581,6 +581,18 @@ export const performanceReviewApi = {
 };
 
 // === Project-based Monthly Performance Evaluations API (perf_evals) ===
+// export const perfEvalApi = {
+//   getAll: (params) =>
+//     api.get("/perf-evals", { params }).then((res) => res.data),
+//   submit: (data) => api.post("/perf-evals", data).then((res) => res.data),
+//   // PM review: approvals + PM ratings + per-param feedback + bonus.
+//   review: (id, data) =>
+//     api.patch(`/perf-evals/${id}/review`, data).then((res) => res.data),
+//   delete: (id) => api.delete(`/perf-evals/${id}`).then((res) => res.data),
+//   getDashboard: () => api.get("/api/perf-evals/dashboard").then((res) => res.data),
+
+// };
+
 export const perfEvalApi = {
   getAll: (params) =>
     api.get("/perf-evals", { params }).then((res) => res.data),
@@ -589,6 +601,7 @@ export const perfEvalApi = {
   review: (id, data) =>
     api.patch(`/perf-evals/${id}/review`, data).then((res) => res.data),
   delete: (id) => api.delete(`/perf-evals/${id}`).then((res) => res.data),
+  getDashboard: () => api.get("/perf-evals/dashboard").then((res) => res.data),
 };
 
 // === Notifications API ===
