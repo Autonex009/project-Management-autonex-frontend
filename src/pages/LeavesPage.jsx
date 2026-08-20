@@ -259,9 +259,10 @@ const LeavesPage = () => {
   ];
 
   // ── Employees (always needed for names / form / KPI) ─────────────────────
+  const isPmOrLead = user.role === "pm" || user.role === "team_lead";
   const { data: employees = [], isLoading: employeesLoading } = useQuery({
-    queryKey: ["employees"],
-    queryFn: () => employeeApi.getAll(),
+    queryKey: ["employees", { team_only: isPmOrLead }],
+    queryFn: () => employeeApi.getAll({ team_only: isPmOrLead }),
   });
 
   // ── Leaves – server-side page (same pattern as Guidelines) ───────────────
