@@ -1,6 +1,8 @@
 import { useState, useEffect } from "react";
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
 import { signupRequestApi } from "../services/api";
+import usePageStateStore from "../store/usePageStateStore"; // adjust path
+import { usePageScroll } from "../hooks/usePageScroll";
 import Button from "../components/ui/Button";
 import {
   CheckCircle,
@@ -42,26 +44,53 @@ const STATUS_BADGE = {
 
 const TABS = ["All", "Pending", "Approved", "Rejected"];
 
+
+
+const PAGE_KEY = "signup-requests";
+
 const SignupRequestsPage = () => {
   const queryClient = useQueryClient();
   const user = JSON.parse(localStorage.getItem("user") || "{}");
-  const [activeTab, setActiveTab] = useState("All");
-  const [rejectModal, setRejectModal] = useState(null); // { requestId, name }
+
+  // ---- restore persisted UI state ----
+  const { getPageState, setPageState } = usePageStateStore();
+  const saved = getPageState(PAGE_KEY);
+
+  const [activeTab, setActiveTab] = useState(saved.activeTab ?? "All");
+  const [search, setSearch] = useState(saved.search ?? "");
+  const [debouncedSearch, setDebouncedSearch] = useState(saved.search ?? "");
+  const [currentPage, setCurrentPage] = useState(saved.currentPage ?? 1);
+
+  // ephemeral UI (not persisted)
+  const [rejectModal, setRejectModal] = useState(null);
   const [rejectReason, setRejectReason] = useState("");
   const [expandedId, setExpandedId] = useState(null);
-  const [currentPage, setCurrentPage] = useState(1);
   const [localEmployeeTypes, setLocalEmployeeTypes] = useState({});
-  const [search, setSearch] = useState("");
-  const [debouncedSearch, setDebouncedSearch] = useState("");
   const PAGE_SIZE = 10;
 
+  // restore scroll position
+  usePageScroll(PAGE_KEY);
+
   useEffect(() => {
-    const timer = setTimeout(() => {
-      setDebouncedSearch(search);
+    setPageState(PAGE_KEY, {
+      activeTab,
+      search,
+      currentPage,
+    });
+  }, [activeTab, search, currentPage, setPageState]);
+
+ useEffect(() => {
+  const timer = setTimeout(() => {
+    setDebouncedSearch(search);
+
+    // Only reset page when the user actually changes the search text,
+    // not when we restore the previous search on mount.
+    if (search !== (saved.search ?? "")) {
       setCurrentPage(1);
-    }, 500);
-    return () => clearTimeout(timer);
-  }, [search]);
+    }
+  }, 500);
+  return () => clearTimeout(timer);
+}, [search]); // eslint-disable-line react-hooks/exhaustive-deps
 
   const { data: listData, isLoading } = useQuery({
     queryKey: ["signup-requests", activeTab, currentPage, debouncedSearch],

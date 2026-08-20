@@ -1,4 +1,6 @@
-import React, { useMemo, useState, useEffect } from "react";
+import React, { useMemo, useState, useEffect, useRef } from "react";
+import usePageStateStore from "../../store/usePageStateStore";
+import { usePageScroll } from "../../hooks/usePageScroll";
 import { useQuery } from "@tanstack/react-query";
 import {
   employeeApi,
@@ -127,13 +129,76 @@ const AdminPerformancePage = () => {
     queryFn: () => parentProjectApi.getAll(),
     staleTime: 5 * 60 * 1000,
   });
-  const [perfPage, setPerfPage] = useState(1);
+  
+    // ── Persist tab / search / filters / pages / scroll ─────────
+  const PAGE_KEY = "admin-performance";
+  const setPageState = usePageStateStore((s) => s.setPageState);
+  const getPageState = usePageStateStore((s) => s.getPageState);
+
   const [tab, setTab] = useState("employees"); // 'employees' | 'pm'
   const [search, setSearch] = useState("");
   const [roleFilter, setRoleFilter] = useState("all");
-  const [expandedEval, setExpandedEval] = useState(null);
-  const [bonusOpen, setBonusOpen] = useState(false); // collapsible "Suggested for Bonus" table
+  const [perfPage, setPerfPage] = useState(1);
   const [bonusPage, setBonusPage] = useState(1);
+  const [bonusOpen, setBonusOpen] = useState(false);
+  const [expandedEval, setExpandedEval] = useState(null); // not persisted (row expand is transient)
+
+  const [ready, setReady] = useState(false);
+
+  // Restore after zustand rehydration
+  useEffect(() => {
+    const restore = () => {
+      const s = getPageState(PAGE_KEY);
+      if (s.tab === "employees" || s.tab === "pm") setTab(s.tab);
+      if (s.search != null) setSearch(s.search);
+      if (s.roleFilter != null) setRoleFilter(s.roleFilter);
+      if (s.perfPage != null) setPerfPage(s.perfPage);
+      if (s.bonusPage != null) setBonusPage(s.bonusPage);
+      if (s.bonusOpen != null) setBonusOpen(!!s.bonusOpen);
+      setReady(true);
+    };
+
+    if (usePageStateStore.persist.hasHydrated()) {
+      restore();
+      return;
+    }
+    return usePageStateStore.persist.onFinishHydration(restore);
+  }, [getPageState]);
+
+  // Write only after restore (never overwrite saved page with 1 on mount)
+  useEffect(() => {
+    if (!ready) return;
+    setPageState(PAGE_KEY, {
+      tab,
+      search,
+      roleFilter,
+      perfPage,
+      bonusPage,
+      bonusOpen,
+    });
+  }, [
+    ready,
+    tab,
+    search,
+    roleFilter,
+    perfPage,
+    bonusPage,
+    bonusOpen,
+    setPageState,
+  ]);
+
+  usePageScroll(PAGE_KEY);
+
+  // Reset main table page when filters/tab change — skip first run after restore
+  const skipPageReset = useRef(true);
+  useEffect(() => {
+    if (!ready) return;
+    if (skipPageReset.current) {
+      skipPageReset.current = false;
+      return;
+    }
+    setPerfPage(1);
+  }, [search, roleFilter, tab, ready]);
 
   // Admin sees ALL evaluations (submitted + reviewed).
   const { data: evaluationsData = {}, isLoading: evalLoading, isFetching: evalFetching } = useQuery({
@@ -147,10 +212,6 @@ const AdminPerformancePage = () => {
   const evaluationsTotal = evaluationsData?.total || 0;
 
   const isLoading = empLoading || evalFetching || projectsLoading || mainProjectsLoading;
-
-  useEffect(() => {
-    setPerfPage(1);
-  }, [search, roleFilter, tab]);
 
   const empById = useMemo(
     () => new Map(employees.map((e) => [e.id, e])),

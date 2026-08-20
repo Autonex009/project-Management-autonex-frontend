@@ -2,6 +2,8 @@ import { useState, useRef, useEffect } from "react";
 import { useSearchParams } from "react-router-dom";
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
 import { leaveApi, employeeApi, wfhApi } from "../services/api";
+import usePageStateStore from "../store/usePageStateStore";
+import { usePageScroll } from "../hooks/usePageScroll";
 import Button from "../components/ui/Button";
 import DatePicker from "../components/ui/DatePicker";
 import UserAvatar from "../components/ui/UserAvatar";
@@ -55,36 +57,151 @@ const PAGE_SIZE = 10;
 
 const LeavesPage = () => {
   const queryClient = useQueryClient();
-  const [searchParams] = useSearchParams();
+  // const [searchParams] = useSearchParams();
+  // const tabParam = searchParams.get("tab");
+  // const [activeTab, setActiveTab] = useState(
+  //   TABS.includes(tabParam) ? tabParam : "Calendar",
+  // );
+  // const queryParam = searchParams.get("q");
+  // const [currentPage, setCurrentPage] = useState(1);
+  // const [isModalOpen, setIsModalOpen] = useState(false);
+  // const [selectedLeaveType, setSelectedLeaveType] = useState("");
+  // const [formStartDate, setFormStartDate] = useState("");
+  // const [formEndDate, setFormEndDate] = useState("");
+  // const [searchQuery, setSearchQuery] = useState(queryParam || "");
+
+  // useEffect(() => {
+  //   if (tabParam && TABS.includes(tabParam)) setActiveTab(tabParam);
+  // }, [tabParam]);
+
+  // useEffect(() => {
+  //   setCurrentPage(1);
+  // }, [activeTab]);
+
+  // useEffect(() => {
+  //   if (queryParam === null) return;
+  //   setSearchQuery(queryParam);
+  //   setCurrentPage(1);
+  // }, [queryParam]);
+
+  // const [statusFilter, setStatusFilter] = useState("all");
+  // const [todayOnly, setTodayOnly] = useState(false);
+  // const [dateSort, setDateSort] = useState("");
+  // const [filtersOpen, setFiltersOpen] = useState(false);
+  // const filtersRef = useRef(null);
+
+  // useEffect(() => {
+  //   const handler = (e) => {
+  //     if (filtersRef.current && !filtersRef.current.contains(e.target))
+  //       setFiltersOpen(false);
+  //   };
+  //   document.addEventListener("mousedown", handler);
+  //   return () => document.removeEventListener("mousedown", handler);
+  // }, []);
+
+  // Reset to page 1 whenever any filter / search / sort changes
+  // useEffect(() => {
+  //   setCurrentPage(1);
+  // }, [searchQuery, statusFilter, todayOnly, dateSort]);
+
+    const [searchParams] = useSearchParams();
   const tabParam = searchParams.get("tab");
+  const queryParam = searchParams.get("q");
+
+  const PAGE_KEY = "leaves";
+  const setPageState = usePageStateStore((s) => s.setPageState);
+  const getPageState = usePageStateStore((s) => s.getPageState);
+
+  const defaultListState = {
+    searchQuery: "",
+    statusFilter: "all",
+    todayOnly: false,
+    dateSort: "",
+    currentPage: 1,
+  };
+
   const [activeTab, setActiveTab] = useState(
     TABS.includes(tabParam) ? tabParam : "Calendar",
   );
-  const queryParam = searchParams.get("q");
+  const [searchQuery, setSearchQuery] = useState(queryParam || "");
+  const [statusFilter, setStatusFilter] = useState("all");
+  const [todayOnly, setTodayOnly] = useState(false);
+  const [dateSort, setDateSort] = useState("");
   const [currentPage, setCurrentPage] = useState(1);
+
+  // Block writes until we restored from storage (avoids overwriting page with 1)
+  const [ready, setReady] = useState(false);
+
+  // Restore after zustand rehydration
+  useEffect(() => {
+    const restore = () => {
+      const root = getPageState(PAGE_KEY);
+
+      const tab =
+        tabParam && TABS.includes(tabParam)
+          ? tabParam
+          : TABS.includes(root.activeTab)
+            ? root.activeTab
+            : "Calendar";
+
+      setActiveTab(tab);
+
+      if (tab === "Leave List" || tab === "WFH Requests") {
+        const t = root.tabs?.[tab] || defaultListState;
+        setSearchQuery(queryParam != null ? queryParam : t.searchQuery || "");
+        setStatusFilter(t.statusFilter ?? "all");
+        setTodayOnly(!!t.todayOnly);
+        setDateSort(t.dateSort || "");
+        setCurrentPage(t.currentPage ?? 1);
+      }
+
+      setReady(true);
+    };
+
+    if (usePageStateStore.persist.hasHydrated()) {
+      restore();
+      return;
+    }
+    return usePageStateStore.persist.onFinishHydration(restore);
+  }, [tabParam, queryParam, getPageState]);
+
+  // Save current tab state (only after restore)
+  useEffect(() => {
+    if (!ready) return;
+
+    const root = getPageState(PAGE_KEY);
+    const tabs = { ...(root.tabs || {}) };
+
+    if (activeTab === "Leave List" || activeTab === "WFH Requests") {
+      tabs[activeTab] = {
+        searchQuery,
+        statusFilter,
+        todayOnly,
+        dateSort,
+        currentPage,
+      };
+    }
+
+    setPageState(PAGE_KEY, { activeTab, tabs });
+  }, [
+    ready,
+    activeTab,
+    searchQuery,
+    statusFilter,
+    todayOnly,
+    dateSort,
+    currentPage,
+    setPageState,
+    getPageState,
+  ]);
+
+  // Scroll position per tab
+  usePageScroll(`leaves:${activeTab}`);
+
   const [isModalOpen, setIsModalOpen] = useState(false);
   const [selectedLeaveType, setSelectedLeaveType] = useState("");
   const [formStartDate, setFormStartDate] = useState("");
   const [formEndDate, setFormEndDate] = useState("");
-  const [searchQuery, setSearchQuery] = useState(queryParam || "");
-
-  useEffect(() => {
-    if (tabParam && TABS.includes(tabParam)) setActiveTab(tabParam);
-  }, [tabParam]);
-
-  useEffect(() => {
-    setCurrentPage(1);
-  }, [activeTab]);
-
-  useEffect(() => {
-    if (queryParam === null) return;
-    setSearchQuery(queryParam);
-    setCurrentPage(1);
-  }, [queryParam]);
-
-  const [statusFilter, setStatusFilter] = useState("all");
-  const [todayOnly, setTodayOnly] = useState(false);
-  const [dateSort, setDateSort] = useState("");
   const [filtersOpen, setFiltersOpen] = useState(false);
   const filtersRef = useRef(null);
 
@@ -97,10 +214,28 @@ const LeavesPage = () => {
     return () => document.removeEventListener("mousedown", handler);
   }, []);
 
-  // Reset to page 1 whenever any filter / search / sort changes
+  // URL tab wins
   useEffect(() => {
+    if (tabParam && TABS.includes(tabParam)) setActiveTab(tabParam);
+  }, [tabParam]);
+
+  // URL ?q= wins
+  useEffect(() => {
+    if (queryParam === null) return;
+    setSearchQuery(queryParam);
     setCurrentPage(1);
-  }, [searchQuery, statusFilter, todayOnly, dateSort]);
+  }, [queryParam]);
+
+  // Reset page only when filters change inside the same list tab
+  const skipPageReset = useRef(true);
+  useEffect(() => {
+    if (!ready) return;
+    if (skipPageReset.current) {
+      skipPageReset.current = false;
+      return;
+    }
+    setCurrentPage(1);
+  }, [searchQuery, statusFilter, todayOnly, dateSort, ready]);
 
   const activeFilterCount =
     (statusFilter !== "all" ? 1 : 0) + (todayOnly ? 1 : 0);
@@ -431,10 +566,50 @@ const LeavesPage = () => {
     `Employee #${id}`;
   const activeEmployees = employees.filter((e) => e.status === "active");
 
-  const handleTabChange = (tab) => {
+  // const handleTabChange = (tab) => {
+  //   setActiveTab(tab);
+  //   setCurrentPage(1);
+  //   setSearchQuery("");
+  // };
+    const handleTabChange = (tab) => {
+    if (tab === activeTab) return;
+
+    // Save current list tab before leaving it
+    if (ready && (activeTab === "Leave List" || activeTab === "WFH Requests")) {
+      const root = getPageState(PAGE_KEY);
+      setPageState(PAGE_KEY, {
+        activeTab: tab,
+        tabs: {
+          ...(root.tabs || {}),
+          [activeTab]: {
+            searchQuery,
+            statusFilter,
+            todayOnly,
+            dateSort,
+            currentPage,
+          },
+        },
+      });
+    } else if (ready) {
+      setPageState(PAGE_KEY, {
+        ...getPageState(PAGE_KEY),
+        activeTab: tab,
+      });
+    }
+
     setActiveTab(tab);
-    setCurrentPage(1);
-    setSearchQuery("");
+
+    // Load target tab's saved filters / pagination
+    if (tab === "Leave List" || tab === "WFH Requests") {
+      const next = getPageState(PAGE_KEY).tabs?.[tab] || defaultListState;
+      setSearchQuery(next.searchQuery || "");
+      setStatusFilter(next.statusFilter ?? "all");
+      setTodayOnly(!!next.todayOnly);
+      setDateSort(next.dateSort || "");
+      setCurrentPage(next.currentPage ?? 1);
+      // Allow page-reset effect to skip this load
+      skipPageReset.current = true;
+    }
   };
 
   const handleSearchChange = (val) => {

@@ -1,4 +1,6 @@
 import React, { useRef, useState, useEffect } from "react";
+import usePageStateStore from "../../store/usePageStateStore";
+import { usePageScroll } from "../../hooks/usePageScroll";
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
 import Button from "../../components/ui/Button";
 import { guidelineApi, projectApi, subProjectApi } from "../../services/api";
@@ -46,6 +48,19 @@ const GuidelinesPage = () => {
   const canEdit = role === "pm" || role === "admin";
   const pmEmployeeId = getPmEmployeeId(user);
 
+   // ── Persist org filter / search / page / scroll ────────────
+  const PAGE_KEY = "guidelines";
+  const setPageState = usePageStateStore((s) => s.setPageState);
+  const getPageState = usePageStateStore((s) => s.getPageState);
+
+  const [filterProject, setFilterProject] = useState("");
+  const [searchQuery, setSearchQuery] = useState("");
+  const [page, setPage] = useState(1);
+
+  const [selectedFile, setSelectedFile] = useState(null);
+  const [isDragActive, setIsDragActive] = useState(false);
+  const fileInputRef = useRef(null);
+  const [deleteTarget, setDeleteTarget] = useState(null);
   const [showForm, setShowForm] = useState(false);
   const [editingId, setEditingId] = useState(null);
   const [form, setForm] = useState({
@@ -54,13 +69,45 @@ const GuidelinesPage = () => {
     sub_project_id: "",
   });
 
-  const [filterProject, setFilterProject] = useState("");
-  const [selectedFile, setSelectedFile] = useState(null);
-  const [isDragActive, setIsDragActive] = useState(false);
-  const fileInputRef = useRef(null);
-  const [searchQuery, setSearchQuery] = useState("");
-  const [deleteTarget, setDeleteTarget] = useState(null);
-  const [page, setPage] = useState(1);
+  const [ready, setReady] = useState(false);
+
+  useEffect(() => {
+    const restore = () => {
+      const s = getPageState(PAGE_KEY);
+      if (s.filterProject != null) setFilterProject(s.filterProject);
+      if (s.searchQuery != null) setSearchQuery(s.searchQuery);
+      if (s.page != null) setPage(s.page);
+      setReady(true);
+    };
+
+    if (usePageStateStore.persist.hasHydrated()) {
+      restore();
+      return;
+    }
+    return usePageStateStore.persist.onFinishHydration(restore);
+  }, [getPageState]);
+
+  useEffect(() => {
+    if (!ready) return;
+    setPageState(PAGE_KEY, {
+      filterProject,
+      searchQuery,
+      page,
+    });
+  }, [ready, filterProject, searchQuery, page, setPageState]);
+
+  usePageScroll(PAGE_KEY);
+
+  // Reset page when filter/search change — skip first run after restore
+  const skipPageReset = useRef(true);
+  useEffect(() => {
+    if (!ready) return;
+    if (skipPageReset.current) {
+      skipPageReset.current = false;
+      return;
+    }
+    setPage(1);
+  }, [searchQuery, filterProject, ready]);
 
   // ── CHANGED: one pre-joined, pre-searched, pre-paginated page from the
   // server, instead of downloading every guideline + every project/org to
@@ -115,9 +162,6 @@ const GuidelinesPage = () => {
   // CHANGED: search/filter now happen server-side via the query key above;
   // reset to page 1 whenever either changes so the new result set starts
   // from the top.
-  useEffect(() => {
-    setPage(1);
-  }, [searchQuery, filterProject]);
 
   // Mutations
   const createMutation = useMutation({
