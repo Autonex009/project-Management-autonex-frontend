@@ -2,6 +2,8 @@ import { useState, useEffect, useRef, useMemo } from "react";
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
 import { useLocation, useNavigate } from "react-router-dom";
 import UserAvatar from "../components/ui/UserAvatar";
+import usePageStateStore from "../store/usePageStateStore";
+import { usePageScroll } from "../hooks/usePageScroll";
 import {
   allocationApi,
   subProjectApi,
@@ -81,10 +83,6 @@ const AllocationsPage = () => {
   const isScoped = isProjectScopedRole(role);
   const prefix = isScoped ? "/pm" : "/admin";
 
-  const [isModalOpen, setIsModalOpen] = useState(false);
-  const [currentPage, setCurrentPage] = useState(1);
-  const [searchQuery, setSearchQuery] = useState("");
-  const [selectedProject, setSelectedProject] = useState(null);
   const [selectedEmployees, setSelectedEmployees] = useState([]);
   const [filterTab, setFilterTab] = useState("all");
   const [editingAllocation, setEditingAllocation] = useState(null); // { projectId, projectName }
@@ -97,6 +95,24 @@ const AllocationsPage = () => {
   const [timeDistribution, setTimeDistribution] = useState({});
   const [totalDailyHours, setTotalDailyHours] = useState(8);
   const [employeeSearch, setEmployeeSearch] = useState("");
+
+  const [isModalOpen, setIsModalOpen] = useState(false);
+
+  // ── Persist search + page + scroll ─────────────────────────
+  const PAGE_KEY = "allocations";
+  const saved = usePageStateStore((s) => s.getPageState(PAGE_KEY));
+  const setPageState = usePageStateStore((s) => s.setPageState);
+
+  const [currentPage, setCurrentPage] = useState(saved.currentPage ?? 1);
+  const [searchQuery, setSearchQuery] = useState(saved.searchQuery ?? "");
+
+  useEffect(() => {
+    setPageState(PAGE_KEY, { searchQuery, currentPage });
+  }, [searchQuery, currentPage, setPageState]);
+
+  usePageScroll(PAGE_KEY);
+
+  const [selectedProject, setSelectedProject] = useState(null);
 
   // ── CHANGED: one pre-aggregated page from the server, instead of
   // projects + allocations + employees + leaves + wfh + parentProjects all

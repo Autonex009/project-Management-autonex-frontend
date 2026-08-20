@@ -1,6 +1,8 @@
 import { useState, useRef, useEffect } from "react";
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
 import { useSearchParams, Link } from "react-router-dom";
+import usePageStateStore from "../store/usePageStateStore";
+import { usePageScroll } from "../hooks/usePageScroll";
 import {
   employeeApi,
   skillApi,
@@ -1152,21 +1154,132 @@ const EmployeesPage = () => {
   const [archiveTarget, setArchiveTarget] = useState(null);
   const [restoreTarget, setRestoreTarget] = useState(null);
   const [convertToFulltimeTarget, setConvertToFulltimeTarget] = useState(null);
-  const [searchQuery, setSearchQuery] = useState("");
-  // Only the server round-trip is debounced; the client-side filter runs on every
-  // keystroke off `searchQuery` so typing stays responsive.
-  const [debouncedSearch, setDebouncedSearch] = useState("");
-  const [skillFilter, setSkillFilter] = useState("");
-  const [designationFilter, setDesignationFilter] = useState([]);
-  const [sortBy, setSortBy] = useState("");
-  const [colDesignation, setColDesignation] = useState(""); // header cycle-filter
-  const [colType, setColType] = useState("");
-  const [colWorkModel, setColWorkModel] = useState("");
-  const [currentPage, setCurrentPage] = useState(1);
   const [formDesignation, setFormDesignation] = useState("Annotator/ Reviewer");
   const [formEmployeeType, setFormEmployeeType] = useState("Full-time");
   const [formWorkModel, setFormWorkModel] = useState("WFO");
-  const PAGE_SIZE = 10;
+    const PAGE_SIZE = 10;
+
+  // ============================================================
+  // PERSISTENCE KEYS
+  // ============================================================
+  // Root key  → remembers which tab the user was on
+  //             (Active Team + All/Active/Inactive/Idle, or Archived)
+  // Tab key   → remembers filters / search / page / scroll per top-level tab
+  // ============================================================
+
+  const PAGE_KEY = "employees";
+
+  const tabKey = statusParam === "archived" ? "archived" : "active";
+  const TAB_PAGE_KEY = `${PAGE_KEY}:${tabKey}`;
+
+  const setPageState = usePageStateStore((s) => s.setPageState);
+
+  // Root: last status (null = Active Team → All)
+  const rootSaved = usePageStateStore((s) => s.pages[PAGE_KEY] || {});
+
+  // Per-tab: filters, search, page
+  const saved = usePageStateStore((s) => s.pages[TAB_PAGE_KEY] || {});
+
+  // ============================================================
+  // LOCAL STATE (hydrated from store)
+  // ============================================================
+
+  const [searchQuery, setSearchQuery] = useState(saved.searchQuery ?? "");
+  const [debouncedSearch, setDebouncedSearch] = useState(saved.searchQuery ?? "");
+  const [skillFilter, setSkillFilter] = useState(saved.skillFilter ?? "");
+  const [designationFilter, setDesignationFilter] = useState(
+    saved.designationFilter ?? [],
+  );
+  const [sortBy, setSortBy] = useState(saved.sortBy ?? "");
+  const [colDesignation, setColDesignation] = useState(
+    saved.colDesignation ?? "",
+  );
+  const [colType, setColType] = useState(saved.colType ?? "");
+  const [colWorkModel, setColWorkModel] = useState(saved.colWorkModel ?? "");
+  const [currentPage, setCurrentPage] = useState(saved.currentPage ?? 1);
+
+  // ============================================================
+  // 1. Restore status tab into the URL (runs once on mount)
+  // ============================================================
+  useEffect(() => {
+    // Nothing stored yet → leave URL as-is
+    if (!("statusParam" in rootSaved)) return;
+
+    const lastStatus = rootSaved.statusParam; // string | null
+    const params = new URLSearchParams(searchParams);
+    const current = params.get("status");
+
+    if (lastStatus === null || lastStatus === "") {
+      // User was on Active Team → All
+      if (current !== null) {
+        params.delete("status");
+        setSearchParams(params, { replace: true });
+      }
+    } else if (current !== lastStatus) {
+      // User was on Active / Inactive / Idle / Archived
+      params.set("status", lastStatus);
+      setSearchParams(params, { replace: true });
+    }
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, []); // intentionally only on mount
+
+  // ============================================================
+  // 2. Persist the status tab whenever it changes
+  // ============================================================
+  useEffect(() => {
+    setPageState(PAGE_KEY, {
+      statusParam: statusParam || null, // null = "All"
+    });
+  }, [statusParam, setPageState]);
+
+  // ============================================================
+  // 3. Re-hydrate filters / page when switching Active ↔ Archived
+  //    (component stays mounted, so useState initial values are ignored)
+  // ============================================================
+  useEffect(() => {
+    const next = usePageStateStore.getState().pages[TAB_PAGE_KEY] || {};
+    setSearchQuery(next.searchQuery ?? "");
+    setDebouncedSearch(next.searchQuery ?? "");
+    setSkillFilter(next.skillFilter ?? "");
+    setDesignationFilter(next.designationFilter ?? []);
+    setSortBy(next.sortBy ?? "");
+    setColDesignation(next.colDesignation ?? "");
+    setColType(next.colType ?? "");
+    setColWorkModel(next.colWorkModel ?? "");
+    setCurrentPage(next.currentPage ?? 1);
+  }, [TAB_PAGE_KEY]);
+
+  // ============================================================
+  // 4. Persist filters / search / page for the current tab
+  // ============================================================
+  useEffect(() => {
+    setPageState(TAB_PAGE_KEY, {
+      searchQuery,
+      skillFilter,
+      designationFilter,
+      sortBy,
+      colDesignation,
+      colType,
+      colWorkModel,
+      currentPage,
+    });
+  }, [
+    TAB_PAGE_KEY,
+    searchQuery,
+    skillFilter,
+    designationFilter,
+    sortBy,
+    colDesignation,
+    colType,
+    colWorkModel,
+    currentPage,
+    setPageState,
+  ]);
+
+  // ============================================================
+  // 5. Scroll position
+  // ============================================================
+  usePageScroll(TAB_PAGE_KEY);
 
   // Fetch employee stats for KPI cards
   const { data: employeeStats } = useQuery({
@@ -1626,21 +1739,22 @@ const EmployeesPage = () => {
     shouldSearchServer && sortedEmployees.length === 0 && serverMatches.length > 0;
   const displayedEmployees = usingServerResults ? serverMatches : sortedEmployees;
 
-  useEffect(() => {
-    setCurrentPage(1);
-  }, [
-    searchQuery,
-    usingServerResults,
-    skillFilter,
-    designationFilter,
-    idleOnly,
-    statusParam,
-    sortBy,
-    colDesignation,
-    colType,
-    colWorkModel,
-  ]);
+  // useEffect(() => {
+  //   setCurrentPage(1);
+  // }, [
+  //   searchQuery,
+  //   usingServerResults,
+  //   skillFilter,
+  //   designationFilter,
+  //   idleOnly,
+  //   statusParam,
+  //   sortBy,
+  //   colDesignation,
+  //   colType,
+  //   colWorkModel,
+  // ]);
 
+  
   const handleSelectColDesignation = (roleKey) => {
     if (colDesignation === roleKey) {
       setColDesignation("");
