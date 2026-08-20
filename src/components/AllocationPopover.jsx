@@ -155,9 +155,13 @@ const AllocationPopover = ({
           total_daily_hours: item.total_daily_hours,
         },
         emp: item.stale ? null : {
+          id: item.employee_id,
           name: item.name,
           email: item.email,
           avatar_url: item.avatar_url,
+          designation: item.designation,
+          isOnLeave: item.is_on_leave,
+          location: item.location,
         },
         former: item.stale ? { name: item.name } : null,
         isPm: item.is_pm,
@@ -495,10 +499,8 @@ const AllocationPopover = ({
                   const tags = Array.isArray(alloc?.role_tags)
                     ? alloc.role_tags
                     : [];
-                  const isOnLeave = emp && onLeaveEmployeeIds?.has?.(emp.id);
-                  const location = emp
-                    ? locationByEmployeeId?.get?.(emp.id)
-                    : undefined;
+                  const isOnLeave = emp?.isOnLeave || (emp && onLeaveEmployeeIds?.has?.(emp.id));
+                  const location = emp?.location || (emp ? locationByEmployeeId?.get?.(emp.id) : undefined);
                   return (
                     <li
                       key={key}

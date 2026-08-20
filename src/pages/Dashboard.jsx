@@ -205,19 +205,13 @@ const Dashboard = () => {
 
   const { data: paginatedProjectsData, isLoading: projectsLoading, isFetching: projectsFetching } = useQuery({
     queryKey: ["sub-projects-paginated", projectPage, 5],
-    queryFn: () => subProjectApi.getPaginated({ page: projectPage, limit: 5 }),
+    queryFn: () => subProjectApi.getPaginated({ page: projectPage, limit: 5, is_dashboard: true }),
     placeholderData: keepPreviousData,
     staleTime: 1000 * 60 * 5, // 5 minutes
   });
 
   // Fallback to empty array for components that still need a list
   const projects = paginatedProjectsData?.items || [];
-
-
-  const { data: skillsSummary = {} } = useQuery({
-    queryKey: ["skillsSummary"],
-    queryFn: () => skillsApi.getSummary(),
-  });
 
   // Autonex most-active user + project (this month, by time spent on Encord).
   const { data: autonexOverview } = useQuery({
@@ -238,7 +232,7 @@ const Dashboard = () => {
   // Status table. Month-to-date; keyed by project_id.
   const { data: analyticsSummary = [] } = useQuery({
     queryKey: ["analytics-summary"],
-    queryFn: () => analyticsApi.getSummary(),
+    queryFn: () => analyticsApi.getSummary({ fields: "project_id,autonex_platform_hours" }),
     refetchOnWindowFocus: true,
   });
   const autonexDaily = autonexKpis?.daily || [];
@@ -250,27 +244,8 @@ const Dashboard = () => {
   // Which organisation / vendor each project belongs to. Organisation is the
   // free-text `client` on the MAIN project — the same field the project card
   // shows beneath the title — and vendors come from the sub-project's own list.
-  const projectsByOrganisation = useMemo(
-    () =>
-      countProjectsBy(
-        projects,
-        (p) => {
-          const org = p.client;
-          return org ? [org] : [];
-        },
-        NO_ORG,
-      ),
-    [projects],
-  );
-  const projectsByVendor = useMemo(
-    () =>
-      countProjectsBy(
-        projects,
-        (p) => (p.workforce_vendors || []).filter(Boolean),
-        NO_VENDOR,
-      ),
-    [projects],
-  );
+  const projectsByOrganisation = dashboardKpis?.projects?.by_organisation || [];
+  const projectsByVendor = dashboardKpis?.projects?.by_vendor || [];
 
 
   // Engagement comes from the shared rules in utils/workforce so this page and

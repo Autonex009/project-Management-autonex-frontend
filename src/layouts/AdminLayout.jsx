@@ -166,8 +166,8 @@ const AdminLayout = () => {
     key: "signup-requests-counts",
     queryKey: ["signup-requests-counts"],
     queryFn: () => signupRequestApi.getCounts(),
-    refetchInterval: 60_000,
-    staleTime: 30_000,
+    refetchInterval: 300_000,
+    staleTime: 60_000,
   });
   const pendingSignupCount = signupCounts?.pending || 0;
 
