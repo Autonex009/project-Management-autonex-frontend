@@ -16,17 +16,11 @@ if (!apiBaseUrl.includes("localhost") && apiBaseUrl.startsWith("http://")) {
  * @returns {Promise<void>}
  */
 export async function streamChat(message, conversationId, onEvent) {
-  const token = localStorage.getItem("token");
-  if (!token) {
-    onEvent({ type: "error", message: "Not authenticated" });
-    return;
-  }
-
   const response = await fetch(`${apiBaseUrl}/chat/stream`, {
     method: "POST",
+    credentials: "include",
     headers: {
       "Content-Type": "application/json",
-      Authorization: `Bearer ${token}`,
     },
     body: JSON.stringify({
       message,
@@ -73,12 +67,11 @@ export async function streamChat(message, conversationId, onEvent) {
  * Confirm a leave application.
  */
 export async function confirmLeave(details) {
-  const token = localStorage.getItem("token");
   const response = await fetch(`${apiBaseUrl}/chat/confirm-leave`, {
     method: "POST",
+    credentials: "include",
     headers: {
       "Content-Type": "application/json",
-      Authorization: `Bearer ${token}`,
     },
     body: JSON.stringify(details),
   });
@@ -89,12 +82,11 @@ export async function confirmLeave(details) {
  * Confirm a WFH application.
  */
 export async function confirmWFH(details) {
-  const token = localStorage.getItem("token");
   const response = await fetch(`${apiBaseUrl}/chat/confirm-wfh`, {
     method: "POST",
+    credentials: "include",
     headers: {
       "Content-Type": "application/json",
-      Authorization: `Bearer ${token}`,
     },
     body: JSON.stringify(details),
   });
@@ -105,12 +97,11 @@ export async function confirmWFH(details) {
  * Confirm a leave cancellation.
  */
 export async function cancelLeave(leaveId) {
-  const token = localStorage.getItem("token");
   const response = await fetch(`${apiBaseUrl}/chat/cancel-leave`, {
     method: "POST",
+    credentials: "include",
     headers: {
       "Content-Type": "application/json",
-      Authorization: `Bearer ${token}`,
     },
     body: JSON.stringify({ leave_id: leaveId }),
   });
@@ -121,9 +112,8 @@ export async function cancelLeave(leaveId) {
  * Get conversation history.
  */
 export async function getChatHistory(conversationId) {
-  const token = localStorage.getItem("token");
   const response = await fetch(`${apiBaseUrl}/chat/history/${conversationId}`, {
-    headers: { Authorization: `Bearer ${token}` },
+    credentials: "include",
   });
   return response.json();
 }
@@ -132,9 +122,8 @@ export async function getChatHistory(conversationId) {
  * List user conversations.
  */
 export async function getConversations() {
-  const token = localStorage.getItem("token");
   const response = await fetch(`${apiBaseUrl}/chat/conversations`, {
-    headers: { Authorization: `Bearer ${token}` },
+    credentials: "include",
   });
   return response.json();
 }
