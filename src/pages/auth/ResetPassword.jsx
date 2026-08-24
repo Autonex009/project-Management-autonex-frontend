@@ -13,6 +13,7 @@ import Spinner from "../../components/ui/LoadingSpinner";
 import toast from "react-hot-toast";
 import AuthBrandPanel from "../../components/brand/AuthBrandPanel";
 import { authApi } from "../../services/api";
+import { parseAuthError } from "../../utils/authErrors";
 
 const themeMap = {
   admin: {
@@ -92,11 +93,10 @@ const ResetPassword = () => {
       authApi.resetPassword(token, { password: nextPassword }),
     onSuccess: (data) => {
       setIsComplete(true);
-      toast.success(data.message);
+      toast.success(data.message || "Password updated successfully");
     },
     onError: (error) => {
-      const message =
-        error.response?.data?.detail || "Unable to reset password.";
+      const { message } = parseAuthError(error, "Unable to reset password.");
       toast.error(message);
     },
   });
@@ -107,8 +107,16 @@ const ResetPassword = () => {
       toast.error("Reset token is missing from this link");
       return;
     }
-    if (password.length < 6) {
-      toast.error("Password must be at least 6 characters");
+    if (password.length < 8) {
+      toast.error("Password must be at least 8 characters");
+      return;
+    }
+    if (!/\d/.test(password)) {
+      toast.error("Password must contain at least one number");
+      return;
+    }
+    if (!/[!@#$%^&*(),.?":{}|<>]/.test(password)) {
+      toast.error("Password must contain at least one special character");
       return;
     }
     if (password !== confirmPassword) {
@@ -214,6 +222,26 @@ const ResetPassword = () => {
                         <Eye className="h-5 w-5" />
                       )}
                     </button>
+                  </div>
+                </div>
+
+                {/* Password Criteria Checklist */}
+                <div className="bg-slate-50/50 rounded-xl p-3 text-xs text-slate-500 space-y-1">
+                  <div className="flex items-center gap-1.5">
+                    <CheckCircle2 className={`w-3.5 h-3.5 ${password.length >= 8 ? "text-emerald-500" : "text-slate-300"}`} />
+                    <span>Minimum 8 characters</span>
+                  </div>
+                  <div className="flex items-center gap-1.5">
+                    <CheckCircle2 className={`w-3.5 h-3.5 ${/\d/.test(password) ? "text-emerald-500" : "text-slate-300"}`} />
+                    <span>At least 1 number</span>
+                  </div>
+                  <div className="flex items-center gap-1.5">
+                    <CheckCircle2 className={`w-3.5 h-3.5 ${/[!@#$%^&*(),.?":{}|<>]/.test(password) ? "text-emerald-500" : "text-slate-300"}`} />
+                    <span>At least 1 special character</span>
+                  </div>
+                  <div className="flex items-center gap-1.5">
+                    <CheckCircle2 className={`w-3.5 h-3.5 ${password && password === confirmPassword ? "text-emerald-500" : "text-slate-300"}`} />
+                    <span>Passwords match</span>
                   </div>
                 </div>
 

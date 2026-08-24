@@ -702,6 +702,38 @@ const LeaderboardPage = () => {
     return (name || "").toLowerCase().trim();
   }, [currentUser]);
 
+  const currentUserEmpId = useMemo(() => {
+    return currentUser?.employee_id || currentUser?.id || meData?.employee_id || meData?.user?.employee_id || meData?.user?.id || null;
+  }, [currentUser, meData]);
+
+  const findCurrentUserIndex = (list) => {
+    if (!list || list.length === 0) return -1;
+    // 1. Exact match by employee_id if available
+    if (currentUserEmpId) {
+      const idx = list.findIndex(
+        (item) => item.employee_id && String(item.employee_id) === String(currentUserEmpId)
+      );
+      if (idx !== -1) return idx;
+    }
+    // 2. Exact match by email (case-insensitive)
+    if (currentUserEmail) {
+      const idx = list.findIndex((item) => {
+        const itemEmail = (item.user_email || "").toLowerCase().trim();
+        return Boolean(itemEmail && itemEmail === currentUserEmail);
+      });
+      if (idx !== -1) return idx;
+    }
+    // 3. Fallback: exact match by full name (never substring)
+    if (currentUserName) {
+      const idx = list.findIndex((item) => {
+        const itemObjName = (item.employee_name || formatDisplayName(item.user_email || "")).toLowerCase().trim();
+        return Boolean(itemObjName && itemObjName === currentUserName);
+      });
+      if (idx !== -1) return idx;
+    }
+    return -1;
+  };
+
   // ── Monthly State & Query ──
   const pastMonths = useMemo(() => generatePastMonths(12), []);
   const currentMonthKey = pastMonths[0]?.key || "";
@@ -782,20 +814,7 @@ const LeaderboardPage = () => {
       0
     );
 
-    let userIndex = -1;
-    if (currentUserEmail) {
-      userIndex = list.findIndex((item) => {
-        const itemEmail = (item.user_email || "").toLowerCase().trim();
-        return itemEmail && (itemEmail === currentUserEmail || currentUserEmail.includes(itemEmail) || itemEmail.includes(currentUserEmail));
-      });
-    }
-
-    if (userIndex === -1 && currentUserName) {
-      userIndex = list.findIndex((item) => {
-        const itemObjName = (item.employee_name || formatDisplayName(item.user_email || "")).toLowerCase().trim();
-        return itemObjName && (itemObjName === currentUserName || currentUserName.includes(itemObjName) || itemObjName.includes(currentUserName));
-      });
-    }
+    const userIndex = findCurrentUserIndex(list);
 
     if (userIndex !== -1) {
       const item = list[userIndex];
@@ -837,7 +856,7 @@ const LeaderboardPage = () => {
     }
 
     return null;
-  }, [allMonthLeaderboard, currentUserEmail, currentUserName, currentUser, isAdmin]);
+  }, [allMonthLeaderboard, currentUserEmail, currentUserName, currentUserEmpId, currentUser, isAdmin]);
 
   const top3Month = useMemo(
     () => filteredMonthLeaderboard.slice(0, 3),
@@ -1073,20 +1092,7 @@ const LeaderboardPage = () => {
     let list = [...allDailyLeaderboard];
     list.sort((a, b) => (b.total_hours || 0) - (a.total_hours || 0));
 
-    let userIndex = -1;
-    if (currentUserEmail) {
-      userIndex = list.findIndex((item) => {
-        const itemEmail = (item.user_email || "").toLowerCase().trim();
-        return itemEmail && (itemEmail === currentUserEmail || currentUserEmail.includes(itemEmail) || itemEmail.includes(currentUserEmail));
-      });
-    }
-
-    if (userIndex === -1 && currentUserName) {
-      userIndex = list.findIndex((item) => {
-        const itemObjName = (item.employee_name || formatDisplayName(item.user_email || "")).toLowerCase().trim();
-        return itemObjName && (itemObjName === currentUserName || currentUserName.includes(itemObjName) || itemObjName.includes(currentUserName));
-      });
-    }
+    const userIndex = findCurrentUserIndex(list);
 
     if (userIndex !== -1) {
       const item = list[userIndex];
@@ -1112,7 +1118,7 @@ const LeaderboardPage = () => {
     }
 
     return null;
-  }, [allDailyLeaderboard, currentUserEmail, currentUserName, currentUser, isAdmin]);
+  }, [allDailyLeaderboard, currentUserEmail, currentUserName, currentUserEmpId, currentUser, isAdmin]);
 
   const allWeekLeaderboard = weekData?.leaderboard || [];
   const hasWeekData = !isWeekLoading && allWeekLeaderboard.length > 0;
@@ -1161,20 +1167,7 @@ const LeaderboardPage = () => {
       0
     );
 
-    let userIndex = -1;
-    if (currentUserEmail) {
-      userIndex = list.findIndex((item) => {
-        const itemEmail = (item.user_email || "").toLowerCase().trim();
-        return itemEmail && (itemEmail === currentUserEmail || currentUserEmail.includes(itemEmail) || itemEmail.includes(currentUserEmail));
-      });
-    }
-
-    if (userIndex === -1 && currentUserName) {
-      userIndex = list.findIndex((item) => {
-        const itemObjName = (item.employee_name || formatDisplayName(item.user_email || "")).toLowerCase().trim();
-        return itemObjName && (itemObjName === currentUserName || currentUserName.includes(itemObjName) || itemObjName.includes(currentUserName));
-      });
-    }
+    const userIndex = findCurrentUserIndex(list);
 
     if (userIndex !== -1) {
       const item = list[userIndex];
@@ -1216,7 +1209,7 @@ const LeaderboardPage = () => {
     }
 
     return null;
-  }, [allWeekLeaderboard, currentUserEmail, currentUserName, currentUser, isAdmin]);
+  }, [allWeekLeaderboard, currentUserEmail, currentUserName, currentUserEmpId, currentUser, isAdmin]);
 
   const top3Week = useMemo(
     () => filteredWeekLeaderboard.slice(0, 3),

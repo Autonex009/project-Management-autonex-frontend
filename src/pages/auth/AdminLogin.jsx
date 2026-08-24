@@ -35,6 +35,7 @@ const AdminLogin = () => {
       // localStorage.setItem("token", data.token); // REMOVED: Using HttpOnly cookie instead
       localStorage.setItem("user", JSON.stringify(data.user));
       localStorage.setItem("role", data.user.role);
+      window.dispatchEvent(new Event("auth-change"));
       localStorage.removeItem("admin-sidebar-width");
       toast.success("Signed in successfully");
       navigate(from, { replace: true });
