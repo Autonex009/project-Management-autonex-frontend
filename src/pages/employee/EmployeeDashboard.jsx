@@ -675,6 +675,17 @@ const EmployeeDashboard = () => {
     setSaveError("");
     setEmailError("");
     
+    const trimmedEmail = editEmail.trim().toLowerCase();
+    const originalEmail = (profile.email || "").trim().toLowerCase();
+    const emailChanged = !!trimmedEmail && trimmedEmail !== originalEmail;
+    
+    if (emailChanged) {
+      if (!trimmedEmail.endsWith(`@${COMPANY_DOMAIN}`) || trimmedEmail.split("@")[0].length === 0) {
+        setEmailError(`Email must be a valid @${COMPANY_DOMAIN} address.`);
+        return; 
+      }
+    }
+      
     try {
       const promises = [];
       
@@ -687,8 +698,8 @@ const EmployeeDashboard = () => {
         })
       );
 
-      if (editEmail && editEmail.trim() !== (profile.email || "").trim()) {
-        promises.push(requestEmailChangeMutation.mutateAsync(editEmail));
+      if (emailChanged) {
+        promises.push(requestEmailChangeMutation.mutateAsync(trimmedEmail));
       }
 
       await Promise.all(promises);

@@ -17,6 +17,7 @@ import { authApi } from "../../services/api";
 import toast from "react-hot-toast";
 import AuthBrandPanel from "../../components/brand/AuthBrandPanel";
 import { parseAuthError } from "../../utils/authErrors";
+import { validateLoginForm } from "../../utils/loginValidation";
 
 const EmployeeLogin = () => {
   const navigate = useNavigate();
@@ -37,14 +38,9 @@ const EmployeeLogin = () => {
   };
 
   const validate = () => {
-    const newErrors = {};
-    if (!formData.email) newErrors.email = "Email is required";
-    else if (!/\S+@\S+\.\S+/.test(formData.email))
-      newErrors.email = "Invalid email format";
-    if (!formData.password) newErrors.password = "Password is required";
+    const { ok, errors: newErrors } = validateLoginForm(formData);
     setErrors(newErrors);
-    // No toast: the message already sits under the field it belongs to.
-    return Object.keys(newErrors).length === 0;
+    return ok;
   };
 
   const loginMutation = useMutation({
@@ -130,6 +126,7 @@ const EmployeeLogin = () => {
               <div className="relative">
                 <Mail className="absolute left-3 top-1/2 h-5 w-5 -translate-y-1/2 text-slate-400" />
                 <input
+                  id="employee-login-email"
                   type="email"
                   name="email"
                   value={formData.email}
@@ -151,6 +148,7 @@ const EmployeeLogin = () => {
               <div className="relative">
                 <Lock className="absolute left-3 top-1/2 h-5 w-5 -translate-y-1/2 text-slate-400" />
                 <input
+                  id="employee-login-password"
                   type={showPassword ? "text" : "password"}
                   name="password"
                   value={formData.password}

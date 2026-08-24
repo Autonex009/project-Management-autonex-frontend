@@ -12,6 +12,7 @@ import {
 import Button from "../ui/Button";
 import { onboardingApi } from "../../services/api";
 import Dropdown from "../ui/Dropdown";
+import { clampPassingScore } from "../../utils/onboarding";
 
 export default function ModuleSectionCard({
   index,
@@ -240,10 +241,7 @@ export default function ModuleSectionCard({
             max={100}
             value={section.quizPassingScore || 0}
             onChange={(e) =>
-              updateField(
-                "quizPassingScore",
-                Math.max(0, Math.min(100, Number(e.target.value) || 0)),
-              )
+              updateField("quizPassingScore", clampPassingScore(e.target.value))
             }
             disabled={!hasQuestions}
             title={

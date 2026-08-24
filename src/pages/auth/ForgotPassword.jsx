@@ -178,6 +178,7 @@ const ForgotPassword = () => {
               <div className="relative">
                 <Mail className="absolute left-3 top-1/2 h-5 w-5 -translate-y-1/2 text-slate-400" />
                 <input
+                  id="forgot-password-email"
                   type="email"
                   value={email}
                   onChange={(event) => {

@@ -7,6 +7,7 @@ import Spinner from "../../components/ui/LoadingSpinner";
 import toast from "react-hot-toast";
 import AuthBrandPanel from "../../components/brand/AuthBrandPanel";
 import { parseAuthError } from "../../utils/authErrors";
+import { validateLoginForm, firstLoginError } from "../../utils/loginValidation";
 
 const PMLogin = () => {
   const navigate = useNavigate();
@@ -38,11 +39,15 @@ const PMLogin = () => {
   const handleSubmit = (e) => {
     e.preventDefault();
     setError(null);
-    if (!formData.email || !formData.password) {
-      setError("Please fill in all fields");
+    const { ok, errors } = validateLoginForm(formData);
+    if (!ok) {
+      setError(firstLoginError(errors));
       return;
     }
-    loginMutation.mutate(formData);
+    loginMutation.mutate({
+      email: formData.email.trim(),
+      password: formData.password,
+    });
   };
 
   return (
@@ -89,6 +94,7 @@ const PMLogin = () => {
               <div className="relative">
                 <Mail className="absolute left-3 top-1/2 h-5 w-5 -translate-y-1/2 text-slate-400" />
                 <input
+                  id="pm-login-email"
                   type="email"
                   value={formData.email}
                   onChange={(e) =>
@@ -108,6 +114,7 @@ const PMLogin = () => {
               <div className="relative">
                 <Lock className="absolute left-3 top-1/2 h-5 w-5 -translate-y-1/2 text-slate-400" />
                 <input
+                  id="pm-login-password"
                   type={showPassword ? "text" : "password"}
                   value={formData.password}
                   onChange={(e) =>
