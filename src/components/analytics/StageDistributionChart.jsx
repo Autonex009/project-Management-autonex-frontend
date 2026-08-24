@@ -6,6 +6,7 @@ import {
   Cell,
   Tooltip,
 } from "recharts";
+import { ChartWrapper, ChartTooltip } from "./ChartWrapper";
 
 const STAGE_COLORS = {
   Annotation: "#f59e0b", // Amber 500
@@ -19,12 +20,7 @@ const DEFAULT_COLORS = ["#f59e0b", "#e11d48", "#8b5cf6", "#3b82f6", "#10b981", "
 const StageDistributionChart = ({ data = [], height = 165 }) => {
   if (!data || data.length === 0) {
     return (
-      <div
-        className="flex items-center justify-center text-xs text-slate-400 font-medium"
-        style={{ height }}
-      >
-        No stage breakdown data available
-      </div>
+      <ChartWrapper data={data} height={height} emptyMessage="No stage breakdown data available" />
     );
   }
 
@@ -69,24 +65,13 @@ const StageDistributionChart = ({ data = [], height = 165 }) => {
                 return <Cell key={`cell-${index}`} fill={color} />;
               })}
             </Pie>
-            <Tooltip
-              isAnimationActive={false}
-              wrapperStyle={{ pointerEvents: "none", outline: "none" }}
+            <ChartTooltip
               formatter={(value, name) => [
                 `${value}h (${
                   totalHours > 0 ? Math.round((value / totalHours) * 100) : 0
                 }%)`,
                 name,
               ]}
-              contentStyle={{
-                borderRadius: 12,
-                border: "1px solid #e2e8f0",
-                boxShadow: "0 8px 24px rgba(15,23,42,0.08)",
-                fontSize: 12,
-                backgroundColor: "rgba(255, 255, 255, 0.95)",
-                backdropFilter: "blur(4px)",
-                pointerEvents: "none",
-              }}
             />
           </PieChart>
         </ResponsiveContainer>

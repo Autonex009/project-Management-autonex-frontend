@@ -14,6 +14,7 @@ import { format, parseISO } from "date-fns";
 import { Zap, Award, FolderKanban } from "lucide-react";
 import Modal from "../ui/Modal";
 import Button from "../ui/Button";
+import { ChartWrapper, ChartTooltip, ChartDefs } from "./ChartWrapper";
 
 const shortDate = (s) => {
   try {
@@ -44,12 +45,7 @@ const DailyPlatformHoursChart = ({
 
   if (!data || data.length === 0) {
     return (
-      <div
-        className="w-full flex items-center justify-center text-slate-400 text-xs font-medium"
-        style={{ height }}
-      >
-        No execution trend data logged yet
-      </div>
+      <ChartWrapper data={data} height={height} emptyMessage="No execution trend data logged yet" />
     );
   }
 
@@ -183,13 +179,7 @@ const DailyPlatformHoursChart = ({
             margin={{ top: 10, right: 12, bottom: 4, left: -4 }}
             onClick={(state, event) => handleChartClick(state, event)}
           >
-            <defs>
-              <linearGradient id="executionGradient" x1="0" y1="0" x2="0" y2="1">
-                <stop offset="5%" stopColor="#4f46e5" stopOpacity={0.4} />
-                <stop offset="50%" stopColor="#06b6d4" stopOpacity={0.15} />
-                <stop offset="95%" stopColor="#06b6d4" stopOpacity={0.0} />
-              </linearGradient>
-            </defs>
+            <ChartDefs />
 
             <CartesianGrid strokeDasharray="3 3" stroke="#f1f5f9" vertical={false} />
 
@@ -230,20 +220,9 @@ const DailyPlatformHoursChart = ({
               />
             )}
 
-            <Tooltip
-              isAnimationActive={false}
-              wrapperStyle={{ pointerEvents: "none", outline: "none" }}
+            <ChartTooltip
               labelFormatter={shortDate}
               formatter={(v) => [`${v}h`, "Logged Execution"]}
-              contentStyle={{
-                borderRadius: 14,
-                border: "1px solid #e2e8f0",
-                boxShadow: "0 10px 30px rgba(15,23,42,0.1)",
-                fontSize: 12,
-                backgroundColor: "rgba(255, 255, 255, 0.95)",
-                backdropFilter: "blur(6px)",
-                pointerEvents: "none",
-              }}
             />
 
             {/* Single Smooth Volume Area with Line Stroke */}

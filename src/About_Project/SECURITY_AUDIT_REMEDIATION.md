@@ -289,3 +289,226 @@ This document serves as the persistent audit tracking log for security findings,
 * **Frontend Verification**:
   - Executed `npm run build`: Zero errors, client and SSR bundles built successfully.
 
+
+## Issue #7 [Frontend]: Insecure Email Editing Flow (OTP Bypass)
+
+| Metadata | Details |
+| :--- | :--- |
+| **Component Tier** | **Frontend (React / Vite)** |
+| **Application** | Autonex Frontend |
+| **Severity** | **MEDIUM (Security / Inconsistent Validation)** |
+| **Target Component** | `src/pages/employee/EmployeeDashboard.jsx` |
+| **Status** | **RESOLVED & VERIFIED** |
+| **Source Files** | `src/pages/employee/EmployeeDashboard.jsx` |
+| **Date Resolved** | August 24, 2026 |
+
+### 1. Issue Statement & Audit Remark
+* **Audit Finding:**
+  > *"EmployeeDashboard.jsx:628–684 vs ProfilePage.jsx:429–461 — two different code paths for the same feature: one requires OTP verification for an email change, the other changes it directly with only a domain-suffix check."*
+* **Impact:**
+  Leaving legacy email change logic on the Dashboard bypassed the secure two-step OTP validation implemented in `ProfilePage.jsx`. Furthermore, the legacy endpoint `employeeApi.changeEmail` was deprecated, which would cause an application crash if invoked.
+
+### 2. Root Cause Analysis
+* When the secure OTP email change flow was introduced to `ProfilePage.jsx`, the corresponding legacy form inputs and API bindings were erroneously left intact in `EmployeeDashboard.jsx`.
+
+### 3. Technical Remediation Applied
+* Completely stripped out all email editing states, API mutations (`changeEmailMutation`), and UI inputs from the `EmployeeDashboard.jsx` modal.
+* Centralized all email change requests to the secure OTP-gated flow in `ProfilePage.jsx` as the single source of truth.
+
+### 4. Verification & Automated Test Results
+* Verified UI: The email input field no longer appears in the Dashboard edit modal.
+* Executed `npm run build`: Zero errors, client and SSR bundles built successfully.
+
+---
+
+## Issue #8 [Backend]: Unauthorized Cross-Manager Employee Note Tampering
+
+| Metadata | Details |
+| :--- | :--- |
+| **Component Tier** | **Backend (Python / FastAPI)** |
+| **Application** | Autonex Backend |
+| **Severity** | **HIGH (Authorization / Tampering)** |
+| **Target Component** | `/api/employee-notes/*` |
+| **Status** | **RESOLVED & VERIFIED** |
+| **Source Files** | `app/api/employee_notes.py` |
+| **Date Resolved** | August 24, 2026 |
+
+### 1. Issue Statement & Audit Remark
+* **Audit Finding:**
+  > *"app/api/employee_notes.py:187–325 — note update/resolve/delete only check role, not project scope; a team lead can edit an HR note about an employee on an unrelated project."*
+* **Impact & Security Risk:**
+  Any Team Lead or PM who managed an employee on any project could edit, resolve, or delete a severe HR disciplinary note or a note authored by another manager on a different project. The system only checked if they managed the employee, not if they had ownership of the note.
+
+### 2. Root Cause Analysis
+* **Missing Ownership Verification:** The mutation endpoints relied solely on `project_scope.require_employee_scope`, which acts as a broad check for employee management status, but lacked a strict authorship (`note.issued_by`) verification.
+
+### 3. Technical Remediation Applied
+* Retained `require_employee_scope` as a baseline prerequisite check.
+* Added explicit 403 Forbidden checks in `update_employee_note`, `resolve_employee_note`, and `delete_employee_note` to ensure the caller is either an Admin/HR, or the exact author (`note.issued_by == current_user.id`).
+
+### 4. Verification & Automated Test Results
+* Executed full backend `pytest` regression suite across all modules.
+* **Status:** 166 tests passed successfully.
+
+---
+
+## Issue #9 [Frontend]: React Rules of Hooks Violation in PlannedVsActualChart
+
+| Metadata | Details |
+| :--- | :--- |
+| **Component Tier** | **Frontend (React / Vite)** |
+| **Application** | Autonex Frontend |
+| **Severity** | **HIGH (Client-side Crash / UI Failure)** |
+| **Target Component** | `PlannedVsActualChart.jsx` |
+| **Status** | **RESOLVED & VERIFIED** |
+| **Source Files** | `src/components/analytics/PlannedVsActualChart.jsx` |
+| **Date Resolved** | August 24, 2026 |
+
+### 1. Issue Statement & Audit Remark
+* **Audit Finding:**
+  > *"PlannedVsActualChart.jsx:26–38 — useMemo is called after a conditional early return, a Rules-of-Hooks violation."*
+* **Impact & Usability Risk:**
+  If the chart's `data` prop changed from a populated array to an empty array across renders, React would encounter an inconsistent hook call order. This conditionally skipped the `useMemo` hook, causing an immediate, unrecoverable crash of the entire React tree.
+
+### 2. Root Cause Analysis
+* **Hook Call Order:** `totals = useMemo(...)` was placed at line 38, while an early return `if (!data || data.length === 0)` was placed at line 26.
+
+### 3. Technical Remediation Applied
+* Moved the `useMemo` hook call to the absolute top of the component, above all conditional return blocks.
+* Guarded the internal `data.reduce` computations with a `safeData = data || []` fallback to prevent null pointer exceptions when data is undefined during the initial hook execution.
+
+### 4. Verification & Automated Test Results
+* Executed `npm run build`: Zero errors, client and SSR bundles built successfully.
+
+---
+
+## Issue #10 [Frontend]: Inconsistent KPI and Table Manpower Calculations
+
+| Metadata | Details |
+| :--- | :--- |
+| **Component Tier** | **Frontend (React / Vite)** |
+| **Application** | Autonex Frontend |
+| **Severity** | **MEDIUM (Logic / UI Consistency)** |
+| **Target Component** | `PMDashboard.jsx` |
+| **Status** | **RESOLVED & VERIFIED** |
+| **Source Files** | `src/pages/pm/PMDashboard.jsx` |
+| **Date Resolved** | August 24, 2026 |
+
+### 1. Issue Statement & Audit Remark
+* **Audit Finding:**
+  > *"PMDashboard.jsx:144–147 vs :252–266 — the 'At Risk' KPI uses a deduped manpower count while the project table's staffing column uses a raw, non-deduped count."*
+* **Impact & Usability Risk:**
+  Because the top-level 'At Risk' KPI widget used a deduplicated set of employees (including PMs and Team Leads) and the project table used a raw count of allocation records, the same project could appear fully staffed in the table but at-risk in the KPI, or vice-versa. This broke trust in the PM dashboard data.
+
+### 2. Root Cause Analysis
+* **Inconsistent Data Sources:** The KPI correctly utilized the centralized `getAllocatedManpower(project)` utility, but the inline project table render method incorrectly calculated staffing by directly counting `projAllocs.length`.
+
+### 3. Technical Remediation Applied
+* Replaced the raw `projAllocs.length` count in the project table's 'Staff' column renderer with the centralized `getAllocatedManpower(project)` utility, aligning both the KPI and the table to exactly the same logic.
+
+### 4. Verification & Automated Test Results
+* Executed `npm run build`: Zero errors, client and SSR bundles built successfully.
+
+---
+
+## Issue #11 [Frontend]: Leaderboard Triplicated Logic Refactor
+
+**Component Tier:** Frontend (React / Vite)
+**Severity:** LOW (Code Quality / Maintainability)
+**Status:** RESOLVED & VERIFIED
+**Date:** August 24, 2026
+**Target Component:** `LeaderboardPage.jsx`
+**Source Files:** `src/pages/admin/LeaderboardPage.jsx`
+
+### 1. Issue Statement & Audit Remark
+* **Audit Finding:** *"LeaderboardPage.jsx — the month/week/day ranking computation and 'find me' logic are triplicated as near-identical 30–40 line blocks instead of one parameterized helper."*
+* **Impact & Usability Risk:** The exact same multi-step mapping, sorting, and user fallback logic was independently written and maintained three times. This bloated the file size and created a significant maintenance burden.
+
+### 2. Root Cause Analysis
+* **Code Duplication:** `filteredMonthLeaderboard`, `filteredWeekLeaderboard`, and `filteredDailyLeaderboard` all performed the exact same data transformations and rank determinations using the same React hooks and mapping procedures.
+
+### 3. Technical Remediation Applied
+* Extracted all sorting, limit processing, hours-calculation, and array reduction into a pure, generic `calculateRankings(data, limit)` helper function.
+* Extracted the current-user ranking logic into a generic `calculateUserRankItem` function.
+* Replaced the six bulky internal logic blocks with unified helper calls, drastically reducing the file size and maintaining consistency.
+
+### 4. Verification & Automated Test Results
+* Executed `npm run build`: Zero errors, client and SSR bundles built successfully.
+
+---
+
+## Issue #12 [Frontend]: Extracted Chart Tooltips & Gradients into ChartWrapper
+
+**Component Tier:** Frontend (React / Vite)
+**Severity:** LOW (Code Quality / Maintainability)
+**Status:** RESOLVED & VERIFIED
+**Date:** August 24, 2026
+**Target Component:** `ChartWrapper.jsx` and Analytics Charts
+**Source Files:** `src/components/analytics/*`
+
+### 1. Issue Statement & Audit Remark
+* **Audit Finding:** *"At least five chart components each hand-roll their own tooltip style, empty-state markup, and gradient <defs> instead of sharing one wrapper."*
+* **Impact & Usability Risk:** Inconsistent styling, risk of design drift, and massive code duplication for boilerplate Recharts components and empty states.
+
+### 2. Root Cause Analysis
+* **Code Duplication:** Developers were copying and pasting identical inline `contentStyle` dictionaries for `<Tooltip>`, identical `<defs>` SVGs, and identical `if (!data) return <div...>` blocks.
+
+### 3. Technical Remediation Applied
+* Created a central `ChartWrapper.jsx` component exposing `<ChartWrapper>`, `<ChartTooltip>`, and `<ChartDefs>`.
+* Wrapped 5 charting widgets with `<ChartWrapper>` to centrally handle `data` null-checking and empty state rendering.
+* Swapped boilerplate `<Tooltip>` with `<ChartTooltip>` and unified SVG gradients inside `<ChartDefs>`.
+
+### 4. Verification & Automated Test Results
+* Executed `npm run build`: Zero errors, client and SSR bundles built successfully.
+
+---
+
+## Issue #13 [Backend]: Secure OTP Key Fallback
+
+**Component Tier:** Backend (FastAPI / Employees API)
+**Severity:** HIGH (Cryptographic Insecurity)
+**Status:** RESOLVED & VERIFIED
+**Date:** August 24, 2026
+**Target Component:** `app/api/employees.py`
+**Source Files:** `app/api/employees.py`
+
+### 1. Issue Statement & Audit Remark
+* **Audit Finding:** *"app/api/employees.py:907,944 — OTP_SECRET_KEY falls back to a hardcoded constant used as the HMAC key gating email-change OTPs."*
+* **Impact & Usability Risk:** If the environment does not explicitly export an OTP secret, the system silently uses the public fallback. An attacker could compute valid HMACs for arbitrary OTPs, completely bypassing the email verification security check.
+
+### 2. Root Cause Analysis
+* **Code Defect:** The `os.getenv` call utilized a default fallback string (`"fallback_dev_secret"`) which guaranteed execution even without a secure cryptographic key.
+
+### 3. Technical Remediation Applied
+* Removed the insecure default from `os.getenv("OTP_SECRET_KEY")`.
+* Added a rigid pre-flight validation to explicitly raise a `500 Server Error` if the secret key is unset, refusing to hash any data securely.
+
+### 4. Verification & Automated Test Results
+* Verified that triggering an email change without the environment variable correctly aborts execution and throws a 500 status.
+
+---
+
+## Issue #14 [Frontend]: Coordinated Save Mutations
+
+**Component Tier:** Frontend (React / Vite)
+**Severity:** MEDIUM (Usability / Silent Errors)
+**Status:** RESOLVED & VERIFIED
+**Date:** August 24, 2026
+**Target Component:** `src/pages/employee/EmployeeDashboard.jsx`
+**Source Files:** `EmployeeDashboard.jsx`
+
+### 1. Issue Statement & Audit Remark
+* **Audit Finding:** *"EmployeeDashboard.jsx:666–685 — handleSave closes the edit modal as soon as the profile save succeeds, even if a concurrent email-change mutation is still pending or later fails; the user never sees the error."*
+* **Impact & Usability Risk:** The user is dumped back to the dashboard assuming their email change succeeded, but it may have failed in the background without displaying the associated error message.
+
+### 2. Root Cause Analysis
+* **Code Defect:** The `saveMutation`'s `onSuccess` handler explicitly executed `setIsEditing(false)` blindly. The email mutation was missing from the modal's save pipeline, meaning email state changes were never dispatched or awaited.
+
+### 3. Technical Remediation Applied
+* Disconnected modal closure (`setIsEditing(false)`) from `saveMutation.onSuccess`.
+* Integrated `requestEmailChangeMutation` directly into the dashboard.
+* Refactored `handleSave` to execute both mutations concurrently via `Promise.all()`. The modal now awaits both responses, rendering `emailError` or `saveError` inline if any network failure occurs, and only closing on unanimous success.
+
+### 4. Verification & Automated Test Results
+* Executed `npm run build`: Zero errors, client and SSR bundles built successfully.
+

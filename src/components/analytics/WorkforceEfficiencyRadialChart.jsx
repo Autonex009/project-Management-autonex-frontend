@@ -7,6 +7,7 @@ import {
   Tooltip,
 } from "recharts";
 import { Zap, ShieldCheck, UserCheck } from "lucide-react";
+import { ChartTooltip } from "./ChartWrapper";
 
 const WorkforceEfficiencyRadialChart = ({
   metrics = {},
@@ -59,19 +60,8 @@ const WorkforceEfficiencyRadialChart = ({
               dataKey="value"
               cornerRadius={8}
             />
-            <Tooltip
-              isAnimationActive={false}
-              wrapperStyle={{ pointerEvents: "none", outline: "none" }}
+            <ChartTooltip
               formatter={(value) => [`${value}% Rate`, "Value"]}
-              contentStyle={{
-                borderRadius: 12,
-                border: "1px solid #e2e8f0",
-                boxShadow: "0 8px 24px rgba(15,23,42,0.08)",
-                fontSize: 11,
-                backgroundColor: "rgba(255, 255, 255, 0.95)",
-                backdropFilter: "blur(4px)",
-                pointerEvents: "none",
-              }}
             />
           </RadialBarChart>
         </ResponsiveContainer>
