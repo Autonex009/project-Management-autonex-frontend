@@ -25,16 +25,71 @@ api.interceptors.request.use(
   },
 );
 
+let isRefreshing = false;
+let failedQueue = [];
+
+const processQueue = (error, token = null) => {
+  failedQueue.forEach(prom => {
+    if (error) {
+      prom.reject(error);
+    } else {
+      prom.resolve(token);
+    }
+  });
+  failedQueue = [];
+};
+
 api.interceptors.response.use(
   (response) => {
     return response;
   },
-  (error) => {
-    if (error.response && error.response.status === 401) {
-      localStorage.removeItem("token"); // Kept for backward compatibility until completely removed
-      localStorage.removeItem("role");
-      localStorage.removeItem("user");
-      // window.location.href = '/login/admin';
+  async (error) => {
+    const originalRequest = error.config;
+
+    // Ignore 401s from login or refresh endpoints to avoid infinite loops
+    if (originalRequest.url === '/auth/login' || originalRequest.url === '/auth/refresh') {
+      return Promise.reject(error);
+    }
+
+    if (error.response && error.response.status === 401 && !originalRequest._retry) {
+      if (isRefreshing) {
+        try {
+          // Suspend this request until the refresh is complete
+          await new Promise((resolve, reject) => {
+            failedQueue.push({ resolve, reject });
+          });
+          return await api(originalRequest);
+        } catch (err) {
+          return Promise.reject(err);
+        }
+      }
+
+      originalRequest._retry = true;
+      isRefreshing = true;
+
+      try {
+        const { data } = await axios.post(`${apiBaseUrl}/auth/refresh`, {}, { withCredentials: true });
+        
+        // Optionally update token in localStorage if still using it for backward compatibility
+        if (localStorage.getItem("token")) {
+           localStorage.setItem("token", data.token);
+        }
+        
+        processQueue(null, data.token);
+        return api(originalRequest);
+      } catch (err) {
+        processQueue(err, null);
+        localStorage.removeItem("token");
+        localStorage.removeItem("role");
+        localStorage.removeItem("user");
+        
+        // Force logout by dispatching an event that the root component can listen to
+        window.dispatchEvent(new Event("auth:unauthorized"));
+        
+        return Promise.reject(err);
+      } finally {
+        isRefreshing = false;
+      }
     }
     return Promise.reject(error);
   },
