@@ -429,6 +429,7 @@ export const guidelineApi = {
   update: (id, data) =>
     api.put(`/guidelines/${id}`, data).then((res) => res.data),
   delete: (id) => api.delete(`/guidelines/${id}`).then((res) => res.data),
+  getForMe: () => api.get("/guidelines/for-me").then((r) => r.data),
 };
 
 guidelineApi.getPage = ({
