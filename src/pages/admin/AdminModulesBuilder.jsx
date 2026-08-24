@@ -31,9 +31,22 @@ export default function AdminModulesBuilder() {
         setTitle(data.title || "");
         setDescription(data.description || "");
         setAssessmentUrl(data.assessment_url || "");
-        setStatus(
-          data.status?.toLowerCase() === "draft" ? "draft" : "published",
-        );
+        
+        const normalized = (data.status || "").toLowerCase();
+        if (normalized === "draft" || normalized === "published") {
+          setStatus(normalized);
+        } else {
+          // Unknown backend value — default to draft (safer than auto-publish)
+          // and surface it so the issue isn't silent.
+          console.warn(
+            `Unexpected module status "${data.status}"; defaulting to draft.`,
+          );
+          toast.error(
+            `Unexpected status "${data.status || "empty"}". Defaulted to Draft — check before saving.`,
+          );
+          setStatus("draft");
+        }
+        
         setOrder(data.order ?? 0);
 
         // Map sections from DB format to component format

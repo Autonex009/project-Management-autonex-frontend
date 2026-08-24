@@ -192,6 +192,7 @@ const ResetPassword = () => {
                   <div className="relative">
                     <Lock className="absolute left-3 top-1/2 h-5 w-5 -translate-y-1/2 text-slate-400" />
                     <input
+                      id="reset-password-new"
                       type={showPassword ? "text" : "password"}
                       value={password}
                       onChange={(event) => setPassword(event.target.value)}
@@ -226,6 +227,7 @@ const ResetPassword = () => {
                   <div className="relative">
                     <KeyRound className="absolute left-3 top-1/2 h-5 w-5 -translate-y-1/2 text-slate-400" />
                     <input
+                      id="reset-password-confirm"
                       type={showConfirm ? "text" : "password"}
                       value={confirmPassword}
                       onChange={(event) =>
