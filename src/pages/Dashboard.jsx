@@ -31,7 +31,6 @@ import StatCard from "../components/dashboard/StatCard";
 import SplitStatCard from "../components/dashboard/SplitStatCard";
 import MostActivePanel from "../components/dashboard/MostActivePanel";
 import MetricDots from "../components/ui/MetricDots";
-import { getWorkingDays } from "../utils/dateCalculations";
 
 // The three engagement buckets, colour-matched to the dots on the Employees page
 // so Active / Inactive / Idle mean the same colour wherever they appear.

@@ -54,6 +54,7 @@ const EmployeeLogin = () => {
       localStorage.setItem("user", JSON.stringify(data.user));
       localStorage.setItem("role", data.user.role);
       localStorage.removeItem("employee-sidebar-width");
+      window.dispatchEvent(new Event("auth-change"));
       toast.success("Signed in successfully");
       navigate("/employee/dashboard");
     },

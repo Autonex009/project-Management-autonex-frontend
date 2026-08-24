@@ -5,6 +5,7 @@ import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
 import { Toaster } from "react-hot-toast";
 import ProtectedRoute from "./routes/ProtectedRoute";
 import ErrorBoundary from "./components/ErrorBoundary";
+import ForcePasswordChangeModal from "./components/ForcePasswordChangeModal";
 
 // Layouts
 import AdminLayout from "./layouts/AdminLayout";
@@ -116,6 +117,7 @@ function App() {
           style: { background: "#333", color: "#fff" },
         }}
       />
+      <ForcePasswordChangeModal />
       <Suspense fallback={null}>
         <Routes>
           {/* Public Auth Routes */}
