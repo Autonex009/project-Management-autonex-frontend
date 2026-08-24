@@ -19,6 +19,15 @@ import { onboardingApi } from "../../services/api";
 import toast from "react-hot-toast";
 import YouTube from "react-youtube";
 import { setPageDetailTitle } from "../../utils/pageDetailTitle";
+import { clampPassingScore } from "../../utils/onboarding";
+
+/** First incomplete section index, or last index if all complete. -1 if no sections. */
+function getActiveSectionIndex(sections, completedSections) {
+  if (!sections?.length) return -1;
+  const idx = sections.findIndex((s) => !completedSections.has(s.id));
+  return idx === -1 ? sections.length - 1 : idx;
+}
+
 const ModuleView = () => {
   const { moduleId } = useParams();
   const navigate = useNavigate();
@@ -45,13 +54,10 @@ const ModuleView = () => {
   const trackingIntervalRef = useRef(null);
 
   // Safely compute the current section ID before early returns for our cleanup hook
-  const safeCurrentIndex = moduleData?.sections
-    ? moduleData.sections.findIndex((s) => !completedSections.has(s.id))
-    : -1;
-  const safeActiveSectionIndex =
-    safeCurrentIndex === -1 && moduleData?.sections
-      ? moduleData.sections.length - 1
-      : safeCurrentIndex;
+  const safeActiveSectionIndex = getActiveSectionIndex(
+    moduleData?.sections,
+    completedSections,
+  );
   const safeCurrentSectionId =
     moduleData?.sections?.[safeActiveSectionIndex]?.id;
 
@@ -121,11 +127,10 @@ const ModuleView = () => {
   }
 
   // Determine the current active section (first uncompleted section, or the last one)
-  const currentIndex = moduleData.sections.findIndex(
-    (s) => !completedSections.has(s.id),
+  const activeSectionIndex = getActiveSectionIndex(
+    moduleData.sections,
+    completedSections,
   );
-  const activeSectionIndex =
-    currentIndex === -1 ? moduleData.sections.length - 1 : currentIndex;
   const currentSection = moduleData.sections[activeSectionIndex];
 
   const getEmbeddedDriveUrl = (url) => {
@@ -215,15 +220,8 @@ const ModuleView = () => {
 
     try {
       const result = await onboardingApi.submitQuiz(sectionId, answers, userId);
-      const passingScore = Math.max(
-        0,
-        Math.min(
-          100,
-          Number(
-            currentSection.quiz_passing_score ??
-              currentSection.quizPassingScore,
-          ) || 0,
-        ),
+      const passingScore = clampPassingScore(
+        currentSection.quiz_passing_score ?? currentSection.quizPassingScore,
       );
       const passed = result.score >= passingScore;
 
@@ -311,14 +309,8 @@ const ModuleView = () => {
     totalSections === 0
       ? 0
       : Math.round((totalCompleted / totalSections) * 100);
-  const currentPassingScore = Math.max(
-    0,
-    Math.min(
-      100,
-      Number(
-        currentSection?.quiz_passing_score ?? currentSection?.quizPassingScore,
-      ) || 0,
-    ),
+  const currentPassingScore = clampPassingScore(
+    currentSection?.quiz_passing_score ?? currentSection?.quizPassingScore,
   );
   const answeredCurrentQuestions =
     currentSection?.questions?.filter(

@@ -15,6 +15,7 @@ import Spinner from "../../components/ui/LoadingSpinner";
 import toast from "react-hot-toast";
 import AuthBrandPanel from "../../components/brand/AuthBrandPanel";
 import { parseAuthError } from "../../utils/authErrors";
+import { validateLoginForm, firstLoginError } from "../../utils/loginValidation";
 
 const AdminLogin = () => {
   const navigate = useNavigate();
@@ -50,11 +51,15 @@ const AdminLogin = () => {
   const handleSubmit = (e) => {
     e.preventDefault();
     setError(null);
-    if (!formData.email || !formData.password) {
-      setError("Please fill in all fields");
+    const { ok, errors } = validateLoginForm(formData);
+    if (!ok) {
+      setError(firstLoginError(errors));
       return;
     }
-    loginMutation.mutate(formData);
+    loginMutation.mutate({
+      email: formData.email.trim(),
+      password: formData.password,
+    });
   };
 
   return (
@@ -115,6 +120,7 @@ const AdminLogin = () => {
               <div className="group relative">
                 <Mail className="absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-slate-500 transition-colors group-focus-within:text-blue-400" />
                 <input
+                  id="admin-login-email"
                   type="email"
                   className="w-full rounded-2xl border border-slate-800 bg-slate-900/70 py-3 pl-10 pr-4 text-sm text-slate-100 outline-none transition-all placeholder:text-slate-600 focus:border-blue-500 focus:ring-2 focus:ring-blue-500/20"
                   placeholder="name@company.com"
@@ -133,6 +139,7 @@ const AdminLogin = () => {
               <div className="group relative">
                 <Lock className="absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-slate-500 transition-colors group-focus-within:text-blue-400" />
                 <input
+                  id="admin-login-password"
                   type={showPassword ? "text" : "password"}
                   className="w-full rounded-2xl border border-slate-800 bg-slate-900/70 py-3 pl-10 pr-10 text-sm text-slate-100 outline-none transition-all placeholder:text-slate-600 focus:border-blue-500 focus:ring-2 focus:ring-blue-500/20"
                   placeholder="••••••••"

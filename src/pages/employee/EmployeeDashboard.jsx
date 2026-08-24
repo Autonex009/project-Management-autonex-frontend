@@ -674,7 +674,6 @@ const EmployeeDashboard = () => {
         queryKey: ["employee-profile", employeeId],
       });
       queryClient.invalidateQueries({ queryKey: ["auth-me"] });
-      setIsEditing(false);
       setSaveError("");
     },
     onError: (err) => {
@@ -684,25 +683,43 @@ const EmployeeDashboard = () => {
 
   const COMPANY_DOMAIN = "autonexai360.com";
 
-  const handleSave = async () => {
-    saveMutation.mutate({
-      phone: editPhone || null,
-      skills: editSkills,
-      slack_user_id: editSlackId || null,
-      encord_id: editEncordId || null,
-    });
+  const handleSave = () => {
+    setSaveError("");
+    setEmailError("");
 
     const trimmedEmail = editEmail.trim().toLowerCase();
     const originalEmail = (profile.email || "").trim().toLowerCase();
-
-    if (
-      trimmedEmail &&
+    const shouldChangeEmail =
+      !!trimmedEmail &&
       trimmedEmail !== originalEmail &&
       trimmedEmail.endsWith(`@${COMPANY_DOMAIN}`) &&
-      trimmedEmail.split("@")[0].length > 0
-    ) {
-      changeEmailMutation.mutate(trimmedEmail);
-    }
+      trimmedEmail.split("@")[0].length > 0;
+
+    saveMutation.mutate(
+      {
+        phone: editPhone || null,
+        skills: editSkills,
+        slack_user_id: editSlackId || null,
+        encord_id: editEncordId || null,
+      },
+      {
+        onSuccess: () => {
+          if (shouldChangeEmail) {
+            // Profile OK — now change email; keep modal open until this finishes
+            changeEmailMutation.mutate(trimmedEmail, {
+              onSuccess: () => {
+                setIsEditing(false);
+              },
+              // onError already sets emailError; modal stays open
+            });
+          } else {
+            // No email change — safe to close
+            setIsEditing(false);
+          }
+        },
+        // onError already sets saveError; modal stays open
+      },
+    );
   };
 
   /* ── Avatar Mutations ────────────────────────────── */
