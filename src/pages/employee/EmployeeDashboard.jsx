@@ -266,14 +266,14 @@ const SkillsMultiSelect = ({ selected, onChange, options, isLoading }) => {
                   type="button"
                   onClick={() => toggle(skill.name)}
                   className={`flex w-full items-center gap-2 px-3 py-1.5 text-left text-xs transition-colors ${isSelected
-                    ? "bg-indigo-50 font-semibold text-teal-800"
-                    : "hover:bg-stone-50 text-stone-700"
+                      ? "bg-indigo-50 font-semibold text-teal-800"
+                      : "hover:bg-stone-50 text-stone-700"
                     }`}
                 >
                   <div
                     className={`flex h-3.5 w-3.5 items-center justify-center rounded border ${isSelected
-                      ? "border-teal-600 bg-teal-600 text-white"
-                      : "border-stone-300"
+                        ? "border-teal-600 bg-teal-600 text-white"
+                        : "border-stone-300"
                       }`}
                   >
                     {isSelected && <Check className="h-2.5 w-2.5" />}
@@ -324,7 +324,6 @@ const EmployeeDashboard = () => {
   const [showLogsModal, setShowLogsModal] = useState(false);
   const [showBadgeLogsModal, setShowBadgeLogsModal] = useState(false);
   const [editEmail, setEditEmail] = useState("");
-  const [activeNoteTab, setActiveNoteTab] = useState("daily");
   const [emailError, setEmailError] = useState("");
   const [profileTab, setProfileTab] = useState("attendance");
   const [bottomTab, setBottomTab] = useState("notes");
@@ -675,21 +674,21 @@ const EmployeeDashboard = () => {
   const handleSave = async () => {
     setSaveError("");
     setEmailError("");
-
+    
     const trimmedEmail = editEmail.trim().toLowerCase();
     const originalEmail = (profile.email || "").trim().toLowerCase();
     const emailChanged = !!trimmedEmail && trimmedEmail !== originalEmail;
-
+    
     if (emailChanged) {
       if (!trimmedEmail.endsWith(`@${COMPANY_DOMAIN}`) || trimmedEmail.split("@")[0].length === 0) {
         setEmailError(`Email must be a valid @${COMPANY_DOMAIN} address.`);
-        return;
+        return; 
       }
     }
-
+      
     try {
       const promises = [];
-
+      
       promises.push(
         saveMutation.mutateAsync({
           phone: editPhone || null,
@@ -1243,14 +1242,6 @@ const EmployeeDashboard = () => {
               </span>
             </div>
 
-            {/* Phone */}
-            <div className="flex items-center justify-start gap-1.5 text-[10px] text-stone-500 font-medium w-full mb-2 px-0.5">
-              <Phone className="w-3.5 h-3.5 text-stone-400 shrink-0" />
-              <span className="truncate">{profile.phone || "No phone"}</span>
-            </div>
-
-            <div className="w-full h-px bg-stone-100 mb-2" />
-
             {profile.skills?.length > 0 && (
               <div className="flex flex-col items-center gap-1 w-full mt-0.5">
                 <span className="text-[9px] font-bold text-stone-400 uppercase tracking-wider text-center">
@@ -1336,30 +1327,11 @@ const EmployeeDashboard = () => {
               </div>
             </div>
 
-            <div className="w-full h-px bg-stone-100 mb-2" />
-
-            <div className="flex flex-col gap-4 mt-1">
-              <div className="flex gap-4">
-                <button
-                  type="button"
-                  onClick={() => setProfileTab("attendance")}
-                  className={`flex items-center gap-1.5 pb-1 border-b-[2px] font-semibold text-[10px] transition-colors ${profileTab === "attendance"
-                    ? "border-indigo-500 text-indigo-600"
-                    : "border-transparent text-stone-400 hover:text-stone-600"
-                    }`}
-                >
-                  <Calendar className="w-3.5 h-3.5" /> Attendance
-                </button>
-                <button
-                  type="button"
-                  onClick={() => setProfileTab("notes")}
-                  className={`flex items-center gap-1.5 pb-1 border-b-[2px] font-semibold text-[10px] transition-colors ${profileTab === "notes"
-                    ? "border-indigo-500 text-indigo-600"
-                    : "border-transparent text-stone-400 hover:text-stone-600"
-                    }`}
-                >
-                  <FileText className="w-3.5 h-3.5" /> Notes
-                </button>
+            <div className="flex flex-col gap-1.5 mt-auto">
+              <div className="flex items-center justify-end">
+                <h3 className="font-display text-[15px] font-extrabold text-stone-900">
+                  Leaves
+                </h3>
               </div>
 
               <div className="grid grid-cols-3 gap-2">
@@ -1402,71 +1374,20 @@ const EmployeeDashboard = () => {
                     >
                       {icon}
                     </div>
-                      <div className="text-center">
-                        <div className="font-data text-lg font-extrabold text-stone-800 leading-none flex items-baseline justify-center gap-0.5">
-                          <span>{remaining}</span>
-                          {quota !== "—" && (
-                            <span className="text-xs font-semibold text-stone-400">
-                              / {quota}
-                            </span>
-                          )}
-                        </div>
-                        <span className="text-[9px] font-medium text-stone-400 mt-0.5 block uppercase tracking-wider">
-                          {label}
-                        </span>
+                    <div className="text-center">
+                      <div className="font-data text-lg font-extrabold text-stone-800 leading-none flex items-baseline justify-center gap-0.5">
+                        <span>{remaining}</span>
+                        {quota !== "—" && (
+                          <span className="text-xs font-semibold text-stone-400">
+                            / {quota}
+                          </span>
+                        )}
                       </div>
+                      <span className="text-[9px] font-medium text-stone-400 mt-0.5 block uppercase tracking-wider">
+                        {label}
+                      </span>
                     </div>
-                  ))}
                   </div>
-                ) : (
-                <div className="grid grid-cols-3 gap-2">
-                  {[
-                    {
-                      icon: <AlertCircle className="w-3.5 h-3.5 text-rose-500" />,
-                      label: "Complaints",
-                      value: complaintsCount,
-                      color: "text-rose-600",
-                    },
-                    {
-                      icon: (
-                        <AlertTriangle className="w-3.5 h-3.5 text-amber-500" />
-                      ),
-                      label: "Warnings",
-                      value: warningsCount,
-                      color: "text-amber-600",
-                    },
-                    {
-                      icon: <Award className="w-3.5 h-3.5 text-indigo-600" />,
-                      label: "Recognition",
-                      value: recognitionsList.length,
-                      color: "text-indigo-600",
-                    },
-                  ].map(({ icon, label, value, color }) => (
-                    <div
-                      key={label}
-                      className="flex flex-col items-center gap-0.5 border border-stone-200 rounded-xl pt-2 pb-1 shadow-sm bg-white"
-                    >
-                      <div
-                        className={`w-7 h-7 rounded-full flex items-center justify-center ${label === "Recognition"
-                          ? "bg-indigo-50"
-                          : label === "Warnings"
-                            ? "bg-amber-50"
-                            : "bg-rose-50"
-                          }`}
-                      >
-                        {icon}
-                      </div>
-                      <div className="text-center">
-                        <span
-                          className={`font-data text-lg font-extrabold leading-none block ${color}`}
-                        >
-                          {value}
-                        </span>
-                        <span className="text-[9px] font-medium text-stone-400 mt-0.5 block uppercase tracking-wider">
-                          {label}
-                        </span>
-                      </div>
-                    </div>
                 ))}
               </div>
             </div>
@@ -1645,8 +1566,8 @@ const EmployeeDashboard = () => {
                       <Star
                         key={s}
                         className={`w-2.5 h-2.5 ${latestRating && s <= Math.floor(latestRating)
-                          ? "fill-amber-400 text-amber-400"
-                          : "fill-stone-200 text-stone-200"
+                            ? "fill-amber-400 text-amber-400"
+                            : "fill-stone-200 text-stone-200"
                           }`}
                       />
                     ))}
@@ -1934,8 +1855,8 @@ const EmployeeDashboard = () => {
                   type="button"
                   onClick={() => setBottomTab("notes")}
                   className={`flex items-center gap-1.5 pb-2 -mb-[3px] border-b-[2px] font-semibold text-[13px] transition-colors ${bottomTab === "notes"
-                    ? "border-indigo-500 text-indigo-600"
-                    : "border-transparent text-stone-400 hover:text-stone-600"
+                      ? "border-indigo-500 text-indigo-600"
+                      : "border-transparent text-stone-400 hover:text-stone-600"
                     }`}
                 >
                   <FileText className="w-4 h-4" /> Notes
@@ -1945,8 +1866,8 @@ const EmployeeDashboard = () => {
                 type="button"
                 onClick={() => setBottomTab("performance")}
                 className={`flex items-center gap-1.5 pb-2 -mb-[3px] border-b-[2px] font-semibold text-[13px] transition-colors ${bottomTab === "performance" || !canViewNotes
-                  ? "border-indigo-500 text-indigo-600"
-                  : "border-transparent text-stone-400 hover:text-stone-600"
+                    ? "border-indigo-500 text-indigo-600"
+                    : "border-transparent text-stone-400 hover:text-stone-600"
                   }`}
               >
                 <TrendingUp className="w-4 h-4" /> Performance History
@@ -2361,8 +2282,8 @@ const EmployeeDashboard = () => {
               <div
                 key={title}
                 className={`flex items-center gap-3 p-2.5 rounded-xl border transition-colors ${earned
-                  ? "bg-stone-50 border-stone-200 hover:bg-stone-100/60"
-                  : "bg-stone-50/40 border-stone-200/50 opacity-50"
+                    ? "bg-stone-50 border-stone-200 hover:bg-stone-100/60"
+                    : "bg-stone-50/40 border-stone-200/50 opacity-50"
                   }`}
               >
                 <span
@@ -2402,10 +2323,10 @@ const EmployeeDashboard = () => {
               <div className="flex items-center gap-2.5">
                 <div
                   className={`w-8 h-8 rounded-xl flex items-center justify-center ${addNoteModal.type === "complaint"
-                    ? "bg-rose-50 text-rose-600"
-                    : addNoteModal.type === "warning"
-                      ? "bg-amber-50 text-amber-600"
-                      : "bg-indigo-50 text-indigo-600"
+                      ? "bg-rose-50 text-rose-600"
+                      : addNoteModal.type === "warning"
+                        ? "bg-amber-50 text-amber-600"
+                        : "bg-indigo-50 text-indigo-600"
                     }`}
                 >
                   {addNoteModal.type === "complaint" ? (
@@ -2484,12 +2405,12 @@ const EmployeeDashboard = () => {
                             setNoteForm((f) => ({ ...f, severity: s }))
                           }
                           className={`flex-1 py-1.5 rounded-lg text-[11px] font-semibold border transition-colors ${noteForm.severity === s
-                            ? s === "high"
-                              ? "bg-rose-50 border-rose-300 text-rose-700"
-                              : s === "medium"
-                                ? "bg-amber-50 border-amber-300 text-amber-700"
-                                : "bg-indigo-50 border-emerald-300 text-emerald-700"
-                            : "bg-white border-stone-200 text-stone-500 hover:bg-stone-50"
+                              ? s === "high"
+                                ? "bg-rose-50 border-rose-300 text-rose-700"
+                                : s === "medium"
+                                  ? "bg-amber-50 border-amber-300 text-amber-700"
+                                  : "bg-indigo-50 border-emerald-300 text-emerald-700"
+                              : "bg-white border-stone-200 text-stone-500 hover:bg-stone-50"
                             }`}
                         >
                           {s.charAt(0).toUpperCase() + s.slice(1)}
@@ -2559,10 +2480,10 @@ const EmployeeDashboard = () => {
               <div className="flex items-center gap-2.5">
                 <div
                   className={`w-8 h-8 rounded-xl flex items-center justify-center ${notesModal.type === "complaints"
-                    ? "bg-rose-50 text-rose-600"
-                    : notesModal.type === "warnings"
-                      ? "bg-amber-50 text-amber-600"
-                      : "bg-indigo-50 text-indigo-600"
+                      ? "bg-rose-50 text-rose-600"
+                      : notesModal.type === "warnings"
+                        ? "bg-amber-50 text-amber-600"
+                        : "bg-indigo-50 text-indigo-600"
                     }`}
                 >
                   {notesModal.type === "complaints" ? (
@@ -2600,10 +2521,10 @@ const EmployeeDashboard = () => {
                   <div
                     key={item.id ?? idx}
                     className={`p-3 rounded-xl border ${notesModal.type === "complaints"
-                      ? "bg-rose-50/30 border-rose-100"
-                      : notesModal.type === "warnings"
-                        ? "bg-amber-50/30 border-amber-100"
-                        : "bg-indigo-50/30 border-indigo-100"
+                        ? "bg-rose-50/30 border-rose-100"
+                        : notesModal.type === "warnings"
+                          ? "bg-amber-50/30 border-amber-100"
+                          : "bg-indigo-50/30 border-indigo-100"
                       }`}
                   >
                     <div className="flex items-start justify-between gap-2 mb-1">
@@ -2701,16 +2622,16 @@ const EmployeeDashboard = () => {
                     <div
                       key={item.id}
                       className={`p-3 rounded-xl border ${isActive
-                        ? "bg-indigo-50/40 border-indigo-100"
-                        : "bg-stone-50 border-stone-100"
+                          ? "bg-indigo-50/40 border-indigo-100"
+                          : "bg-stone-50 border-stone-100"
                         }`}
                     >
                       <div className="flex items-center justify-between gap-2 mb-1">
                         <div className="flex items-center gap-2 min-w-0">
                           <span
                             className={`px-2 py-0.5 text-[8.5px] font-bold uppercase rounded-md shrink-0 ${isActive
-                              ? "bg-indigo-600 text-white"
-                              : "bg-stone-200 text-stone-600"
+                                ? "bg-indigo-600 text-white"
+                                : "bg-stone-200 text-stone-600"
                               }`}
                           >
                             {isActive ? "Active" : "Completed"}
@@ -2941,16 +2862,16 @@ const EmployeeDashboard = () => {
                   key={tab.key}
                   onClick={() => setAttendanceModalTab(tab.key)}
                   className={`flex items-center gap-2 px-3 py-2 text-xs font-semibold rounded-t-xl border-b-2 transition-all cursor-pointer ${attendanceModalTab === tab.key
-                    ? "border-indigo-600 text-indigo-700 bg-white shadow-xs"
-                    : "border-transparent text-stone-500 hover:text-stone-700 hover:bg-stone-100/50"
+                      ? "border-indigo-600 text-indigo-700 bg-white shadow-xs"
+                      : "border-transparent text-stone-500 hover:text-stone-700 hover:bg-stone-100/50"
                     }`}
                 >
                   {tab.icon}
                   {tab.label}
                   <span
                     className={`px-1.5 py-0.5 text-[10px] font-bold rounded-full ${attendanceModalTab === tab.key
-                      ? "bg-indigo-100 text-indigo-700"
-                      : "bg-stone-100 text-stone-600"
+                        ? "bg-indigo-100 text-indigo-700"
+                        : "bg-stone-100 text-stone-600"
                       }`}
                   >
                     {tab.count}
@@ -2987,12 +2908,12 @@ const EmployeeDashboard = () => {
                               </span>
                               <span
                                 className={`text-[10px] font-bold uppercase px-2 py-0.5 rounded-full ${(wfh.status || "pending").toLowerCase() ===
-                                  "approved"
-                                  ? "bg-indigo-100 text-indigo-700"
-                                  : (wfh.status || "pending").toLowerCase() ===
-                                    "rejected"
-                                    ? "bg-rose-100 text-rose-700"
-                                    : "bg-amber-100 text-amber-700"
+                                    "approved"
+                                    ? "bg-indigo-100 text-indigo-700"
+                                    : (wfh.status || "pending").toLowerCase() ===
+                                      "rejected"
+                                      ? "bg-rose-100 text-rose-700"
+                                      : "bg-amber-100 text-amber-700"
                                   }`}
                               >
                                 {wfh.status || "Pending"}
@@ -3051,12 +2972,12 @@ const EmployeeDashboard = () => {
                                   )}
                                   <span
                                     className={`text-[10px] font-bold uppercase px-2 py-0.5 rounded-full ${(leave.status || "pending").toLowerCase() ===
-                                      "approved"
-                                      ? "bg-indigo-100 text-indigo-700"
-                                      : (leave.status || "pending").toLowerCase() ===
-                                        "rejected"
-                                        ? "bg-rose-100 text-rose-700"
-                                        : "bg-amber-100 text-amber-700"
+                                        "approved"
+                                        ? "bg-indigo-100 text-indigo-700"
+                                        : (leave.status || "pending").toLowerCase() ===
+                                          "rejected"
+                                          ? "bg-rose-100 text-rose-700"
+                                          : "bg-amber-100 text-amber-700"
                                       }`}
                                   >
                                     {leave.status || "Pending"}
