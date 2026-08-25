@@ -126,16 +126,10 @@ const SplitStatCard = ({ halves = [] }) => {
                     : "-translate-y-1 scale-[0.97] opacity-0"
                 }`}
               >
-                <div className="flex items-baseline justify-between gap-2 px-3 pb-2 pt-2.5">
-                  <p className="truncate text-[13px] font-semibold text-slate-900">
-                    {half.title} · pending review
-                  </p>
-                </div>
-
                 {tabs.length > 1 && (
                   <div
                     role="tablist"
-                    className="mx-1.5 mb-1 flex items-center gap-0.5 rounded-lg bg-slate-100/80 p-0.5"
+                    className="mx-1.5 mt-1.5 flex items-center gap-0.5 rounded-lg bg-slate-100/80 p-0.5"
                   >
                     {tabs.map((tab, i) => (
                       <button
@@ -162,6 +156,12 @@ const SplitStatCard = ({ halves = [] }) => {
                     ))}
                   </div>
                 )}
+
+                <div className="flex items-baseline justify-between gap-2 px-3 pb-2 pt-2">
+                  <p className="truncate text-[13px] font-semibold text-slate-900">
+                    {half.title} · pending review
+                  </p>
+                </div>
 
                 <div className="max-h-[min(50vh,12rem)] overflow-y-auto px-1.5 pb-1.5">
                   {people.length === 0 ? (

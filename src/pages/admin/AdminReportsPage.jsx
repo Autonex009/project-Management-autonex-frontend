@@ -35,7 +35,7 @@ export default function AdminReportsPage() {
   // ["employees"] cache entry with the rest of the admin portal.
   const { data: employees = [] } = useQuery({
     queryKey: ["employees"],
-    queryFn: employeeApi.getAll,
+    queryFn: () => employeeApi.getAll(),
   });
   
   const avatarByEmployeeId = useMemo(

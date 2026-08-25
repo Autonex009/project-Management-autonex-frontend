@@ -325,16 +325,41 @@ const ProfilePage = () => {
 
   const { data: skillsList = [], isLoading: skillsLoading } = useQuery({
     queryKey: ["skills-list"],
-    queryFn: skillsApi.getAll,
+    queryFn: () => skillsApi.getAll(),
   });
 
   const isLoading = accountLoading || employeeLoading;
+
+const formatPhoneNumber = (phone) => {
+  if (!phone) return "";
+  const str = String(phone).trim();
+  if (!str) return "";
+
+  if (str.startsWith("+91") || str.startsWith("+ 91")) {
+    return str;
+  }
+
+  const cleanDigits = str.replace(/\D/g, "");
+  if (cleanDigits.length === 12 && cleanDigits.startsWith("91")) {
+    return `+91 ${cleanDigits.slice(2)}`;
+  }
+
+  if (cleanDigits.length === 10) {
+    return `+91 ${cleanDigits}`;
+  }
+
+  if (str.startsWith("91")) {
+    return `+${str}`;
+  }
+
+  return `+91 ${str}`;
+};
 
   /* ── Merged Profile State ───────────────────────────────────── */
   const mergedProfile = {
     name: account?.name || employee?.name || localUser.name,
     email: account?.email || employee?.email || localUser.email,
-    phone: employee?.phone || account?.phone,
+    phone: formatPhoneNumber(employee?.phone || account?.phone),
     role: account?.role || localUser.role || "employee",
     employeeId: employee?.id || employeeId,
     employeeType: employee?.employee_type,

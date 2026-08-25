@@ -15,6 +15,7 @@ import { onboardingApi } from "../../services/api";
 import SearchBar from "../../components/ui/SearchBar";
 import Modal from "../../components/ui/Modal";
 
+
 export default function AdminModulesList() {
   const [modules, setModules] = useState([]);
   const [searchQuery, setSearchQuery] = useState("");

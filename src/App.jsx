@@ -4,7 +4,7 @@ import { Routes, Route, Navigate } from "react-router-dom";
 import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
 import { Toaster } from "react-hot-toast";
 import ProtectedRoute from "./routes/ProtectedRoute";
-// import ErrorBoundary from "./components/ErrorBoundary";
+import ErrorBoundary from "./components/ErrorBoundary";
 import ForcePasswordChangeModal from "./components/ForcePasswordChangeModal";
 
 // Layouts
@@ -99,159 +99,164 @@ function App() {
           queries: {
             refetchOnWindowFocus: false,
             retry: 1,
+            staleTime: 1000 * 60 * 5, // Cache data for 5 minutes globally
           },
         },
       }),
   );
 
   return (
-    <QueryClientProvider client={queryClient}>
-      <Toaster
-        position="top-right"
-        containerStyle={{ zIndex: 100000 }}
-        toastOptions={{
-          duration: 4000,
-          style: { background: "#333", color: "#fff" },
-        }}
-      />
-      <ForcePasswordChangeModal />
-      <Suspense fallback={null}>
-        <Routes>
-          {/* Public Auth Routes */}
-          <Route path="/login/admin" element={<AdminLogin />} />
-          <Route path="/login/employee" element={<EmployeeLogin />} />
-          <Route path="/login/pm" element={<PMLogin />} />
-          <Route path="/forgot-password" element={<ForgotPassword />} />
-          <Route path="/reset-password" element={<ResetPassword />} />
-          <Route path="/employee-signup" element={<EmployeeSignupPage />} />
-          <Route
-            path="/login"
-            element={<Navigate to="/login/admin" replace />}
+    <ErrorBoundary>
+      <div suppressHydrationWarning>
+        <QueryClientProvider client={queryClient}>
+          <Toaster
+            position="top-right"
+            containerStyle={{ zIndex: 100000 }}
+            toastOptions={{
+              duration: 4000,
+              style: { background: "#333", color: "#fff" },
+            }}
           />
+          <ForcePasswordChangeModal />
+          <Suspense fallback={null}>
+            <Routes>
+              {/* Public Auth Routes */}
+              <Route path="/login/admin" element={<AdminLogin />} />
+              <Route path="/login/employee" element={<EmployeeLogin />} />
+              <Route path="/login/pm" element={<PMLogin />} />
+              <Route path="/forgot-password" element={<ForgotPassword />} />
+              <Route path="/reset-password" element={<ResetPassword />} />
+              <Route path="/employee-signup" element={<EmployeeSignupPage />} />
+              <Route
+                path="/login"
+                element={<Navigate to="/login/admin" replace />}
+              />
 
-          {/* Protected Admin Routes */}
-          <Route
-            path="/admin"
-            element={
-              <ProtectedRoute allowedRoles={["admin", "hr"]}>
-                <AdminLayout />
-              </ProtectedRoute>
-            }
-          >
-            <Route index element={<Navigate to="/admin/dashboard" replace />} />
-            <Route path="dashboard" element={<Dashboard />} />
-            <Route path="analytics" element={<AnalyticsDashboard />} />
-            <Route
-              path="analytics/:mainProjectId"
-              element={<AnalyticsDashboard />}
-            />
-            {/* Organizations page removed on admin — redirect to Projects */}
-            <Route
-              path="projects"
-              element={<Navigate to="/admin/sub-projects" replace />}
-            />
-            <Route path="employees" element={<EmployeesPage />} />
-            <Route path="employees/:id" element={<EmployeeDashboard />} />
-            <Route path="change-log" element={<ChangeLogPage />} />
-            <Route path="leaderboard" element={<LeaderboardPage />} />
-            <Route path="sub-projects" element={<SubProjectsPage />} />
-            <Route path="allocations" element={<AllocationsPage />} />
-            <Route path="leaves" element={<LeavesPage />} />
-            <Route path="performance" element={<AdminPerformancePage />} />
-            <Route path="signup-requests" element={<SignupRequestsPage />} />
-            <Route path="payroll" element={<PayrollTabs />} />
-            <Route path="referrals" element={<ReferralsPage />} />
-            <Route path="guidelines" element={<GuidelinesPage />} />
-            <Route path="modules" element={<AdminModulesList />} />
-            <Route path="modules/new" element={<AdminModulesBuilder />} />
-            {/* <Route path="onboarding-team" element={<AdminTeamPage />} /> */}
-            <Route path="onboarding-reports" element={<AdminReportsPage />} />
-            <Route path="newly-onboarded" element={<NewlyOnboardedPage />} />
-            <Route
-              path="company-settings"
-              element={<AdminCompanySettingsPage />}
-            />
-            {/* <Route path="onboarding-analytics" element={<AdminAnalyticsPage />} /> */}
-          </Route>
+              {/* Protected Admin Routes */}
+              <Route
+                path="/admin"
+                element={
+                  <ProtectedRoute allowedRoles={["admin", "hr"]}>
+                    <AdminLayout />
+                  </ProtectedRoute>
+                }
+              >
+                <Route index element={<Navigate to="/admin/dashboard" replace />} />
+                <Route path="dashboard" element={<Dashboard />} />
+                <Route path="analytics" element={<AnalyticsDashboard />} />
+                <Route
+                  path="analytics/:mainProjectId"
+                  element={<AnalyticsDashboard />}
+                />
+                {/* Organizations page removed on admin — redirect to Projects */}
+                <Route
+                  path="projects"
+                  element={<Navigate to="/admin/sub-projects" replace />}
+                />
+                <Route path="employees" element={<EmployeesPage />} />
+                <Route path="employees/:id" element={<EmployeeDashboard />} />
+                <Route path="change-log" element={<ChangeLogPage />} />
+                <Route path="leaderboard" element={<LeaderboardPage />} />
+                <Route path="sub-projects" element={<SubProjectsPage />} />
+                <Route path="allocations" element={<AllocationsPage />} />
+                <Route path="leaves" element={<LeavesPage />} />
+                <Route path="performance" element={<AdminPerformancePage />} />
+                <Route path="signup-requests" element={<SignupRequestsPage />} />
+                <Route path="payroll" element={<PayrollTabs />} />
+                <Route path="referrals" element={<ReferralsPage />} />
+                <Route path="guidelines" element={<GuidelinesPage />} />
+                <Route path="modules" element={<AdminModulesList />} />
+                <Route path="modules/new" element={<AdminModulesBuilder />} />
+                {/* <Route path="onboarding-team" element={<AdminTeamPage />} /> */}
+                <Route path="onboarding-reports" element={<AdminReportsPage />} />
+                <Route path="newly-onboarded" element={<NewlyOnboardedPage />} />
+                <Route
+                  path="company-settings"
+                  element={<AdminCompanySettingsPage />}
+                />
+                {/* <Route path="onboarding-analytics" element={<AdminAnalyticsPage />} /> */}
+              </Route>
 
-          {/* Root Redirect */}
-          <Route
-            path="/"
-            element={<Navigate to="/admin/dashboard" replace />}
-          />
+              {/* Root Redirect */}
+              <Route
+                path="/"
+                element={<Navigate to="/admin/dashboard" replace />}
+              />
 
-          {/* Protected Employee Routes */}
-          <Route
-            path="/employee"
-            element={
-              <ProtectedRoute allowedRoles={["employee"]}>
-                <EmployeeLayout />
-              </ProtectedRoute>
-            }
-          >
-            <Route
-              index
-              element={<Navigate to="/employee/dashboard" replace />}
-            />
-            <Route path="dashboard" element={<EmployeeDashboard />} />
-            <Route path="projects" element={<EmployeeProjectsPage />} />
-            <Route path="leaderboard" element={<LeaderboardPage />} />
-            <Route path="leaves" element={<EmployeeLeavesPage />} />
-            <Route path="self-evaluation" element={<SelfEvaluationPage />} />
-            <Route path="side-projects" element={<SideProjectsPage />} />
-            <Route path="guidelines" element={<EmployeeGuidelinesPage />} />
-            <Route path="referrals" element={<EmployeeReferralsPage />} />
-            <Route path="company-info" element={<CompanyInfoPage />} />
-            <Route path="onboarding" element={<OnboardingDashboard />} />
-            <Route path="onboarding/:moduleId" element={<ModuleView />} />
-            <Route path="profile" element={<ProfilePage />} />
-          </Route>
+              {/* Protected Employee Routes */}
+              <Route
+                path="/employee"
+                element={
+                  <ProtectedRoute allowedRoles={["employee"]}>
+                    <EmployeeLayout />
+                  </ProtectedRoute>
+                }
+              >
+                <Route
+                  index
+                  element={<Navigate to="/employee/dashboard" replace />}
+                />
+                <Route path="dashboard" element={<EmployeeDashboard />} />
+                <Route path="projects" element={<EmployeeProjectsPage />} />
+                <Route path="leaderboard" element={<LeaderboardPage />} />
+                <Route path="leaves" element={<EmployeeLeavesPage />} />
+                <Route path="self-evaluation" element={<SelfEvaluationPage />} />
+                <Route path="side-projects" element={<SideProjectsPage />} />
+                <Route path="guidelines" element={<EmployeeGuidelinesPage />} />
+                <Route path="referrals" element={<EmployeeReferralsPage />} />
+                <Route path="company-info" element={<CompanyInfoPage />} />
+                <Route path="onboarding" element={<OnboardingDashboard />} />
+                <Route path="onboarding/:moduleId" element={<ModuleView />} />
+                <Route path="profile" element={<ProfilePage />} />
+              </Route>
 
-          {/* Protected PM Routes. Team leads live here too: same pages, same
+              {/* Protected PM Routes. Team leads live here too: same pages, same
               layout, view-only. The backend decides what they may act on
               (services/project_scope.py). */}
-          <Route
-            path="/pm"
-            element={
-              <ProtectedRoute allowedRoles={["pm", "hr", "team_lead"]}>
-                <EmployeeLayout />
-              </ProtectedRoute>
-            }
-          >
-            <Route index element={<Navigate to="/pm/dashboard" replace />} />
-            <Route path="dashboard" element={<PMDashboard />} />
-            <Route path="analytics" element={<AnalyticsDashboard />} />
-            <Route
-              path="analytics/:mainProjectId"
-              element={<AnalyticsDashboard />}
-            />
-            <Route path="projects" element={<ProjectsPage />} />
-            <Route path="sub-projects" element={<SubProjectsPage />} />
-            <Route path="leaderboard" element={<LeaderboardPage />} />
-            <Route path="allocations" element={<AllocationsPage />} />
-            <Route path="my-team" element={<MyTeamPage />} />
-            <Route path="my-team/:id" element={<EmployeeDashboard />} />
-            <Route path="performance" element={<PerformanceReviewsPage />} />
-            <Route path="self-evaluation" element={<SelfEvaluationPage />} />
-            <Route path="leaves" element={<LeavesPage />} />
-            <Route path="my-leaves" element={<PMMyLeavesPage />} />
-            <Route path="side-projects" element={<SideProjectsPage />} />
-            <Route path="guidelines" element={<GuidelinesPage />} />
-            <Route path="onboarding" element={<OnboardingDashboard />} />
-            <Route path="onboarding/:moduleId" element={<ModuleView />} />
-            <Route path="onboarding-mentor" element={<PMMentorshipPage />} />
-            <Route
-              path="newly-onboarded"
-              element={<Navigate to="/pm/onboarding-mentor" replace />}
-            />
-            <Route path="profile" element={<ProfilePage />} />
-          </Route>
+              <Route
+                path="/pm"
+                element={
+                  <ProtectedRoute allowedRoles={["pm", "hr", "team_lead"]}>
+                    <EmployeeLayout />
+                  </ProtectedRoute>
+                }
+              >
+                <Route index element={<Navigate to="/pm/dashboard" replace />} />
+                <Route path="dashboard" element={<PMDashboard />} />
+                <Route path="analytics" element={<AnalyticsDashboard />} />
+                <Route
+                  path="analytics/:mainProjectId"
+                  element={<AnalyticsDashboard />}
+                />
+                <Route path="projects" element={<ProjectsPage />} />
+                <Route path="sub-projects" element={<SubProjectsPage />} />
+                <Route path="leaderboard" element={<LeaderboardPage />} />
+                <Route path="allocations" element={<AllocationsPage />} />
+                <Route path="my-team" element={<MyTeamPage />} />
+                <Route path="my-team/:id" element={<EmployeeDashboard />} />
+                <Route path="performance" element={<PerformanceReviewsPage />} />
+                <Route path="self-evaluation" element={<SelfEvaluationPage />} />
+                <Route path="leaves" element={<LeavesPage />} />
+                <Route path="my-leaves" element={<PMMyLeavesPage />} />
+                <Route path="side-projects" element={<SideProjectsPage />} />
+                <Route path="guidelines" element={<GuidelinesPage />} />
+                <Route path="onboarding" element={<OnboardingDashboard />} />
+                <Route path="onboarding/:moduleId" element={<ModuleView />} />
+                <Route path="onboarding-mentor" element={<PMMentorshipPage />} />
+                <Route
+                  path="newly-onboarded"
+                  element={<Navigate to="/pm/onboarding-mentor" replace />}
+                />
+                <Route path="profile" element={<ProfilePage />} />
+              </Route>
 
-          {/* Catch all */}
-          <Route path="*" element={<Navigate to="/login/admin" replace />} />
-        </Routes>
-      </Suspense>
-    </QueryClientProvider>
+              {/* Catch all */}
+              <Route path="*" element={<Navigate to="/login/admin" replace />} />
+            </Routes>
+          </Suspense>
+        </QueryClientProvider>
+      </div>
+    </ErrorBoundary>
   );
 }
 

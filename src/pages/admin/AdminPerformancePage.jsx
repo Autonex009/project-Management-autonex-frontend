@@ -118,18 +118,17 @@ const AdminPerformancePage = () => {
   const user = JSON.parse(localStorage.getItem("user") || "{}");
   const { data: employees = [], isLoading: empLoading } = useQuery({
     queryKey: ["employees"],
-    queryFn: employeeApi.getAll,
+    queryFn: () => employeeApi.getAll(),
   });
   const { data: projects = [], isLoading: projectsLoading } = useQuery({
     queryKey: ["sub-projects"],
-    queryFn: subProjectApi.getAll,
+    queryFn: () => subProjectApi.getAll(),
   });
   const { data: mainProjects = [], isLoading: mainProjectsLoading } = useQuery({
     queryKey: ["parent-projects"],
-    queryFn: parentProjectApi.getAll,
+    queryFn: () => parentProjectApi.getAll(),
     staleTime: 5 * 60 * 1000,
   });
-
   // ── Persist tab / search / filters / pages / scroll ─────────
   const PAGE_KEY = "admin-performance";
   const setPageState = usePageStateStore((s) => s.setPageState);
@@ -682,6 +681,7 @@ const AdminPerformancePage = () => {
               allowOverflow
               columns={reviewColumns}
               data={filtered}
+              totalItems={evaluationsTotal}
               currentPage={perfPage}
               pageSize={PAGE_SIZE}
               onPageChange={setPerfPage}
