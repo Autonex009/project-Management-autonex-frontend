@@ -1,4 +1,6 @@
-import { useState } from "react";
+import { useState, useEffect, useRef } from "react";
+import usePageStateStore from "../store/usePageStateStore";
+import { usePageScroll } from "../hooks/usePageScroll";
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
 import { referralApi, employeeApi } from "../services/api";
 import Spinner from "../components/ui/LoadingSpinner";
@@ -88,12 +90,42 @@ const StatusBadge = ({ status }) => {
 
 const ReferralsPage = () => {
   const queryClient = useQueryClient();
+  
+    // ── Persist tab / search / scroll ──────────────────────────
+  const PAGE_KEY = "referrals";
+  const setPageState = usePageStateStore((s) => s.setPageState);
+  const getPageState = usePageStateStore((s) => s.getPageState);
+
   const [activeTab, setActiveTab] = useState("All");
-  const [expandedId, setExpandedId] = useState(null);
-  const [statusModal, setStatusModal] = useState(null); // { referral }
+  const [searchQuery, setSearchQuery] = useState("");
+  const [expandedId, setExpandedId] = useState(null); // transient — not persisted
+  const [statusModal, setStatusModal] = useState(null);
   const [newStatus, setNewStatus] = useState("");
   const [statusNote, setStatusNote] = useState("");
-  const [searchQuery, setSearchQuery] = useState("");
+
+  const [ready, setReady] = useState(false);
+
+  useEffect(() => {
+    const restore = () => {
+      const s = getPageState(PAGE_KEY);
+      if (s.activeTab && TABS.includes(s.activeTab)) setActiveTab(s.activeTab);
+      if (s.searchQuery != null) setSearchQuery(s.searchQuery);
+      setReady(true);
+    };
+
+    if (usePageStateStore.persist.hasHydrated()) {
+      restore();
+      return;
+    }
+    return usePageStateStore.persist.onFinishHydration(restore);
+  }, [getPageState]);
+
+  useEffect(() => {
+    if (!ready) return;
+    setPageState(PAGE_KEY, { activeTab, searchQuery });
+  }, [ready, activeTab, searchQuery, setPageState]);
+
+  usePageScroll(PAGE_KEY);
 
   const { data: referrals = [], isLoading } = useQuery({
     queryKey: ["referrals", "admin"],
@@ -127,7 +159,7 @@ const ReferralsPage = () => {
 
   const handleTabChange = (tab) => {
     setActiveTab(tab);
-    setSearchQuery("");
+    setExpandedId(null);
   };
 
   const filtered = referrals.filter((r) => {

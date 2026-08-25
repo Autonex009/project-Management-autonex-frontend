@@ -1,6 +1,8 @@
 import { useState, useRef, useEffect } from "react";
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
 import { useSearchParams, Link } from "react-router-dom";
+import usePageStateStore from "../store/usePageStateStore";
+import { usePageScroll } from "../hooks/usePageScroll";
 import {
   employeeApi,
   skillApi,
@@ -33,6 +35,9 @@ import {
   ArrowDown,
   Search,
   Check,
+  Copy,
+  ExternalLink,
+  KeyRound,
 } from "lucide-react";
 import toast from "react-hot-toast";
 import UserAvatar from "../components/ui/UserAvatar";
@@ -550,6 +555,95 @@ function EmployeeConvertToFulltimeModal({
     </Modal>
   );
 }
+
+function EmployeeCredentialsModal({ credentials, onClose }) {
+  const [copied, setCopied] = useState(false);
+
+  if (!credentials) return null;
+
+  const handleCopy = () => {
+    const text = `PM Portal Login Credentials\n---------------------------\nName: ${credentials.name}\nEmail: ${credentials.email}\nTemporary Password: ${credentials.temp_password}\nPortal Link: ${credentials.portal_url}`;
+    navigator.clipboard.writeText(text);
+    setCopied(true);
+    toast.success("Credentials copied to clipboard!");
+    setTimeout(() => setCopied(false), 3000);
+  };
+
+  return (
+    <Modal isOpen onClose={onClose} size="md" maxHeight="90vh">
+      <Modal.Header onClose={onClose}>
+        <div className="flex items-center gap-2">
+          <div className="p-2 bg-emerald-50 text-emerald-600 rounded-lg">
+            <KeyRound className="w-5 h-5" />
+          </div>
+          <div>
+            <h3 className="text-lg font-bold text-gray-900">
+              Employee Created — Login Credentials
+            </h3>
+            <p className="text-xs text-gray-500">
+              Temporary access key generated for first-time sign-in
+            </p>
+          </div>
+        </div>
+      </Modal.Header>
+      <Modal.Body className="space-y-4">
+        <div className="bg-emerald-50/70 border border-emerald-200/80 rounded-xl p-3.5 text-xs text-emerald-800 flex items-start gap-2">
+          <Check className="w-4 h-4 text-emerald-600 shrink-0 mt-0.5" />
+          <div>
+            <span className="font-semibold">Welcome email dispatched:</span> A welcome notification with these temporary credentials has been automatically sent to <strong>{credentials.email}</strong>.
+          </div>
+        </div>
+
+        <div className="bg-slate-50 border border-slate-200 rounded-xl p-4 space-y-3">
+          <div className="flex justify-between items-center text-sm border-b border-slate-200 pb-2">
+            <span className="text-gray-500 font-medium">Employee Name</span>
+            <span className="font-semibold text-gray-900">{credentials.name}</span>
+          </div>
+          <div className="flex justify-between items-center text-sm border-b border-slate-200 pb-2">
+            <span className="text-gray-500 font-medium">Email / Username</span>
+            <span className="font-mono text-gray-900">{credentials.email}</span>
+          </div>
+          <div className="flex justify-between items-center text-sm border-b border-slate-200 pb-2">
+            <span className="text-gray-500 font-medium">Temporary Password</span>
+            <span className="font-mono font-bold text-indigo-700 bg-indigo-50 px-2.5 py-1 rounded-lg border border-indigo-100 select-all">
+              {credentials.temp_password}
+            </span>
+          </div>
+          <div className="flex justify-between items-center text-sm">
+            <span className="text-gray-500 font-medium">Portal URL</span>
+            <a
+              href={credentials.portal_url}
+              target="_blank"
+              rel="noopener noreferrer"
+              className="text-xs text-indigo-600 hover:text-indigo-800 underline truncate max-w-[220px]"
+            >
+              {credentials.portal_url}
+            </a>
+          </div>
+        </div>
+
+        <p className="text-xs text-gray-500 italic">
+          * The employee will be prompted to choose a permanent, private password immediately upon their first login.
+        </p>
+      </Modal.Body>
+      <Modal.Footer>
+        <Button
+          type="button"
+          variant="secondary"
+          onClick={handleCopy}
+          className="flex items-center gap-1.5"
+        >
+          {copied ? <Check className="w-4 h-4 text-emerald-600" /> : <Copy className="w-4 h-4" />}
+          <span>{copied ? "Copied" : "Copy Credentials"}</span>
+        </Button>
+        <Button type="button" onClick={onClose}>
+          Done
+        </Button>
+      </Modal.Footer>
+    </Modal>
+  );
+}
+
 
 // Order matters only for the dropdown. "Team Lead" grants the PM portal in read-only
 // form — the mapping that makes that happen lives in DESIGNATION_ROLE_MAP
@@ -1152,21 +1246,133 @@ const EmployeesPage = () => {
   const [archiveTarget, setArchiveTarget] = useState(null);
   const [restoreTarget, setRestoreTarget] = useState(null);
   const [convertToFulltimeTarget, setConvertToFulltimeTarget] = useState(null);
-  const [searchQuery, setSearchQuery] = useState("");
-  // Only the server round-trip is debounced; the client-side filter runs on every
-  // keystroke off `searchQuery` so typing stays responsive.
-  const [debouncedSearch, setDebouncedSearch] = useState("");
-  const [skillFilter, setSkillFilter] = useState("");
-  const [designationFilter, setDesignationFilter] = useState([]);
-  const [sortBy, setSortBy] = useState("");
-  const [colDesignation, setColDesignation] = useState(""); // header cycle-filter
-  const [colType, setColType] = useState("");
-  const [colWorkModel, setColWorkModel] = useState("");
-  const [currentPage, setCurrentPage] = useState(1);
+  const [newlyCreatedCredentials, setNewlyCreatedCredentials] = useState(null);
   const [formDesignation, setFormDesignation] = useState("Annotator/ Reviewer");
   const [formEmployeeType, setFormEmployeeType] = useState("Full-time");
   const [formWorkModel, setFormWorkModel] = useState("WFO");
-  const PAGE_SIZE = 10;
+    const PAGE_SIZE = 10;
+
+  // ============================================================
+  // PERSISTENCE KEYS
+  // ============================================================
+  // Root key  → remembers which tab the user was on
+  //             (Active Team + All/Active/Inactive/Idle, or Archived)
+  // Tab key   → remembers filters / search / page / scroll per top-level tab
+  // ============================================================
+
+  const PAGE_KEY = "employees";
+
+  const tabKey = statusParam === "archived" ? "archived" : "active";
+  const TAB_PAGE_KEY = `${PAGE_KEY}:${tabKey}`;
+
+  const setPageState = usePageStateStore((s) => s.setPageState);
+
+  // Root: last status (null = Active Team → All)
+  const rootSaved = usePageStateStore((s) => s.pages[PAGE_KEY] || {});
+
+  // Per-tab: filters, search, page
+  const saved = usePageStateStore((s) => s.pages[TAB_PAGE_KEY] || {});
+
+  // ============================================================
+  // LOCAL STATE (hydrated from store)
+  // ============================================================
+
+  const [searchQuery, setSearchQuery] = useState(saved.searchQuery ?? "");
+  const [debouncedSearch, setDebouncedSearch] = useState(saved.searchQuery ?? "");
+  const [skillFilter, setSkillFilter] = useState(saved.skillFilter ?? "");
+  const [designationFilter, setDesignationFilter] = useState(
+    saved.designationFilter ?? [],
+  );
+  const [sortBy, setSortBy] = useState(saved.sortBy ?? "");
+  const [colDesignation, setColDesignation] = useState(
+    saved.colDesignation ?? "",
+  );
+  const [colType, setColType] = useState(saved.colType ?? "");
+  const [colWorkModel, setColWorkModel] = useState(saved.colWorkModel ?? "");
+  const [currentPage, setCurrentPage] = useState(saved.currentPage ?? 1);
+
+  // ============================================================
+  // 1. Restore status tab into the URL (runs once on mount)
+  // ============================================================
+  useEffect(() => {
+    // Nothing stored yet → leave URL as-is
+    if (!("statusParam" in rootSaved)) return;
+
+    const lastStatus = rootSaved.statusParam; // string | null
+    const params = new URLSearchParams(searchParams);
+    const current = params.get("status");
+
+    if (lastStatus === null || lastStatus === "") {
+      // User was on Active Team → All
+      if (current !== null) {
+        params.delete("status");
+        setSearchParams(params, { replace: true });
+      }
+    } else if (current !== lastStatus) {
+      // User was on Active / Inactive / Idle / Archived
+      params.set("status", lastStatus);
+      setSearchParams(params, { replace: true });
+    }
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, []); // intentionally only on mount
+
+  // ============================================================
+  // 2. Persist the status tab whenever it changes
+  // ============================================================
+  useEffect(() => {
+    setPageState(PAGE_KEY, {
+      statusParam: statusParam || null, // null = "All"
+    });
+  }, [statusParam, setPageState]);
+
+  // ============================================================
+  // 3. Re-hydrate filters / page when switching Active ↔ Archived
+  //    (component stays mounted, so useState initial values are ignored)
+  // ============================================================
+  useEffect(() => {
+    const next = usePageStateStore.getState().pages[TAB_PAGE_KEY] || {};
+    setSearchQuery(next.searchQuery ?? "");
+    setDebouncedSearch(next.searchQuery ?? "");
+    setSkillFilter(next.skillFilter ?? "");
+    setDesignationFilter(next.designationFilter ?? []);
+    setSortBy(next.sortBy ?? "");
+    setColDesignation(next.colDesignation ?? "");
+    setColType(next.colType ?? "");
+    setColWorkModel(next.colWorkModel ?? "");
+    setCurrentPage(next.currentPage ?? 1);
+  }, [TAB_PAGE_KEY]);
+
+  // ============================================================
+  // 4. Persist filters / search / page for the current tab
+  // ============================================================
+  useEffect(() => {
+    setPageState(TAB_PAGE_KEY, {
+      searchQuery,
+      skillFilter,
+      designationFilter,
+      sortBy,
+      colDesignation,
+      colType,
+      colWorkModel,
+      currentPage,
+    });
+  }, [
+    TAB_PAGE_KEY,
+    searchQuery,
+    skillFilter,
+    designationFilter,
+    sortBy,
+    colDesignation,
+    colType,
+    colWorkModel,
+    currentPage,
+    setPageState,
+  ]);
+
+  // ============================================================
+  // 5. Scroll position
+  // ============================================================
+  usePageScroll(TAB_PAGE_KEY);
 
   // Fetch employees
   const { data: employees = [], isLoading } = useQuery({
@@ -1418,11 +1624,21 @@ const EmployeesPage = () => {
 
   const createMutation = useMutation({
     mutationFn: employeeApi.create,
-    onSuccess: (res, variables) => {
+    onSuccess: (res) => {
       queryClient.invalidateQueries(["employees"]);
       queryClient.invalidateQueries(["skills"]); // Refresh skills in case new ones were added
       setIsModalOpen(false);
-      toast.success("Employee created successfully");
+      if (res && res.temp_password) {
+        setNewlyCreatedCredentials({
+          name: res.name,
+          email: res.email,
+          designation: res.designation,
+          temp_password: res.temp_password,
+          portal_url: res.portal_url || "https://pmportal.autonexai360.com/login/employee",
+        });
+      } else {
+        toast.success("Employee created successfully");
+      }
     },
     onError: (err) => {
       toast.error(err.response?.data?.detail || "Failed to create employee");
@@ -1727,21 +1943,22 @@ const EmployeesPage = () => {
     shouldSearchServer && filteredEmployees.length === 0 && serverMatches.length > 0;
   const displayedEmployees = usingServerResults ? serverMatches : sortedEmployees;
 
-  useEffect(() => {
-    setCurrentPage(1);
-  }, [
-    searchQuery,
-    usingServerResults,
-    skillFilter,
-    designationFilter,
-    idleOnly,
-    statusParam,
-    sortBy,
-    colDesignation,
-    colType,
-    colWorkModel,
-  ]);
+  // useEffect(() => {
+  //   setCurrentPage(1);
+  // }, [
+  //   searchQuery,
+  //   usingServerResults,
+  //   skillFilter,
+  //   designationFilter,
+  //   idleOnly,
+  //   statusParam,
+  //   sortBy,
+  //   colDesignation,
+  //   colType,
+  //   colWorkModel,
+  // ]);
 
+  
   const handleSelectColDesignation = (roleKey) => {
     if (colDesignation === roleKey) {
       setColDesignation("");
@@ -2934,6 +3151,12 @@ const EmployeesPage = () => {
           </Modal.Footer>
         </form>
       </Modal>
+
+      {/* Temporary Credentials Delivery Confirmation Modal */}
+      <EmployeeCredentialsModal
+        credentials={newlyCreatedCredentials}
+        onClose={() => setNewlyCreatedCredentials(null)}
+      />
     </div>
   );
 };

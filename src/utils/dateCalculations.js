@@ -1,41 +1,31 @@
 /**
  * Date Calculation Utilities
- * Senior-level functions for accurate capacity planning
+ * Unified with leaveTypes for consistent holiday-aware capacity and duration planning
  */
+import { getWorkingDayCount, toLocalISODate, isWeekend as isWeekendLeaveType, isNonWorkingDay } from "./leaveTypes";
 
 /**
- * Calculate working days between two dates (excludes weekends)
+ * Calculate working days between two dates (excludes weekends and fixed company holidays)
  * @param {Date|string} startDate - Start date
  * @param {Date|string} endDate - End date
- * @returns {number} Number of working days (Mon-Fri)
+ * @returns {number} Number of working days
  */
 export const getWorkingDays = (startDate, endDate) => {
-  let count = 0;
-  let curDate = new Date(startDate);
-  const end = new Date(endDate);
-
-  // Validate dates
-  if (isNaN(curDate.getTime()) || isNaN(end.getTime())) {
-    return 0;
-  }
-
-  while (curDate <= end) {
-    const dayOfWeek = curDate.getDay();
-    // 0 = Sunday, 6 = Saturday. Only count 1-5 (Mon-Fri)
-    if (dayOfWeek !== 0 && dayOfWeek !== 6) {
-      count++;
-    }
-    curDate.setDate(curDate.getDate() + 1);
-  }
-  return count;
+  if (!startDate || !endDate) return 0;
+  const startStr = startDate instanceof Date ? toLocalISODate(startDate) : String(startDate).split("T")[0];
+  const endStr = endDate instanceof Date ? toLocalISODate(endDate) : String(endDate).split("T")[0];
+  return getWorkingDayCount(startStr, endStr);
 };
 
 /**
  * Check if a date is a weekend
- * @param {Date} date - Date to check
+ * @param {Date|string} date - Date to check
  * @returns {boolean} True if Saturday or Sunday
  */
 export const isWeekend = (date) => {
-  const day = new Date(date).getDay();
-  return day === 0 || day === 6;
+  if (!date) return false;
+  const dateStr = date instanceof Date ? toLocalISODate(date) : String(date).split("T")[0];
+  return isWeekendLeaveType(dateStr);
 };
+
+export { isNonWorkingDay, getWorkingDayCount };

@@ -245,17 +245,25 @@ const ProjectAnalyticsPage = () => {
 
     return annotators.map((a) => {
       const emp = empMap[a.user_email?.toLowerCase()] || {};
+      // Match only by employee — projectAllocations is already scoped to this project,
+      // so an OR on sub_project_id was always true and returned the first row for everyone. (Bug resolved)
       const alloc = projectAllocations.find(
-        (al) => al.employee_id === emp.id || String(al.sub_project_id) === String(mainProjectId)
+        (al) => emp.id != null && al.employee_id === emp.id
       );
+
+      const dailyHours = alloc?.total_daily_hours ?? alloc?.hours_per_day ?? 0;
+      const role =
+        (Array.isArray(alloc?.role_tags) && alloc.role_tags[0]) ||
+        alloc?.role ||
+        "Annotator";
 
       return {
         id: emp.id || a.user_email,
         name: emp.name || a.employee_name || a.user_email,
         email: a.user_email,
         avatar_url: emp.avatar_url,
-        role: alloc?.role || "Annotator",
-        planned_hours: alloc ? (alloc.hours_per_day || 0) * 20 : 80,
+        role,
+        planned_hours: alloc ? dailyHours * 20 : 80,
         actual_hours: a.total_hours || 0,
         tasks_submitted: a.tasks_submitted || 0,
         labels_created: a.labels_created || 0,

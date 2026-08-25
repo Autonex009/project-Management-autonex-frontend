@@ -125,6 +125,59 @@ const AllocationPopover = ({
   // way to find the allocation that needs deleting — but marked stale, sorted
   // last, and excluded from the count in the header.
   const list = useMemo(() => {
+    if (fetchDetail) {
+      if (!detailData) return [];
+      const rows = detailData.items.map((item) => ({
+        key: `alloc-${item.allocation_id || item.employee_id}`,
+        alloc: {
+          id: item.allocation_id,
+          employee_id: item.employee_id,
+          role_tags: item.role_tags,
+          total_daily_hours: item.total_daily_hours,
+        },
+        emp: item.stale ? null : {
+          id: item.employee_id,
+          name: item.name,
+          email: item.email,
+          avatar_url: item.avatar_url,
+          designation: item.designation,
+          isOnLeave: item.is_on_leave,
+          location: item.location,
+        },
+        former: item.stale ? { name: item.name } : null,
+        isPm: item.is_pm,
+        isLead: item.is_lead,
+        isStale: item.stale,
+      }));
+
+      // Calculate how many allocations a person holds on this project
+      const rowsPerEmployeeId = {};
+      rows.forEach((r) => {
+        const id = r.alloc?.employee_id;
+        if (id != null) {
+          rowsPerEmployeeId[id] = (rowsPerEmployeeId[id] || 0) + 1;
+        }
+      });
+      rows.forEach((r) => {
+        if (r.alloc?.employee_id != null) {
+          r.rowsForPerson = rowsPerEmployeeId[r.alloc.employee_id];
+        }
+      });
+
+      const activeRows = rows.filter((r) => !r.isStale).sort((a, b) => {
+        if (a.isPm !== b.isPm) return a.isPm ? -1 : 1;
+        if (a.isLead !== b.isLead) return a.isLead ? -1 : 1;
+        const nameA = a.emp?.name || a.former?.name || staleAllocationName(a.alloc);
+        const nameB = b.emp?.name || b.former?.name || staleAllocationName(b.alloc);
+        return nameA.localeCompare(nameB);
+      });
+
+      return [
+        ...activeRows,
+        ...rows.filter((r) => r.isStale),
+      ];
+    }
+
     const filtered = Array.isArray(allocations)
       ? allocations.filter((a) =>
         a.sub_project_id !== undefined
@@ -147,7 +200,7 @@ const AllocationPopover = ({
     });
 
     const allocatedEmpIds = new Set(filtered.map(a => String(a.employee_id)));
-    
+
     // Add PMs who don't have an allocation
     const allPmIds = new Set([...pmIdSet, ...(pmIds || [])]);
     allPmIds.forEach((id) => {
@@ -189,7 +242,7 @@ const AllocationPopover = ({
         rowsPerEmployeeId[id] = (rowsPerEmployeeId[id] || 0) + 1;
       }
     });
-    
+
     rows.forEach((r) => {
       const id = r.alloc?.employee_id;
       r.rowsForPerson = id != null ? rowsPerEmployeeId[id] : 1;
@@ -426,10 +479,8 @@ const AllocationPopover = ({
                   const tags = Array.isArray(alloc?.role_tags)
                     ? alloc.role_tags
                     : [];
-                  const isOnLeave = emp && onLeaveEmployeeIds?.has?.(emp.id);
-                  const location = emp
-                    ? locationByEmployeeId?.get?.(emp.id)
-                    : undefined;
+                  const isOnLeave = emp?.isOnLeave || (emp && onLeaveEmployeeIds?.has?.(emp.id));
+                  const location = emp?.location || (emp ? locationByEmployeeId?.get?.(emp.id) : undefined);
                   return (
                     <li
                       key={key}

@@ -19,10 +19,9 @@ const parseJwt = (token) => {
 };
 
 const useAuth = () => {
-  let token = null;
-
   if (typeof window === "undefined") {
     // Server side: extract access_token from the global cookie header set in entry-server.jsx
+    let token = null;
     if (globalThis.__cookieHeader) {
       const match = globalThis.__cookieHeader.match(
         /(?:^|; )access_token=([^;]*)/,
@@ -31,30 +30,32 @@ const useAuth = () => {
         token = decodeURIComponent(match[1]);
       }
     }
-  } else {
-    // Client side: fetch from localStorage
-    token = localStorage.getItem("token");
-  }
+    
+    if (!token) return { isAuthenticated: false, role: null, user: null };
 
-  if (!token) return { isAuthenticated: false, role: null, user: null };
-
-  const payload = parseJwt(token);
-  if (!payload) return { isAuthenticated: false, role: null, user: null };
-
-  // Check expiry
-  if (payload.exp && payload.exp * 1000 < Date.now()) {
-    if (typeof window !== "undefined") {
-      localStorage.removeItem("token");
-      localStorage.removeItem("role");
-      localStorage.removeItem("user");
+    const payload = parseJwt(token);
+    if (!payload || (payload.exp && payload.exp * 1000 < Date.now())) {
+      return { isAuthenticated: false, role: null, user: null };
     }
-    return { isAuthenticated: false, role: null, user: null };
+    
+    return { isAuthenticated: true, role: payload.role, user: payload };
+  } else {
+    // Client side: we cannot read the HttpOnly cookie.
+    // Rely on localStorage for UI state; the backend will reject invalid cookies with 401.
+    const storedRole = localStorage.getItem("role");
+    const storedUser = localStorage.getItem("user");
+    
+    if (!storedRole || !storedUser) {
+      return { isAuthenticated: false, role: null, user: null };
+    }
+    
+    try {
+      const parsedUser = JSON.parse(storedUser);
+      return { isAuthenticated: true, role: storedRole, user: parsedUser };
+    } catch {
+      return { isAuthenticated: false, role: null, user: null };
+    }
   }
-
-  const role =
-    payload.role ||
-    (typeof window !== "undefined" ? localStorage.getItem("role") : null);
-  return { isAuthenticated: true, role, user: payload };
 };
 
 const ProtectedRoute = ({ children, allowedRoles }) => {

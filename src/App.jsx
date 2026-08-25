@@ -4,6 +4,7 @@ import { Routes, Route, Navigate } from "react-router-dom";
 import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
 import { Toaster } from "react-hot-toast";
 import ProtectedRoute from "./routes/ProtectedRoute";
+import ForcePasswordChangeModal from "./components/ForcePasswordChangeModal";
 
 // Layouts
 import AdminLayout from "./layouts/AdminLayout";
@@ -45,7 +46,6 @@ const SelfEvaluationPage = lazy(
 );
 
 // Scoped Pages
-const PMLeavesPage = lazy(() => import("./pages/pm/PMLeavesPage"));
 const PMMyLeavesPage = lazy(() => import("./pages/pm/PMMyLeavesPage"));
 const EmployeeProjectsPage = lazy(
   () => import("./pages/employee/EmployeeProjectsPage"),
@@ -113,6 +113,7 @@ function App() {
           style: { background: "#333", color: "#fff" },
         }}
       />
+      <ForcePasswordChangeModal />
       <Suspense fallback={null}>
         <Routes>
           {/* Public Auth Routes */}
@@ -231,7 +232,7 @@ function App() {
             <Route path="my-team/:id" element={<EmployeeDashboard />} />
             <Route path="performance" element={<PerformanceReviewsPage />} />
             <Route path="self-evaluation" element={<SelfEvaluationPage />} />
-            <Route path="leaves" element={<PMLeavesPage />} />
+            <Route path="leaves" element={<LeavesPage />} />
             <Route path="my-leaves" element={<PMMyLeavesPage />} />
             <Route path="side-projects" element={<SideProjectsPage />} />
             <Route path="guidelines" element={<GuidelinesPage />} />

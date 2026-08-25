@@ -9,6 +9,7 @@ import {
   CartesianGrid,
 } from "recharts";
 import { format, parseISO } from "date-fns";
+import { ChartWrapper, ChartTooltip, ChartDefs } from "./ChartWrapper";
 
 const shortDate = (s) => {
   if (!s) return "";
@@ -57,12 +58,7 @@ const WorkforceSplitAreaChart = ({
 
   if (!chartData || chartData.length === 0) {
     return (
-      <div
-        className="flex items-center justify-center text-xs text-slate-400 font-medium"
-        style={{ height }}
-      >
-        No execution trend data available for selected range
-      </div>
+      <ChartWrapper data={chartData} height={height} emptyMessage="No execution trend data available for selected range" />
     );
   }
 
@@ -91,16 +87,7 @@ const WorkforceSplitAreaChart = ({
       <div style={{ width: "100%", height: height - 36 }}>
         <ResponsiveContainer width="100%" height="100%">
           <AreaChart data={chartData} margin={{ top: 10, right: 10, left: -4, bottom: 0 }}>
-            <defs>
-              <linearGradient id="colorAnnotation" x1="0" y1="0" x2="0" y2="1">
-                <stop offset="5%" stopColor="#f59e0b" stopOpacity={0.4} />
-                <stop offset="95%" stopColor="#f59e0b" stopOpacity={0.0} />
-              </linearGradient>
-              <linearGradient id="colorReview" x1="0" y1="0" x2="0" y2="1">
-                <stop offset="5%" stopColor="#e11d48" stopOpacity={0.4} />
-                <stop offset="95%" stopColor="#e11d48" stopOpacity={0.0} />
-              </linearGradient>
-            </defs>
+            <ChartDefs />
 
             <CartesianGrid strokeDasharray="3 3" stroke="#f1f5f9" vertical={false} />
 
@@ -119,9 +106,7 @@ const WorkforceSplitAreaChart = ({
               tickFormatter={(v) => `${v}h`}
             />
 
-            <Tooltip
-              isAnimationActive={false}
-              wrapperStyle={{ pointerEvents: "none", outline: "none" }}
+            <ChartTooltip
               labelFormatter={(lbl) => shortDate(lbl)}
               formatter={(val, name) => [
                 `${val}h`,
@@ -129,15 +114,6 @@ const WorkforceSplitAreaChart = ({
                   ? "Annotation Hours"
                   : "Review Hours",
               ]}
-              contentStyle={{
-                borderRadius: 14,
-                border: "1px solid #e2e8f0",
-                boxShadow: "0 10px 30px rgba(15,23,42,0.1)",
-                fontSize: 12,
-                backgroundColor: "rgba(255, 255, 255, 0.95)",
-                backdropFilter: "blur(6px)",
-                pointerEvents: "none",
-              }}
             />
 
             <Area

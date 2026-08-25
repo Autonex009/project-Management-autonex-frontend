@@ -169,9 +169,9 @@ const NotificationBell = () => {
 
   // Event-driven (no polling): React Query refetches on mount + tab refocus; we add
   // refetch-on-navigation and refetch-on-open below. Cuts the constant 15s drumbeat.
-  const { data: notifications = [], refetch } = useQuery({
+  const { data: bellData = { unread_count: 0, latest: [] }, refetch } = useQuery({
     queryKey: ["notifications", userId],
-    queryFn: () => notificationApi.getAll(userId),
+    queryFn: () => notificationApi.getUnreadSummary(),
     enabled: !!userId && mounted,
     staleTime: 15_000,
     refetchOnWindowFocus: true, // global default is false; enable just for notifications
@@ -186,8 +186,9 @@ const NotificationBell = () => {
     if (userId) refetch();
   }, [location.pathname]); // eslint-disable-line react-hooks/exhaustive-deps
 
-  const unreadCount = notifications.filter((n) => !n.is_read).length;
-  const readCount = notifications.filter((n) => n.is_read).length;
+  const notifications = bellData.latest || [];
+  const unreadCount = bellData.unread_count;
+  const readCount = notifications.filter((n) => n.is_read).length; // Approximated from latest
 
   const markReadMutation = useMutation({
     mutationFn: (id) => notificationApi.markRead(id, userId),

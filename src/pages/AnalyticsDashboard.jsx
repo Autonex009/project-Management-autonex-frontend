@@ -1,7 +1,9 @@
-import { useMemo, useState, useEffect } from "react";
+import { useMemo, useState, useEffect, useRef } from "react";
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
 import { useNavigate, useLocation, useParams, useSearchParams } from "react-router-dom";
 import { analyticsApi, subProjectApi, allocationApi } from "../services/api";
+import usePageStateStore from "../store/usePageStateStore"; 
+import { usePageScroll } from "../hooks/usePageScroll";
 import Table from "../components/ui/Table";
 import Button from "../components/ui/Button";
 import DatePicker from "../components/ui/DatePicker";
@@ -66,10 +68,17 @@ const AnalyticsDashboard = () => {
   const queryClient = useQueryClient();
   const basePath = location.pathname.startsWith("/pm") ? "/pm" : "/admin";
 
-  const [range, setRange] = useState("30");
-  const [dateFrom, setDateFrom] = useState("");
-  const [dateTo, setDateTo] = useState("");
-  const [heatmapSearch, setHeatmapSearch] = useState("");
+  // ============================================================
+  // PERSISTENCE
+  // ============================================================
+  const PAGE_KEY = "analytics-dashboard";
+  const setPageState = usePageStateStore((s) => s.setPageState);
+  const saved = usePageStateStore((s) => s.pages[PAGE_KEY] || {});
+
+  const [range, setRange] = useState(saved.range ?? "30");
+  const [dateFrom, setDateFrom] = useState(saved.dateFrom ?? "");
+  const [dateTo, setDateTo] = useState(saved.dateTo ?? "");
+  const [heatmapSearch, setHeatmapSearch] = useState(saved.heatmapSearch ?? "");
 
   const queryParams = useMemo(() => {
     const today = new Date();
@@ -105,12 +114,18 @@ const AnalyticsDashboard = () => {
     };
   }, [range, dateFrom, dateTo]);
 
-  const [currentPage, setCurrentPage] = useState(1);
-  const [opsPage, setOpsPage] = useState(1);
-  const [healthPage, setHealthPage] = useState(1);
+  const [currentPage, setCurrentPage] = useState(saved.currentPage ?? 1);
+  const [opsPage, setOpsPage] = useState(saved.opsPage ?? 1);
+  const [healthPage, setHealthPage] = useState(saved.healthPage ?? 1);
   const pageSize = 5;
 
+  // Only reset pages when the user changes the date range, not on restore
+  const isInitialMount = useRef(true);
   useEffect(() => {
+    if (isInitialMount.current) {
+      isInitialMount.current = false;
+      return;
+    }
     setCurrentPage(1);
     setOpsPage(1);
     setHealthPage(1);
@@ -123,6 +138,7 @@ const AnalyticsDashboard = () => {
     if (jobId) setActiveJobId(jobId);
   }, []);
 
+  // Ephemeral UI — not persisted
   const [isWorkforceModalOpen, setIsWorkforceModalOpen] = useState(false);
   const [workforceSearch, setWorkforceSearch] = useState("");
   const [workforceRoleFilter, setWorkforceRoleFilter] = useState("all");
@@ -221,8 +237,13 @@ const AnalyticsDashboard = () => {
   const { mainProjectId } = useParams();
   const [searchParams] = useSearchParams();
 
+  // Prefer URL/route param → stored value → "all"
   const [selectedProjectId, setSelectedProjectId] = useState(
-    () => mainProjectId || searchParams.get("project") || "all"
+    () =>
+      mainProjectId ||
+      searchParams.get("project") ||
+      saved.selectedProjectId ||
+      "all"
   );
 
   useEffect(() => {
@@ -231,6 +252,33 @@ const AnalyticsDashboard = () => {
       setSelectedProjectId(pId);
     }
   }, [mainProjectId, searchParams]);
+
+  // Persist filters / range / project / pages
+  useEffect(() => {
+    setPageState(PAGE_KEY, {
+      range,
+      dateFrom,
+      dateTo,
+      selectedProjectId,
+      heatmapSearch,
+      currentPage,
+      opsPage,
+      healthPage,
+    });
+  }, [
+    range,
+    dateFrom,
+    dateTo,
+    selectedProjectId,
+    heatmapSearch,
+    currentPage,
+    opsPage,
+    healthPage,
+    setPageState,
+  ]);
+
+  // Scroll position
+  usePageScroll(PAGE_KEY);
 
   const isGlobal = selectedProjectId === "all";
 

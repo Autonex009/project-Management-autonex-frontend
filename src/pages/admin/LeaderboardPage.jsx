@@ -652,6 +652,84 @@ const TopRankingsCards = ({
   );
 };
 
+// Utility to calculate leaderboard rankings (Top N)
+const calculateRankings = (leaderboardData, limit = 10) => {
+  let list = [...(leaderboardData || [])];
+  list.sort((a, b) => (b.total_hours || 0) - (a.total_hours || 0));
+  list = list.slice(0, limit);
+
+  const maxHours = list[0] ? Number(list[0].total_hours) || 0 : 0;
+  const totalHours = list.reduce((sum, item) => sum + (Number(item.total_hours) || 0), 0);
+
+  return list.map((item, idx) => {
+    const hrs = Number(item.total_hours) || 0;
+    const sharePct = totalHours > 0 ? Math.round((hrs / totalHours) * 1000) / 10 : 0;
+    const barWidth = maxHours > 0 ? Math.min(100, Math.max(4, Math.round((hrs / maxHours) * 100))) : 0;
+
+    return {
+      ...item,
+      rank: idx + 1,
+      active_hours: hrs,
+      share_percentage: sharePct,
+      bar_width_pct: barWidth,
+    };
+  });
+};
+
+// Utility to calculate the logged-in user's rank item
+const calculateUserRankItem = (
+  leaderboardData,
+  isAdmin,
+  currentUser,
+  currentUserEmail,
+  currentUserName,
+  findUserIndexFn
+) => {
+  if (isAdmin || !leaderboardData || leaderboardData.length === 0) return null;
+
+  let list = [...leaderboardData];
+  list.sort((a, b) => (b.total_hours || 0) - (a.total_hours || 0));
+
+  const maxHours = list[0] ? Number(list[0].total_hours) || 0 : 0;
+  const totalHours = list.reduce((sum, item) => sum + (Number(item.total_hours) || 0), 0);
+
+  const userIndex = findUserIndexFn(list);
+
+  if (userIndex !== -1) {
+    const item = list[userIndex];
+    const hrs = Number(item.total_hours) || 0;
+    const sharePct = totalHours > 0 ? Math.round((hrs / totalHours) * 1000) / 10 : 0;
+    const barWidth = maxHours > 0 ? Math.min(100, Math.max(4, Math.round((hrs / maxHours) * 100))) : 0;
+
+    return {
+      ...item,
+      rank: userIndex + 1,
+      active_hours: hrs,
+      share_percentage: sharePct,
+      bar_width_pct: barWidth,
+    };
+  }
+
+  if (currentUser || currentUserEmail) {
+    const email = currentUserEmail || currentUser?.email || currentUser?.user_email || "user@autonex.ai";
+    const name = currentUserName || currentUser?.name || formatDisplayName(email);
+    return {
+      user_email: email,
+      employee_name: name,
+      avatar_url: currentUser?.avatar_url || "",
+      rank: list.length + 1,
+      active_hours: 0,
+      annotation_hours: 0,
+      review_hours: 0,
+      share_percentage: 0,
+      bar_width_pct: 0,
+      isUnranked: true,
+    };
+  }
+
+  return null;
+};
+
 const LeaderboardPage = () => {
   const [activeTab, setActiveTab] = useState("monthly"); // "monthly" | "weekly"
 
@@ -702,6 +780,38 @@ const LeaderboardPage = () => {
     return (name || "").toLowerCase().trim();
   }, [currentUser]);
 
+  const currentUserEmpId = useMemo(() => {
+    return currentUser?.employee_id || currentUser?.id || meData?.employee_id || meData?.user?.employee_id || meData?.user?.id || null;
+  }, [currentUser, meData]);
+
+  const findCurrentUserIndex = (list) => {
+    if (!list || list.length === 0) return -1;
+    // 1. Exact match by employee_id if available
+    if (currentUserEmpId) {
+      const idx = list.findIndex(
+        (item) => item.employee_id && String(item.employee_id) === String(currentUserEmpId)
+      );
+      if (idx !== -1) return idx;
+    }
+    // 2. Exact match by email (case-insensitive)
+    if (currentUserEmail) {
+      const idx = list.findIndex((item) => {
+        const itemEmail = (item.user_email || "").toLowerCase().trim();
+        return Boolean(itemEmail && itemEmail === currentUserEmail);
+      });
+      if (idx !== -1) return idx;
+    }
+    // 3. Fallback: exact match by full name (never substring)
+    if (currentUserName) {
+      const idx = list.findIndex((item) => {
+        const itemObjName = (item.employee_name || formatDisplayName(item.user_email || "")).toLowerCase().trim();
+        return Boolean(itemObjName && itemObjName === currentUserName);
+      });
+      if (idx !== -1) return idx;
+    }
+    return -1;
+  };
+
   // ── Monthly State & Query ──
   const pastMonths = useMemo(() => generatePastMonths(12), []);
   const currentMonthKey = pastMonths[0]?.key || "";
@@ -738,106 +848,16 @@ const LeaderboardPage = () => {
   const allMonthLeaderboard = monthData?.leaderboard || [];
   const hasMonthData = !isMonthLoading && allMonthLeaderboard.length > 0;
 
-  const filteredMonthLeaderboard = useMemo(() => {
-    let list = [...allMonthLeaderboard];
-    list.sort((a, b) => (b.total_hours || 0) - (a.total_hours || 0));
-    list = list.slice(0, 10);
-
-    const maxHours = list[0] ? Number(list[0].total_hours) || 0 : 0;
-    const totalHours = list.reduce(
-      (sum, item) => sum + (Number(item.total_hours) || 0),
-      0
-    );
-
-    return list.map((item, idx) => {
-      const hrs = Number(item.total_hours) || 0;
-      const sharePct =
-        totalHours > 0
-          ? Math.round((hrs / totalHours) * 1000) / 10
-          : 0;
-      const barWidth =
-        maxHours > 0
-          ? Math.min(100, Math.max(4, Math.round((hrs / maxHours) * 100)))
-          : 0;
-
-      return {
-        ...item,
-        rank: idx + 1,
-        active_hours: hrs,
-        share_percentage: sharePct,
-        bar_width_pct: barWidth,
-      };
-    });
-  }, [allMonthLeaderboard]);
+  const filteredMonthLeaderboard = useMemo(
+    () => calculateRankings(allMonthLeaderboard, 10),
+    [allMonthLeaderboard]
+  );
 
   // Full Month User Rank Calculation
-  const userMonthRankItem = useMemo(() => {
-    if (isAdmin || allMonthLeaderboard.length === 0) return null;
-    let list = [...allMonthLeaderboard];
-    list.sort((a, b) => (b.total_hours || 0) - (a.total_hours || 0));
-
-    const maxHours = list[0] ? Number(list[0].total_hours) || 0 : 0;
-    const totalHours = list.reduce(
-      (sum, item) => sum + (Number(item.total_hours) || 0),
-      0
-    );
-
-    let userIndex = -1;
-    if (currentUserEmail) {
-      userIndex = list.findIndex((item) => {
-        const itemEmail = (item.user_email || "").toLowerCase().trim();
-        return itemEmail && (itemEmail === currentUserEmail || currentUserEmail.includes(itemEmail) || itemEmail.includes(currentUserEmail));
-      });
-    }
-
-    if (userIndex === -1 && currentUserName) {
-      userIndex = list.findIndex((item) => {
-        const itemObjName = (item.employee_name || formatDisplayName(item.user_email || "")).toLowerCase().trim();
-        return itemObjName && (itemObjName === currentUserName || currentUserName.includes(itemObjName) || itemObjName.includes(currentUserName));
-      });
-    }
-
-    if (userIndex !== -1) {
-      const item = list[userIndex];
-      const hrs = Number(item.total_hours) || 0;
-      const sharePct =
-        totalHours > 0
-          ? Math.round((hrs / totalHours) * 1000) / 10
-          : 0;
-      const barWidth =
-        maxHours > 0
-          ? Math.min(100, Math.max(4, Math.round((hrs / maxHours) * 100)))
-          : 0;
-
-      return {
-        ...item,
-        rank: userIndex + 1,
-        active_hours: hrs,
-        share_percentage: sharePct,
-        bar_width_pct: barWidth,
-      };
-    }
-
-    // Always fallback to logged-in user profile if user is logged in
-    if (currentUser || currentUserEmail) {
-      const email = currentUserEmail || currentUser?.email || currentUser?.user_email || "user@autonex.ai";
-      const name = currentUserName || currentUser?.name || formatDisplayName(email);
-      return {
-        user_email: email,
-        employee_name: name,
-        avatar_url: currentUser?.avatar_url || "",
-        rank: list.length + 1,
-        active_hours: 0,
-        annotation_hours: 0,
-        review_hours: 0,
-        share_percentage: 0,
-        bar_width_pct: 0,
-        isUnranked: true,
-      };
-    }
-
-    return null;
-  }, [allMonthLeaderboard, currentUserEmail, currentUserName, currentUser, isAdmin]);
+  const userMonthRankItem = useMemo(
+    () => calculateUserRankItem(allMonthLeaderboard, isAdmin, currentUser, currentUserEmail, currentUserName, findCurrentUserIndex),
+    [allMonthLeaderboard, currentUserEmail, currentUserName, currentUserEmpId, currentUser, isAdmin]
+  );
 
   const top3Month = useMemo(
     () => filteredMonthLeaderboard.slice(0, 3),
@@ -1036,187 +1056,29 @@ const LeaderboardPage = () => {
 
   const allDailyLeaderboard = dailyData?.leaderboard || [];
 
-  const filteredDailyLeaderboard = useMemo(() => {
-    let list = [...allDailyLeaderboard];
-    list.sort((a, b) => (b.total_hours || 0) - (a.total_hours || 0));
-    list = list.slice(0, 10);
+  const filteredDailyLeaderboard = useMemo(
+    () => calculateRankings(allDailyLeaderboard, 10),
+    [allDailyLeaderboard]
+  );
 
-    const maxHours = list[0] ? Number(list[0].total_hours) || 0 : 0;
-    const totalHours = list.reduce(
-      (sum, item) => sum + (Number(item.total_hours) || 0),
-      0
-    );
-
-    return list.map((item, idx) => {
-      const hrs = Number(item.total_hours) || 0;
-      const sharePct =
-        totalHours > 0
-          ? Math.round((hrs / totalHours) * 1000) / 10
-          : 0;
-      const barWidth =
-        maxHours > 0
-          ? Math.min(100, Math.max(4, Math.round((hrs / maxHours) * 100)))
-          : 0;
-
-      return {
-        ...item,
-        rank: idx + 1,
-        active_hours: hrs,
-        share_percentage: sharePct,
-        bar_width_pct: barWidth,
-      };
-    });
-  }, [allDailyLeaderboard]);
-
-  const userDailyRankItem = useMemo(() => {
-    if (isAdmin || allDailyLeaderboard.length === 0) return null;
-    let list = [...allDailyLeaderboard];
-    list.sort((a, b) => (b.total_hours || 0) - (a.total_hours || 0));
-
-    let userIndex = -1;
-    if (currentUserEmail) {
-      userIndex = list.findIndex((item) => {
-        const itemEmail = (item.user_email || "").toLowerCase().trim();
-        return itemEmail && (itemEmail === currentUserEmail || currentUserEmail.includes(itemEmail) || itemEmail.includes(currentUserEmail));
-      });
-    }
-
-    if (userIndex === -1 && currentUserName) {
-      userIndex = list.findIndex((item) => {
-        const itemObjName = (item.employee_name || formatDisplayName(item.user_email || "")).toLowerCase().trim();
-        return itemObjName && (itemObjName === currentUserName || currentUserName.includes(itemObjName) || itemObjName.includes(currentUserName));
-      });
-    }
-
-    if (userIndex !== -1) {
-      const item = list[userIndex];
-      const hrs = Number(item.total_hours) || 0;
-      return {
-        ...item,
-        rank: userIndex + 1,
-        active_hours: hrs,
-      };
-    }
-
-    if (currentUser || currentUserEmail) {
-      const email = currentUserEmail || currentUser?.email || currentUser?.user_email || "user@autonex.ai";
-      const name = currentUserName || currentUser?.name || formatDisplayName(email);
-      return {
-        user_email: email,
-        employee_name: name,
-        avatar_url: currentUser?.avatar_url || "",
-        rank: list.length + 1,
-        active_hours: 0,
-        isUnranked: true,
-      };
-    }
-
-    return null;
-  }, [allDailyLeaderboard, currentUserEmail, currentUserName, currentUser, isAdmin]);
+  const userDailyRankItem = useMemo(
+    () => calculateUserRankItem(allDailyLeaderboard, isAdmin, currentUser, currentUserEmail, currentUserName, findCurrentUserIndex),
+    [allDailyLeaderboard, currentUserEmail, currentUserName, currentUserEmpId, currentUser, isAdmin]
+  );
 
   const allWeekLeaderboard = weekData?.leaderboard || [];
   const hasWeekData = !isWeekLoading && allWeekLeaderboard.length > 0;
 
-  const filteredWeekLeaderboard = useMemo(() => {
-    let list = [...allWeekLeaderboard];
-    list.sort((a, b) => (b.total_hours || 0) - (a.total_hours || 0));
-    list = list.slice(0, 10);
-
-    const maxHours = list[0] ? Number(list[0].total_hours) || 0 : 0;
-    const totalHours = list.reduce(
-      (sum, item) => sum + (Number(item.total_hours) || 0),
-      0
-    );
-
-    return list.map((item, idx) => {
-      const hrs = Number(item.total_hours) || 0;
-      const sharePct =
-        totalHours > 0
-          ? Math.round((hrs / totalHours) * 1000) / 10
-          : 0;
-      const barWidth =
-        maxHours > 0
-          ? Math.min(100, Math.max(4, Math.round((hrs / maxHours) * 100)))
-          : 0;
-
-      return {
-        ...item,
-        rank: idx + 1,
-        active_hours: hrs,
-        share_percentage: sharePct,
-        bar_width_pct: barWidth,
-      };
-    });
-  }, [allWeekLeaderboard]);
+  const filteredWeekLeaderboard = useMemo(
+    () => calculateRankings(allWeekLeaderboard, 10),
+    [allWeekLeaderboard]
+  );
 
   // Full Week User Rank Calculation
-  const userWeekRankItem = useMemo(() => {
-    if (isAdmin || allWeekLeaderboard.length === 0) return null;
-    let list = [...allWeekLeaderboard];
-    list.sort((a, b) => (b.total_hours || 0) - (a.total_hours || 0));
-
-    const maxHours = list[0] ? Number(list[0].total_hours) || 0 : 0;
-    const totalHours = list.reduce(
-      (sum, item) => sum + (Number(item.total_hours) || 0),
-      0
-    );
-
-    let userIndex = -1;
-    if (currentUserEmail) {
-      userIndex = list.findIndex((item) => {
-        const itemEmail = (item.user_email || "").toLowerCase().trim();
-        return itemEmail && (itemEmail === currentUserEmail || currentUserEmail.includes(itemEmail) || itemEmail.includes(currentUserEmail));
-      });
-    }
-
-    if (userIndex === -1 && currentUserName) {
-      userIndex = list.findIndex((item) => {
-        const itemObjName = (item.employee_name || formatDisplayName(item.user_email || "")).toLowerCase().trim();
-        return itemObjName && (itemObjName === currentUserName || currentUserName.includes(itemObjName) || itemObjName.includes(currentUserName));
-      });
-    }
-
-    if (userIndex !== -1) {
-      const item = list[userIndex];
-      const hrs = Number(item.total_hours) || 0;
-      const sharePct =
-        totalHours > 0
-          ? Math.round((hrs / totalHours) * 1000) / 10
-          : 0;
-      const barWidth =
-        maxHours > 0
-          ? Math.min(100, Math.max(4, Math.round((hrs / maxHours) * 100)))
-          : 0;
-
-      return {
-        ...item,
-        rank: userIndex + 1,
-        active_hours: hrs,
-        share_percentage: sharePct,
-        bar_width_pct: barWidth,
-      };
-    }
-
-    // Always fallback to logged-in user profile if user is logged in
-    if (currentUser || currentUserEmail) {
-      const email = currentUserEmail || currentUser?.email || currentUser?.user_email || "user@autonex.ai";
-      const name = currentUserName || currentUser?.name || formatDisplayName(email);
-      return {
-        user_email: email,
-        employee_name: name,
-        avatar_url: currentUser?.avatar_url || "",
-        rank: list.length + 1,
-        active_hours: 0,
-        annotation_hours: 0,
-        review_hours: 0,
-        share_percentage: 0,
-        bar_width_pct: 0,
-        isUnranked: true,
-      };
-    }
-
-    return null;
-  }, [allWeekLeaderboard, currentUserEmail, currentUserName, currentUser, isAdmin]);
+  const userWeekRankItem = useMemo(
+    () => calculateUserRankItem(allWeekLeaderboard, isAdmin, currentUser, currentUserEmail, currentUserName, findCurrentUserIndex),
+    [allWeekLeaderboard, currentUserEmail, currentUserName, currentUserEmpId, currentUser, isAdmin]
+  );
 
   const top3Week = useMemo(
     () => filteredWeekLeaderboard.slice(0, 3),

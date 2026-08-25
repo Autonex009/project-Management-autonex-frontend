@@ -111,9 +111,8 @@ function calculateTenure(dateStr) {
     const years = differenceInYears(now, start);
     const months = differenceInMonths(now, start) % 12;
     if (years === 0 && months === 0) return "1 Month";
-    return `${years > 0 ? `${years} Year${years > 1 ? "s" : ""} ` : ""}${months} Month${
-      months !== 1 ? "s" : ""
-    }`;
+    return `${years > 0 ? `${years} Year${years > 1 ? "s" : ""} ` : ""}${months} Month${months !== 1 ? "s" : ""
+      }`;
   } catch {
     return "3 Years 5 Months";
   }
@@ -210,13 +209,12 @@ const SkillsMultiSelect = ({ selected, onChange, options, isLoading }) => {
       >
         <span className="text-stone-400">Add or remove skills…</span>
         <ChevronDown
-          className={`h-3.5 w-3.5 text-stone-400 transition-transform ${
-            open ? "rotate-180" : ""
-          }`}
+          className={`h-3.5 w-3.5 text-stone-400 transition-transform ${open ? "rotate-180" : ""
+            }`}
         />
       </button>
 
-      
+
       {open && (
         <div className="absolute left-0 right-0 z-30 mt-1 max-h-48 overflow-y-auto rounded-xl border border-stone-200 bg-white py-1 shadow-lg">
           {isLoading ? (
@@ -231,18 +229,16 @@ const SkillsMultiSelect = ({ selected, onChange, options, isLoading }) => {
                   key={skill.id}
                   type="button"
                   onClick={() => toggle(skill.name)}
-                  className={`flex w-full items-center gap-2 px-3 py-1.5 text-left text-xs transition-colors ${
-                    isSelected
-                      ? "bg-indigo-50 font-semibold text-teal-800"
-                      : "hover:bg-stone-50 text-stone-700"
-                  }`}
+                  className={`flex w-full items-center gap-2 px-3 py-1.5 text-left text-xs transition-colors ${isSelected
+                    ? "bg-indigo-50 font-semibold text-teal-800"
+                    : "hover:bg-stone-50 text-stone-700"
+                    }`}
                 >
                   <div
-                    className={`flex h-3.5 w-3.5 items-center justify-center rounded border ${
-                      isSelected
-                        ? "border-teal-600 bg-teal-600 text-white"
-                        : "border-stone-300"
-                    }`}
+                    className={`flex h-3.5 w-3.5 items-center justify-center rounded border ${isSelected
+                      ? "border-teal-600 bg-teal-600 text-white"
+                      : "border-stone-300"
+                      }`}
                   >
                     {isSelected && <Check className="h-2.5 w-2.5" />}
                   </div>
@@ -285,7 +281,9 @@ const EmployeeDashboard = () => {
   };
 
   const localUser = JSON.parse(localStorage.getItem("user") || "{}");
-  const isAdmin = localUser.role === "admin";
+  const userRole = localStorage.getItem("role") || localUser.role || "employee";
+  const isAdmin = userRole === "admin";
+  const isAdminOrHr = userRole === "admin" || userRole === "hr";
   const employeeId = params.id || localUser.employee_id || localUser.id || 1;
   const isSelf = !params.id || String(params.id) === String(localUser.employee_id || localUser.id);
 
@@ -312,6 +310,30 @@ const EmployeeDashboard = () => {
     queryKey: ["sub-projects"],
     queryFn: subProjectApi.getAll,
   });
+
+  const loggedInEmpId = Number(localUser.employee_id || localUser.id || account?.employee_id);
+
+  const isManagerOfEmployee = useMemo(() => {
+    if (!loggedInEmpId) return false;
+    if (userRole !== "pm" && userRole !== "team_lead") return false;
+    return allocations.some((alloc) => {
+      const proj = projects.find((p) => p.id === alloc.sub_project_id);
+      if (!proj) return false;
+      const managerIds = Array.isArray(proj.assigned_employee_ids)
+        ? proj.assigned_employee_ids.map(Number)
+        : [];
+      return managerIds.includes(loggedInEmpId);
+    });
+  }, [allocations, projects, userRole, loggedInEmpId]);
+
+  const canViewNotes = isAdminOrHr || isSelf || isManagerOfEmployee;
+  const canManageNotes = isAdminOrHr || isManagerOfEmployee;
+
+  useEffect(() => {
+    if (!canViewNotes && bottomTab === "notes") {
+      setBottomTab("performance");
+    }
+  }, [canViewNotes, bottomTab]);
 
   const { data: allLeaves = [] } = useQuery({
     queryKey: ["my-leaves", employeeId],
@@ -381,7 +403,7 @@ const EmployeeDashboard = () => {
   const { data: employeeNotes = [], isLoading: notesLoading } = useQuery({
     queryKey: ["employee-notes", employeeId],
     queryFn: () => employeeNotesApi.getByEmployee(employeeId),
-    enabled: !!employeeId,
+    enabled: !!employeeId && canViewNotes,
   });
 
   const { data: employeeBadges = [] } = useQuery({
@@ -516,11 +538,11 @@ const EmployeeDashboard = () => {
   const [saveError, setSaveError] = useState("");
 
   const enterEditMode = () => {
+    setEditEmail(profile.email || "");
     setEditPhone(profile.phone || "");
     setEditSkills([...(profile.skills || [])]);
     setEditSlackId(profile.slackUserId || "");
     setEditEncordId(profile.encordId || "");
-    setEditEmail(profile.email || "");
     setSaveError("");
     setEmailError("");
     setIsEditing(true);
@@ -529,28 +551,10 @@ const EmployeeDashboard = () => {
   const cancelEdit = () => {
     setIsEditing(false);
     setSaveError("");
+    setEmailError("");
   };
 
-  const changeEmailMutation = useMutation({
-    mutationFn: (newEmail) => employeeApi.changeEmail(employeeId, newEmail),
-    onSuccess: (updated) => {
-      try {
-        const cached = JSON.parse(localStorage.getItem("user") || "{}");
-        localStorage.setItem(
-          "user",
-          JSON.stringify({ ...cached, email: updated.email })
-        );
-      } catch {}
-      queryClient.invalidateQueries({ queryKey: ["auth-me"] });
-      queryClient.invalidateQueries({
-        queryKey: ["employee-profile", employeeId],
-      });
-      setEmailError("");
-    },
-    onError: (err) => {
-      setEmailError(err?.response?.data?.detail || "Could not change email.");
-    },
-  });
+
 
   const saveMutation = useMutation({
     mutationFn: (data) => employeeApi.update(employeeId, data),
@@ -559,34 +563,56 @@ const EmployeeDashboard = () => {
         queryKey: ["employee-profile", employeeId],
       });
       queryClient.invalidateQueries({ queryKey: ["auth-me"] });
-      setIsEditing(false);
-      setSaveError("");
     },
     onError: (err) => {
       setSaveError(err?.response?.data?.detail || "Failed to save changes.");
     },
   });
 
+  const requestEmailChangeMutation = useMutation({
+    mutationFn: (newEmail) => employeeApi.requestEmailChange(employeeId, { new_email: newEmail }),
+    onError: (err) => {
+      setEmailError(err?.response?.data?.detail || "Could not send OTP.");
+    },
+  });
+
   const COMPANY_DOMAIN = "autonexai360.com";
 
   const handleSave = async () => {
-    saveMutation.mutate({
-      phone: editPhone || null,
-      skills: editSkills,
-      slack_user_id: editSlackId || null,
-      encord_id: editEncordId || null,
-    });
+    setSaveError("");
+    setEmailError("");
 
     const trimmedEmail = editEmail.trim().toLowerCase();
     const originalEmail = (profile.email || "").trim().toLowerCase();
+    const emailChanged = !!trimmedEmail && trimmedEmail !== originalEmail;
 
-    if (
-      trimmedEmail &&
-      trimmedEmail !== originalEmail &&
-      trimmedEmail.endsWith(`@${COMPANY_DOMAIN}`) &&
-      trimmedEmail.split("@")[0].length > 0
-    ) {
-      changeEmailMutation.mutate(trimmedEmail);
+    if (emailChanged) {
+      if (!trimmedEmail.endsWith(`@${COMPANY_DOMAIN}`) || trimmedEmail.split("@")[0].length === 0) {
+        setEmailError(`Email must be a valid @${COMPANY_DOMAIN} address.`);
+        return;
+      }
+    }
+
+    try {
+      const promises = [];
+
+      promises.push(
+        saveMutation.mutateAsync({
+          phone: editPhone || null,
+          skills: editSkills,
+          slack_user_id: editSlackId || null,
+          encord_id: editEncordId || null,
+        })
+      );
+
+      if (emailChanged) {
+        promises.push(requestEmailChangeMutation.mutateAsync(trimmedEmail));
+      }
+
+      await Promise.all(promises);
+      setIsEditing(false);
+    } catch (err) {
+      // Errors are caught and set by the mutation onError handlers
     }
   };
 
@@ -806,8 +832,8 @@ const EmployeeDashboard = () => {
       const days = leave.is_half_day
         ? 0.5
         : leave.start_date && leave.end_date
-        ? getWorkingDayCount(leave.start_date, leave.end_date)
-        : 1.0;
+          ? getWorkingDayCount(leave.start_date, leave.end_date)
+          : 1.0;
       if (!leave.start_date || !leave.end_date) {
         if (type in usedYear) usedYear[type] += days;
         return;
@@ -1027,11 +1053,6 @@ const EmployeeDashboard = () => {
   const complaintsCount = openComplaints.length;
   const warningsCount = openWarnings.length;
 
-  const canManageNotes =
-    localUser.role === "admin" ||
-    localUser.role === "pm" ||
-    localUser.role === "hr";
-
   return (
     <div
       className="w-full h-full text-stone-800 font-sans flex flex-col gap-2 sm:gap-3"
@@ -1076,7 +1097,7 @@ const EmployeeDashboard = () => {
               <Calendar className="w-3.5 h-3.5 text-stone-400 shrink-0" />
               <span className="truncate">{display(profile.joiningDate)}</span>
             </div>
-            
+
             {/* Phone */}
             <div className="flex items-center justify-start gap-1.5 text-[10px] text-stone-500 font-medium w-full mb-2 px-0.5">
               <Phone className="w-3.5 h-3.5 text-stone-400 shrink-0" />
@@ -1159,22 +1180,20 @@ const EmployeeDashboard = () => {
                 <button
                   type="button"
                   onClick={() => setProfileTab("attendance")}
-                  className={`flex items-center gap-1.5 pb-1 border-b-[2px] font-semibold text-[10px] transition-colors ${
-                    profileTab === "attendance"
+                  className={`flex items-center gap-1.5 pb-1 border-b-[2px] font-semibold text-[10px] transition-colors ${profileTab === "attendance"
                       ? "border-indigo-500 text-indigo-600"
                       : "border-transparent text-stone-400 hover:text-stone-600"
-                  }`}
+                    }`}
                 >
                   <Calendar className="w-3.5 h-3.5" /> Attendance
                 </button>
                 <button
                   type="button"
                   onClick={() => setProfileTab("notes")}
-                  className={`flex items-center gap-1.5 pb-1 border-b-[2px] font-semibold text-[10px] transition-colors ${
-                    profileTab === "notes"
+                  className={`flex items-center gap-1.5 pb-1 border-b-[2px] font-semibold text-[10px] transition-colors ${profileTab === "notes"
                       ? "border-indigo-500 text-indigo-600"
                       : "border-transparent text-stone-400 hover:text-stone-600"
-                  }`}
+                    }`}
                 >
                   <FileText className="w-3.5 h-3.5" /> Notes
                 </button>
@@ -1210,15 +1229,12 @@ const EmployeeDashboard = () => {
                     },
                   ].map(({ icon, label, remaining, quota, tabKey }) => (
                     <div
-                      key={label}
-                      onClick={() => handleOpenAttendanceModal(tabKey)}
-                      title={`Click to view ${label} records`}
-                      className="flex flex-col items-center gap-0.5 border border-stone-200 rounded-xl pt-2 pb-1 bg-white shadow-sm cursor-pointer hover:border-stone-300 transition-colors"
+                      className={`w-7 h-7 rounded-full flex items-center justify-center ${label === "Sick" ? "bg-orange-50" : "bg-indigo-50"
+                        }`}
                     >
                       <div
-                        className={`w-7 h-7 rounded-full flex items-center justify-center ${
-                          label === "Sick" ? "bg-orange-50" : "bg-indigo-50"
-                        }`}
+                        className={`w-7 h-7 rounded-full flex items-center justify-center ${label === "Sick" ? "bg-orange-50" : "bg-indigo-50"
+                          }`}
                       >
                         {icon}
                       </div>
@@ -1267,13 +1283,12 @@ const EmployeeDashboard = () => {
                       className="flex flex-col items-center gap-0.5 border border-stone-200 rounded-xl pt-2 pb-1 shadow-sm bg-white"
                     >
                       <div
-                        className={`w-7 h-7 rounded-full flex items-center justify-center ${
-                          label === "Recognition"
+                        className={`w-7 h-7 rounded-full flex items-center justify-center ${label === "Recognition"
                             ? "bg-indigo-50"
                             : label === "Warnings"
-                            ? "bg-amber-50"
-                            : "bg-rose-50"
-                        }`}
+                              ? "bg-amber-50"
+                              : "bg-rose-50"
+                          }`}
                       >
                         {icon}
                       </div>
@@ -1330,16 +1345,14 @@ const EmployeeDashboard = () => {
                 <img
                   src={badge.image}
                   alt={badge.label}
-                  className={`w-9 h-9 object-contain mt-1 mb-1 relative z-0 ${
-                    badge.earned ? "" : "grayscale opacity-40"
-                  }`}
+                  className={`w-9 h-9 object-contain mt-1 mb-1 relative z-0 ${badge.earned ? "" : "grayscale opacity-40"
+                    }`}
                 />
 
                 <div className="flex flex-col items-center w-full">
                   <span
-                    className={`text-[9px] font-bold leading-tight w-full truncate px-1 ${
-                      badge.earned ? "text-stone-800" : "text-stone-400"
-                    }`}
+                    className={`text-[9px] font-bold leading-tight w-full truncate px-1 ${badge.earned ? "text-stone-800" : "text-stone-400"
+                      }`}
                   >
                     {badge.label}
                   </span>
@@ -1460,11 +1473,10 @@ const EmployeeDashboard = () => {
                     {[1, 2, 3, 4, 5].map((s) => (
                       <Star
                         key={s}
-                        className={`w-2.5 h-2.5 ${
-                          latestRating && s <= Math.floor(latestRating)
-                            ? "fill-amber-400 text-amber-400"
-                            : "fill-stone-200 text-stone-200"
-                        }`}
+                        className={`w-2.5 h-2.5 ${latestRating && s <= Math.floor(latestRating)
+                          ? "fill-amber-400 text-amber-400"
+                          : "fill-stone-200 text-stone-200"
+                          }`}
                       />
                     ))}
                   </div>
@@ -1521,9 +1533,8 @@ const EmployeeDashboard = () => {
               },
               {
                 label: "vs Team Avg",
-                value: `${activityStats.deltaPct >= 0 ? "+" : ""}${
-                  activityStats.deltaPct
-                }%`,
+                value: `${activityStats.deltaPct >= 0 ? "+" : ""}${activityStats.deltaPct
+                  }%`,
                 color:
                   activityStats.deltaPct >= 0
                     ? "text-indigo-600"
@@ -1651,8 +1662,8 @@ const EmployeeDashboard = () => {
                             hoverPoint.x / CHART_W > 0.85
                               ? "translate(-100%, -100%)"
                               : hoverPoint.x / CHART_W < 0.15
-                              ? "translate(0%, -100%)"
-                              : "translate(-50%, -100%)",
+                                ? "translate(0%, -100%)"
+                                : "translate(-50%, -100%)",
                         }}
                       >
                         <p className="font-display font-medium text-stone-500 mb-0.5">
@@ -1741,43 +1752,46 @@ const EmployeeDashboard = () => {
         <div className="lg:col-span-8 bg-white border border-stone-200 rounded-2xl p-4 flex flex-col gap-3 shadow-[0_1px_4px_rgba(28,25,23,0.06)]">
           <div className="flex flex-col gap-3 h-full">
             <div className="flex gap-5 border-b border-stone-100 pb-0.5">
-              <button
-                type="button"
-                onClick={() => setBottomTab("notes")}
-                className={`flex items-center gap-1.5 pb-2 -mb-[3px] border-b-[2px] font-semibold text-[13px] transition-colors ${
-                  bottomTab === "notes"
+              {canViewNotes && (
+                <button
+                  type="button"
+                  onClick={() => setBottomTab("notes")}
+                  className={`flex items-center gap-1.5 pb-2 -mb-[3px] border-b-[2px] font-semibold text-[13px] transition-colors ${bottomTab === "notes"
                     ? "border-indigo-500 text-indigo-600"
                     : "border-transparent text-stone-400 hover:text-stone-600"
-                }`}
-              >
-                <FileText className="w-4 h-4" /> Notes
-              </button>
+                    }`}
+                >
+                  <FileText className="w-4 h-4" /> Notes
+                </button>
+              )}
               <button
                 type="button"
                 onClick={() => setBottomTab("performance")}
-                className={`flex items-center gap-1.5 pb-2 -mb-[3px] border-b-[2px] font-semibold text-[13px] transition-colors ${
-                  bottomTab === "performance"
-                    ? "border-indigo-500 text-indigo-600"
-                    : "border-transparent text-stone-400 hover:text-stone-600"
-                }`}
+                className={`flex items-center gap-1.5 pb-2 -mb-[3px] border-b-[2px] font-semibold text-[13px] transition-colors ${bottomTab === "performance" || !canViewNotes
+                  ? "border-indigo-500 text-indigo-600"
+                  : "border-transparent text-stone-400 hover:text-stone-600"
+                  }`}
               >
                 <TrendingUp className="w-4 h-4" /> Performance History
               </button>
             </div>
-          {/* Tab body */}
-          {bottomTab === "notes" ? (
-            <div className="grid grid-cols-3 gap-3 flex-1">
-              {/* Complaints */}
-              <div className="flex flex-col bg-white border border-stone-200 rounded-xl p-2.5">
-                <div className="flex items-center justify-between gap-1.5 mb-2">
-                  <div className="flex items-center gap-1.5">
-                    <AlertCircle className="w-3.5 h-3.5 text-rose-500 shrink-0" />
-                    <h3 className="text-[10px] font-bold text-stone-700 uppercase tracking-wider">Complaints</h3>
-                  </div>
-                  <div className="flex items-center gap-1.5">
-                    <button onClick={() => setNotesModal({ isOpen: true, type: 'complaints', title: 'Complaints History', data: complaintsList })} className="flex items-center gap-1 text-[9px] font-semibold text-stone-500 hover:text-stone-800 bg-stone-100 hover:bg-stone-200 border border-stone-200 px-1.5 py-0.5 rounded transition-colors cursor-pointer">
-                      <History className="w-2.5 h-2.5" /> History
-                    </button>
+            {/* Tab body */}
+            {bottomTab === "notes" && canViewNotes ? (
+              <div className="grid grid-cols-3 gap-3 flex-1">
+                {/* Complaints */}
+                <div className="flex flex-col bg-white border border-stone-200 rounded-xl p-2.5">
+                  <div className="flex items-center justify-between gap-1.5 mb-2">
+                    <div className="flex items-center gap-1.5">
+                      <AlertCircle className="w-3.5 h-3.5 text-rose-500 shrink-0" />
+                      <h3 className="text-[10px] font-bold text-stone-700 uppercase tracking-wider">Complaints</h3>
+                      <span className="px-1.5 py-0.5 text-[10px] font-extrabold rounded-full bg-rose-50 text-rose-600 border border-rose-200/80 leading-none ml-0.5">
+                        {complaintsCount}
+                      </span>
+                    </div>
+                    <div className="flex items-center gap-1.5">
+                      <button onClick={() => setNotesModal({ isOpen: true, type: 'complaints', title: 'Complaints History', data: complaintsList })} className="flex items-center gap-1 text-[9px] font-semibold text-stone-500 hover:text-stone-800 bg-stone-100 hover:bg-stone-200 border border-stone-200 px-1.5 py-0.5 rounded transition-colors cursor-pointer">
+                        <History className="w-2.5 h-2.5" /> History
+                      </button>
 
 
                       {canManageNotes && !isSelf && (
@@ -1815,13 +1829,12 @@ const EmployeeDashboard = () => {
                             >
                               <p className="text-[10px] text-stone-600 leading-snug flex-1 min-w-0">
                                 {item.title
-                                  ? `${item.title}${
-                                      item.content ? ` — ${item.content}` : ""
-                                    }`
+                                  ? `${item.title}${item.content ? ` — ${item.content}` : ""
+                                  }`
                                   : item.message ||
-                                    item.reason ||
-                                    item.note ||
-                                    "Complaint recorded"}
+                                  item.reason ||
+                                  item.note ||
+                                  "Complaint recorded"}
                               </p>
 
                               {canManageNotes && !isSelf && item.id && (
@@ -1877,17 +1890,20 @@ const EmployeeDashboard = () => {
                   </div>
                 </div>
 
-              {/* Warnings */}
-              <div className="flex flex-col bg-white border border-stone-200 rounded-xl p-2.5">
-                <div className="flex items-center justify-between gap-1.5 mb-2">
-                  <div className="flex items-center gap-1.5">
-                    <AlertTriangle className="w-3.5 h-3.5 text-amber-500 shrink-0" />
-                    <h3 className="text-[10px] font-bold text-stone-700 uppercase tracking-wider">Warnings</h3>
-                  </div>
-                  <div className="flex items-center gap-1.5">
-                    <button onClick={() => setNotesModal({ isOpen: true, type: 'warnings', title: 'Warnings History', data: warningsList })} className="flex items-center gap-1 text-[9px] font-semibold text-stone-500 hover:text-stone-800 bg-stone-100 hover:bg-stone-200 border border-stone-200 px-1.5 py-0.5 rounded transition-colors cursor-pointer">
-                      <History className="w-2.5 h-2.5" /> History
-                    </button>
+                {/* Warnings */}
+                <div className="flex flex-col bg-white border border-stone-200 rounded-xl p-2.5">
+                  <div className="flex items-center justify-between gap-1.5 mb-2">
+                    <div className="flex items-center gap-1.5">
+                      <AlertTriangle className="w-3.5 h-3.5 text-amber-500 shrink-0" />
+                      <h3 className="text-[10px] font-bold text-stone-700 uppercase tracking-wider">Warnings</h3>
+                      <span className="px-1.5 py-0.5 text-[10px] font-extrabold rounded-full bg-amber-50 text-amber-600 border border-amber-200/80 leading-none ml-0.5">
+                        {warningsCount}
+                      </span>
+                    </div>
+                    <div className="flex items-center gap-1.5">
+                      <button onClick={() => setNotesModal({ isOpen: true, type: 'warnings', title: 'Warnings History', data: warningsList })} className="flex items-center gap-1 text-[9px] font-semibold text-stone-500 hover:text-stone-800 bg-stone-100 hover:bg-stone-200 border border-stone-200 px-1.5 py-0.5 rounded transition-colors cursor-pointer">
+                        <History className="w-2.5 h-2.5" /> History
+                      </button>
 
 
                       {canManageNotes && !isSelf && (
@@ -1925,13 +1941,12 @@ const EmployeeDashboard = () => {
                             >
                               <p className="text-[10px] text-stone-600 leading-snug flex-1 min-w-0">
                                 {item.title
-                                  ? `${item.title}${
-                                      item.content ? ` — ${item.content}` : ""
-                                    }`
+                                  ? `${item.title}${item.content ? ` — ${item.content}` : ""
+                                  }`
                                   : item.message ||
-                                    item.reason ||
-                                    item.note ||
-                                    "Warning issued"}
+                                  item.reason ||
+                                  item.note ||
+                                  "Warning issued"}
                               </p>
 
                               {canManageNotes && !isSelf && item.id && (
@@ -1985,17 +2000,20 @@ const EmployeeDashboard = () => {
                   </div>
                 </div>
 
-              {/* Recognition */}
-              <div className="flex flex-col bg-white border border-stone-200 rounded-xl p-2.5">
-                <div className="flex items-center justify-between gap-1.5 mb-2">
-                  <div className="flex items-center gap-1.5">
-                    <Award className="w-3.5 h-3.5 text-indigo-600 shrink-0" />
-                    <h3 className="text-[10px] font-bold text-stone-700 uppercase tracking-wider">Recognition</h3>
-                  </div>
-                  <div className="flex items-center gap-1.5">
-                    <button onClick={() => setNotesModal({ isOpen: true, type: 'recognitions', title: 'Recognition History', data: recognitionsList })} className="flex items-center gap-1 text-[9px] font-semibold text-stone-500 hover:text-stone-800 bg-stone-100 hover:bg-stone-200 border border-stone-200 px-1.5 py-0.5 rounded transition-colors cursor-pointer">
-                      <History className="w-2.5 h-2.5" /> History
-                    </button>
+                {/* Recognition */}
+                <div className="flex flex-col bg-white border border-stone-200 rounded-xl p-2.5">
+                  <div className="flex items-center justify-between gap-1.5 mb-2">
+                    <div className="flex items-center gap-1.5">
+                      <Award className="w-3.5 h-3.5 text-indigo-600 shrink-0" />
+                      <h3 className="text-[10px] font-bold text-stone-700 uppercase tracking-wider">Recognition</h3>
+                      <span className="px-1.5 py-0.5 text-[10px] font-extrabold rounded-full bg-indigo-50 text-indigo-600 border border-indigo-200/80 leading-none ml-0.5">
+                        {recognitionsList.length}
+                      </span>
+                    </div>
+                    <div className="flex items-center gap-1.5">
+                      <button onClick={() => setNotesModal({ isOpen: true, type: 'recognitions', title: 'Recognition History', data: recognitionsList })} className="flex items-center gap-1 text-[9px] font-semibold text-stone-500 hover:text-stone-800 bg-stone-100 hover:bg-stone-200 border border-stone-200 px-1.5 py-0.5 rounded transition-colors cursor-pointer">
+                        <History className="w-2.5 h-2.5" /> History
+                      </button>
 
 
                       {canManageNotes && !isSelf && (
@@ -2033,13 +2051,12 @@ const EmployeeDashboard = () => {
                             >
                               <p className="text-[10px] text-stone-600 leading-snug flex-1 min-w-0">
                                 {item.title
-                                  ? `${item.title}${
-                                      item.content ? ` — ${item.content}` : ""
-                                    }`
+                                  ? `${item.title}${item.content ? ` — ${item.content}` : ""
+                                  }`
                                   : item.message ||
-                                    item.reason ||
-                                    item.note ||
-                                    "Recognition received"}
+                                  item.reason ||
+                                  item.note ||
+                                  "Recognition received"}
                               </p>
 
                               {canManageNotes && !isSelf && item.id && (
@@ -2166,35 +2183,30 @@ const EmployeeDashboard = () => {
             ].map(({ icon: Icon, title, date, earned, color }) => (
               <div
                 key={title}
-                className={`flex items-center gap-3 p-2.5 rounded-xl border transition-colors ${
-                  earned
-                    ? "bg-stone-50 border-stone-200 hover:bg-stone-100/60"
-                    : "bg-stone-50/40 border-stone-200/50 opacity-50"
-                }`}
+                className={`flex items-center gap-3 p-2.5 rounded-xl border transition-colors ${earned
+                  ? "bg-stone-50 border-stone-200 hover:bg-stone-100/60"
+                  : "bg-stone-50/40 border-stone-200/50 opacity-50"
+                  }`}
               >
                 <span
-                  className={`w-9 h-9 rounded-xl flex items-center justify-center shrink-0 ${
-                    earned ? "bg-white border border-stone-200" : "bg-stone-100"
-                  }`}
+                  className={`w-9 h-9 rounded-xl flex items-center justify-center shrink-0 ${earned ? "bg-white border border-stone-200" : "bg-stone-100"
+                    }`}
                 >
                   <Icon
-                    className={`w-4 h-4 ${
-                      earned ? color : "text-stone-400"
-                    }`}
+                    className={`w-4 h-4 ${earned ? color : "text-stone-400"
+                      }`}
                   />
                 </span>
                 <div className="min-w-0">
                   <p
-                    className={`text-[11px] font-bold truncate ${
-                      earned ? "text-stone-800" : "text-stone-500"
-                    }`}
+                    className={`text-[11px] font-bold truncate ${earned ? "text-stone-800" : "text-stone-500"
+                      }`}
                   >
                     {title}
                   </p>
                   <p
-                    className={`text-[9.5px] ${
-                      earned ? "text-stone-400" : "text-stone-300"
-                    }`}
+                    className={`text-[9.5px] ${earned ? "text-stone-400" : "text-stone-300"
+                      }`}
                   >
                     {date}
                   </p>
@@ -2212,13 +2224,12 @@ const EmployeeDashboard = () => {
             <div className="px-4 py-3 border-b border-stone-100 flex items-center justify-between">
               <div className="flex items-center gap-2.5">
                 <div
-                  className={`w-8 h-8 rounded-xl flex items-center justify-center ${
-                    addNoteModal.type === "complaint"
-                      ? "bg-rose-50 text-rose-600"
-                      : addNoteModal.type === "warning"
+                  className={`w-8 h-8 rounded-xl flex items-center justify-center ${addNoteModal.type === "complaint"
+                    ? "bg-rose-50 text-rose-600"
+                    : addNoteModal.type === "warning"
                       ? "bg-amber-50 text-amber-600"
                       : "bg-indigo-50 text-indigo-600"
-                  }`}
+                    }`}
                 >
                   {addNoteModal.type === "complaint" ? (
                     <AlertCircle className="w-4 h-4" />
@@ -2234,8 +2245,8 @@ const EmployeeDashboard = () => {
                     {addNoteModal.type === "complaint"
                       ? "Complaint"
                       : addNoteModal.type === "warning"
-                      ? "Warning"
-                      : "Recognition"}
+                        ? "Warning"
+                        : "Recognition"}
                   </h3>
                   <p className="text-[10px] text-stone-400">
                     This will be visible on the employee’s profile
@@ -2283,34 +2294,33 @@ const EmployeeDashboard = () => {
 
               {(addNoteModal.type === "complaint" ||
                 addNoteModal.type === "warning") && (
-                <div>
-                  <label className="text-[10px] font-bold uppercase tracking-wider text-stone-400">
-                    Severity
-                  </label>
-                  <div className="mt-1.5 flex gap-2">
-                    {["low", "medium", "high"].map((s) => (
-                      <button
-                        key={s}
-                        type="button"
-                        onClick={() =>
-                          setNoteForm((f) => ({ ...f, severity: s }))
-                        }
-                        className={`flex-1 py-1.5 rounded-lg text-[11px] font-semibold border transition-colors ${
-                          noteForm.severity === s
+                  <div>
+                    <label className="text-[10px] font-bold uppercase tracking-wider text-stone-400">
+                      Severity
+                    </label>
+                    <div className="mt-1.5 flex gap-2">
+                      {["low", "medium", "high"].map((s) => (
+                        <button
+                          key={s}
+                          type="button"
+                          onClick={() =>
+                            setNoteForm((f) => ({ ...f, severity: s }))
+                          }
+                          className={`flex-1 py-1.5 rounded-lg text-[11px] font-semibold border transition-colors ${noteForm.severity === s
                             ? s === "high"
                               ? "bg-rose-50 border-rose-300 text-rose-700"
                               : s === "medium"
-                              ? "bg-amber-50 border-amber-300 text-amber-700"
-                              : "bg-indigo-50 border-emerald-300 text-emerald-700"
+                                ? "bg-amber-50 border-amber-300 text-amber-700"
+                                : "bg-indigo-50 border-emerald-300 text-emerald-700"
                             : "bg-white border-stone-200 text-stone-500 hover:bg-stone-50"
-                        }`}
-                      >
-                        {s.charAt(0).toUpperCase() + s.slice(1)}
-                      </button>
-                    ))}
+                            }`}
+                        >
+                          {s.charAt(0).toUpperCase() + s.slice(1)}
+                        </button>
+                      ))}
+                    </div>
                   </div>
-                </div>
-              )}
+                )}
 
               {noteFormError && (
                 <p className="text-xs font-medium text-rose-600">
@@ -2356,8 +2366,8 @@ const EmployeeDashboard = () => {
                 {addNoteModal.type === "complaint"
                   ? "Complaint"
                   : addNoteModal.type === "warning"
-                  ? "Warning"
-                  : "Recognition"}
+                    ? "Warning"
+                    : "Recognition"}
               </button>
             </div>
           </div>
@@ -2371,13 +2381,12 @@ const EmployeeDashboard = () => {
             <div className="px-4 py-3 border-b border-stone-100 flex items-center justify-between">
               <div className="flex items-center gap-2.5">
                 <div
-                  className={`w-8 h-8 rounded-xl flex items-center justify-center ${
-                    notesModal.type === "complaints"
-                      ? "bg-rose-50 text-rose-600"
-                      : notesModal.type === "warnings"
+                  className={`w-8 h-8 rounded-xl flex items-center justify-center ${notesModal.type === "complaints"
+                    ? "bg-rose-50 text-rose-600"
+                    : notesModal.type === "warnings"
                       ? "bg-amber-50 text-amber-600"
                       : "bg-indigo-50 text-indigo-600"
-                  }`}
+                    }`}
                 >
                   {notesModal.type === "complaints" ? (
                     <AlertCircle className="w-4 h-4" />
@@ -2413,13 +2422,12 @@ const EmployeeDashboard = () => {
                 [...notesModal.data].reverse().map((item, idx) => (
                   <div
                     key={item.id ?? idx}
-                    className={`p-3 rounded-xl border ${
-                      notesModal.type === "complaints"
-                        ? "bg-rose-50/30 border-rose-100"
-                        : notesModal.type === "warnings"
+                    className={`p-3 rounded-xl border ${notesModal.type === "complaints"
+                      ? "bg-rose-50/30 border-rose-100"
+                      : notesModal.type === "warnings"
                         ? "bg-amber-50/30 border-amber-100"
                         : "bg-indigo-50/30 border-indigo-100"
-                    }`}
+                      }`}
                   >
                     <div className="flex items-start justify-between gap-2 mb-1">
                       <p className="text-xs font-semibold text-stone-800">
@@ -2515,20 +2523,18 @@ const EmployeeDashboard = () => {
                   return (
                     <div
                       key={item.id}
-                      className={`p-3 rounded-xl border ${
-                        isActive
-                          ? "bg-indigo-50/40 border-indigo-100"
-                          : "bg-stone-50 border-stone-100"
-                      }`}
+                      className={`p-3 rounded-xl border ${isActive
+                        ? "bg-indigo-50/40 border-indigo-100"
+                        : "bg-stone-50 border-stone-100"
+                        }`}
                     >
                       <div className="flex items-center justify-between gap-2 mb-1">
                         <div className="flex items-center gap-2 min-w-0">
                           <span
-                            className={`px-2 py-0.5 text-[8.5px] font-bold uppercase rounded-md shrink-0 ${
-                              isActive
-                                ? "bg-indigo-600 text-white"
-                                : "bg-stone-200 text-stone-600"
-                            }`}
+                            className={`px-2 py-0.5 text-[8.5px] font-bold uppercase rounded-md shrink-0 ${isActive
+                              ? "bg-indigo-600 text-white"
+                              : "bg-stone-200 text-stone-600"
+                              }`}
                           >
                             {isActive ? "Active" : "Completed"}
                           </span>
@@ -2555,6 +2561,94 @@ const EmployeeDashboard = () => {
                 {allEmployeeProjects.length} total assignment{allEmployeeProjects.length !== 1 ? 's' : ''}
               </span>
               <button onClick={() => setShowLogsModal(false)} className="px-4 py-1.5 bg-indigo-600 hover:bg-indigo-700 text-white font-semibold rounded-lg text-xs transition-colors shadow-sm cursor-pointer">
+                Close
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {showBadgeLogsModal && (
+        <div className="fixed inset-0 z-50 flex items-end sm:items-center justify-center p-0 sm:p-4 bg-stone-900/40 backdrop-blur-sm">
+          <div className="bg-white border border-stone-200 rounded-t-2xl sm:rounded-2xl w-full max-w-xl shadow-2xl overflow-hidden flex flex-col max-h-[90vh] sm:max-h-[85vh]">
+            <div className="px-4 py-3 border-b border-stone-100 flex items-center justify-between bg-white/50">
+              <div className="flex items-center gap-2.5">
+                <div className="w-8 h-8 rounded-xl bg-indigo-100/50 text-indigo-600 border border-indigo-200/50 flex items-center justify-center shadow-sm">
+                  <BadgeCheck className="w-4 h-4" />
+                </div>
+                <div>
+                  <h3 className="font-display text-sm font-bold text-stone-800">
+                    Badge History
+                  </h3>
+                  <p className="text-[10px] text-stone-400">
+                    History of earned badges and milestones
+                  </p>
+                </div>
+              </div>
+              <button
+                onClick={() => setShowBadgeLogsModal(false)}
+                className="w-8 h-8 rounded-xl text-stone-400 hover:text-stone-600 hover:bg-stone-200/50 flex items-center justify-center transition-colors cursor-pointer"
+              >
+                <X className="w-4 h-4" />
+              </button>
+            </div>
+
+            <div className="p-4 overflow-y-auto db-scroll space-y-2 flex-1">
+              {badgeLogsLoading ? (
+                <div className="flex items-center justify-center py-10">
+                  <span className="text-xs text-stone-400">Loading logs...</span>
+                </div>
+              ) : badgeLogs.length === 0 ? (
+                <div className="flex flex-col items-center justify-center py-10 text-center">
+                  <div className="w-12 h-12 rounded-full bg-stone-100 flex items-center justify-center mb-3">
+                    <BadgeCheck className="w-5 h-5 text-stone-400" />
+                  </div>
+                  <p className="text-xs font-semibold text-stone-600">No badge logs available.</p>
+                  <p className="text-[10px] text-stone-400 mt-1">Badge achievements will appear here.</p>
+                </div>
+              ) : (
+                badgeLogs.map((log) => {
+                  return (
+                    <div
+                      key={log.id}
+                      className="p-3 rounded-xl border bg-stone-50 border-stone-100 flex items-center gap-3"
+                    >
+                      <div className="w-10 h-10 rounded-full bg-white border border-stone-200 shadow-sm flex items-center justify-center shrink-0">
+                        <img
+                          src={
+                            log.badge_code === "tenure_6_months" ? sixMonthsBadge :
+                              log.badge_code === "tenure_3_months" ? threeMonthsBadge :
+                                BADGE_CONFIG[log.badge_code]?.image || threeMonthsBadge
+                          }
+                          alt={log.badge_name || log.badge_code}
+                          className="w-6 h-6 object-contain"
+                        />
+                      </div>
+                      <div className="flex flex-col flex-1 min-w-0">
+                        <div className="flex items-center justify-between mb-0.5">
+                          <h4 className="font-bold text-stone-800 text-xs truncate">
+                            {log.badge_name || log.badge_code}
+                          </h4>
+                          <span className="text-[9px] text-stone-400 font-data shrink-0 ml-2">
+                            {display(log.created_at?.split('T')[0])}
+                          </span>
+                        </div>
+                        <p className="text-[10px] text-stone-500">
+                          Action: <strong className="text-indigo-600 capitalize">{log.action}</strong>
+                          {log.period_start && log.period_end && ` • ${log.period_start} to ${log.period_end}`}
+                        </p>
+                      </div>
+                    </div>
+                  );
+                })
+              )}
+            </div>
+
+            <div className="px-4 py-3 border-t border-stone-100 bg-white flex items-center justify-between">
+              <span className="text-xs font-semibold text-stone-500">
+                {badgeLogs.length} total record{badgeLogs.length !== 1 ? 's' : ''}
+              </span>
+              <button onClick={() => setShowBadgeLogsModal(false)} className="px-4 py-1.5 bg-indigo-600 hover:bg-indigo-700 text-white font-semibold rounded-lg text-xs transition-colors shadow-sm cursor-pointer">
                 Close
               </button>
             </div>
@@ -2669,20 +2763,18 @@ const EmployeeDashboard = () => {
                 <button
                   key={tab.key}
                   onClick={() => setAttendanceModalTab(tab.key)}
-                  className={`flex items-center gap-2 px-3 py-2 text-xs font-semibold rounded-t-xl border-b-2 transition-all cursor-pointer ${
-                    attendanceModalTab === tab.key
-                      ? "border-indigo-600 text-indigo-700 bg-white shadow-xs"
-                      : "border-transparent text-stone-500 hover:text-stone-700 hover:bg-stone-100/50"
-                  }`}
+                  className={`flex items-center gap-2 px-3 py-2 text-xs font-semibold rounded-t-xl border-b-2 transition-all cursor-pointer ${attendanceModalTab === tab.key
+                    ? "border-indigo-600 text-indigo-700 bg-white shadow-xs"
+                    : "border-transparent text-stone-500 hover:text-stone-700 hover:bg-stone-100/50"
+                    }`}
                 >
                   {tab.icon}
                   {tab.label}
                   <span
-                    className={`px-1.5 py-0.5 text-[10px] font-bold rounded-full ${
-                      attendanceModalTab === tab.key
-                        ? "bg-indigo-100 text-indigo-700"
-                        : "bg-stone-100 text-stone-600"
-                    }`}
+                    className={`px-1.5 py-0.5 text-[10px] font-bold rounded-full ${attendanceModalTab === tab.key
+                      ? "bg-indigo-100 text-indigo-700"
+                      : "bg-stone-100 text-stone-600"
+                      }`}
                   >
                     {tab.count}
                   </span>
@@ -2717,15 +2809,14 @@ const EmployeeDashboard = () => {
                                   : ""}
                               </span>
                               <span
-                                className={`text-[10px] font-bold uppercase px-2 py-0.5 rounded-full ${
-                                  (wfh.status || "pending").toLowerCase() ===
+                                className={`text-[10px] font-bold uppercase px-2 py-0.5 rounded-full ${(wfh.status || "pending").toLowerCase() ===
                                   "approved"
-                                    ? "bg-indigo-100 text-indigo-700"
-                                    : (wfh.status || "pending").toLowerCase() ===
-                                      "rejected"
+                                  ? "bg-indigo-100 text-indigo-700"
+                                  : (wfh.status || "pending").toLowerCase() ===
+                                    "rejected"
                                     ? "bg-rose-100 text-rose-700"
                                     : "bg-amber-100 text-amber-700"
-                                }`}
+                                  }`}
                               >
                                 {wfh.status || "Pending"}
                               </span>
@@ -2743,80 +2834,79 @@ const EmployeeDashboard = () => {
 
               {(attendanceModalTab === "paid" ||
                 attendanceModalTab === "casual_sick") && (
-                <div>
-                  {modalLeavesList.filter(
-                    (l) =>
-                      normalizeLeaveType(l.leave_type) === attendanceModalTab
-                  ).length === 0 ? (
-                    <div className="text-center py-10 text-stone-400">
-                      <Calendar className="w-8 h-8 mx-auto mb-2 opacity-40 text-stone-400" />
-                      <p className="text-xs font-medium">
-                        No {attendanceModalTab === "paid" ? "Paid" : "Sick/Casual"} leave records found for {format(modalSelectedMonth, "MMMM yyyy")}.
-                      </p>
-                    </div>
-                  ) : (
-                    <div className="space-y-2.5">
-                      {modalLeavesList
-                        .filter(
-                          (l) =>
-                            normalizeLeaveType(l.leave_type) ===
-                            attendanceModalTab
-                        )
-                        .map((leave) => (
-                          <div
-                            key={leave.id}
-                            className="p-3.5 rounded-xl border border-stone-100 bg-stone-50/50 hover:bg-stone-50 transition-colors flex items-center justify-between gap-4"
-                          >
-                            <div className="space-y-1">
-                              <div className="flex items-center gap-2">
-                                <span className="text-xs font-bold text-stone-800">
-                                  {leave.start_date || "—"}
-                                  {leave.end_date &&
-                                  leave.end_date !== leave.start_date
-                                    ? ` to ${leave.end_date}`
-                                    : ""}
-                                </span>
-                                {leave.is_half_day && (
-                                  <span className="text-[10px] bg-indigo-50 text-indigo-700 font-semibold px-2 py-0.5 rounded-md">
-                                    Half Day
+                  <div>
+                    {modalLeavesList.filter(
+                      (l) =>
+                        normalizeLeaveType(l.leave_type) === attendanceModalTab
+                    ).length === 0 ? (
+                      <div className="text-center py-10 text-stone-400">
+                        <Calendar className="w-8 h-8 mx-auto mb-2 opacity-40 text-stone-400" />
+                        <p className="text-xs font-medium">
+                          No {attendanceModalTab === "paid" ? "Paid" : "Sick/Casual"} leave records found for {format(modalSelectedMonth, "MMMM yyyy")}.
+                        </p>
+                      </div>
+                    ) : (
+                      <div className="space-y-2.5">
+                        {modalLeavesList
+                          .filter(
+                            (l) =>
+                              normalizeLeaveType(l.leave_type) ===
+                              attendanceModalTab
+                          )
+                          .map((leave) => (
+                            <div
+                              key={leave.id}
+                              className="p-3.5 rounded-xl border border-stone-100 bg-stone-50/50 hover:bg-stone-50 transition-colors flex items-center justify-between gap-4"
+                            >
+                              <div className="space-y-1">
+                                <div className="flex items-center gap-2">
+                                  <span className="text-xs font-bold text-stone-800">
+                                    {leave.start_date || "—"}
+                                    {leave.end_date &&
+                                      leave.end_date !== leave.start_date
+                                      ? ` to ${leave.end_date}`
+                                      : ""}
                                   </span>
-                                )}
-                                <span
-                                  className={`text-[10px] font-bold uppercase px-2 py-0.5 rounded-full ${
-                                    (leave.status || "pending").toLowerCase() ===
-                                    "approved"
+                                  {leave.is_half_day && (
+                                    <span className="text-[10px] bg-indigo-50 text-indigo-700 font-semibold px-2 py-0.5 rounded-md">
+                                      Half Day
+                                    </span>
+                                  )}
+                                  <span
+                                    className={`text-[10px] font-bold uppercase px-2 py-0.5 rounded-full ${(leave.status || "pending").toLowerCase() ===
+                                      "approved"
                                       ? "bg-indigo-100 text-indigo-700"
                                       : (leave.status || "pending").toLowerCase() ===
                                         "rejected"
-                                      ? "bg-rose-100 text-rose-700"
-                                      : "bg-amber-100 text-amber-700"
-                                  }`}
-                                >
-                                  {leave.status || "Pending"}
+                                        ? "bg-rose-100 text-rose-700"
+                                        : "bg-amber-100 text-amber-700"
+                                      }`}
+                                  >
+                                    {leave.status || "Pending"}
+                                  </span>
+                                </div>
+                                <p className="text-xs text-stone-600">
+                                  {leave.reason || "No reason specified"}
+                                </p>
+                              </div>
+                              <div className="text-right flex-shrink-0">
+                                <span className="text-xs font-semibold text-stone-500">
+                                  {leave.is_half_day
+                                    ? "0.5 day"
+                                    : leave.start_date && leave.end_date
+                                      ? `${getWorkingDayCount(
+                                        leave.start_date,
+                                        leave.end_date
+                                      )} days`
+                                      : "1 day"}
                                 </span>
                               </div>
-                              <p className="text-xs text-stone-600">
-                                {leave.reason || "No reason specified"}
-                              </p>
                             </div>
-                            <div className="text-right flex-shrink-0">
-                              <span className="text-xs font-semibold text-stone-500">
-                                {leave.is_half_day
-                                  ? "0.5 day"
-                                  : leave.start_date && leave.end_date
-                                  ? `${getWorkingDayCount(
-                                      leave.start_date,
-                                      leave.end_date
-                                    )} days`
-                                  : "1 day"}
-                              </span>
-                            </div>
-                          </div>
-                        ))}
-                    </div>
-                  )}
-                </div>
-              )}
+                          ))}
+                      </div>
+                    )}
+                  </div>
+                )}
             </div>
 
             <div className="px-5 py-3 border-t border-stone-100 bg-stone-50/50 flex justify-end flex-shrink-0">
@@ -2850,23 +2940,15 @@ const EmployeeDashboard = () => {
             <div className="p-4 space-y-4 overflow-y-auto">
               <div>
                 <label className="text-[10px] font-bold uppercase tracking-wider text-stone-400">
-                  Login Email
+                  Email Address
                 </label>
                 <input
                   type="email"
                   value={editEmail}
                   onChange={(e) => setEditEmail(e.target.value)}
-                  placeholder={`you@${COMPANY_DOMAIN}`}
+                  placeholder="employee@autonexai360.com"
                   className="mt-1 w-full rounded-xl border border-stone-200 bg-white px-3 py-2 text-xs outline-none focus:border-indigo-500 focus:ring-1 focus:ring-indigo-500"
                 />
-                <p className="mt-1 text-[10px] text-stone-400">
-                  Must end with @{COMPANY_DOMAIN}
-                </p>
-                {emailError && (
-                  <p className="mt-1 text-[11px] font-medium text-rose-600">
-                    {emailError}
-                  </p>
-                )}
               </div>
               <div>
                 <label className="text-[10px] font-bold uppercase tracking-wider text-stone-400">
@@ -2915,8 +2997,11 @@ const EmployeeDashboard = () => {
                   isLoading={skillsLoading}
                 />
               </div>
-              {saveError && (
-                <p className="text-xs font-medium text-rose-600">{saveError}</p>
+              {(saveError || emailError) && (
+                <div className="bg-rose-50 px-3 py-2 rounded-lg border border-rose-100">
+                  {saveError && <p className="text-xs font-medium text-rose-600">{saveError}</p>}
+                  {emailError && <p className="text-xs font-medium text-rose-600">{emailError}</p>}
+                </div>
               )}
             </div>
 
@@ -2929,12 +3014,10 @@ const EmployeeDashboard = () => {
               </button>
               <button
                 onClick={handleSave}
-                disabled={
-                  saveMutation.isPending || changeEmailMutation.isPending
-                }
+                disabled={saveMutation.isPending}
                 className="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-lg bg-teal-600 text-white text-xs font-semibold hover:bg-indigo-600 disabled:opacity-60"
               >
-                {saveMutation.isPending || changeEmailMutation.isPending ? (
+                {saveMutation.isPending ? (
                   <Loader2 className="w-3.5 h-3.5 animate-spin" />
                 ) : (
                   <Save className="w-3.5 h-3.5" />

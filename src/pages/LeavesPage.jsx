@@ -3,6 +3,8 @@ import { useSearchParams } from "react-router-dom";
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
 import { leaveApi, employeeApi, wfhApi } from "../services/api";
 import Spinner from "../components/ui/LoadingSpinner";
+import usePageStateStore from "../store/usePageStateStore";
+import { usePageScroll } from "../hooks/usePageScroll";
 import Button from "../components/ui/Button";
 import DatePicker from "../components/ui/DatePicker";
 import UserAvatar from "../components/ui/UserAvatar";
@@ -51,50 +53,110 @@ import { LEAVE_STATUS_TEXT } from "../components/ui/LeaveStatusText";
 import { makeOpensUpward } from "../utils/tableRows";
 import { checkHalfDayTiming } from "../utils/halfDayTiming";
 
-
-const TABS = ["Leave List", "Calendar", "WFH Requests", "Employee KPI"];
+const TABS = ["Calendar", "Leave List", "WFH Requests", "Employee KPI"];
+const PAGE_SIZE = 10;
 
 const LeavesPage = () => {
   const queryClient = useQueryClient();
-  // ?tab= lets other screens deep-link a specific tab (the Dashboard's WFH card
-  // opens "WFH Requests" directly). Unknown values fall back to the default.
+
   const [searchParams] = useSearchParams();
   const tabParam = searchParams.get("tab");
-  const [activeTab, setActiveTab] = useState(
-    TABS.includes(tabParam) ? tabParam : "Leave List",
-  );
   const queryParam = searchParams.get("q");
+
+  const PAGE_KEY = "leaves";
+  const setPageState = usePageStateStore((s) => s.setPageState);
+  const getPageState = usePageStateStore((s) => s.getPageState);
+
+  const defaultListState = {
+    searchQuery: "",
+    statusFilter: "all",
+    todayOnly: false,
+    dateSort: "",
+    currentPage: 1,
+  };
+
+  const [activeTab, setActiveTab] = useState(
+    TABS.includes(tabParam) ? tabParam : "Calendar",
+  );
+  const [searchQuery, setSearchQuery] = useState(queryParam || "");
+  const [statusFilter, setStatusFilter] = useState("all");
+  const [todayOnly, setTodayOnly] = useState(false);
+  const [dateSort, setDateSort] = useState("");
   const [currentPage, setCurrentPage] = useState(1);
-  const PAGE_SIZE = 10;
+
+  // Block writes until we restored from storage (avoids overwriting page with 1)
+  const [ready, setReady] = useState(false);
+
+  // Restore after zustand rehydration
+  useEffect(() => {
+    const restore = () => {
+      const root = getPageState(PAGE_KEY);
+
+      const tab =
+        tabParam && TABS.includes(tabParam)
+          ? tabParam
+          : TABS.includes(root.activeTab)
+            ? root.activeTab
+            : "Calendar";
+
+      setActiveTab(tab);
+
+      if (tab === "Leave List" || tab === "WFH Requests") {
+        const t = root.tabs?.[tab] || defaultListState;
+        setSearchQuery(queryParam != null ? queryParam : t.searchQuery || "");
+        setStatusFilter(t.statusFilter ?? "all");
+        setTodayOnly(!!t.todayOnly);
+        setDateSort(t.dateSort || "");
+        setCurrentPage(t.currentPage ?? 1);
+      }
+
+      setReady(true);
+    };
+
+    if (usePageStateStore.persist.hasHydrated()) {
+      restore();
+      return;
+    }
+    return usePageStateStore.persist.onFinishHydration(restore);
+  }, [tabParam, queryParam, getPageState]);
+
+  // Save current tab state (only after restore)
+  useEffect(() => {
+    if (!ready) return;
+
+    const root = getPageState(PAGE_KEY);
+    const tabs = { ...(root.tabs || {}) };
+
+    if (activeTab === "Leave List" || activeTab === "WFH Requests") {
+      tabs[activeTab] = {
+        searchQuery,
+        statusFilter,
+        todayOnly,
+        dateSort,
+        currentPage,
+      };
+    }
+
+    setPageState(PAGE_KEY, { activeTab, tabs });
+  }, [
+    ready,
+    activeTab,
+    searchQuery,
+    statusFilter,
+    todayOnly,
+    dateSort,
+    currentPage,
+    setPageState,
+    getPageState,
+  ]);
+
+  // Scroll position per tab
+  usePageScroll(`leaves:${activeTab}`);
+
   const [isModalOpen, setIsModalOpen] = useState(false);
   const [selectedLeaveType, setSelectedLeaveType] = useState("");
   const [formStartDate, setFormStartDate] = useState("");
   const [formEndDate, setFormEndDate] = useState("");
-  // ?q= seeds the search box so a Dashboard card can deep-link straight to one
-  // person's requests. It stays editable — clearing the box just clears it.
-  const [searchQuery, setSearchQuery] = useState(queryParam || "");
-
-  // Also react to the params changing while the page is already mounted — e.g.
-  // clicking a second name in the Dashboard popover without leaving the page.
-  // Declared after the state above so the setters are initialised.
-  useEffect(() => {
-    if (tabParam && TABS.includes(tabParam)) setActiveTab(tabParam);
-  }, [tabParam]);
-
-  // Reset page when switching tabs
-  useEffect(() => {
-    setCurrentPage(1);
-  }, [activeTab]);
-  useEffect(() => {
-    if (queryParam === null) return;
-    setSearchQuery(queryParam);
-    // Match handleSearchChange: a narrowed list must start at page 1, or the
-    // deep-linked person can land off-screen on a stale page.
-    setCurrentPage(1);
-  }, [queryParam]);
-  const [statusFilter, setStatusFilter] = useState("all"); // all | pending | approved | rejected
-  const [todayOnly, setTodayOnly] = useState(false); // only leaves that start today
-  const [dateSort, setDateSort] = useState(""); // '' | 'asc' (Jan→Dec) | 'desc' (Dec→Jan)
   const [filtersOpen, setFiltersOpen] = useState(false);
   const filtersRef = useRef(null);
   useEffect(() => {
@@ -105,6 +167,30 @@ const LeavesPage = () => {
     document.addEventListener("mousedown", handler);
     return () => document.removeEventListener("mousedown", handler);
   }, []);
+
+  // URL tab wins
+  useEffect(() => {
+    if (tabParam && TABS.includes(tabParam)) setActiveTab(tabParam);
+  }, [tabParam]);
+
+  // URL ?q= wins
+  useEffect(() => {
+    if (queryParam === null) return;
+    setSearchQuery(queryParam);
+    setCurrentPage(1);
+  }, [queryParam]);
+
+  // Reset page only when filters change inside the same list tab
+  const skipPageReset = useRef(true);
+  useEffect(() => {
+    if (!ready) return;
+    if (skipPageReset.current) {
+      skipPageReset.current = false;
+      return;
+    }
+    setCurrentPage(1);
+  }, [searchQuery, statusFilter, todayOnly, dateSort, ready]);
+
   const activeFilterCount =
     (statusFilter !== "all" ? 1 : 0) + (todayOnly ? 1 : 0);
   const [remarkModal, setRemarkModal] = useState(null); // { leaveId }
@@ -128,15 +214,60 @@ const LeavesPage = () => {
     "Approved — one-off exception",
   ];
 
-  const { data: leaves = [], isLoading } = useQuery({
-    queryKey: ["leaves"],
-    queryFn: leaveApi.getAll,
+  // ── Employees (always needed for names / form / KPI) ─────────────────────
+  const isPmOrLead = user.role === "pm" || user.role === "team_lead";
+  const { data: employees = [], isLoading: employeesLoading } = useQuery({
+    queryKey: ["employees", { team_only: isPmOrLead }],
+    queryFn: () => employeeApi.getAll({ team_only: isPmOrLead }),
   });
 
-  const { data: employees = [], isLoading: employeesLoading } = useQuery({
-    queryKey: ["employees"],
-    queryFn: employeeApi.getAll,
+  // ── Leaves – server-side page (same pattern as Guidelines) ───────────────
+  const {
+    data: leavePageData,
+    isLoading: leavesLoading,
+    isFetching: leavesFetching,
+  } = useQuery({
+    queryKey: [
+      "leaves-page",
+      currentPage,
+      searchQuery,
+      statusFilter,
+      todayOnly,
+      dateSort,
+    ],
+    queryFn: () =>
+      leaveApi.getPage({
+        page: currentPage,
+        page_size: PAGE_SIZE,
+        search: searchQuery || undefined,
+        status: statusFilter,
+        today_only: todayOnly,
+        sort: dateSort || undefined,
+      }),
+    enabled: activeTab === "Leave List",
+    keepPreviousData: true,
   });
+
+  const leaves = leavePageData?.items || [];
+  // Support both the shape we return and the shape Guidelines uses
+  const leaveTotalItems =
+    leavePageData?.total_items ?? leavePageData?.total ?? 0;
+  const leaveTotalPages =
+    leavePageData?.total_pages ??
+    leavePageData?.pages ??
+    (Math.ceil(leaveTotalItems / PAGE_SIZE) || 0);
+
+  // Full leaves only when KPI / Calendar need them
+  const { data: allLeaves = [] } = useQuery({
+    queryKey: ["leaves"],
+    queryFn: leaveApi.getAll,
+    enabled: activeTab === "Employee KPI"
+  });
+
+  // const { data: employees = [], isLoading: employeesLoading } = useQuery({
+  //   queryKey: ["employees"],
+  //   queryFn: employeeApi.getAll,
+  // });
 
   const { data: wfhRequests = [], isLoading: wfhLoading } = useQuery({
     queryKey: ["wfh"],
@@ -353,11 +484,50 @@ const LeavesPage = () => {
     formatDisplayName(employees.find((e) => e.id === id)?.name) || `Employee #${id}`;
   const activeEmployees = employees.filter((e) => e.status === "active");
 
-  // Pagination: reset to page 1 when tab changes
+  // const handleTabChange = (tab) => {
+  //   setActiveTab(tab);
+  //   setCurrentPage(1);
+  //   setSearchQuery("");
+  // };
   const handleTabChange = (tab) => {
+    if (tab === activeTab) return;
+
+    // Save current list tab before leaving it
+    if (ready && (activeTab === "Leave List" || activeTab === "WFH Requests")) {
+      const root = getPageState(PAGE_KEY);
+      setPageState(PAGE_KEY, {
+        activeTab: tab,
+        tabs: {
+          ...(root.tabs || {}),
+          [activeTab]: {
+            searchQuery,
+            statusFilter,
+            todayOnly,
+            dateSort,
+            currentPage,
+          },
+        },
+      });
+    } else if (ready) {
+      setPageState(PAGE_KEY, {
+        ...getPageState(PAGE_KEY),
+        activeTab: tab,
+      });
+    }
+
     setActiveTab(tab);
-    setCurrentPage(1);
-    setSearchQuery("");
+
+    // Load target tab's saved filters / pagination
+    if (tab === "Leave List" || tab === "WFH Requests") {
+      const next = getPageState(PAGE_KEY).tabs?.[tab] || defaultListState;
+      setSearchQuery(next.searchQuery || "");
+      setStatusFilter(next.statusFilter ?? "all");
+      setTodayOnly(!!next.todayOnly);
+      setDateSort(next.dateSort || "");
+      setCurrentPage(next.currentPage ?? 1);
+      // Allow page-reset effect to skip this load
+      skipPageReset.current = true;
+    }
   };
 
   const handleSearchChange = (val) => {
@@ -394,7 +564,7 @@ const LeavesPage = () => {
   const filteredWFH = wfhRequests.filter((w) => {
     const name = nameSearchText(
       w.employee_name ||
-        employees.find((e) => e.id === w.employee_id)?.name,
+      employees.find((e) => e.id === w.employee_id)?.name,
     );
     const reason = (w.reason || "").toLowerCase();
     const q = searchQuery.toLowerCase();
@@ -503,14 +673,13 @@ const LeavesPage = () => {
                     </span>
                     <button
                       type="button"
-                      onClick={() => {
-                        setTodayOnly((t) => !t);
-                        setCurrentPage(1);
-                      }}
-                      className={`inline-flex h-5 w-9 items-center rounded-full transition-colors ${todayOnly ? "bg-indigo-600" : "bg-slate-200"}`}
+                      onClick={() => setTodayOnly((t) => !t)}
+                      className={`inline-flex h-5 w-9 items-center rounded-full transition-colors ${todayOnly ? "bg-indigo-600" : "bg-slate-200"
+                        }`}
                     >
                       <span
-                        className={`inline-block h-4 w-4 transform rounded-full bg-white transition-transform ${todayOnly ? "translate-x-4" : "translate-x-0.5"}`}
+                        className={`inline-block h-4 w-4 transform rounded-full bg-white transition-transform ${todayOnly ? "translate-x-4" : "translate-x-0.5"
+                          }`}
                       />
                     </button>
                   </div>
@@ -726,7 +895,8 @@ const LeavesPage = () => {
                       {leave.is_half_day ? (
                         <>
                           day (
-                          {leave.half_day_slot === "first_half" || leave.half_day_slot === "1st Half"
+                          {leave.half_day_slot === "first_half" ||
+                            leave.half_day_slot === "1st Half"
                             ? "1st Half"
                             : "2nd Half"}
                           )
@@ -1056,11 +1226,10 @@ const LeavesPage = () => {
                   key={preset}
                   type="button"
                   onClick={() => setWfhRemark(preset)}
-                  className={`px-2.5 py-1 rounded-lg border text-[11px] font-semibold transition-colors ${
-                    wfhRemark === preset
-                      ? "bg-indigo-600 text-white border-indigo-600"
-                      : "bg-slate-50 text-slate-600 border-slate-200 hover:bg-slate-100"
-                  }`}
+                  className={`px-2.5 py-1 rounded-lg border text-[11px] font-semibold transition-colors ${wfhRemark === preset
+                    ? "bg-indigo-600 text-white border-indigo-600"
+                    : "bg-slate-50 text-slate-600 border-slate-200 hover:bg-slate-100"
+                    }`}
                 >
                   {preset}
                 </button>
@@ -1163,7 +1332,7 @@ const LeavesPage = () => {
             </div>
             <div>
               {selectedLeaveType === "first_half" ||
-              selectedLeaveType === "second_half" ? (
+                selectedLeaveType === "second_half" ? (
                 <div>
                   <label className="block text-sm font-medium text-gray-700 mb-1">
                     Date <span className="text-red-500">*</span>
@@ -1220,7 +1389,7 @@ const LeavesPage = () => {
                 <div className="rounded-xl border border-indigo-150 bg-indigo-50/50 p-4 text-sm text-indigo-900 space-y-2">
                   <div className="flex items-center gap-1.5 font-semibold text-indigo-950">
                     <Clock className="w-4 h-4 text-indigo-600" /> Half-day Leave
-                    Policy & Slots
+                    Policy &amp; Slots
                   </div>
                   <div className="grid grid-cols-1 sm:grid-cols-2 gap-3 text-xs">
                     <div className="p-2.5 bg-white rounded-lg border border-indigo-100/80">
@@ -1286,7 +1455,10 @@ const LeavesPage = () => {
           }}
           isPending={deleteMutation.isPending}
           title="Delete Leave Record"
-          message={`Are you sure you want to delete the ${getLeaveTypeLabel(deleteTarget.leave_type)} record for ${getEmployeeName(deleteTarget.employee_id)} (${deleteTarget.start_date} — ${deleteTarget.end_date})?`}
+          message={`Are you sure you want to delete the ${getLeaveTypeLabel(
+            deleteTarget.leave_type,
+          )} record for ${getEmployeeName(deleteTarget.employee_id)} (${deleteTarget.start_date
+            } — ${deleteTarget.end_date})?`}
           variant="danger"
           confirmText="Delete"
           cancelText="Cancel"

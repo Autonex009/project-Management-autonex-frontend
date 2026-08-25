@@ -2,6 +2,8 @@ import { useState, useEffect, useRef, useMemo } from "react";
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
 import { useLocation, useNavigate } from "react-router-dom";
 import UserAvatar from "../components/ui/UserAvatar";
+import usePageStateStore from "../store/usePageStateStore";
+import { usePageScroll } from "../hooks/usePageScroll";
 import {
   allocationApi,
   subProjectApi,
@@ -102,11 +104,6 @@ const AllocationsPage = () => {
   const isPm = role === "pm";
   const isScoped = isProjectScopedRole(role);
   const prefix = isScoped ? "/pm" : "/admin";
-  const pmEmployeeId = getPmEmployeeId(user);
-  const [isModalOpen, setIsModalOpen] = useState(false);
-  const [currentPage, setCurrentPage] = useState(1);
-  const PAGE_SIZE = 10;
-  const [selectedProject, setSelectedProject] = useState(null);
   const [selectedEmployees, setSelectedEmployees] = useState([]);
   const [availableEmployees, setAvailableEmployees] = useState([]);
   const [allocatedEmployeesOther, setAllocatedEmployeesOther] = useState([]);
@@ -122,7 +119,48 @@ const AllocationsPage = () => {
   const [totalDailyHours, setTotalDailyHours] = useState(8);
   const [employeeSearch, setEmployeeSearch] = useState("");
 
-  const { data: projects = [], isLoading: projectsLoading } = useQuery({
+  const [isModalOpen, setIsModalOpen] = useState(false);
+
+  // ── Persist search + page + scroll ─────────────────────────
+  const PAGE_KEY = "allocations";
+  const saved = usePageStateStore((s) => s.getPageState(PAGE_KEY));
+  const setPageState = usePageStateStore((s) => s.setPageState);
+
+  const [currentPage, setCurrentPage] = useState(saved.currentPage ?? 1);
+  const [searchQuery, setSearchQuery] = useState(saved.searchQuery ?? "");
+
+  useEffect(() => {
+    setPageState(PAGE_KEY, { searchQuery, currentPage });
+  }, [searchQuery, currentPage, setPageState]);
+
+  usePageScroll(PAGE_KEY);
+
+  const [selectedProject, setSelectedProject] = useState(null);
+
+  // ── CHANGED: one pre-aggregated page from the server, instead of
+  // projects + allocations + employees + leaves + wfh + parentProjects all
+  // joined and recomputed for every project in the browser. ─────────────
+  const {
+    data: pageData,
+    isLoading: pageLoading,
+    isFetching: pageFetching,
+  } = useQuery({
+    queryKey: ["allocations-page", currentPage, searchQuery],
+    queryFn: () =>
+      allocationApi.getPage({
+        page: currentPage,
+        pageSize: PAGE_SIZE,
+        search: searchQuery,
+      }),
+    keepPreviousData: true,
+  });
+
+  const rows = pageData?.items || [];
+  const totalPages = pageData?.total_pages || 0;
+  const totalItems = pageData?.total_items || 0;
+
+  // Lightweight list of every project, for the "Select Project" dropdown only.
+  const { data: projects = [] } = useQuery({
     queryKey: ["sub-projects"],
     queryFn: subProjectApi.getAll,
   });
@@ -585,7 +623,7 @@ const AllocationsPage = () => {
     })
     .filter((pa) => pa.allocations.length > 0 || pa.requiredManpower > 0);
 
-  const [searchQuery, setSearchQuery] = useState("");
+  // const [searchQuery, setSearchQuery] = useState("");
 
   const filteredProjectAllocations = useMemo(() => {
     if (!searchQuery.trim()) return projectAllocations;
@@ -674,7 +712,7 @@ const AllocationsPage = () => {
             render: (projectAllocs, row) => {
               const project = row.project;
               const pmIdSet = new Set((project?.assigned_employee_ids || []).map(String));
-              
+
               const rawRows = projectAllocs
                 .filter((a) => !isStale(a))
                 .map((a) => {
@@ -689,9 +727,9 @@ const AllocationsPage = () => {
                     isLead: (a.role_tags || []).includes("Team Lead")
                   };
                 });
-                
+
               const allocatedEmpIds = new Set(rawRows.map(r => String(r.alloc.employee_id)));
-              
+
               const allPmIds = new Set([...pmIdSet, ...(row.pmIds || [])]);
               allPmIds.forEach((id) => {
                 if (!allocatedEmpIds.has(id) && employeeIndex.has(id)) {
@@ -724,12 +762,12 @@ const AllocationsPage = () => {
               });
 
               const ordered = rawRows.sort((a, b) => {
-                  if (a.isPm && !b.isPm) return -1;
-                  if (!a.isPm && b.isPm) return 1;
-                  if (a.isLead && !b.isLead) return -1;
-                  if (!a.isLead && b.isLead) return 1;
-                  return a.name.localeCompare(b.name);
-                });
+                if (a.isPm && !b.isPm) return -1;
+                if (!a.isPm && b.isPm) return 1;
+                if (a.isLead && !b.isLead) return -1;
+                if (!a.isLead && b.isLead) return 1;
+                return a.name.localeCompare(b.name);
+              });
               return (
                 <div className="flex items-center gap-2">
                   <div className="flex -space-x-1.5 overflow-hidden">
@@ -809,10 +847,10 @@ const AllocationsPage = () => {
               const assigned = row.assignedManpower || 0;
               const required = row.requiredManpower || 0;
               const full = assigned >= required && required > 0;
-              
+
               const allocPm = row.pmSlots || 0;
               const allocLead = row.leadSlots || 0;
-              
+
               // Split allocated employees into on-leave / WFH / WFO for today.
               let onLeaveToday = 0,
                 wfhCount = 0,
@@ -1097,14 +1135,14 @@ const AllocationsPage = () => {
                                     : `${rawName}${alloc.total_daily_hours ? ` · ${alloc.total_daily_hours}h/day` : ""}`
                                 }
                                 className={`group inline-flex items-center gap-1.5 pl-1 pr-1 py-0.5 rounded-full shadow-sm transition-opacity ${stale
-                                    ? "border border-rose-300 bg-rose-50"
-                                    : "border border-slate-200 bg-white"
+                                  ? "border border-rose-300 bg-rose-50"
+                                  : "border border-slate-200 bg-white"
                                   } ${isRemoving ? "opacity-50" : ""}`}
                               >
                                 <span
                                   className={`w-5 h-5 rounded-full text-[10px] font-semibold flex items-center justify-center ${stale
-                                      ? "bg-rose-200 text-rose-700"
-                                      : "bg-indigo-500 text-white"
+                                    ? "bg-rose-200 text-rose-700"
+                                    : "bg-indigo-500 text-white"
                                     }`}
                                 >
                                   {stale ? (
@@ -1115,8 +1153,8 @@ const AllocationsPage = () => {
                                 </span>
                                 <span
                                   className={`text-xs max-w-[120px] truncate ${stale
-                                      ? "font-medium text-rose-700"
-                                      : "text-slate-700"
+                                    ? "font-medium text-rose-700"
+                                    : "text-slate-700"
                                     }`}
                                 >
                                   {name}
@@ -1148,8 +1186,8 @@ const AllocationsPage = () => {
                                     });
                                   }}
                                   className={`ml-0.5 w-4 h-4 rounded-full flex items-center justify-center transition-colors disabled:cursor-not-allowed ${stale
-                                      ? "text-rose-500 hover:text-white hover:bg-rose-500"
-                                      : "text-slate-400 hover:text-white hover:bg-rose-500"
+                                    ? "text-rose-500 hover:text-white hover:bg-rose-500"
+                                    : "text-slate-400 hover:text-white hover:bg-rose-500"
                                     }`}
                                   title={`Remove ${name}`}
                                 >
@@ -1217,8 +1255,8 @@ const AllocationsPage = () => {
                           type="button"
                           onClick={() => setFilterTab(t.key)}
                           className={`px-3 py-1.5 text-[13px] font-semibold rounded-md transition-all whitespace-nowrap ${filterTab === t.key
-                              ? "bg-white text-slate-900 shadow-sm ring-1 ring-slate-200/70"
-                              : "text-slate-500 hover:text-slate-800"
+                            ? "bg-white text-slate-900 shadow-sm ring-1 ring-slate-200/70"
+                            : "text-slate-500 hover:text-slate-800"
                             }`}
                         >
                           {t.label}
@@ -1528,8 +1566,8 @@ const AllocationsPage = () => {
                           return (
                             <div
                               className={`mt-2 p-2 rounded text-sm ${isValid
-                                  ? "bg-green-50 text-green-700 border border-green-200"
-                                  : "bg-red-50 text-red-700 border border-red-200"
+                                ? "bg-green-50 text-green-700 border border-green-200"
+                                : "bg-red-50 text-red-700 border border-red-200"
                                 }`}
                             >
                               {isValid
@@ -1598,15 +1636,15 @@ const AllocationsPage = () => {
                 <div
                   key={alloc.id}
                   className={`flex items-center justify-between p-4 border rounded-md ${stale
-                      ? "border-rose-200 bg-rose-50"
-                      : "border-gray-200 hover:bg-gray-50"
+                    ? "border-rose-200 bg-rose-50"
+                    : "border-gray-200 hover:bg-gray-50"
                     }`}
                 >
                   <div className="flex items-center gap-3">
                     <div
                       className={`w-10 h-10 rounded-full flex items-center justify-center font-medium ${stale
-                          ? "bg-rose-200 text-rose-700"
-                          : "bg-blue-500 text-white"
+                        ? "bg-rose-200 text-rose-700"
+                        : "bg-blue-500 text-white"
                         }`}
                     >
                       {stale ? (

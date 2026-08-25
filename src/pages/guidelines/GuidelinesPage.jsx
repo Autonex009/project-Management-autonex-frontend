@@ -1,4 +1,6 @@
 import React, { useRef, useState, useEffect } from "react";
+import usePageStateStore from "../../store/usePageStateStore";
+import { usePageScroll } from "../../hooks/usePageScroll";
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
 import Button from "../../components/ui/Button";
 import { guidelineApi, projectApi, subProjectApi } from "../../services/api";
@@ -47,6 +49,19 @@ const GuidelinesPage = () => {
   const canEdit = role === "pm" || role === "admin";
   const pmEmployeeId = getPmEmployeeId(user);
 
+  // ── Persist org filter / search / page / scroll ────────────
+  const PAGE_KEY = "guidelines";
+  const setPageState = usePageStateStore((s) => s.setPageState);
+  const getPageState = usePageStateStore((s) => s.getPageState);
+
+  const [filterProject, setFilterProject] = useState("");
+  const [searchQuery, setSearchQuery] = useState("");
+  const [page, setPage] = useState(1);
+
+  const [selectedFile, setSelectedFile] = useState(null);
+  const [isDragActive, setIsDragActive] = useState(false);
+  const fileInputRef = useRef(null);
+  const [deleteTarget, setDeleteTarget] = useState(null);
   const [showForm, setShowForm] = useState(false);
   const [editingId, setEditingId] = useState(null);
   const [form, setForm] = useState({
@@ -55,14 +70,45 @@ const GuidelinesPage = () => {
     sub_project_id: "",
   });
 
-  const [filterProject, setFilterProject] = useState("");
-  const [selectedFile, setSelectedFile] = useState(null);
-  const [isDragActive, setIsDragActive] = useState(false);
-  const fileInputRef = useRef(null);
-  const [searchQuery, setSearchQuery] = useState("");
-  const [deleteTarget, setDeleteTarget] = useState(null);
-  const [page, setPage] = useState(1);
-  const PAGE_SIZE = 12;
+  const [ready, setReady] = useState(false);
+
+  useEffect(() => {
+    const restore = () => {
+      const s = getPageState(PAGE_KEY);
+      if (s.filterProject != null) setFilterProject(s.filterProject);
+      if (s.searchQuery != null) setSearchQuery(s.searchQuery);
+      if (s.page != null) setPage(s.page);
+      setReady(true);
+    };
+
+    if (usePageStateStore.persist.hasHydrated()) {
+      restore();
+      return;
+    }
+    return usePageStateStore.persist.onFinishHydration(restore);
+  }, [getPageState]);
+
+  useEffect(() => {
+    if (!ready) return;
+    setPageState(PAGE_KEY, {
+      filterProject,
+      searchQuery,
+      page,
+    });
+  }, [ready, filterProject, searchQuery, page, setPageState]);
+
+  usePageScroll(PAGE_KEY);
+
+  // Reset page when filter/search change — skip first run after restore
+  const skipPageReset = useRef(true);
+  useEffect(() => {
+    if (!ready) return;
+    if (skipPageReset.current) {
+      skipPageReset.current = false;
+      return;
+    }
+    setPage(1);
+  }, [searchQuery, filterProject, ready]);
 
   // Fetch guidelines
   const params = {};
@@ -93,17 +139,9 @@ const GuidelinesPage = () => {
     ? getPmSubProjects(subProjects, mainProjects, pmEmployeeId, [])
     : subProjects;
 
-  const filteredGuidelines = guidelines.filter((g) => {
-    const title = (g.title || "").toLowerCase();
-    const content = (g.content || "").toLowerCase();
-    const fileName = (g.file_name || "").toLowerCase();
-    const q = searchQuery.toLowerCase();
-    return title.includes(q) || content.includes(q) || fileName.includes(q);
-  });
-
-  useEffect(() => {
-    setPage(1);
-  }, [searchQuery, filterProject]);
+  // CHANGED: search/filter now happen server-side via the query key above;
+  // reset to page 1 whenever either changes so the new result set starts
+  // from the top.
 
   // Mutations
   const createMutation = useMutation({
@@ -190,9 +228,9 @@ const GuidelinesPage = () => {
 
   const visibleSubProjects = form.main_project_id
     ? visibleSubProjectsForRole.filter(
-        (project) =>
-          String(project.main_project_id) === String(form.main_project_id),
-      )
+      (project) =>
+        String(project.main_project_id) === String(form.main_project_id),
+    )
     : visibleSubProjectsForRole;
 
   const columns = [
@@ -251,10 +289,10 @@ const GuidelinesPage = () => {
         <span className="whitespace-nowrap text-slate-500 tabular-nums">
           {g.created_at
             ? new Date(g.created_at).toLocaleDateString("en-US", {
-                month: "short",
-                day: "numeric",
-                year: "numeric",
-              })
+              month: "short",
+              day: "numeric",
+              year: "numeric",
+            })
             : "—"}
         </span>
       ),
@@ -268,16 +306,16 @@ const GuidelinesPage = () => {
         <div className="flex items-center justify-end gap-1">
           {g.file_url && (
             <a
-                href={g.file_url}
-                target="_blank"
-                rel="noreferrer"
-                download
-                title={`Download ${g.file_name || "file"}`}
-                onClick={(e) => e.stopPropagation()}
-                className="rounded-lg p-1.5 text-slate-400 transition-colors hover:bg-indigo-50 hover:text-indigo-600"
-              >
-                <Download className="h-4 w-4" />
-              </a>
+              href={g.file_url}
+              target="_blank"
+              rel="noreferrer"
+              download
+              title={`Download ${g.file_name || "file"}`}
+              onClick={(e) => e.stopPropagation()}
+              className="rounded-lg p-1.5 text-slate-400 transition-colors hover:bg-indigo-50 hover:text-indigo-600"
+            >
+              <Download className="h-4 w-4" />
+            </a>
           )}
           {canEdit && (
             <>
@@ -480,11 +518,10 @@ const GuidelinesPage = () => {
                       addGuidelineFile(e.dataTransfer.files?.[0]);
                     }}
                     onClick={() => fileInputRef.current?.click()}
-                    className={`border-2 border-dashed rounded-xl p-6 text-center cursor-pointer transition-colors ${
-                      isDragActive
+                    className={`border-2 border-dashed rounded-xl p-6 text-center cursor-pointer transition-colors ${isDragActive
                         ? "border-indigo-500 bg-indigo-50"
                         : "border-slate-300 bg-slate-50 hover:border-indigo-400 hover:bg-indigo-50/60"
-                    }`}
+                      }`}
                   >
                     <input
                       ref={fileInputRef}
