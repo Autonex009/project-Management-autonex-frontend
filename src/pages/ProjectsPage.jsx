@@ -1,5 +1,5 @@
 import { useState, useEffect, useRef, useMemo } from "react";
-import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
+import { useQuery, useMutation, useQueryClient, keepPreviousData } from "@tanstack/react-query";
 import { useNavigate, useSearchParams } from "react-router-dom";
 import Button from "../components/ui/Button";
 import Spinner from "../components/ui/LoadingSpinner";
@@ -75,16 +75,16 @@ import useProjectsStore from "../store/useProjectsStore";
 import { formatDisplayName } from "../utils/displayName";
 import { getWorkingDayCount } from "../utils/leaveTypes";
 
-import {
-  STATUS_CONFIG,
-  ARCHIVED_STATUSES,
-  isArchivedStatus,
-  getStatusBadgeConfig,
-  formatCreatedDate,
-  PROJECT_TYPE_CATEGORIES,
-  typeLabel,
-  DEVELOPER_TYPE_KEY,
-  isDeveloperProject
+import { 
+  STATUS_CONFIG, 
+  ARCHIVED_STATUSES, 
+  isArchivedStatus, 
+  getStatusBadgeConfig, 
+  formatCreatedDate, 
+  PROJECT_TYPE_CATEGORIES, 
+  typeLabel, 
+  DEVELOPER_TYPE_KEY, 
+  isDeveloperProject 
 } from "../utils/projectConstants";
 import ProjectCard from "../components/projects/ProjectCard";
 import { SkillMultiSelect, EmployeeMultiSelect, TeamLeadMultiSelect, PmMultiSelect } from "../components/projects/ProjectDropdowns";
@@ -93,6 +93,11 @@ import { SkillMultiSelect, EmployeeMultiSelect, TeamLeadMultiSelect, PmMultiSele
 const ProjectsPage = () => {
   const queryClient = useQueryClient();
   const navigate = useNavigate();
+  const [searchParams, setSearchParams] = useSearchParams();
+  const filterMainProjectId = searchParams.get("project");
+  const statusParam = searchParams.get("status");
+  const recommendationParam = searchParams.get("recommendation");
+  const focusId = searchParams.get("focus"); // scroll to + highlight this sub-project (e.g. from Allocations)
   const user = JSON.parse(localStorage.getItem("user") || "{}");
   const role = localStorage.getItem("role") || "admin";
   // `isPm` means "owns projects" — it drives self-assignment as a project's manager, so a
@@ -181,70 +186,109 @@ const ProjectsPage = () => {
     setPrioritySuggestion(sugg);
   }, [manpowerTrigger, selectedTeamLeadIds, isModalOpen]);
 
-  const { data: projects = [], isLoading } = useQuery({
-    queryKey: ["sub-projects"],
-    queryFn: subProjectApi.getAll,
+  const { data: projectKpis } = useQuery({
+    queryKey: ["sub-projects-kpi"],
+    queryFn: () => subProjectApi.getKpi(),
+    staleTime: 60000,
   });
 
-  const { data: mainProjects = [] } = useQuery({
+  const { data: paginatedData, isLoading, isFetching } = useQuery({
+    queryKey: [
+      "sub-projects-paginated",
+      currentPage,
+      12,
+        subProjectSearch,
+      filterMainProjectId,
+      statusParam,
+      recommendationParam,
+      selectedOrganization,
+      selectedPm,
+      selectedTeamLead,
+      selectedStatus,
+      selectedPriority,
+      projectView,
+      autonexOnly,
+    ],
+    queryFn: () =>
+      subProjectApi.getPaginated({
+        page: currentPage,
+        limit: 12,
+        search: subProjectSearch || undefined,
+        main_project_id: filterMainProjectId || undefined,
+        project_view: projectView,
+        status: statusParam || (selectedStatus !== "all" ? selectedStatus : undefined),
+        priority: selectedPriority !== "all" ? selectedPriority : undefined,
+        organization: selectedOrganization !== "all" ? selectedOrganization : undefined,
+        autonex_only: autonexOnly ? true : undefined,
+        pm_id: selectedPm !== "all" ? selectedPm : undefined,
+        team_lead_id: selectedTeamLead !== "all" ? selectedTeamLead : undefined,
+        recommendation: recommendationParam || undefined,
+      }),
+    placeholderData: keepPreviousData,
+    staleTime: 5 * 60 * 1000, // 5 minutes
+  });
+
+  const projects = paginatedData?.items || [];
+  const totalItems = paginatedData?.total || 0;
+  const projectMetrics = projectKpis?.metrics || {
+    totalProjects: 0,
+    activeProjects: 0,
+    overburdenedProjects: 0,
+    balancedProjects: 0,
+    onHoldProjects: 0,
+    completedProjects: 0,
+    cancelledProjects: 0,
+  };
+  const tabCounts = projectKpis?.tab_counts || {
+    active: 0,
+    archived: 0,
+    development: 0,
+  };
+
+  const { data: parentProjects = [] } = useQuery({
     queryKey: ["parent-projects"],
-    queryFn: parentProjectApi.getAll,
+    queryFn: () => parentProjectApi.getAll(),
   });
 
+  // Lazy-load employees only when needed for add/edit modal? No, employeeIndex
+  // is required for resolving PMs and Team Leads on the initial render of the
+  // project cards, otherwise they show as 0 or empty until the modal opens.
   const { data: employees = [] } = useQuery({
     queryKey: ["employees"],
     queryFn: () => employeeApi.getSlim(),
   });
-
-  // Only active Program Managers (used in Add Project modal)
-  const pmEmployees = useMemo(() => {
-    return employees.filter(
-      (emp) =>
-        emp.status === "active" &&
-        (emp.designation || "").toLowerCase().includes("program manager")
-    );
-  }, [employees]);
-
-  // Each picker offers exactly its own designation: Team Leads here, Program Managers in
-  // pmEmployees above. Needing an extra manager on a project is now served by adding a
-  // co-manager to that list rather than by borrowing one as a lead.
-  //
-  // The underlying "program manager acting as a lead" record still works and is still
-  // honoured wherever leads are resolved — it is set from the Allocations page, so a project
-  // that already has one keeps showing it. This dropdown simply does not create them.
-  const teamLeadEmployees = useMemo(() => {
-    return employees.filter(
-      (emp) => emp.status === "active" && isTeamLeadDesignation(emp.designation),
-    );
-  }, [employees]);
-
-  // Roster lookup — also the test for a stale allocation, since `GET /employees`
-  // omits archived staff that `GET /allocations` still references.
-  const employeeIndex = useMemo(
-    () => buildEmployeeIndex(employees),
-    [employees],
-  );
-
-  // Archived staff, so a stale allocation names who left instead of reading
-  // "Former employee". Naming only — never counted towards manpower.
   const { data: formerEmployees = [] } = useQuery({
     queryKey: ["employees", "archived"],
     queryFn: () => employeeApi.getSlim({ status: "archived" }),
   });
-
+  const employeeIndex = useMemo(() => {
+    return new Map(employees.map((e) => [String(e.id), e]));
+  }, [employees]);
+  const pmEmployees = useMemo(() => {
+    return employees.filter((e) =>
+      (e.designation || "").toLowerCase().includes("program manager"),
+    );
+  }, [employees]);
+  const teamLeadEmployees = useMemo(() => {
+    return employees.filter((e) =>
+      (e.designation || "").toLowerCase().includes("team lead"),
+    );
+  }, [employees]);
+  const createVendorMutation = useMutation({
+    mutationFn: (name) => vendorApi.create({ name }),
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ["vendors"] });
+    },
+  });
   const { data: skillsData = [] } = useQuery({
     queryKey: ["skills"],
-    queryFn: skillApi.getAll,
+    queryFn: () => skillApi.getAll(),
+    enabled: isModalOpen || !!editingProject,
   });
-
   const { data: vendorsData = [] } = useQuery({
     queryKey: ["vendors"],
-    queryFn: vendorApi.getAll,
-  });
-
-  const createVendorMutation = useMutation({
-    mutationFn: (name) => vendorApi.create(name),
-    onSuccess: () => queryClient.invalidateQueries(["vendors"]),
+    queryFn: () => vendorApi.getAll(),
+    enabled: isModalOpen || !!editingProject,
   });
 
   const { data: allocations = [] } = useQuery({
@@ -252,30 +296,11 @@ const ProjectsPage = () => {
     queryFn: () => allocationApi.getSlim(),
     staleTime: 5 * 60 * 1000,
   });
-
-  // Guideline docs, filtered per-card by sub_project_id for the card "Docs" popover.
-  // const { data: guidelinesData = [] } = useQuery({
-  //   queryKey: ["guidelines", "cards"],
-  //   queryFn: () => guidelineApi.getAll(),
-  // });
-
-  const { startStr, endStr } = useMemo(() => {
-    const today = new Date();
-    const y = today.getFullYear();
-    const m = today.getMonth();
-    const start = `${y}-${String(m + 1).padStart(2, "0")}-01`;
-    const end = `${y}-${String(m + 1).padStart(2, "0")}-${String(new Date(y, m + 1, 0).getDate()).padStart(2, "0")}`;
-    return { startStr: start, endStr: end };
-  }, []);
-
   const { data: leaves = [] } = useQuery({
     queryKey: ["leaves"],
     queryFn: () => leaveApi.getTodayIds(),
     staleTime: 5 * 60 * 1000,
   });
-
-  // Approved WFH-for-a-day requests, so the allocation popover can say where
-  // each person actually is today.
   const { data: wfh = [] } = useQuery({
     queryKey: ["wfh"],
     queryFn: () => wfhApi.getTodayIds(),
@@ -315,26 +340,13 @@ const ProjectsPage = () => {
   // PM *or* allocated to it, so a lead sees exactly the projects they lead — and nothing
   // else. Keyed on isScoped, not isPm: a lead failing an isPm test would fall through to
   // the unscoped admin branch and be shown every project in the organisation.
-  const visibleProjects = isScoped
-    ? getPmSubProjects(projects, mainProjects, pmEmployeeId, allocations)
-    : projects;
+  const visibleProjects = projects;
 
   // Organisations to show: those the person manages, plus the parent of every project they
   // can see. The second half matters for a team lead, who manages no organisation at all —
   // without it `resolvePmIds` would find no parent to fall back to and a project whose PM is
   // recorded only at organisation level would render with no manager.
-  const visibleMainProjects = useMemo(() => {
-    if (!isScoped) return mainProjects;
-    const managedIds = new Set(
-      getPmProjects(mainProjects, pmEmployeeId).map((p) => p.id),
-    );
-    const parentIds = new Set(
-      visibleProjects.map((p) => p.main_project_id).filter(Boolean),
-    );
-    return mainProjects.filter(
-      (mp) => managedIds.has(mp.id) || parentIds.has(mp.id),
-    );
-  }, [isScoped, mainProjects, visibleProjects, pmEmployeeId]);
+  const visibleMainProjects = parentProjects;
 
   // Organization → Project cascade for the create/edit modal. "Organization" is
   // the free-text `client` on a main project (same concept as the Organizations
@@ -348,7 +360,7 @@ const ProjectsPage = () => {
   // The create/edit modal lets a PM pick ANY existing organization (not just their
   // own), so they reuse "Autonex" etc. instead of creating a duplicate. The top
   // filter above stays PM-scoped (organizations); this is modal-only.
-  const allOrganizations = [...new Set(mainProjects.map(clientOf))].sort(
+  const allOrganizations = [...new Set(parentProjects.map(clientOf))].sort(
     (a, b) => (a === NO_ORG ? 1 : b === NO_ORG ? -1 : a.localeCompare(b)),
   );
   // The organization a given main-project id belongs to (used to prefill on edit/copy).
@@ -602,10 +614,10 @@ const ProjectsPage = () => {
       // Match against ALL organizations (not just the PM's own) so a PM reuses an
       // existing org like "Autonex" instead of silently creating a duplicate.
       const existingOrg =
-        mainProjects.find(
+        parentProjects.find(
           (p) => (p.name || "").trim().toLowerCase() === orgName.toLowerCase(),
         ) ||
-        mainProjects.find(
+        parentProjects.find(
           (p) => (p.client || "").trim().toLowerCase() === orgName.toLowerCase(),
         );
 
@@ -992,11 +1004,7 @@ const ProjectsPage = () => {
     };
   };
 
-  const [searchParams, setSearchParams] = useSearchParams();
-  const filterMainProjectId = searchParams.get("project");
-  const statusParam = searchParams.get("status");
-  const recommendationParam = searchParams.get("recommendation");
-  const focusId = searchParams.get("focus"); // scroll to + highlight this sub-project (e.g. from Allocations)
+
   const [deleteConfirm, setDeleteConfirm] = useState(null);
   const [highlightId, setHighlightId] = useState(null);
 
@@ -1067,84 +1075,7 @@ const ProjectsPage = () => {
     return () => document.removeEventListener("mousedown", handler);
   }, []);
 
-  const filteredProjects = (
-    filterMainProjectId
-      ? visibleProjects.filter(
-        (p) => p.main_project_id === parseInt(filterMainProjectId),
-      )
-      : visibleProjects
-  )
-    .filter((project) => {
-      // Tabs are admin-only. PMs have no tabs and see every project together.
-      if (!isAdmin) return true;
-      // Top-level tabs. Development is a separate bucket (by project type); Active vs
-      // Archived split the rest by status (Completed / On Hold / Cancelled = archived).
-      const dev = isDeveloperProject(project);
-      if (projectView === "development") return dev;
-      if (dev) return false; // developer projects live only under the Development tab
-      return projectView === "archived"
-        ? isArchivedStatus(project.project_status)
-        : !isArchivedStatus(project.project_status);
-    })
-    .filter((project) => {
-      // "Autonex" quick filter: only projects staffed with ≥1 Autonex employee
-      // (team composition = Autonex annotators + reviewers + QC).
-      if (!autonexOnly) return true;
-      return (
-        (project.autonex_annotators || 0) + (project.autonex_reviewers || 0) > 0
-      );
-    })
-    .filter((project) => {
-      if (selectedOrganization === "all") return true;
-
-      const parentProject = visibleMainProjects.find(
-        (p) => p.id === project.main_project_id,
-      );
-
-      return (parentProject?.client || NO_ORG) === selectedOrganization;
-    })
-    .filter((project) => {
-      if (selectedPm === "all") return true;
-      return resolvePmIds(project).includes(Number(selectedPm));
-    })
-    .filter((project) => {
-      if (selectedTeamLead === "all") return true;
-      return (teamLeadIdsByProject.get(project.id) || new Set()).has(
-        Number(selectedTeamLead),
-      );
-    })
-    .filter((project) => {
-      if (selectedStatus === "all") return true;
-      const status = (project.project_status || "active").toLowerCase().trim();
-      if (selectedStatus === "active") {
-        return (
-          status === "active" ||
-          status === "in-progress" ||
-          status === "in progress"
-        );
-      }
-      if (selectedStatus === "poc") {
-        return status === "poc";
-      }
-      return status === selectedStatus.toLowerCase();
-    })
-    .filter((project) => {
-      if (selectedPriority === "all") return true;
-      return (project.priority || "medium") === selectedPriority;
-    })
-    .filter((p) => {
-      if (statusParam && p.project_status !== statusParam) return false;
-
-      if (recommendationParam) {
-        const recResult = getSystemRecommendation(p);
-
-        if (recResult.label.toLowerCase() !== recommendationParam.toLowerCase())
-          return false;
-      }
-
-      return p.name.toLowerCase().includes(subProjectSearch.toLowerCase());
-    })
-    .sort((a, b) => a.name.localeCompare(b.name));
+  const filteredProjects = projects;
 
   // Reset to page 1 when filters change
   useEffect(() => {
@@ -1191,69 +1122,7 @@ const ProjectsPage = () => {
     (p) => p.id === parseInt(filterMainProjectId),
   );
 
-  const projectMetrics = useMemo(() => {
-    const totalProjects = filteredProjects.length;
 
-    const activeProjects = filteredProjects.filter(
-      (p) => p.project_status === "active",
-    ).length;
-
-    const overburdenedProjects = filteredProjects.filter((p) => {
-      const required = getRequiredManpower(p);
-      const allocated = getAllocatedManpower(p);
-      return required > 0 ? allocated < required : false;
-    }).length;
-
-    const balancedProjects = filteredProjects.filter((p) => {
-      const required = getRequiredManpower(p);
-      const allocated = getAllocatedManpower(p);
-      return required > 0 ? allocated >= required : allocated > 0;
-    }).length;
-
-    // Archived-tab breakdown by status.
-    const statusOf = (p) => (p.project_status || "active").toLowerCase().trim();
-    const onHoldProjects = filteredProjects.filter(
-      (p) => statusOf(p) === "on-hold",
-    ).length;
-    const completedProjects = filteredProjects.filter(
-      (p) => statusOf(p) === "completed",
-    ).length;
-    const cancelledProjects = filteredProjects.filter(
-      (p) => statusOf(p) === "cancelled",
-    ).length;
-
-    return {
-      totalProjects,
-      activeProjects,
-      overburdenedProjects,
-      balancedProjects,
-      onHoldProjects,
-      completedProjects,
-      cancelledProjects,
-    };
-  }, [filteredProjects, allocations, employees, leaves]);
-
-  // Per-tab totals shown as badges next to each tab label (independent of the
-  // currently selected tab, but respecting the org/project scope filter).
-  const tabCounts = useMemo(() => {
-    const base = filterMainProjectId
-      ? visibleProjects.filter(
-        (p) => p.main_project_id === parseInt(filterMainProjectId),
-      )
-      : visibleProjects;
-    let active = 0,
-      archived = 0,
-      development = 0;
-    base.forEach((project) => {
-      if (isDeveloperProject(project)) {
-        development += 1;
-        return;
-      }
-      if (isArchivedStatus(project.project_status)) archived += 1;
-      else active += 1;
-    });
-    return { active, archived, development };
-  }, [visibleProjects, filterMainProjectId]);
 
   // Open the full create/edit modal, prefilled from a project. `copy` clones it.
   const openProjectModal = (project, { copy = false } = {}) => {
@@ -1838,7 +1707,7 @@ const ProjectsPage = () => {
         </div>
       )}
 
-      {isLoading ? (
+      {(isLoading || isFetching) ? (
         <div className="grid grid-cols-1 md:grid-cols-2 xl:grid-cols-3 gap-2.5">
           {[...Array(6)].map((_, index) => (
             <div
@@ -1919,7 +1788,7 @@ const ProjectsPage = () => {
             </div>
           ))}
         </div>
-      ) : filteredProjects.length === 0 ? (
+      ) : totalItems === 0 ? (
         <div className="rounded-2xl border border-slate-200 bg-white p-12 text-center">
           <h3 className="text-lg font-semibold text-slate-800">
             {filterMainProjectId
@@ -1938,45 +1807,41 @@ const ProjectsPage = () => {
               of room first. */}
           <div className="grid grid-cols-1 md:grid-cols-2 xl:grid-cols-3 gap-2.5">
             {filteredProjects
-              .slice((currentPage - 1) * PAGE_SIZE, currentPage * PAGE_SIZE)
               .map((project) => {
                 const parentProject = visibleMainProjects.find(
                   (p) => p.id === project.main_project_id,
                 );
 
                 const pmIds = resolvePmIds(project);
-                const pmNames = pmIds
-                  .map((id) => employees.find((e) => e.id === id)?.name)
-                  .filter(Boolean);
+              const pmNames = pmIds.map(id => employeeIndex.get(String(id))?.name).filter(Boolean);
+              const allocatedManpower = getAllocatedManpower(project);
 
-                const allocatedManpower = getAllocatedManpower(project);
-
-                return (
-                  <ProjectCard
-                    key={project.id}
-                    id={`sub-project-${project.id}`}
-                    highlighted={highlightId === project.id}
-                    project={project}
-                    parentProject={parentProject}
-                    pmNames={pmNames}
-                    teamLeadNames={getTeamLeadNames(project)}
-                    pmIds={pmIds}
-                    leadIds={getTeamLeadIds(project)}
-                    onLeaveEmployeeIds={leaveEmployeeIds}
-                    locationByEmployeeId={locationByEmployeeId}
-                    allocatedManpower={allocatedManpower}
-                    requiredManpower={getRequiredManpower(project)}
-                    pmSlots={getPmSlots(project)}
-                    leadSlots={getTeamLeadIds(project).length}
-                    allocations={allocations}
-                    employees={employees}
-                    formerEmployees={formerEmployees}
-                    prefix={prefix}
-                    navigate={navigate}
-                    docs={guidelinesData.filter(
-                      (g) => g.sub_project_id === project.id,
-                    )}
-                    isEditing={editingCardId === project.id}
+              return (
+                <ProjectCard
+                  key={project.id}
+                  id={`sub-project-${project.id}`}
+                  highlighted={highlightId === project.id}
+                  project={project}
+                  parentProject={parentProject}
+                  pmNames={pmNames}
+                  teamLeadNames={getTeamLeadNames(project)}
+                  pmIds={pmIds}
+                  leadIds={getTeamLeadIds(project)}
+                  onLeaveEmployeeIds={leaveEmployeeIds}
+                  locationByEmployeeId={locationByEmployeeId}
+                  allocatedManpower={allocatedManpower}
+                  requiredManpower={project.required_manpower || 0}
+                  pmSlots={getPmSlots(project)}
+                  leadSlots={getTeamLeadIds(project).filter(id => employeeIndex.has(String(id))).length}
+                  allocations={allocations}
+                  employees={employees}
+                  formerEmployees={formerEmployees}
+                  prefix={prefix}
+                  navigate={navigate}
+                  docs={guidelinesData.filter(
+                    (g) => g.sub_project_id === project.id,
+                  )}
+                  isEditing={editingCardId === project.id}
                     draft={cardDraft}
                     onStartEdit={() => startCardEdit(project)}
                     onCancelEdit={cancelCardEdit}
@@ -2000,15 +1865,15 @@ const ProjectsPage = () => {
           </div>
 
           {/* Pagination */}
-          {filteredProjects.length > 0 && (
+          {totalItems > 0 && (
             <div className="flex items-center justify-between px-5 py-3 border-t border-slate-100 mt-4">
               <p className="text-sm text-slate-500">
                 Showing{" "}
-                {filteredProjects.length === 0
+                {totalItems === 0
                   ? 0
                   : (currentPage - 1) * PAGE_SIZE + 1}
-                –{Math.min(currentPage * PAGE_SIZE, filteredProjects.length)} of{" "}
-                {filteredProjects.length} items
+                –{Math.min(currentPage * PAGE_SIZE, totalItems)} of{" "}
+                {totalItems} items
               </p>
 
               <div className="flex items-center gap-1">
@@ -2022,14 +1887,14 @@ const ProjectsPage = () => {
 
                 {Array.from(
                   {
-                    length: Math.ceil(filteredProjects.length / PAGE_SIZE),
+                    length: Math.ceil(totalItems / PAGE_SIZE),
                   },
                   (_, i) => i + 1,
                 )
                   .filter(
                     (p) =>
                       p === 1 ||
-                      p === Math.ceil(filteredProjects.length / PAGE_SIZE) ||
+                      p === Math.ceil(totalItems / PAGE_SIZE) ||
                       Math.abs(p - currentPage) <= 1,
                   )
                   .reduce((acc, p, idx, arr) => {
@@ -2066,14 +1931,14 @@ const ProjectsPage = () => {
                   onClick={() =>
                     setCurrentPage(
                       Math.min(
-                        Math.ceil(filteredProjects.length / PAGE_SIZE),
+                        Math.ceil(totalItems / PAGE_SIZE),
                         currentPage + 1,
                       ),
                     )
                   }
                   disabled={
                     currentPage ===
-                    Math.ceil(filteredProjects.length / PAGE_SIZE)
+                    Math.ceil(totalItems / PAGE_SIZE)
                   }
                   className="px-3 py-1.5 text-sm rounded-lg border border-slate-200 text-slate-600 hover:bg-slate-50 disabled:opacity-40 disabled:cursor-not-allowed transition-colors"
                 >
@@ -2154,7 +2019,7 @@ const ProjectsPage = () => {
                   value={formOrg}
                   onChange={(val) => {
                     setFormOrg(val);
-                    const projs = mainProjects.filter(
+                    const projs = parentProjects.filter(
                       (p) => clientOf(p) === val,
                     );
                     setFormMainProjectId(
@@ -2746,10 +2611,9 @@ const ProjectsPage = () => {
                       Annotators" is informational and deliberately not in the sum
                       — it counts the vendor's people as well as ours. */}
                   <p className="mt-2 text-[11px] text-slate-400">
-                    Required headcount = Autonex Annotators + Autonex Reviewers +
-                    Others + Team Leads + Team Managers
-                    {isDevelopmentSelected ? " + Developers" : ""}. Leads and
-                    managers are counted from the fields above, not typed.
+                    {`Required headcount = Autonex Annotators + Autonex Reviewers + Others + Team Leads + Team Managers${
+                      isDevelopmentSelected ? " + Developers" : ""
+                    }. Leads and managers are counted from the fields above, not typed.`}
                   </p>
                 </div>
               </div>

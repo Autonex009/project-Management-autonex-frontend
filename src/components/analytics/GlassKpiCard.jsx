@@ -56,66 +56,67 @@ const GlassKpiCard = ({
   return (
     <div
       onClick={onClick}
-      className={`group relative bg-white/90 backdrop-blur-md border ${theme.border} rounded-2xl p-4 shadow-[0_2px_10px_rgba(15,23,42,0.03)] flex flex-col justify-between hover:-translate-y-0.5 hover:shadow-lg transition-all duration-300 ${
+      className={`group relative bg-white border ${theme.border} rounded-2xl p-3.5 shadow-[0_1px_4px_rgba(28,25,23,0.06)] flex flex-col justify-between hover:-translate-y-0.5 hover:shadow-md transition-all duration-300 ${
         onClick ? "cursor-pointer hover:ring-2 hover:ring-sky-500/40 active:scale-[0.99]" : ""
       }`}
     >
-      <div>
-        <div className="flex items-center justify-between gap-2 mb-3">
-          <div className="flex items-center gap-2.5 min-w-0">
-            <div className={`w-9 h-9 rounded-xl flex items-center justify-center shrink-0 ${theme.iconBg}`}>
-              {Icon && <Icon className="w-4 h-4" />}
-            </div>
-            <div className="text-[11px] font-bold text-slate-700 uppercase tracking-wider leading-tight truncate flex-1 min-w-0">
+      <div className="flex items-start gap-2.5">
+        <div className={`w-8 h-8 rounded-xl flex items-center justify-center shrink-0 mt-0.5 ${theme.iconBg}`}>
+          {Icon && <Icon className="w-3.5 h-3.5" />}
+        </div>
+
+        <div className="flex-1 min-w-0">
+          <div className="flex items-center justify-between gap-1 mb-1">
+            <div className="text-[11px] font-bold text-stone-700 uppercase tracking-wider leading-tight truncate">
               {label}
             </div>
+            {onClick && (
+              <span className="text-[10px] font-bold px-1.5 py-0.5 rounded-md bg-sky-50 text-sky-700 border border-sky-200/80 group-hover:bg-sky-500 group-hover:text-white transition-colors shrink-0">
+                View List
+              </span>
+            )}
+            {hasBreakdown && !onClick && <ChevronDown className="w-3.5 h-3.5 text-stone-400 group-hover:text-stone-600 transition-colors shrink-0" />}
           </div>
-          {onClick && (
-            <span className="text-[10px] font-bold px-1.5 py-0.5 rounded-md bg-sky-50 text-sky-700 border border-sky-200/80 group-hover:bg-sky-500 group-hover:text-white transition-colors shrink-0">
-              View List
-            </span>
-          )}
-          {hasBreakdown && !onClick && <ChevronDown className="w-3.5 h-3.5 text-slate-400 group-hover:text-slate-600 transition-colors shrink-0" />}
-        </div>
 
-        <div className="flex items-center justify-between gap-1">
-          <div className="text-xl sm:text-2xl font-black text-slate-900 tracking-tight font-mono shrink-0 capitalize" title={String(value)}>
-            {value}
+          <div className="flex items-center justify-between gap-1">
+            <div className="text-lg sm:text-xl font-extrabold text-stone-900 tracking-tight font-mono shrink-0 capitalize" title={String(value)}>
+              {value}
+            </div>
+            {trend !== undefined && trend !== null && (
+              <span
+                className={`inline-flex items-center gap-1 px-1.5 py-0.5 rounded-full text-[9.5px] font-bold shrink-0 ${
+                  trend >= 0
+                    ? "bg-emerald-50 text-emerald-700 border border-emerald-200/80"
+                    : "bg-rose-50 text-rose-700 border border-rose-200/80"
+                }`}
+                title={`${trend >= 0 ? "+" : ""}${trend}% ${trendLabel || "vs prev period"}`}
+              >
+                {trend >= 0 ? <TrendingUp className="w-2.5 h-2.5" /> : <TrendingDown className="w-2.5 h-2.5" />}
+                <span>{trend >= 0 ? `+${trend}%` : `${trend}%`}</span>
+                <span className="font-semibold opacity-75">{trendLabel || "vs prev"}</span>
+              </span>
+            )}
           </div>
-          {trend !== undefined && trend !== null && (
-            <span
-              className={`inline-flex items-center gap-1 px-1.5 py-0.5 rounded-full text-[9.5px] font-bold shrink-0 ${
-                trend >= 0
-                  ? "bg-emerald-50 text-emerald-700 border border-emerald-200/80"
-                  : "bg-rose-50 text-rose-700 border border-rose-200/80"
-              }`}
-              title={`${trend >= 0 ? "+" : ""}${trend}% ${trendLabel || "vs prev period"}`}
-            >
-              {trend >= 0 ? <TrendingUp className="w-2.5 h-2.5" /> : <TrendingDown className="w-2.5 h-2.5" />}
-              <span>{trend >= 0 ? `+${trend}%` : `${trend}%`}</span>
-              <span className="font-semibold opacity-75">{trendLabel || "vs prev"}</span>
-            </span>
+
+          {subtitle && (
+            <div className="text-[11px] text-stone-500 font-medium mt-1 truncate">
+              {subtitle}
+            </div>
           )}
         </div>
-
-        {subtitle && (
-          <div className="text-[11px] text-slate-600 font-semibold mt-1 truncate">
-            {subtitle}
-          </div>
-        )}
       </div>
 
       {/* Hover Breakdown Popover */}
       {hasBreakdown && (
-        <div className="pointer-events-none absolute right-0 top-full z-40 mt-1.5 w-max min-w-[220px] max-w-[320px] origin-top-right scale-95 rounded-2xl border border-slate-200/90 bg-white/95 backdrop-blur-md p-3 opacity-0 shadow-2xl transition-all duration-200 group-hover:scale-100 group-hover:opacity-100">
-          <p className="px-1 pb-1.5 text-[10px] font-bold uppercase tracking-wider text-slate-400 border-b border-slate-100 mb-1">
+        <div className="pointer-events-none absolute right-0 top-full z-40 mt-1.5 w-max min-w-[220px] max-w-[320px] origin-top-right scale-95 rounded-xl border border-stone-200 bg-white p-2.5 opacity-0 shadow-xl transition-all duration-200 group-hover:scale-100 group-hover:opacity-100">
+          <p className="px-1 pb-1 text-[10px] font-bold uppercase tracking-wider text-stone-400 border-b border-stone-100 mb-1">
             Where time went
           </p>
           <div className="space-y-1">
             {breakdown.map((b) => (
-              <div key={b.stage} className="flex items-center justify-between gap-6 rounded-lg px-2 py-1 text-xs hover:bg-slate-50 font-medium">
-                <span className="text-slate-600 truncate">{b.stage}</span>
-                <span className="font-mono font-bold text-slate-900">{b.hours}h</span>
+              <div key={b.stage} className="flex items-center justify-between gap-6 rounded-lg px-2 py-1 text-xs hover:bg-stone-50 font-medium">
+                <span className="text-stone-600 truncate">{b.stage}</span>
+                <span className="font-mono font-bold text-stone-900">{b.hours}h</span>
               </div>
             ))}
           </div>
