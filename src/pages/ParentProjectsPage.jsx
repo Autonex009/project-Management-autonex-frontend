@@ -51,24 +51,24 @@ const ParentProjectsPage = () => {
   // Fetch parent projects
   const { data: parentProjects = [], isLoading } = useQuery({
     queryKey: ["parent-projects"],
-    queryFn: () => parentProjectApi.getAll(),
+    queryFn: parentProjectApi.getAll,
   });
 
   // Fetch employees for PM dropdown
   const { data: employees = [] } = useQuery({
     queryKey: ["employees"],
-    queryFn: () => employeeApi.getAll(),
+    queryFn: employeeApi.getAll,
   });
 
   // Fetch sub-projects and allocations for manpower stats
   const { data: subProjects = [] } = useQuery({
     queryKey: ["sub-projects"],
-    queryFn: () => subProjectApi.getAll(),
+    queryFn: subProjectApi.getAll,
     staleTime: 2 * 60 * 1000,
   });
   const { data: allocations = [] } = useQuery({
     queryKey: ["allocations"],
-    queryFn: () => allocationApi.getAll(),
+    queryFn: allocationApi.getAll,
     staleTime: 2 * 60 * 1000,
   });
 

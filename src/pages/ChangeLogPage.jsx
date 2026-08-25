@@ -164,7 +164,7 @@ export default function ChangeLogPage() {
 
   const { data: filterOptions } = useQuery({
     queryKey: ["audit-log-filters"],
-    queryFn: () => auditLogApi.getFilters(),
+    queryFn: auditLogApi.getFilters,
   });
 
   const rawLogs = result?.items || [];

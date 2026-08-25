@@ -13,6 +13,7 @@ import {
   Download,
   FolderOpen,
   UploadCloud,
+  Eye,
 } from "lucide-react";
 import toast from "react-hot-toast";
 import {
@@ -38,7 +39,7 @@ const TruncTip = ({ text, className = "" }) => (
   </span>
 );
 
-const PAGE_SIZE = 12;
+
 
 const GuidelinesPage = () => {
   const queryClient = useQueryClient();
@@ -48,7 +49,7 @@ const GuidelinesPage = () => {
   const canEdit = role === "pm" || role === "admin";
   const pmEmployeeId = getPmEmployeeId(user);
 
-   // ── Persist org filter / search / page / scroll ────────────
+  // ── Persist org filter / search / page / scroll ────────────
   const PAGE_KEY = "guidelines";
   const setPageState = usePageStateStore((s) => s.setPageState);
   const getPageState = usePageStateStore((s) => s.getPageState);
@@ -109,48 +110,27 @@ const GuidelinesPage = () => {
     setPage(1);
   }, [searchQuery, filterProject, ready]);
 
-  // ── CHANGED: one pre-joined, pre-searched, pre-paginated page from the
-  // server, instead of downloading every guideline + every project/org to
-  // filter, search and resolve names in the browser. ─────────────────────
-  const {
-    data: pageData,
-    isLoading: guidelinesLoading,
-    isFetching: guidelinesFetching,
-  } = useQuery({
-    queryKey: ["guidelines-page", page, filterProject, searchQuery, role, user.id],
-    queryFn: () =>
-      guidelineApi.getPage({
-        page,
-        pageSize: PAGE_SIZE,
-        search: searchQuery,
-        mainProjectId: filterProject,
-        uploadedBy: role === "pm" && user.id ? user.id : "",
-      }),
-    keepPreviousData: true,
+  // Fetch guidelines
+  const params = {};
+  if (filterProject) params.main_project_id = filterProject;
+  if (role === "pm" && user.id) params.uploaded_by = user.id;
+  const { data: guidelines = [], isLoading: guidelinesLoading } = useQuery({
+    queryKey: ["guidelines", filterProject, role, user.id],
+    queryFn: () => guidelineApi.getAll(params),
   });
 
-  const guidelines = pageData?.items || [];
-  const totalItems = pageData?.total_items || 0;
-  const totalPages = pageData?.total_pages || 0;
-
-  // Still fetched eagerly: small list, needed for the "All Organizations"
-  // filter dropdown (always visible) and the create/edit form's org selector.
+  // Fetch main projects for filter/selector
   const { data: mainProjects = [], isLoading: mainProjectsLoading } = useQuery({
     queryKey: ["main-projects"],
-    queryFn: () => projectApi.getAll(),
+    queryFn: projectApi.getAll,
   });
 
-  // ── CHANGED: sub-projects are only needed to populate the "Project"
-  // dropdown inside the create/edit modal — the table itself now gets
-  // project_name straight from the server. Fetch lazily, only while the
-  // modal is open. ─────────────────────────────────────────────────────
   const { data: subProjects = [], isLoading: subProjectsLoading } = useQuery({
     queryKey: ["sub-projects"],
     queryFn: subProjectApi.getAll,
-    enabled: showForm && canEdit,
   });
 
-  const isLoading = guidelinesLoading || mainProjectsLoading;
+  const isLoading = guidelinesLoading || mainProjectsLoading || subProjectsLoading;
 
   const visibleMainProjects = isPm
     ? getPmVisibleOrgs(mainProjects, subProjects, pmEmployeeId)
@@ -167,7 +147,7 @@ const GuidelinesPage = () => {
   const createMutation = useMutation({
     mutationFn: (formData) => guidelineApi.upload(formData),
     onSuccess: () => {
-      queryClient.invalidateQueries({ queryKey: ["guidelines-page"] });
+      queryClient.invalidateQueries({ queryKey: ["guidelines"] });
       toast.success("Guideline created!");
       resetForm();
     },
@@ -177,7 +157,7 @@ const GuidelinesPage = () => {
   const updateMutation = useMutation({
     mutationFn: ({ id, data }) => guidelineApi.update(id, data),
     onSuccess: () => {
-      queryClient.invalidateQueries({ queryKey: ["guidelines-page"] });
+      queryClient.invalidateQueries({ queryKey: ["guidelines"] });
       toast.success("Guideline updated!");
       resetForm();
     },
@@ -187,7 +167,7 @@ const GuidelinesPage = () => {
   const deleteMutation = useMutation({
     mutationFn: (id) => guidelineApi.delete(id),
     onSuccess: () => {
-      queryClient.invalidateQueries({ queryKey: ["guidelines-page"] });
+      queryClient.invalidateQueries({ queryKey: ["guidelines"] });
       toast.success("Guideline deleted");
       setDeleteTarget(null);
     },
@@ -235,11 +215,6 @@ const GuidelinesPage = () => {
     }
   };
 
-  // CHANGED: edit now seeds the form from the row's own main_project_id /
-  // sub_project_id (still present on each item), unchanged from before —
-  // just no longer needs a full project list lookup to display the name,
-  // since the row itself already carries organization_name / project_name
-  // for the read-only summary block below.
   const startEdit = (g) => {
     setForm({
       title: g.title,
@@ -253,16 +228,10 @@ const GuidelinesPage = () => {
 
   const visibleSubProjects = form.main_project_id
     ? visibleSubProjectsForRole.filter(
-        (project) =>
-          String(project.main_project_id) === String(form.main_project_id),
-      )
+      (project) =>
+        String(project.main_project_id) === String(form.main_project_id),
+    )
     : visibleSubProjectsForRole;
-
-  // The guideline currently being edited, if its row is on the visible page —
-  // used only for the read-only Organization/Project summary in the edit modal.
-  const editingGuideline = editingId
-    ? guidelines.find((g) => g.id === editingId)
-    : null;
 
   const columns = [
     {
@@ -282,31 +251,35 @@ const GuidelinesPage = () => {
       key: "organization",
       label: "Organization",
       width: "w-[20%]",
-      // CHANGED: organization_name comes straight from the server-joined row —
-      // no client-side lookup against the full mainProjects array.
-      render: (_, g) =>
-        g.organization_name ? (
-          <span className="inline-flex max-w-full truncate rounded-full bg-indigo-50 px-2 py-0.5 text-[11px] font-medium text-indigo-600">
-            {g.organization_name}
+      render: (_, g) => {
+        const mp = mainProjects.find((p) => p.id === g.main_project_id);
+        return mp ? (
+          <span
+            className="inline-flex max-w-full truncate rounded-full bg-indigo-50 px-2 py-0.5 text-[11px] font-medium text-indigo-600"
+            title={undefined}
+          >
+            {mp.name}
           </span>
         ) : (
           <span className="text-slate-300">—</span>
-        ),
+        );
+      },
     },
     {
       key: "project",
       label: "Project",
       width: "w-[26%]",
-      // CHANGED: project_name comes straight from the server-joined row.
-      render: (_, g) =>
-        g.project_name ? (
+      render: (_, g) => {
+        const sp = subProjects.find((p) => p.id === g.sub_project_id);
+        return sp ? (
           <div className="flex min-w-0 items-center gap-1 text-slate-600">
             <FolderOpen className="h-3.5 w-3.5 shrink-0 text-slate-400" />
-            <TruncTip text={g.project_name} />
+            <TruncTip text={sp.name} />
           </div>
         ) : (
           <span className="text-slate-300">—</span>
-        ),
+        );
+      },
     },
     {
       key: "created",
@@ -316,10 +289,10 @@ const GuidelinesPage = () => {
         <span className="whitespace-nowrap text-slate-500 tabular-nums">
           {g.created_at
             ? new Date(g.created_at).toLocaleDateString("en-US", {
-                month: "short",
-                day: "numeric",
-                year: "numeric",
-              })
+              month: "short",
+              day: "numeric",
+              year: "numeric",
+            })
             : "—"}
         </span>
       ),
@@ -331,7 +304,7 @@ const GuidelinesPage = () => {
       width: "w-[10%]",
       render: (_, g) => (
         <div className="flex items-center justify-end gap-1">
-                    {g.file_url && (
+          {g.file_url && (
             <a
               href={g.file_url}
               target="_blank"
@@ -399,11 +372,9 @@ const GuidelinesPage = () => {
             }}
             placeholder="All Organizations"
           />
-          {/* CHANGED: count now reflects the server's total_items for the
-              current filter/search, not filteredGuidelines.length of a
-              client-side-filtered in-memory array. */}
           <span className="text-sm text-slate-400">
-            {totalItems} guideline{totalItems !== 1 ? "s" : ""}
+            {filteredGuidelines.length} guideline
+            {filteredGuidelines.length !== 1 ? "s" : ""}
           </span>
         </div>
 
@@ -481,22 +452,25 @@ const GuidelinesPage = () => {
 
             {editingId &&
               (() => {
-                // CHANGED: read straight off the row's server-provided
-                // organization_name / project_name — no lookup against the
-                // full mainProjects/subProjects arrays needed here.
+                const mp = mainProjects.find(
+                  (p) => String(p.id) === String(form.main_project_id),
+                );
+                const sp = subProjects.find(
+                  (p) => String(p.id) === String(form.sub_project_id),
+                );
                 return (
                   <div className="space-y-1 rounded-lg border border-slate-200 bg-slate-50 px-3 py-2.5 text-sm">
                     <div className="flex justify-between gap-3">
                       <span className="text-slate-400">Organization</span>
                       <span className="truncate font-medium text-slate-700">
-                        {editingGuideline?.organization_name || "General"}
+                        {mp?.name || "General"}
                       </span>
                     </div>
-                    {editingGuideline?.project_name && (
+                    {sp && (
                       <div className="flex justify-between gap-3">
                         <span className="text-slate-400">Project</span>
                         <span className="truncate font-medium text-slate-700">
-                          {editingGuideline.project_name}
+                          {sp.name}
                         </span>
                       </div>
                     )}
@@ -544,11 +518,10 @@ const GuidelinesPage = () => {
                       addGuidelineFile(e.dataTransfer.files?.[0]);
                     }}
                     onClick={() => fileInputRef.current?.click()}
-                    className={`border-2 border-dashed rounded-xl p-6 text-center cursor-pointer transition-colors ${
-                      isDragActive
+                    className={`border-2 border-dashed rounded-xl p-6 text-center cursor-pointer transition-colors ${isDragActive
                         ? "border-indigo-500 bg-indigo-50"
                         : "border-slate-300 bg-slate-50 hover:border-indigo-400 hover:bg-indigo-50/60"
-                    }`}
+                      }`}
                   >
                     <input
                       ref={fileInputRef}
@@ -615,13 +588,11 @@ const GuidelinesPage = () => {
         variant="untitled"
         allowOverflow
         columns={columns}
-        data={guidelines}
-        loading={isLoading || guidelinesFetching}
+        data={filteredGuidelines}
+        loading={isLoading}
         skeletonRows={12}
         currentPage={page}
         pageSize={PAGE_SIZE}
-        totalItems={totalItems}
-        totalPages={totalPages}
         onPageChange={setPage}
         getRowId={(g) => g.id}
         emptyState={{

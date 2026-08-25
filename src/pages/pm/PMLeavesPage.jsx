@@ -1,13 +1,28 @@
 import { useState, useRef, useEffect } from "react";
-import { useSearchParams } from "react-router-dom";
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
-import { leaveApi, employeeApi, wfhApi } from "../services/api";
-import usePageStateStore from "../store/usePageStateStore";
-import { usePageScroll } from "../hooks/usePageScroll";
-import Spinner from "../components/ui/LoadingSpinner";
-import Button from "../components/ui/Button";
-import DatePicker from "../components/ui/DatePicker";
-import UserAvatar from "../components/ui/UserAvatar";
+import {
+  leaveApi,
+  allocationApi,
+  employeeApi,
+  subProjectApi,
+  wfhApi,
+  parentProjectApi,
+} from "../../services/api";
+import Button from "../../components/ui/Button";
+import Table from "../../components/ui/Table";
+import Modal from "../../components/ui/Modal";
+import DatePicker from "../../components/ui/DatePicker";
+import SearchBar from "../../components/ui/SearchBar";
+import Dropdown from "../../components/ui/Dropdown";
+import ConfirmDialog from "../../components/ui/ConfirmDialog";
+import RowActionMenu from "../../components/ui/RowActionMenu";
+import ReasonPopover, { ReasonText } from "../../components/ui/ReasonPopover";
+import UserAvatar from "../../components/ui/UserAvatar";
+import FlagChip from "../../components/ui/FlagChip";
+import { LEAVE_STATUS_TEXT } from "../../components/ui/LeaveStatusText";
+import OverLimitHoverCard from "../../components/ui/OverLimitHoverCard";
+import LeaveCalendar from "../../components/LeaveCalendar";
+import EmployeeKPIPanel from "../../components/EmployeeKPIPanel";
 import {
   Plus,
   Calendar,
@@ -24,138 +39,77 @@ import {
 } from "lucide-react";
 import { format } from "date-fns";
 import toast from "react-hot-toast";
+import { getPmEmployeeId, getPmSubProjects } from "../../utils/pmScope";
 import {
   getEndDateValidationMessage,
   isEndDateBeforeStartDate,
-} from "../utils/dateValidation";
-import { formatDisplayName, nameSearchText } from "../utils/displayName";
+} from "../../utils/dateValidation";
+import { formatDisplayName, nameSearchText } from "../../utils/displayName";
 import {
-  getLeaveTypeBadgeClass,
   getLeaveTypeLabel,
-  LEAVE_TYPE_OPTIONS,
+  getLeaveTypeBadgeClass,
   getWorkingDayCount,
-  validateConsecutiveLeaves,
   resolveLeaveAppliedDate,
+  validateConsecutiveLeaves,
   recordLeaveApplication,
-} from "../utils/leaveTypes";
-import LeaveCalendar from "../components/LeaveCalendar";
-import ConfirmDialog from "../components/ui/ConfirmDialog";
-import SearchBar from "../components/ui/SearchBar";
-import Dropdown from "../components/ui/Dropdown";
-import Table from "../components/ui/Table";
-import RowActionMenu from "../components/ui/RowActionMenu";
-import ReasonPopover, { ReasonText } from "../components/ui/ReasonPopover";
-import EmployeeKPIPanel from "../components/EmployeeKPIPanel";
-import Modal from "../components/ui/Modal";
-import OverLimitHoverCard from "../components/ui/OverLimitHoverCard";
-import FlagChip from "../components/ui/FlagChip";
-import { LEAVE_STATUS_TEXT } from "../components/ui/LeaveStatusText";
-import { makeOpensUpward } from "../utils/tableRows";
-import { checkHalfDayTiming } from "../utils/halfDayTiming";
+  LEAVE_TYPE_OPTIONS,
+} from "../../utils/leaveTypes";
+import { checkHalfDayTiming } from "../../utils/halfDayTiming";
+import { makeOpensUpward } from "../../utils/tableRows";
+import {
+  canDecideForEmployee,
+  canRoleActOnRequests,
+} from "../../utils/roleAccess";
 
-const TABS = ["Calendar", "Leave List", "WFH Requests", "Employee KPI"];
-const PAGE_SIZE = 10;
+const TABS = ["Leave Requests", "Calendar", "WFH Requests", "Employee KPI"];
 
-const LeavesPage = () => {
-  const queryClient = useQueryClient();
-  const [searchParams] = useSearchParams();
-  const tabParam = searchParams.get("tab");
-  const queryParam = searchParams.get("q");
+// Which roles get the action controls comes from utils/roleAccess — team leads decide for
+// their own team members exactly as a program manager does, and a literal list here has
+// twice been written without them. The server still has the final say per row
+// (project_scope.can_manage_employee): a lead may not action a *peer lead's* request, and
+// nobody but an admin may action a manager's.
 
-  const PAGE_KEY = "leaves";
-  const setPageState = usePageStateStore((s) => s.setPageState);
-  const getPageState = usePageStateStore((s) => s.getPageState);
-
-  const defaultListState = {
-    searchQuery: "",
-    statusFilter: "all",
-    todayOnly: false,
-    dateSort: "",
-    currentPage: 1,
-  };
-
-  const [activeTab, setActiveTab] = useState(
-    TABS.includes(tabParam) ? tabParam : "Calendar",
+/**
+ * Who decided this request, under the employee's name.
+ *
+ * Worth showing because it is not inferable: any manager *or lead* of any project the
+ * person is on may decide, so a lead sitting on two projects can be signed off by either
+ * project's PM. `approved_by_name` is resolved server-side — `approved_by` is a users.id,
+ * which the client has no way to turn into a name.
+ *
+ * Nothing is rendered while a request is still pending, or for older rows that predate the
+ * approver being recorded.
+ */
+const DecidedBy = ({ request }) => {
+  const status = (request?.status || "").toLowerCase();
+  if (status !== "approved" && status !== "rejected") return null;
+  if (!request.approved_by_name) return null;
+  return (
+    <p className="mt-0.5 truncate text-xs text-slate-400">
+      {status === "approved" ? "Approved" : "Rejected"} by{" "}
+      <span className="font-medium text-slate-500">
+        {formatDisplayName(request.approved_by_name)}
+      </span>
+    </p>
   );
-  const [searchQuery, setSearchQuery] = useState(queryParam || "");
-  const [statusFilter, setStatusFilter] = useState("all");
-  const [todayOnly, setTodayOnly] = useState(false);
-  const [dateSort, setDateSort] = useState("");
+};
+
+const PMLeavesPage = () => {
+  const queryClient = useQueryClient();
+  const user = JSON.parse(localStorage.getItem("user") || "{}");
+  const role = localStorage.getItem("role") || user.role || "pm";
+  const canAct = canRoleActOnRequests(role);
+  const employeeId = getPmEmployeeId(user);
+
+  const [activeTab, setActiveTab] = useState("Leave Requests");
   const [currentPage, setCurrentPage] = useState(1);
+  const PAGE_SIZE = 10;
 
-  // Block writes until we restored from storage (avoids overwriting page with 1)
-  const [ready, setReady] = useState(false);
-
-  // Restore after zustand rehydration
-  useEffect(() => {
-    const restore = () => {
-      const root = getPageState(PAGE_KEY);
-
-      const tab =
-        tabParam && TABS.includes(tabParam)
-          ? tabParam
-          : TABS.includes(root.activeTab)
-            ? root.activeTab
-            : "Calendar";
-
-      setActiveTab(tab);
-
-      if (tab === "Leave List" || tab === "WFH Requests") {
-        const t = root.tabs?.[tab] || defaultListState;
-        setSearchQuery(queryParam != null ? queryParam : t.searchQuery || "");
-        setStatusFilter(t.statusFilter ?? "all");
-        setTodayOnly(!!t.todayOnly);
-        setDateSort(t.dateSort || "");
-        setCurrentPage(t.currentPage ?? 1);
-      }
-
-      setReady(true);
-    };
-
-    if (usePageStateStore.persist.hasHydrated()) {
-      restore();
-      return;
-    }
-    return usePageStateStore.persist.onFinishHydration(restore);
-  }, [tabParam, queryParam, getPageState]);
-
-  // Save current tab state (only after restore)
-  useEffect(() => {
-    if (!ready) return;
-
-    const root = getPageState(PAGE_KEY);
-    const tabs = { ...(root.tabs || {}) };
-
-    if (activeTab === "Leave List" || activeTab === "WFH Requests") {
-      tabs[activeTab] = {
-        searchQuery,
-        statusFilter,
-        todayOnly,
-        dateSort,
-        currentPage,
-      };
-    }
-
-    setPageState(PAGE_KEY, { activeTab, tabs });
-  }, [
-    ready,
-    activeTab,
-    searchQuery,
-    statusFilter,
-    todayOnly,
-    dateSort,
-    currentPage,
-    setPageState,
-    getPageState,
-  ]);
-
-  // Scroll position per tab
-  usePageScroll(`leaves:${activeTab}`);
-
-  const [isModalOpen, setIsModalOpen] = useState(false);
-  const [selectedLeaveType, setSelectedLeaveType] = useState("");
-  const [formStartDate, setFormStartDate] = useState("");
-  const [formEndDate, setFormEndDate] = useState("");
+  // ── Toolbar state ────────────────────────────────────────────────
+  const [searchQuery, setSearchQuery] = useState("");
+  const [statusFilter, setStatusFilter] = useState("all"); // all | pending | approved | rejected
+  const [todayOnly, setTodayOnly] = useState(false); // only requests dated today
+  const [dateSort, setDateSort] = useState(""); // '' | 'asc' (Jan→Dec) | 'desc' (Dec→Jan)
   const [filtersOpen, setFiltersOpen] = useState(false);
   const filtersRef = useRef(null);
   useEffect(() => {
@@ -166,118 +120,125 @@ const LeavesPage = () => {
     document.addEventListener("mousedown", handler);
     return () => document.removeEventListener("mousedown", handler);
   }, []);
-
-  // URL tab wins
-  useEffect(() => {
-    if (tabParam && TABS.includes(tabParam)) setActiveTab(tabParam);
-  }, [tabParam]);
-
-  // URL ?q= wins
-  useEffect(() => {
-    if (queryParam === null) return;
-    setSearchQuery(queryParam);
-    setCurrentPage(1);
-  }, [queryParam]);
-
-  // Reset page only when filters change inside the same list tab
-  const skipPageReset = useRef(true);
-  useEffect(() => {
-    if (!ready) return;
-    if (skipPageReset.current) {
-      skipPageReset.current = false;
-      return;
-    }
-    setCurrentPage(1);
-  }, [searchQuery, statusFilter, todayOnly, dateSort, ready]);
-
   const activeFilterCount =
     (statusFilter !== "all" ? 1 : 0) + (todayOnly ? 1 : 0);
+
+  // ── Modal state ──────────────────────────────────────────────────
   const [remarkModal, setRemarkModal] = useState(null); // { leaveId }
   const [remark, setRemark] = useState("");
   const [wfhRemarkModal, setWfhRemarkModal] = useState(null); // { wfhId, employeeName }
   const [wfhRemark, setWfhRemark] = useState("");
   const [deleteTarget, setDeleteTarget] = useState(null);
   const [wfhDeleteConfirm, setWfhDeleteConfirm] = useState(null);
+  const [isModalOpen, setIsModalOpen] = useState(false);
+  const [selectedLeaveType, setSelectedLeaveType] = useState("");
   const [formEmployeeId, setFormEmployeeId] = useState("");
-  const user = JSON.parse(localStorage.getItem("user") || "{}");
+  const [formStartDate, setFormStartDate] = useState("");
+  const [formEndDate, setFormEndDate] = useState("");
 
-  // Quick-fill options for the flagged-WFH justification. The first is derived from
-  // the signed-in user's actual role rather than a generic "PM/Admin", so the stored
-  // remark stays truthful — it is kept as the approval's audit trail.
+  useEffect(() => {
+    setCurrentPage(1);
+  }, [activeTab]);
+
+  // Quick-fill options for the flagged-WFH justification. The first is derived
+  // from the signed-in user's actual role so the stored remark stays truthful —
+  // it is kept as the approval's audit trail.
   const approverLabel =
-    { admin: "Admin", pm: "PM", hr: "HR", team_lead: "Team Lead" }[user.role] ||
-    "Admin";
+    { admin: "Admin", pm: "PM", hr: "HR", team_lead: "Team Lead" }[role] || "PM";
   const WFH_REMARK_PRESETS = [
     `Approved by ${approverLabel}`,
     "Approved — business requirement",
     "Approved — one-off exception",
   ];
 
-  // ── Employees (always needed for names / form / KPI) ─────────────────────
-  const isPmOrLead = user.role === "pm" || user.role === "team_lead";
-  const { data: employees = [], isLoading: employeesLoading } = useQuery({
-    queryKey: ["employees", { team_only: isPmOrLead }],
-    queryFn: () => employeeApi.getAll({ team_only: isPmOrLead }),
-  });
-
-  // ── Leaves – server-side page (same pattern as Guidelines) ───────────────
-  const {
-    data: leavePageData,
-    isLoading: leavesLoading,
-    isFetching: leavesFetching,
-  } = useQuery({
-    queryKey: [
-      "leaves-page",
-      currentPage,
-      searchQuery,
-      statusFilter,
-      todayOnly,
-      dateSort,
-    ],
-    queryFn: () =>
-      leaveApi.getPage({
-        page: currentPage,
-        page_size: PAGE_SIZE,
-        search: searchQuery || undefined,
-        status: statusFilter,
-        today_only: todayOnly,
-        sort: dateSort || undefined,
-      }),
-    enabled: activeTab === "Leave List",
-    keepPreviousData: true,
-  });
-
-  const leaves = leavePageData?.items || [];
-  // Support both the shape we return and the shape Guidelines uses
-  const leaveTotalItems =
-    leavePageData?.total_items ?? leavePageData?.total ?? 0;
-  const leaveTotalPages =
-    leavePageData?.total_pages ??
-    leavePageData?.pages ??
-    (Math.ceil(leaveTotalItems / PAGE_SIZE) || 0);
-
-  // Full leaves only when KPI / Calendar need them
-  const { data: allLeaves = [] } = useQuery({
+  const { data: allLeaves = [], isLoading } = useQuery({
     queryKey: ["leaves"],
-    queryFn: leaveApi.getAll,
-    enabled: activeTab === "Employee KPI"
+    queryFn: () => leaveApi.getAll(),
   });
-
-  // const { data: employees = [], isLoading: employeesLoading } = useQuery({
-  //   queryKey: ["employees"],
-  //   queryFn: employeeApi.getAll,
-  // });
-
+  const { data: allocations = [], isLoading: allocationsLoading } = useQuery({
+    queryKey: ["allocations"],
+    queryFn: allocationApi.getAll,
+  });
+  const { data: employees = [], isLoading: employeesLoading } = useQuery({
+    queryKey: ["employees"],
+    queryFn: employeeApi.getAll,
+  });
+  const { data: projects = [] } = useQuery({
+    queryKey: ["sub-projects"],
+    queryFn: subProjectApi.getAll,
+  });
+  const { data: parentProjects = [] } = useQuery({
+    queryKey: ["parent-projects"],
+    queryFn: parentProjectApi.getAll,
+  });
   const { data: wfhRequests = [], isLoading: wfhLoading } = useQuery({
     queryKey: ["wfh"],
     queryFn: () => wfhApi.getAll(),
   });
 
+  // ── PM scope ─────────────────────────────────────────────────────
+  const scopedProjects = getPmSubProjects(
+    projects,
+    parentProjects,
+    employeeId,
+    allocations,
+  );
+  const myProjectIds = new Set(scopedProjects.map((p) => p.id));
+  const teamEmployeeIds = new Set(
+    allocations
+      .filter((a) => myProjectIds.has(a.sub_project_id))
+      .map((a) => a.employee_id),
+  );
+  // Narrow the team to the people whose requests this viewer may actually decide. Being on
+  // one of their projects is not enough on its own — managers and leads are allocated to the
+  // projects they run, so the raw list contains:
+  //
+  //   * the viewer themselves     → belongs on My Leaves; nobody signs off their own
+  //   * program managers and HR   → an admin's call, whoever else is on the project
+  //   * other team leads          → their own program manager's call, not a peer lead's
+  //
+  // The server refuses all three (project_scope.can_manage_employee), so listing them would
+  // only offer actions that 403 — and imply they were the viewer's responsibility. Filtering
+  // the set rather than the buttons also keeps the Add Leave picker and the KPI tab honest,
+  // since both derive from it.
+  // Skipped until the roster has loaded: with `employees` still empty every tier lookup
+  // fails and the table would flash "no requests" before filling in.
+  if (employees.length > 0) {
+    [...teamEmployeeIds].forEach((id) => {
+      const employee = employees.find((e) => e.id === id);
+      if (
+        !canDecideForEmployee({
+          viewerRole: role,
+          viewerEmployeeId: employeeId,
+          employee,
+        })
+      )
+        teamEmployeeIds.delete(id);
+    });
+  }
+
+  const teamLeaves = allLeaves.filter(
+    (l) => teamEmployeeIds.has(l.employee_id) && l.start_date && l.end_date,
+  );
+  const teamLeavesForKpi = allLeaves.filter((l) =>
+    teamEmployeeIds.has(l.employee_id),
+  );
+  const teamWfh = wfhRequests.filter((w) => teamEmployeeIds.has(w.employee_id));
+
+  const getEmployeeName = (id) =>
+    formatDisplayName(employees.find((e) => e.id === id)?.name) ||
+    `Employee #${id}`;
+  // A PM files leave for their own team only, so the picker is the scoped roster
+  // rather than the whole company as on the admin page.
+  const activeEmployees = employees.filter(
+    (e) => e.status === "active" && teamEmployeeIds.has(e.id),
+  );
+
   // ── Leave mutations ──────────────────────────────────────────────
   const approveMutation = useMutation({
     mutationFn: ({ id, remark }) => leaveApi.approve(id, user.id, remark),
-    onSuccess: (res, variables) => {
-      queryClient.invalidateQueries(["leaves"]);
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ["leaves"] });
       setRemarkModal(null);
       setRemark("");
       toast.success("Leave approved");
@@ -288,8 +249,8 @@ const LeavesPage = () => {
 
   const rejectMutation = useMutation({
     mutationFn: (id) => leaveApi.reject(id, user.id),
-    onSuccess: (_, id) => {
-      queryClient.invalidateQueries(["leaves"]);
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ["leaves"] });
       toast.success("Leave rejected");
     },
     onError: (err) =>
@@ -299,8 +260,8 @@ const LeavesPage = () => {
   const undoApproveMutation = useMutation({
     mutationFn: (id) => leaveApi.undoApprove(id, user.id),
     onSuccess: () => {
-      queryClient.invalidateQueries(["leaves"]);
-      queryClient.invalidateQueries(["leave-calendar"]);
+      queryClient.invalidateQueries({ queryKey: ["leaves"] });
+      queryClient.invalidateQueries({ queryKey: ["leave-calendar"] });
       toast.success("Leave approval undone");
     },
     onError: (err) =>
@@ -310,8 +271,8 @@ const LeavesPage = () => {
   const undoRejectMutation = useMutation({
     mutationFn: (id) => leaveApi.undoReject(id, user.id),
     onSuccess: () => {
-      queryClient.invalidateQueries(["leaves"]);
-      queryClient.invalidateQueries(["leave-calendar"]);
+      queryClient.invalidateQueries({ queryKey: ["leaves"] });
+      queryClient.invalidateQueries({ queryKey: ["leave-calendar"] });
       toast.success("Leave rejection undone");
     },
     onError: (err) =>
@@ -322,14 +283,13 @@ const LeavesPage = () => {
     mutationFn: leaveApi.create,
     onSuccess: (res, variables) => {
       recordLeaveApplication({ ...variables, id: res?.id || res?.leave_id });
-      queryClient.invalidateQueries(["leaves"]);
+      queryClient.invalidateQueries({ queryKey: ["leaves"] });
       setIsModalOpen(false);
       setSelectedLeaveType("");
       setFormEmployeeId("");
       setFormStartDate("");
       setFormEndDate("");
       toast.success("Leave record created successfully");
-
     },
     onError: (err) =>
       toast.error(
@@ -340,7 +300,7 @@ const LeavesPage = () => {
   const deleteMutation = useMutation({
     mutationFn: leaveApi.delete,
     onSuccess: () => {
-      queryClient.invalidateQueries(["leaves"]);
+      queryClient.invalidateQueries({ queryKey: ["leaves"] });
       toast.success("Leave deleted");
     },
     onError: (err) =>
@@ -351,8 +311,8 @@ const LeavesPage = () => {
   const wfhApproveMutation = useMutation({
     mutationFn: ({ id, remark }) => wfhApi.approve(id, user.id, remark),
     onSuccess: () => {
-      queryClient.invalidateQueries(["wfh"]);
-      queryClient.invalidateQueries(["leave-calendar"]);
+      queryClient.invalidateQueries({ queryKey: ["wfh"] });
+      queryClient.invalidateQueries({ queryKey: ["leave-calendar"] });
       setWfhRemarkModal(null);
       setWfhRemark("");
       toast.success("WFH approved");
@@ -364,7 +324,7 @@ const LeavesPage = () => {
   const wfhRejectMutation = useMutation({
     mutationFn: (id) => wfhApi.reject(id, user.id),
     onSuccess: () => {
-      queryClient.invalidateQueries(["wfh"]);
+      queryClient.invalidateQueries({ queryKey: ["wfh"] });
       toast.success("WFH rejected");
     },
     onError: (err) =>
@@ -374,8 +334,8 @@ const LeavesPage = () => {
   const wfhUndoApproveMutation = useMutation({
     mutationFn: (id) => wfhApi.undoApprove(id, user.id),
     onSuccess: () => {
-      queryClient.invalidateQueries(["wfh"]);
-      queryClient.invalidateQueries(["leave-calendar"]);
+      queryClient.invalidateQueries({ queryKey: ["wfh"] });
+      queryClient.invalidateQueries({ queryKey: ["leave-calendar"] });
       toast.success("WFH approval undone");
     },
     onError: (err) =>
@@ -385,7 +345,7 @@ const LeavesPage = () => {
   const wfhUndoRejectMutation = useMutation({
     mutationFn: (id) => wfhApi.undoReject(id, user.id),
     onSuccess: () => {
-      queryClient.invalidateQueries(["wfh"]);
+      queryClient.invalidateQueries({ queryKey: ["wfh"] });
       toast.success("WFH rejection undone");
     },
     onError: (err) =>
@@ -395,39 +355,37 @@ const LeavesPage = () => {
   const wfhDeleteMutation = useMutation({
     mutationFn: wfhApi.delete,
     onSuccess: () => {
-      queryClient.invalidateQueries(["wfh"]);
+      queryClient.invalidateQueries({ queryKey: ["wfh"] });
       toast.success("WFH request deleted");
     },
+    onError: (err) =>
+      toast.error(err.response?.data?.detail || "Failed to delete WFH request"),
   });
 
   const handleApprove = (leave) => {
-    if (leave.flagged) {
-      setRemarkModal({ leaveId: leave.leave_id });
-    } else {
-      approveMutation.mutate({ id: leave.leave_id, remark: null });
-    }
+    if (leave.flagged) setRemarkModal({ leaveId: leave.leave_id });
+    else approveMutation.mutate({ id: leave.leave_id, remark: null });
   };
 
-  // Mirrors handleApprove: the backend rejects a flagged WFH approval that carries no
-  // remark, so ask for one up front instead of letting the request 400.
+  // Mirrors handleApprove: the backend rejects a flagged WFH approval that
+  // carries no remark, so ask for one up front instead of letting it 400.
   const handleWfhApprove = (w) => {
-    if (w.flagged) {
+    if (w.flagged)
       setWfhRemarkModal({ wfhId: w.id, employeeName: w.employee_name });
-    } else {
-      wfhApproveMutation.mutate({ id: w.id, remark: null });
-    }
+    else wfhApproveMutation.mutate({ id: w.id, remark: null });
   };
 
   const handleSubmit = (e) => {
     e.preventDefault();
     const formData = new FormData(e.target);
-    const employeeId = formData.get("employee_id");
+    const empId = formData.get("employee_id");
     const startDate = formData.get("start_date");
     const leaveType = formData.get("leave_type");
     const reason = (formData.get("reason") || "").trim();
     const isHalf = leaveType === "first_half" || leaveType === "second_half";
     const endDate = isHalf ? startDate : formData.get("end_date");
-    if (!employeeId) {
+
+    if (!empId) {
       toast.error("Please select an employee");
       return;
     }
@@ -443,17 +401,13 @@ const LeavesPage = () => {
         toast.error(timingErr);
         return;
       }
-    } else {
-      if (isEndDateBeforeStartDate(startDate, endDate)) {
-        toast.error(getEndDateValidationMessage());
-        return;
-      }
+    } else if (isEndDateBeforeStartDate(startDate, endDate)) {
+      toast.error(getEndDateValidationMessage());
+      return;
     }
 
-    const empIdInt = parseInt(employeeId);
-    const empLeaves = leaves.filter((l) => l.employee_id === empIdInt);
-
-    // Validate consecutive leaves safeguard
+    const empIdInt = parseInt(empId);
+    const empLeaves = allLeaves.filter((l) => l.employee_id === empIdInt);
     if (
       leaveType !== "wfh" &&
       !validateConsecutiveLeaves(startDate, endDate, empLeaves, null, isHalf)
@@ -465,7 +419,7 @@ const LeavesPage = () => {
     }
 
     const payload = {
-      employee_id: parseInt(employeeId),
+      employee_id: empIdInt,
       start_date: startDate,
       end_date: endDate,
       leave_type: leaveType,
@@ -479,54 +433,10 @@ const LeavesPage = () => {
     createMutation.mutate(payload);
   };
 
-  const getEmployeeName = (id) =>
-    formatDisplayName(employees.find((e) => e.id === id)?.name) || `Employee #${id}`;
-  const activeEmployees = employees.filter((e) => e.status === "active");
-
-  // const handleTabChange = (tab) => {
-  //   setActiveTab(tab);
-  //   setCurrentPage(1);
-  //   setSearchQuery("");
-  // };
   const handleTabChange = (tab) => {
-    if (tab === activeTab) return;
-
-    // Save current list tab before leaving it
-    if (ready && (activeTab === "Leave List" || activeTab === "WFH Requests")) {
-      const root = getPageState(PAGE_KEY);
-      setPageState(PAGE_KEY, {
-        activeTab: tab,
-        tabs: {
-          ...(root.tabs || {}),
-          [activeTab]: {
-            searchQuery,
-            statusFilter,
-            todayOnly,
-            dateSort,
-            currentPage,
-          },
-        },
-      });
-    } else if (ready) {
-      setPageState(PAGE_KEY, {
-        ...getPageState(PAGE_KEY),
-        activeTab: tab,
-      });
-    }
-
     setActiveTab(tab);
-
-    // Load target tab's saved filters / pagination
-    if (tab === "Leave List" || tab === "WFH Requests") {
-      const next = getPageState(PAGE_KEY).tabs?.[tab] || defaultListState;
-      setSearchQuery(next.searchQuery || "");
-      setStatusFilter(next.statusFilter ?? "all");
-      setTodayOnly(!!next.todayOnly);
-      setDateSort(next.dateSort || "");
-      setCurrentPage(next.currentPage ?? 1);
-      // Allow page-reset effect to skip this load
-      skipPageReset.current = true;
-    }
+    setCurrentPage(1);
+    setSearchQuery("");
   };
 
   const handleSearchChange = (val) => {
@@ -534,9 +444,9 @@ const LeavesPage = () => {
     setCurrentPage(1);
   };
 
+  // ── Search / filter / sort, applied on top of the PM's scoped rows ──
   const todayStr = format(new Date(), "yyyy-MM-dd");
-  const filteredLeaves = leaves.filter((leave) => {
-    if (!leave.start_date || !leave.end_date) return false;
+  const filteredLeaves = teamLeaves.filter((leave) => {
     // Searched against the stored name as well as the shortened label, so a middle
     // name still finds its owner — see nameSearchText.
     const name = nameSearchText(
@@ -551,8 +461,8 @@ const LeavesPage = () => {
       !todayOnly || (leave.start_date || "").slice(0, 10) === todayStr;
     return matchesSearch && matchesStatus && matchesToday;
   });
-  // Sort by start date. 'YYYY-MM-DD' sorts lexicographically = chronologically,
-  // so ascending = Jan→Dec (1→31) and descending = Dec→Jan (31→1).
+  // 'YYYY-MM-DD' sorts lexicographically = chronologically, so ascending is
+  // Jan→Dec and descending is Dec→Jan.
   if (dateSort) {
     filteredLeaves.sort((a, b) => {
       const cmp = (a.start_date || "").localeCompare(b.start_date || "");
@@ -560,7 +470,7 @@ const LeavesPage = () => {
     });
   }
 
-  const filteredWFH = wfhRequests.filter((w) => {
+  const filteredWFH = teamWfh.filter((w) => {
     const name = nameSearchText(
       w.employee_name ||
       employees.find((e) => e.id === w.employee_id)?.name,
@@ -574,7 +484,6 @@ const LeavesPage = () => {
       !todayOnly || (w.wfh_date || "").slice(0, 10) === todayStr;
     return matchesSearch && matchesStatus && matchesToday;
   });
-  // Sort by WFH date, same chronological rule as leaves.
   if (dateSort) {
     filteredWFH.sort((a, b) => {
       const cmp = (a.wfh_date || "").localeCompare(b.wfh_date || "");
@@ -587,9 +496,15 @@ const LeavesPage = () => {
 
   return (
     <div className="space-y-3">
+      {/* Header */}
+      <div>
+        <h1 className="text-lg font-semibold text-slate-900">Team Leaves</h1>
+        <p className="mt-0.5 text-[13px] text-slate-500">
+          Manage leave and WFH requests from your team
+        </p>
+      </div>
 
-
-      {/* Tabs · Search · Add Leave */}
+      {/* Tabs · Filters · Sort · Search · Add Leave */}
       <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3">
         <div className="inline-flex items-center rounded-lg border border-slate-200 bg-slate-50 p-0.5 w-fit">
           {TABS.map((tab) => {
@@ -599,8 +514,8 @@ const LeavesPage = () => {
                 key={tab}
                 onClick={() => handleTabChange(tab)}
                 className={`inline-flex items-center gap-1.5 px-3.5 py-1.5 text-[13px] font-semibold rounded-md transition-all whitespace-nowrap ${isActive
-                  ? "bg-white text-slate-900 shadow-sm ring-1 ring-slate-200/70"
-                  : "text-slate-500 hover:text-slate-800"
+                    ? "bg-white text-slate-900 shadow-sm ring-1 ring-slate-200/70"
+                    : "text-slate-500 hover:text-slate-800"
                   }`}
               >
                 {tab === "WFH Requests" ? (
@@ -627,107 +542,110 @@ const LeavesPage = () => {
         </div>
 
         <div className="flex items-center gap-2">
-          {(activeTab === "Leave List" || activeTab === "WFH Requests") && (
-            <div ref={filtersRef} className="relative shrink-0">
-              <button
-                type="button"
-                onClick={() => setFiltersOpen((o) => !o)}
-                className="inline-flex items-center gap-2 h-9 px-3 rounded-lg border border-slate-200 bg-white text-[13px] font-medium text-slate-700 hover:bg-slate-50 transition-colors"
-              >
-                <Filter className="w-4 h-4 text-slate-500" />
-                Filters
-                {activeFilterCount > 0 && (
-                  <span className="inline-flex items-center justify-center h-4 min-w-4 px-1 rounded-full bg-indigo-600 text-white text-[10px] font-semibold">
-                    {activeFilterCount}
-                  </span>
-                )}
-              </button>
-              {filtersOpen && (
-                <div className="absolute left-0 mt-1.5 z-40 w-64 bg-white rounded-xl shadow-xl border border-slate-200 p-3 space-y-3">
-                  <div className="space-y-1.5">
-                    <label className="text-[11px] font-semibold uppercase tracking-wide text-slate-400">
-                      Status
-                    </label>
-                    <Dropdown
-                      options={[
-                        { value: "all", label: "All Status" },
-                        { value: "pending", label: "Pending" },
-                        { value: "approved", label: "Approved" },
-                        { value: "rejected", label: "Rejected" },
-                      ]}
-                      value={statusFilter}
-                      onChange={(v) => {
-                        setStatusFilter(v);
-                        setCurrentPage(1);
-                      }}
-                      placeholder="All Status"
-                      optionsClassName="w-full"
-                    />
-                  </div>
-                  <div className="flex items-center justify-between rounded-lg border border-slate-200 px-3 py-2">
-                    <span className="text-[13px] font-medium text-slate-600">
-                      {activeTab === "WFH Requests"
-                        ? "Today's WFH"
-                        : "Today's Leaves"}
-                    </span>
-                    <button
-                      type="button"
-                      onClick={() => setTodayOnly((t) => !t)}
-                      className={`inline-flex h-5 w-9 items-center rounded-full transition-colors ${todayOnly ? "bg-indigo-600" : "bg-slate-200"
-                        }`}
-                    >
-                      <span
-                        className={`inline-block h-4 w-4 transform rounded-full bg-white transition-transform ${todayOnly ? "translate-x-4" : "translate-x-0.5"
-                          }`}
-                      />
-                    </button>
-                  </div>
+          {(activeTab === "Leave Requests" ||
+            activeTab === "WFH Requests") && (
+              <div ref={filtersRef} className="relative shrink-0">
+                <button
+                  type="button"
+                  onClick={() => setFiltersOpen((o) => !o)}
+                  className="inline-flex items-center gap-2 h-9 px-3 rounded-lg border border-slate-200 bg-white text-[13px] font-medium text-slate-700 hover:bg-slate-50 transition-colors"
+                >
+                  <Filter className="w-4 h-4 text-slate-500" />
+                  Filters
                   {activeFilterCount > 0 && (
-                    <button
-                      type="button"
-                      onClick={() => {
-                        setStatusFilter("all");
-                        setTodayOnly(false);
-                        setCurrentPage(1);
-                      }}
-                      className="w-full text-center pt-2.5 text-xs font-medium text-indigo-600 hover:text-indigo-700 border-t border-slate-100"
-                    >
-                      Clear filters
-                    </button>
+                    <span className="inline-flex items-center justify-center h-4 min-w-4 px-1 rounded-full bg-indigo-600 text-white text-[10px] font-semibold">
+                      {activeFilterCount}
+                    </span>
                   )}
-                </div>
-              )}
-            </div>
-          )}
-          {(activeTab === "Leave List" || activeTab === "WFH Requests") && (
-            <div className="shrink-0">
-              <Dropdown
-                options={[
-                  { value: "", label: "Sort: Default" },
-                  {
-                    value: "asc",
-                    label:
-                      activeTab === "WFH Requests"
-                        ? "WFH date: Jan → Dec"
-                        : "Start date: Jan → Dec",
-                  },
-                  {
-                    value: "desc",
-                    label:
-                      activeTab === "WFH Requests"
-                        ? "WFH date: Dec → Jan"
-                        : "Start date: Dec → Jan",
-                  },
-                ]}
-                value={dateSort}
-                onChange={(v) => {
-                  setDateSort(v);
-                  setCurrentPage(1);
-                }}
-                placeholder="Sort by date"
-              />
-            </div>
-          )}
+                </button>
+                {filtersOpen && (
+                  <div className="absolute left-0 mt-1.5 z-40 w-64 bg-white rounded-xl shadow-xl border border-slate-200 p-3 space-y-3">
+                    <div className="space-y-1.5">
+                      <label className="text-[11px] font-semibold uppercase tracking-wide text-slate-400">
+                        Status
+                      </label>
+                      <Dropdown
+                        options={[
+                          { value: "all", label: "All Status" },
+                          { value: "pending", label: "Pending" },
+                          { value: "approved", label: "Approved" },
+                          { value: "rejected", label: "Rejected" },
+                        ]}
+                        value={statusFilter}
+                        onChange={(v) => {
+                          setStatusFilter(v);
+                          setCurrentPage(1);
+                        }}
+                        placeholder="All Status"
+                        optionsClassName="w-full"
+                      />
+                    </div>
+                    <div className="flex items-center justify-between rounded-lg border border-slate-200 px-3 py-2">
+                      <span className="text-[13px] font-medium text-slate-600">
+                        {activeTab === "WFH Requests"
+                          ? "Today's WFH"
+                          : "Today's Leaves"}
+                      </span>
+                      <button
+                        type="button"
+                        onClick={() => {
+                          setTodayOnly((t) => !t);
+                          setCurrentPage(1);
+                        }}
+                        className={`inline-flex h-5 w-9 items-center rounded-full transition-colors ${todayOnly ? "bg-indigo-600" : "bg-slate-200"}`}
+                      >
+                        <span
+                          className={`inline-block h-4 w-4 transform rounded-full bg-white transition-transform ${todayOnly ? "translate-x-4" : "translate-x-0.5"}`}
+                        />
+                      </button>
+                    </div>
+                    {activeFilterCount > 0 && (
+                      <button
+                        type="button"
+                        onClick={() => {
+                          setStatusFilter("all");
+                          setTodayOnly(false);
+                          setCurrentPage(1);
+                        }}
+                        className="w-full text-center pt-2.5 text-xs font-medium text-indigo-600 hover:text-indigo-700 border-t border-slate-100"
+                      >
+                        Clear filters
+                      </button>
+                    )}
+                  </div>
+                )}
+              </div>
+            )}
+          {(activeTab === "Leave Requests" ||
+            activeTab === "WFH Requests") && (
+              <div className="shrink-0">
+                <Dropdown
+                  options={[
+                    { value: "", label: "Sort: Default" },
+                    {
+                      value: "asc",
+                      label:
+                        activeTab === "WFH Requests"
+                          ? "WFH date: Jan → Dec"
+                          : "Start date: Jan → Dec",
+                    },
+                    {
+                      value: "desc",
+                      label:
+                        activeTab === "WFH Requests"
+                          ? "WFH date: Dec → Jan"
+                          : "Start date: Dec → Jan",
+                    },
+                  ]}
+                  value={dateSort}
+                  onChange={(v) => {
+                    setDateSort(v);
+                    setCurrentPage(1);
+                  }}
+                  placeholder="Sort by date"
+                />
+              </div>
+            )}
           {activeTab !== "Calendar" && activeTab !== "Employee KPI" && (
             <SearchBar
               responsive
@@ -740,7 +658,7 @@ const LeavesPage = () => {
               }
             />
           )}
-          {activeTab === "Leave List" && (
+          {activeTab === "Leave Requests" && canAct && (
             <button
               type="button"
               onClick={() => setIsModalOpen(true)}
@@ -752,17 +670,16 @@ const LeavesPage = () => {
         </div>
       </div>
 
-      {/* ── Tab: Leave List ── */}
-      {activeTab === "Leave List" && (
+      {/* ── Tab: Leave Requests ── */}
+      {activeTab === "Leave Requests" && (
         <Table
           variant="untitled"
           allowOverflow
+          loading={isLoading || employeesLoading || allocationsLoading}
+          skeletonRows={10}
           columns={[
             {
               key: "employee_id",
-              // Sized to the longest name plus the avatar and not a pixel more:
-              // a wider share here is dead space that pushes Reason away from the
-              // name it belongs to, since the names are far shorter than the column.
               label: "Employee",
               width: "w-[19%]",
               render: (_, leave) => {
@@ -780,7 +697,10 @@ const LeavesPage = () => {
                           {empName}
                         </span>
                         {leave.flagged && (
-                          <OverLimitHoverCard leave={leave} allLeaves={leaves} />
+                          <OverLimitHoverCard
+                            leave={leave}
+                            allLeaves={allLeaves}
+                          />
                         )}
                         {leave.is_emergency && (
                           <FlagChip
@@ -791,6 +711,7 @@ const LeavesPage = () => {
                           />
                         )}
                       </div>
+                      <DecidedBy request={leave} />
                     </div>
                   </div>
                 );
@@ -813,9 +734,6 @@ const LeavesPage = () => {
                 />
               ),
             },
-            // Every column past the employee is centred on an even 12–14% share,
-            // so the row reads as a regular grid instead of left-hugging text with
-            // wide gaps opening up between the columns.
             {
               key: "leave_type",
               label: "Leave Type",
@@ -860,13 +778,22 @@ const LeavesPage = () => {
               width: "w-[11%]",
               render: (_, leave) => {
                 const rawApplied = resolveLeaveAppliedDate(leave);
-                if (!rawApplied) return <span className="text-[13px] text-slate-400">—</span>;
-                // Extract YYYY-MM-DD from the ISO string to avoid UTC→local timezone shifts
+                if (!rawApplied)
+                  return (
+                    <span className="text-[13px] text-slate-400">—</span>
+                  );
+                // Extract YYYY-MM-DD from the ISO string to avoid UTC→local shifts
                 const dateStr = String(rawApplied).slice(0, 10);
                 const [y, m, day] = dateStr.split("-").map(Number);
-                if (!y || !m || !day) return <span className="text-[13px] text-slate-400">—</span>;
+                if (!y || !m || !day)
+                  return (
+                    <span className="text-[13px] text-slate-400">—</span>
+                  );
                 const d = new Date(y, m - 1, day);
-                if (isNaN(d.getTime())) return <span className="text-[13px] text-slate-400">—</span>;
+                if (isNaN(d.getTime()))
+                  return (
+                    <span className="text-[13px] text-slate-400">—</span>
+                  );
                 return (
                   <span className="text-[13px] text-slate-700 whitespace-nowrap">
                     {format(d, "MMM d, yyyy")}
@@ -923,6 +850,8 @@ const LeavesPage = () => {
               align: "center",
               width: "w-[7%]",
               render: (_, leave) => {
+                if (!canAct)
+                  return <span className="text-xs text-slate-300">—</span>;
                 const isPending = !leave.status || leave.status === "pending";
                 return (
                   <div className="flex items-center justify-center">
@@ -975,24 +904,26 @@ const LeavesPage = () => {
           currentPage={currentPage}
           pageSize={PAGE_SIZE}
           onPageChange={setCurrentPage}
-          loading={isLoading || employeesLoading}
-          skeletonRows={10}
           emptyState={{
-            title: "No leaves recorded yet",
-            description: "Try adjusting your search query",
+            title: "No leave requests",
+            description: "No leave requests from your team",
           }}
         />
       )}
 
       {/* ── Tab: Calendar ── */}
-      {activeTab === "Calendar" && <LeaveCalendar />}
+      {activeTab === "Calendar" && (
+        <LeaveCalendar
+          filterEmployeeIds={teamEmployeeIds.size > 0 ? teamEmployeeIds : null}
+        />
+      )}
 
       {/* ── Tab: WFH Requests ── */}
       {activeTab === "WFH Requests" && (
         <Table
           variant="untitled"
           allowOverflow
-          loading={wfhLoading || employeesLoading}
+          loading={wfhLoading || employeesLoading || allocationsLoading}
           skeletonRows={10}
           columns={[
             {
@@ -1000,8 +931,10 @@ const LeavesPage = () => {
               label: "Employee",
               width: "w-[20%]",
               render: (value, w) => {
-                const emp = employees.find(e => e.id === w.employee_id);
-                const empName = value ? formatDisplayName(value) : getEmployeeName(w.employee_id);
+                const emp = employees.find((e) => e.id === w.employee_id);
+                const empName = value
+                  ? formatDisplayName(value)
+                  : getEmployeeName(w.employee_id);
                 return (
                   <div className="flex items-center gap-3">
                     <UserAvatar src={emp?.avatar_url} name={empName} size="sm" />
@@ -1017,8 +950,10 @@ const LeavesPage = () => {
                           <FlagChip icon={AlertTriangle} label="Over limit" />
                         )}
                       </div>
-                      {/* The remark is the justification for approving an over-limit
-                          request, so it belongs on the row rather than only in the DB. */}
+                      <DecidedBy request={w} />
+                      {/* The remark is the justification for approving an
+                          over-limit request, so it belongs on the row rather
+                          than only in the DB. */}
                       {w.remark && (
                         <p className="text-xs text-slate-400 mt-0.5 truncate">
                           Remark: {w.remark}
@@ -1040,7 +975,7 @@ const LeavesPage = () => {
                 </span>
               ),
             },
-            // Five columns here against the Leave List's eight, so the note is
+            // Five columns here against Leave Requests' nine, so the note is
             // spelled out in the row rather than folded behind an icon.
             {
               key: "reason",
@@ -1065,48 +1000,52 @@ const LeavesPage = () => {
               label: "Actions",
               align: "center",
               width: "w-[11%]",
-              render: (_, w) => (
-                <div className="flex items-center justify-center">
-                  <RowActionMenu
-                    openUpward={opensUpward(filteredWFH, w)}
-                    actions={[
-                      w.status === "pending" && {
-                        label: "Approve",
-                        icon: CheckCircle,
-                        tone: "success",
-                        disabled: wfhApproveMutation.isPending,
-                        onClick: () => handleWfhApprove(w),
-                      },
-                      w.status === "pending" && {
-                        label: "Reject",
-                        icon: XCircle,
-                        tone: "danger",
-                        disabled: wfhRejectMutation.isPending,
-                        onClick: () => wfhRejectMutation.mutate(w.id),
-                      },
-                      w.status === "approved" && {
-                        label: "Undo approval",
-                        icon: RotateCcw,
-                        disabled: wfhUndoApproveMutation.isPending,
-                        onClick: () => wfhUndoApproveMutation.mutate(w.id),
-                      },
-                      w.status === "rejected" && {
-                        label: "Undo rejection",
-                        icon: RotateCcw,
-                        disabled: wfhUndoRejectMutation.isPending,
-                        onClick: () => wfhUndoRejectMutation.mutate(w.id),
-                      },
-                      { divider: true },
-                      {
-                        label: "Delete",
-                        icon: Trash2,
-                        tone: "danger",
-                        onClick: () => setWfhDeleteConfirm(w.id),
-                      },
-                    ]}
-                  />
-                </div>
-              ),
+              render: (_, w) => {
+                if (!canAct)
+                  return <span className="text-xs text-slate-300">—</span>;
+                return (
+                  <div className="flex items-center justify-center">
+                    <RowActionMenu
+                      openUpward={opensUpward(filteredWFH, w)}
+                      actions={[
+                        w.status === "pending" && {
+                          label: "Approve",
+                          icon: CheckCircle,
+                          tone: "success",
+                          disabled: wfhApproveMutation.isPending,
+                          onClick: () => handleWfhApprove(w),
+                        },
+                        w.status === "pending" && {
+                          label: "Reject",
+                          icon: XCircle,
+                          tone: "danger",
+                          disabled: wfhRejectMutation.isPending,
+                          onClick: () => wfhRejectMutation.mutate(w.id),
+                        },
+                        w.status === "approved" && {
+                          label: "Undo approval",
+                          icon: RotateCcw,
+                          disabled: wfhUndoApproveMutation.isPending,
+                          onClick: () => wfhUndoApproveMutation.mutate(w.id),
+                        },
+                        w.status === "rejected" && {
+                          label: "Undo rejection",
+                          icon: RotateCcw,
+                          disabled: wfhUndoRejectMutation.isPending,
+                          onClick: () => wfhUndoRejectMutation.mutate(w.id),
+                        },
+                        { divider: true },
+                        {
+                          label: "Delete",
+                          icon: Trash2,
+                          tone: "danger",
+                          onClick: () => setWfhDeleteConfirm(w.id),
+                        },
+                      ]}
+                    />
+                  </div>
+                );
+              },
             },
           ]}
           data={filteredWFH}
@@ -1114,7 +1053,7 @@ const LeavesPage = () => {
           pageSize={PAGE_SIZE}
           onPageChange={setCurrentPage}
           emptyState={{
-            title: "No WFH requests yet",
+            title: "No WFH requests from your team",
             description: "WFH requests will appear here",
           }}
         />
@@ -1123,9 +1062,9 @@ const LeavesPage = () => {
       {/* ── Tab: Employee KPI ── */}
       {activeTab === "Employee KPI" && (
         <EmployeeKPIPanel
-          employees={employees}
-          leaves={leaves}
-          wfhRequests={wfhRequests}
+          employees={employees.filter((e) => teamEmployeeIds.has(e.id))}
+          leaves={teamLeavesForKpi}
+          wfhRequests={teamWfh}
         />
       )}
 
@@ -1226,8 +1165,8 @@ const LeavesPage = () => {
                   type="button"
                   onClick={() => setWfhRemark(preset)}
                   className={`px-2.5 py-1 rounded-lg border text-[11px] font-semibold transition-colors ${wfhRemark === preset
-                    ? "bg-indigo-600 text-white border-indigo-600"
-                    : "bg-slate-50 text-slate-600 border-slate-200 hover:bg-slate-100"
+                      ? "bg-indigo-600 text-white border-indigo-600"
+                      : "bg-slate-50 text-slate-600 border-slate-200 hover:bg-slate-100"
                     }`}
                 >
                   {preset}
@@ -1306,9 +1245,12 @@ const LeavesPage = () => {
                 onChange={setFormEmployeeId}
                 placeholder="Select employee"
                 disabled={activeEmployees.length === 0}
-                searchable
-                searchPlaceholder="Search employee..."
               />
+              {activeEmployees.length === 0 && (
+                <p className="mt-1 text-xs text-slate-400">
+                  Nobody is allocated to your projects yet.
+                </p>
+              )}
             </div>
             <div>
               <label className="block text-sm font-medium text-gray-700 mb-1">
@@ -1340,7 +1282,6 @@ const LeavesPage = () => {
                   <input type="hidden" name="end_date" value={formStartDate} />
                   <DatePicker
                     type="date"
-                    accentColor="indigo"
                     value={formStartDate}
                     onChange={(e) => {
                       setFormStartDate(e.target.value);
@@ -1352,13 +1293,13 @@ const LeavesPage = () => {
               ) : (
                 <div>
                   <label className="block text-sm font-medium text-gray-700 mb-1">
-                    Leave Duration (Start & End Date) <span className="text-red-500">*</span>
+                    Leave Duration (Start &amp; End Date){" "}
+                    <span className="text-red-500">*</span>
                   </label>
                   <input type="hidden" name="start_date" value={formStartDate} />
                   <input type="hidden" name="end_date" value={formEndDate} />
                   <DatePicker
                     type="range"
-                    accentColor="indigo"
                     startDate={formStartDate}
                     endDate={formEndDate}
                     onRangeChange={({ startDate, endDate }) => {
@@ -1441,28 +1382,25 @@ const LeavesPage = () => {
           </Modal.Footer>
         </form>
       </Modal>
+
       {deleteTarget && (
         <ConfirmDialog
           isOpen={!!deleteTarget}
           onClose={() => setDeleteTarget(null)}
-          onConfirm={() => {
-            if (deleteTarget) {
-              deleteMutation.mutate(deleteTarget.leave_id, {
-                onSuccess: () => setDeleteTarget(null),
-              });
-            }
-          }}
+          onConfirm={() =>
+            deleteMutation.mutate(deleteTarget.leave_id, {
+              onSuccess: () => setDeleteTarget(null),
+            })
+          }
           isPending={deleteMutation.isPending}
           title="Delete Leave Record"
-          message={`Are you sure you want to delete the ${getLeaveTypeLabel(
-            deleteTarget.leave_type,
-          )} record for ${getEmployeeName(deleteTarget.employee_id)} (${deleteTarget.start_date
-            } — ${deleteTarget.end_date})?`}
+          message={`Are you sure you want to delete the ${getLeaveTypeLabel(deleteTarget.leave_type)} record for ${getEmployeeName(deleteTarget.employee_id)} (${deleteTarget.start_date} — ${deleteTarget.end_date})?`}
           variant="danger"
           confirmText="Delete"
           cancelText="Cancel"
         />
       )}
+
       <ConfirmDialog
         isOpen={wfhDeleteConfirm !== null}
         onClose={() => setWfhDeleteConfirm(null)}
@@ -1480,4 +1418,4 @@ const LeavesPage = () => {
   );
 };
 
-export default LeavesPage;
+export default PMLeavesPage;

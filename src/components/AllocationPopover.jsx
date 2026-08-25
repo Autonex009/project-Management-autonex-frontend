@@ -95,7 +95,6 @@ const AllocationPopover = ({
   // fewer people than the ratio it sits beside — the card said 7 while the badge said 6,
   // the difference being a lead recorded on the project but not allocated to it.
   leadIds = [],
-  fetchDetail,
 }) => {
   const [open, setOpen] = useState(false);
   const [position, setPosition] = useState({
@@ -107,24 +106,6 @@ const AllocationPopover = ({
   const triggerRef = useRef(null);
   const popoverRef = useRef(null);
   const closeTimerRef = useRef(null);
-
-  const [detailData, setDetailData] = useState(null);
-  const [isLoadingDetail, setIsLoadingDetail] = useState(false);
-
-  useEffect(() => {
-    if (open && fetchDetail && !detailData) {
-      setIsLoadingDetail(true);
-      fetchDetail()
-        .then((data) => {
-          setDetailData(data);
-          setIsLoadingDetail(false);
-        })
-        .catch((err) => {
-          console.error("Failed to fetch allocation detail:", err);
-          setIsLoadingDetail(false);
-        });
-    }
-  }, [open, fetchDetail, detailData]);
 
   const employeeIndex = useMemo(
     () => buildEmployeeIndex(employees),
@@ -219,7 +200,7 @@ const AllocationPopover = ({
     });
 
     const allocatedEmpIds = new Set(filtered.map(a => String(a.employee_id)));
-    
+
     // Add PMs who don't have an allocation
     const allPmIds = new Set([...pmIdSet, ...(pmIds || [])]);
     allPmIds.forEach((id) => {
@@ -261,7 +242,7 @@ const AllocationPopover = ({
         rowsPerEmployeeId[id] = (rowsPerEmployeeId[id] || 0) + 1;
       }
     });
-    
+
     rows.forEach((r) => {
       const id = r.alloc?.employee_id;
       r.rowsForPerson = id != null ? rowsPerEmployeeId[id] : 1;
@@ -466,22 +447,21 @@ const AllocationPopover = ({
           </div>
 
           {/* Body */}
-          <div className="max-h-[320px] overflow-y-auto">
-            {isLoadingDetail ? (
-              <div className="px-3 py-6 text-center text-sm text-slate-400">
-                Loading allocations...
-              </div>
-            ) : list.length === 0 ? (
-              <div className="px-3 py-6 text-center">
-                <p className="text-sm font-medium text-slate-500">
-                  No one is allocated to this project
+          <div className="max-h-64 overflow-y-auto py-1">
+            {list.length === 0 ? (
+              <div className="px-4 py-8 text-center">
+                <div className="w-10 h-10 rounded-full bg-slate-100 text-slate-400 flex items-center justify-center mx-auto mb-2">
+                  <Users className="w-5 h-5" />
+                </div>
+                <p className="text-sm font-medium text-slate-600">
+                  No employees allocated
                 </p>
-                <p className="mt-1 text-xs text-slate-400">
-                  Click Add Employee to get started
+                <p className="text-xs text-slate-400 mt-0.5">
+                  Add the first one to get started
                 </p>
               </div>
             ) : (
-              <ul className="py-1.5 divide-y divide-slate-50">
+              <ul className="divide-y divide-slate-50">
                 {list.map((row) => {
                   const { key, alloc, emp, former, isStale, rowsForPerson } =
                     row;

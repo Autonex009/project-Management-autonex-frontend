@@ -8,6 +8,9 @@ import {
   allocationApi,
   subProjectApi,
   employeeApi,
+  leaveApi,
+  parentProjectApi,
+  wfhApi,
 } from "../services/api";
 import {
   Plus,
@@ -27,14 +30,28 @@ import {
 } from "lucide-react";
 import toast from "react-hot-toast";
 import ConfirmDialog from "../components/ui/ConfirmDialog";
-import { isProjectScopedRole } from "../utils/roleAccess";
+import { getPmEmployeeId, getPmSubProjects } from "../utils/pmScope";
+import {
+  demotedToLeadIds,
+  isProjectScopedRole,
+  isTeamLeadAllocation,
+  resolveProjectPmIds,
+} from "../utils/roleAccess";
+import {
+  buildEmployeeIndex,
+  isArchived,
+  isStaleAllocation,
+  manpowerEmployeeIds,
+  staleAllocationName,
+  totalRequiredManpower,
+} from "../utils/workforce";
 import Table from "../components/ui/Table";
 import Button from "../components/ui/Button";
 import Modal from "../components/ui/Modal";
 import AllocationPopover from "../components/AllocationPopover";
 import Dropdown from "../components/ui/Dropdown";
 import SearchBar from "../components/ui/SearchBar";
-import { formatDisplayName } from "../utils/displayName";
+import { formatDisplayName, nameSearchText } from "../utils/displayName";
 
 // Stable color palette for avatars based on the employee name
 const AVATAR_PALETTE = [
@@ -57,7 +74,10 @@ const getAvatarGradient = (name) => {
 };
 
 // Marks an allocation as the project's team lead. Stored inside role_tags because that is
-// already per-(employee, project). Kept identical to the backend's TEAM_LEAD_TAG constant.
+// already per-(employee, project): the same person can lead one project without leading
+// every project they are allocated to, which a designation cannot express.
+// A lead may act on the project like its manager; what the hierarchy governs is whose own
+// requests they may decide (backend/app/services/project_scope.py).
 export const TEAM_LEAD_TAG = "Team Lead";
 
 // Role tag constants for time division
@@ -72,20 +92,23 @@ const ROLE_TAGS = [
   "Smart Factory Development",
 ];
 
-const PAGE_SIZE = 10;
-
 const AllocationsPage = () => {
   const location = useLocation();
   const navigate = useNavigate();
   const queryClient = useQueryClient();
   const hasHandledLocationProject = useRef(false);
+  const user = JSON.parse(localStorage.getItem("user") || "{}");
   const role = localStorage.getItem("role") || "admin";
+  // See utils/roleAccess: isPm confers ownership, isScoped only narrows what is listed.
+  // Scoping on isPm alone would show a team lead every allocation in the organisation.
+  const isPm = role === "pm";
   const isScoped = isProjectScopedRole(role);
   const prefix = isScoped ? "/pm" : "/admin";
-
   const [selectedEmployees, setSelectedEmployees] = useState([]);
+  const [availableEmployees, setAvailableEmployees] = useState([]);
+  const [allocatedEmployeesOther, setAllocatedEmployeesOther] = useState([]);
   const [filterTab, setFilterTab] = useState("all");
-  const [editingAllocation, setEditingAllocation] = useState(null); // { projectId, projectName }
+  const [editingAllocation, setEditingAllocation] = useState(null);
   const [confirmState, setConfirmState] = useState(null);
   const [showAllAllocated, setShowAllAllocated] = useState(false);
 
@@ -139,42 +162,133 @@ const AllocationsPage = () => {
   // Lightweight list of every project, for the "Select Project" dropdown only.
   const { data: projects = [] } = useQuery({
     queryKey: ["sub-projects"],
-    queryFn: () => subProjectApi.getAll(),
+    queryFn: subProjectApi.getAll,
   });
 
-  // ── CHANGED: full employee roster and the "who's on another project"
-  // map are only fetched once the Create-Allocation modal is actually
-  // open, instead of on every page load. ─────────────────────────────
-  const { data: employees = [] } = useQuery({
+  const { data: employees = [], isLoading: employeesLoading } = useQuery({
     queryKey: ["employees"],
     queryFn: employeeApi.getAll,
-    enabled: isModalOpen,
   });
 
-  const { data: employeeProjectsMap = {} } = useQuery({
-    queryKey: ["allocations", "employee-projects"],
-    queryFn: allocationApi.getEmployeeProjects,
-    enabled: isModalOpen,
+  const { data: allocations = [], isLoading: allocationsLoading } = useQuery({
+    queryKey: ["allocations"],
+    queryFn: allocationApi.getAll,
   });
 
-  // ── CHANGED: full allocation detail for the CURRENTLY SELECTED project
-  // only — this replaces deriving "on this project" / edit-modal rows from
-  // a giant client-side `allocations` array. ─────────────────────────────
-  const activeDetailProjectId = selectedProject?.id ?? editingAllocation?.projectId ?? null;
-  const { data: projectDetail } = useQuery({
-    queryKey: ["allocations", "project-detail", activeDetailProjectId],
-    queryFn: () => allocationApi.getProjectDetail(activeDetailProjectId),
-    enabled: !!activeDetailProjectId,
+  // Archived staff. Used ONLY to name the stale allocations they left behind —
+  // never merged into the roster, or they would fill manpower slots again.
+  const { data: formerEmployees = [] } = useQuery({
+    queryKey: ["employees", "archived"],
+    queryFn: () => employeeApi.getAll({ status: "archived" }),
+    staleTime: 5 * 60 * 1000,
   });
+
+  const { startStr, endStr } = useMemo(() => {
+    const today = new Date();
+    const y = today.getFullYear();
+    const m = today.getMonth();
+    const start = `${y}-${String(m + 1).padStart(2, "0")}-01`;
+    const end = `${y}-${String(m + 1).padStart(2, "0")}-${String(new Date(y, m + 1, 0).getDate()).padStart(2, "0")}`;
+    return { startStr: start, endStr: end };
+  }, []);
+
+  const { data: leaves = [] } = useQuery({
+    queryKey: ["leaves", startStr, endStr],
+    queryFn: () => leaveApi.getAll({ start_date: startStr, end_date: endStr }),
+  });
+  const { data: parentProjects = [] } = useQuery({
+    queryKey: ["parent-projects"],
+    queryFn: parentProjectApi.getAll,
+  });
+
+  // Approved WFH-for-a-day requests (used to flag WFO employees who are working
+  // from home today).
+  const { data: wfh = [] } = useQuery({
+    queryKey: ["wfh"],
+    queryFn: () => wfhApi.getAll(),
+  });
+
+  // Roster lookup. `GET /employees` hides archived staff while `GET /allocations`
+  // hides nobody, so an allocation missing from this index belongs to somebody
+  // who has left: it is stale, and never counted as filling a manpower slot.
+  const employeeIndex = useMemo(
+    () => buildEmployeeIndex(employees),
+    [employees],
+  );
+  const formerIndex = useMemo(
+    () => buildEmployeeIndex(formerEmployees),
+    [formerEmployees],
+  );
+  const isStale = (alloc) => isStaleAllocation(alloc, employeeIndex);
+  // Whoever a stale allocation belonged to, named as precisely as we can manage.
+  const staleName = (alloc) =>
+    formerIndex.get(String(alloc?.employee_id))?.name ||
+    staleAllocationName(alloc);
+
+  // Employees on approved leave today — shared by the Fill column and the allocation popover.
+  const leaveEmployeeIds = useMemo(() => {
+    const todayStr = new Date().toISOString().slice(0, 10);
+    const ids = new Set();
+    leaves.forEach((l) => {
+      if (
+        l.status === "approved" &&
+        String(l.start_date).slice(0, 10) <= todayStr &&
+        String(l.end_date).slice(0, 10) >= todayStr
+      ) {
+        ids.add(l.employee_id);
+      }
+    });
+    return ids;
+  }, [leaves]);
+
+  // Employees on an approved WFH day today.
+  const wfhTodayIds = useMemo(() => {
+    const todayStr = new Date().toISOString().slice(0, 10);
+    const ids = new Set();
+    wfh.forEach((w) => {
+      if (
+        (w.status || "").toLowerCase() === "approved" &&
+        String(w.wfh_date).slice(0, 10) === todayStr
+      ) {
+        ids.add(w.employee_id);
+      }
+    });
+    return ids;
+  }, [wfh]);
+
+  // Each employee's work location TODAY: 'WFH' if they work from home regularly
+  // (employee.work_model) or have an approved WFH day today; otherwise 'WFO'.
+  const locationByEmployeeId = useMemo(() => {
+    const m = new Map();
+    employees.forEach((e) => {
+      const wm = (e.work_model || "WFO").toUpperCase();
+      const regularWfh = wm === "WFH" || wm.includes("HOME");
+      m.set(e.id, regularWfh || wfhTodayIds.has(e.id) ? "WFH" : "WFO");
+    });
+    return m;
+  }, [employees, wfhTodayIds]);
+
+  const isDataLoading =
+    projectsLoading || employeesLoading || allocationsLoading;
+  const visibleProjects = isScoped
+    ? getPmSubProjects(projects, parentProjects, pmEmployeeId, allocations)
+    : projects;
+  const visibleProjectIds = new Set(
+    visibleProjects.map((project) => project.id),
+  );
+  const visibleAllocations = isScoped
+    ? allocations.filter((allocation) =>
+      visibleProjectIds.has(allocation.sub_project_id),
+    )
+    : allocations;
 
   const createMutation = useMutation({
     mutationFn: allocationApi.create,
     onSuccess: () => {
-      queryClient.invalidateQueries(["allocations-page"]);
-      queryClient.invalidateQueries(["allocations", "project-detail"]);
-      queryClient.invalidateQueries(["allocations", "employee-projects"]);
+      queryClient.invalidateQueries(["allocations"]);
       queryClient.invalidateQueries(["sub-projects"]);
       setIsModalOpen(false);
+      // setSuccessMessage removed
       toast.success("Allocation created successfully!");
     },
     onError: (err) => {
@@ -183,22 +297,6 @@ const AllocationsPage = () => {
         err.response?.data?.detail ||
         err.message ||
         "Failed to create allocation";
-      toast.error(message);
-    },
-  });
-
-  const deleteMutation = useMutation({
-    mutationFn: allocationApi.delete,
-    onSuccess: () => {
-      queryClient.invalidateQueries(["allocations-page"]);
-      queryClient.invalidateQueries(["allocations", "project-detail"]);
-      queryClient.invalidateQueries(["allocations", "employee-projects"]);
-      queryClient.invalidateQueries(["sub-projects"]);
-      toast.success("Allocation removed successfully!");
-    },
-    onError: (err) => {
-      const message =
-        err.response?.data?.detail || err.message || "Failed to delete allocation";
       toast.error(message);
     },
   });
@@ -212,81 +310,121 @@ const AllocationsPage = () => {
     setTimeDistribution({});
     setTotalDailyHours(8);
     setFilterTab("all");
-    setEmployeeSearch("");
-    setShowAllAllocated(false);
   };
+
+  const deleteMutation = useMutation({
+    mutationFn: allocationApi.delete,
+    onSuccess: () => {
+      queryClient.invalidateQueries(["allocations"]);
+      queryClient.invalidateQueries(["sub-projects"]);
+      toast.success("Allocation removed successfully!");
+    },
+    onError: (err) => {
+      const message =
+        err.response?.data?.detail ||
+        err.message ||
+        "Failed to delete allocation";
+      toast.error(message);
+    },
+  });
 
   // Handle incoming project selection from Projects page
   useEffect(() => {
-    if (location.state?.projectId && !hasHandledLocationProject.current && projects.length) {
-      const project = projects.find((p) => p.id === location.state.projectId);
+    if (location.state?.projectId && !hasHandledLocationProject.current) {
+      const project = visibleProjects.find(
+        (p) => p.id === location.state.projectId,
+      );
       if (project) {
         hasHandledLocationProject.current = true;
         setSelectedProject(project);
         setIsModalOpen(true);
       }
     }
-  }, [location.state, projects]);
+  }, [location.state, visibleProjects]);
 
-  // ── Derive available / allocated-elsewhere employee lists for the modal
-  // from the lazily-fetched roster + employee-projects map + this project's
-  // own detail (instead of scanning the whole allocations array). ────────
-  const { availableEmployees, allocatedEmployeesOther } = useMemo(() => {
-    if (!selectedProject || !employees.length) {
-      return { availableEmployees: [], allocatedEmployeesOther: [] };
-    }
-    const allocatedToCurrentProjectIds = new Set(
-      (projectDetail?.project_id === selectedProject.id ? projectDetail.items : [])
-        .filter((it) => !it.stale)
-        .map((it) => it.employee_id),
-    );
+  useEffect(() => {
+    if (selectedProject) {
+      const allocatedToCurrentProject = allocations
+        .filter((a) => a.sub_project_id === selectedProject.id)
+        .map((a) => a.employee_id);
 
-    const requiredSkills = selectedProject.required_expertise || [];
-    const matching = employees
-      .filter((emp) => emp.status !== "archived")
-      .map((emp) => {
-        const empSkills = emp.skills || [];
-        const skillMatch =
-          requiredSkills.length === 0 ||
-          requiredSkills.some((skill) =>
-            empSkills.some((empSkill) => empSkill.toLowerCase().includes(skill.toLowerCase())),
-          );
-        const alreadyInProject = allocatedToCurrentProjectIds.has(emp.id);
-        const currentProjects = (employeeProjectsMap[String(emp.id)] || []).filter(
-          (p) => p.project_id !== selectedProject.id,
-        );
-        return { ...emp, skillMatch, alreadyInProject, currentProjects: currentProjects.length ? currentProjects : null };
-      })
-      .sort((a, b) => {
-        if (a.alreadyInProject !== b.alreadyInProject) return a.alreadyInProject ? 1 : -1;
-        return b.skillMatch - a.skillMatch;
+      // Find which employees are allocated to OTHER projects (not current)
+      const allocatedToOtherProjects = {};
+      allocations.forEach((alloc) => {
+        if (alloc.sub_project_id !== selectedProject.id) {
+          if (!allocatedToOtherProjects[alloc.employee_id]) {
+            allocatedToOtherProjects[alloc.employee_id] = [];
+          }
+          const proj = projects.find((p) => p.id === alloc.sub_project_id);
+          if (proj) {
+            allocatedToOtherProjects[alloc.employee_id].push({
+              projectId: proj.id,
+              projectName: proj.name,
+              hours: alloc.total_daily_hours || 8,
+            });
+          }
+        }
       });
 
-    return {
-      availableEmployees: matching.filter((e) => !e.currentProjects),
-      allocatedEmployeesOther: matching.filter((e) => e.currentProjects),
-    };
-  }, [selectedProject, employees, employeeProjectsMap, projectDetail]);
+      // Everyone on the roster (including those already in this project so the
+      // list is never empty). The test is "not archived", NOT status === "active":
+      // status only carries the archived flag now, so demanding "active" silently
+      // dropped employees whose status is blank or something else and made them
+      // impossible to allocate — the modal offered 202 of the roster's 206.
+      const requiredSkills = selectedProject.required_expertise || [];
+      const matchingEmployees = employees
+        .filter((emp) => !isArchived(emp))
+        .map((emp) => {
+          const empSkills = emp.skills || [];
+          const skillMatch =
+            requiredSkills.length === 0 ||
+            requiredSkills.some((skill) =>
+              empSkills.some((empSkill) =>
+                empSkill.toLowerCase().includes(skill.toLowerCase()),
+              ),
+            );
+          const alreadyInProject = allocatedToCurrentProject.includes(emp.id);
+          return { ...emp, skillMatch, alreadyInProject };
+        })
+        .sort((a, b) => {
+          // Sort: skill-matched first, then unallocated, then already-in-project
+          if (a.alreadyInProject !== b.alreadyInProject)
+            return a.alreadyInProject ? 1 : -1;
+          return b.skillMatch - a.skillMatch;
+        });
 
-  // Required/assigned stats for the selected project — comes straight from
-  // its row in the current page when available, else from the lazy detail
-  // fetch (covers the case where the project isn't on the visible page,
-  // e.g. selected via the "Select Project" dropdown search).
-  const selectedProjectStats = useMemo(() => {
-    if (!selectedProject) return { required: 0, assigned: 0 };
-    const row = rows.find((r) => r.project_id === selectedProject.id);
-    if (row) return { required: row.required_manpower, assigned: row.assigned_manpower };
-    return {
-      required: projectDetail?.required_manpower || 0,
-      assigned: (projectDetail?.items || []).filter((i) => !i.stale).length,
-    };
-  }, [selectedProject, rows, projectDetail]);
+      // Split into unallocated and allocated-to-other-projects
+      const unallocatedList = matchingEmployees
+        .filter((emp) => !allocatedToOtherProjects[emp.id])
+        .map((emp) => ({
+          ...emp,
+          currentProjects: allocatedToOtherProjects[emp.id] || null,
+        }));
+
+      const allocatedOtherList = matchingEmployees
+        .filter((emp) => allocatedToOtherProjects[emp.id])
+        .map((emp) => ({
+          ...emp,
+          currentProjects: allocatedToOtherProjects[emp.id],
+        }));
+
+      setAvailableEmployees(unallocatedList);
+      setAllocatedEmployeesOther(allocatedOtherList);
+    }
+  }, [selectedProject, employees, allocations, leaves, projects]);
 
   const handleSubmit = (e) => {
     e.preventDefault();
 
-    const { required, assigned: currentAllocated } = selectedProjectStats;
-    const newTotal = currentAllocated + selectedEmployees.length;
+    // Check for over-allocation against the same arithmetic the table shows —
+    // people, PMs counted on both sides. Counting PMs as filled while comparing
+    // against a required figure that excluded them fired this warning on projects
+    // that still had room.
+    const { assignedIds, required } = manpowerFor(selectedProject);
+    const filledIds = new Set(assignedIds);
+    const currentAllocated = filledIds.size;
+    selectedEmployees.forEach((emp) => filledIds.add(String(emp.id)));
+    const newTotal = filledIds.size;
 
     if (newTotal > required) {
       setConfirmState({
@@ -312,12 +450,18 @@ const AllocationsPage = () => {
   };
 
   const performAllocation = () => {
+    // Create allocations for all selected employees
     selectedEmployees.forEach((emp) => {
       const data = {
         employee_id: emp.id,
         sub_project_id: selectedProject.id,
         total_daily_hours: totalDailyHours,
-        role_tags: isTeamLead ? [...selectedRoleTags, TEAM_LEAD_TAG] : selectedRoleTags,
+        // The team-lead marker rides along in role_tags but is deliberately kept out
+        // of selectedRoleTags: those tags split the working day between workstreams,
+        // and leading a project is a position rather than hours to divide.
+        role_tags: isTeamLead
+          ? [...selectedRoleTags, TEAM_LEAD_TAG]
+          : selectedRoleTags,
         time_distribution: selectedRoleTags.length > 0 ? timeDistribution : {},
         weekly_hours_allocated: emp.weekly_availability || 40,
         weekly_tasks_allocated: 0,
@@ -325,9 +469,12 @@ const AllocationsPage = () => {
         effective_week: new Date().toISOString().split("T")[0],
         active_start_date: selectedProject.start_date,
         active_end_date: selectedProject.end_date,
-        override_flag: emp.currentProjects ? true : false,
-        override_reason: emp.currentProjects ? "PM Override - Dual allocation" : null,
+        override_flag: emp.currentProjects ? true : false, // Mark as override if already allocated
+        override_reason: emp.currentProjects
+          ? "PM Override - Dual allocation"
+          : null,
       };
+
       createMutation.mutate(data);
     });
   };
@@ -335,8 +482,11 @@ const AllocationsPage = () => {
   const handleEmployeeToggle = (employee) => {
     setSelectedEmployees((prev) => {
       const exists = prev.find((e) => e.id === employee.id);
-      if (exists) return prev.filter((e) => e.id !== employee.id);
-      return [...prev, employee];
+      if (exists) {
+        return prev.filter((e) => e.id !== employee.id);
+      } else {
+        return [...prev, employee];
+      }
     });
   };
 
@@ -353,8 +503,149 @@ const AllocationsPage = () => {
     }
   };
 
+  const getEmployeeName = (employeeId) => {
+    const emp = employeeIndex.get(String(employeeId));
+    return emp ? formatDisplayName(emp.name) : "";
+  };
+
+  const getProjectName = (projectId) => {
+    const proj = visibleProjects.find((p) => p.id === projectId);
+    return proj ? proj.name : "Unknown";
+  };
+
+  const getAllocatedEmployees = (projectId) => {
+    return visibleAllocations.filter((a) => a.sub_project_id === projectId);
+  };
+
+  // Managers and leads occupy manpower slots, so they count on BOTH sides of the ratio:
+  // manpowerEmployeeIds adds them to assigned, totalRequiredManpower adds them to required.
+  // Both resolvers are shared with the Projects page — a near-copy here previously drifted
+  // and the two screens reported different requirements for one project.
+  const resolvePmIds = (project) =>
+    resolveProjectPmIds(project, parentProjects, employeeIndex);
+
+  const resolveLeadIds = (project) => {
+    const fromAllocations = allocations
+      .filter(
+        (a) =>
+          a.sub_project_id === project?.id &&
+          isTeamLeadAllocation(a, employeeIndex.get(String(a.employee_id))),
+      )
+      .map((a) => a.employee_id);
+    // Union with converted managers still sitting in the manager slot, deduped so someone
+    // who is both does not fill two manpower slots.
+    return [
+      ...new Set([
+        ...fromAllocations,
+        ...demotedToLeadIds(project, parentProjects, employeeIndex),
+      ]),
+    ];
+  };
+
+  // One definition of a project's manpower for the create modal, its project
+  // dropdown and the over-allocation guard. Each used to count it its own way —
+  // the modal counted allocation ROWS against the raw required (70/73) while the
+  // table counted PEOPLE including PMs (69/74) — so one project reported two
+  // different fill ratios on the same screen.
+  const manpowerFor = (project) => {
+    const projectAllocs = allocations.filter(
+      (a) => a.sub_project_id === project?.id,
+    );
+    const pmIds = resolvePmIds(project);
+    const leadIds = resolveLeadIds(project);
+    const assignedIds = manpowerEmployeeIds({
+      allocations: projectAllocs,
+      pmIds,
+      leadIds,
+      employeeIndex,
+    });
+    return {
+      projectAllocs,
+      pmIds,
+      leadIds,
+      assignedIds,
+      assigned: assignedIds.size,
+      // The stored figure as typed in Team Composition — leads and managers are
+      // part of it now, so they are no longer added from the allocations here.
+      required: totalRequiredManpower({
+        project,
+        pmIds,
+        leadIds,
+        employeeIndex,
+      }),
+    };
+  };
+
+  // Group allocations by project
+  const projectAllocations = visibleProjects
+    .map((project) => {
+      const allocations = visibleAllocations.filter(
+        (a) => a.sub_project_id === project.id,
+      );
+      const pmIds = resolvePmIds(project);
+      const leadIds = resolveLeadIds(project);
+      // Count people, not allocation rows: a manager who is also allocated, or anyone
+      // holding two allocations here, must only fill one slot. People who have
+      // left are excluded — a stale allocation staffs nothing.
+      const filledIds = manpowerEmployeeIds({
+        allocations,
+        pmIds,
+        leadIds,
+        employeeIndex,
+      });
+      // Compute dynamically from the assigned PMs and Leads, exactly like ProjectsPage does,
+      // because team_manager_count and team_lead_count can be stale if the project wasn't re-saved.
+      const pmSlots = pmIds.length;
+      const leadSlots = leadIds.length;
+      // The role slots only — managers and leads are shown separately in the tooltip, and
+      // `required_manpower` already folds them in, so reusing it would state them twice.
+      const requestedManpower =
+        (Number(project.autonex_annotators) || 0) +
+        (Number(project.autonex_reviewers) || 0) +
+        (Number(project.others_count) || 0) +
+        (Number(project.developers_count) || 0);
+      return {
+        project,
+        allocations,
+        pmIds,
+        leadIds,
+        assignedManpower: filledIds.size,
+        requestedManpower,
+        pmSlots,
+        leadSlots,
+        requiredManpower: totalRequiredManpower({
+          project,
+          pmIds,
+          leadIds,
+          employeeIndex,
+        }),
+      };
+    })
+    .filter((pa) => pa.allocations.length > 0 || pa.requiredManpower > 0);
+
+  // const [searchQuery, setSearchQuery] = useState("");
+
+  const filteredProjectAllocations = useMemo(() => {
+    if (!searchQuery.trim()) return projectAllocations;
+    const q = searchQuery.toLowerCase();
+    return projectAllocations.filter(
+      ({ project, allocations: projectAllocs }) => {
+        if (project.name.toLowerCase().includes(q)) return true;
+        return projectAllocs.some((a) => {
+          // The stored name as well as the shortened label — searching a middle
+          // name must still find its owner. See nameSearchText.
+          const empName = nameSearchText(
+            employeeIndex.get(String(a.employee_id))?.name,
+          );
+          return empName.includes(q);
+        });
+      },
+    );
+  }, [projectAllocations, searchQuery, employees]);
+
   return (
     <div className="space-y-4">
+
       {/* Toolbar — search (left) · create allocation (right) */}
       <div className="flex flex-wrap items-center justify-between gap-2">
         <SearchBar
@@ -362,7 +653,7 @@ const AllocationsPage = () => {
           value={searchQuery}
           onChange={(val) => {
             setSearchQuery(val);
-            setCurrentPage(1); // CHANGED: search now re-queries the server, so reset to page 1
+            setCurrentPage(1);
           }}
           placeholder="Search projects or employees..."
         />
@@ -379,34 +670,36 @@ const AllocationsPage = () => {
           Create Allocation
         </button>
       </div>
-
       <Table
         variant="untitled"
         allowOverflow
-        loading={pageLoading || pageFetching}
+        loading={isDataLoading}
         columns={[
           {
             key: "project",
             label: "Project",
             width: "w-[24%]",
-            render: (_, row) => (
+            render: (project) => (
               <button
                 type="button"
-                onClick={() => navigate(`${prefix}/sub-projects?focus=${row.project_id}`)}
+                onClick={() =>
+                  navigate(`${prefix}/sub-projects?focus=${project.id}`)
+                }
                 className="group/proj -mx-1 flex w-full min-w-0 items-center gap-3 rounded-md px-1 py-0.5 text-left transition-colors hover:bg-slate-50"
               >
                 <div className="w-9 h-9 rounded-lg bg-indigo-50 text-indigo-600 flex items-center justify-center text-[13px] font-semibold ring-1 ring-slate-200 shrink-0">
-                  {(row.project_name || "?").charAt(0).toUpperCase()}
+                  {(project.name || "?").charAt(0).toUpperCase()}
                 </div>
                 <div className="group/tip relative min-w-0 flex-1">
                   <div className="truncate text-[13.5px] font-semibold text-slate-900 transition-colors group-hover/proj:text-indigo-600">
-                    {row.project_name}
+                    {project.name}
                   </div>
                   <div className="truncate text-[12px] text-slate-400">
-                    {row.project_type || "—"}
+                    {project.project_type || "—"}
                   </div>
+                  {/* Full name on hover — light tooltip */}
                   <span className="pointer-events-none absolute left-0 top-full z-40 mt-1 hidden w-max max-w-[280px] whitespace-normal break-words rounded-lg border border-slate-200 bg-white px-2.5 py-1.5 text-[11px] font-medium text-slate-600 shadow-lg group-hover/tip:block">
-                    {row.project_name}
+                    {project.name}
                   </span>
                 </div>
               </button>
@@ -416,58 +709,129 @@ const AllocationsPage = () => {
             key: "allocations",
             label: "Allocated Employees",
             width: "w-[28%]",
-            // CHANGED: renders the server-provided 6-avatar preview directly —
-            // no client-side merge of allocations + PM ids + lead ids.
-            render: (_, row) => (
-              <div className="flex items-center gap-2">
-                <div className="flex -space-x-1.5 overflow-hidden">
-                  {row.allocated_preview.map((p) => (
-                    <UserAvatar
-                      key={p.allocation_id}
-                      src={p.avatar_url}
-                      name={formatDisplayName(p.name)}
-                      size="sm"
-                      className="w-8 h-8 border-2 border-white shadow-xs shrink-0"
-                      fallbackClassName="w-8 h-8 text-[11px]"
-                    />
-                  ))}
-                  {row.total_allocated_count > row.allocated_preview.length && (
-                    <div className="w-8 h-8 rounded-full bg-slate-100 border-2 border-white text-[10px] font-bold text-slate-500 flex items-center justify-center shadow-sm shrink-0">
-                      +{row.total_allocated_count - row.allocated_preview.length}
-                    </div>
-                  )}
+            render: (projectAllocs, row) => {
+              const project = row.project;
+              const pmIdSet = new Set((project?.assigned_employee_ids || []).map(String));
+
+              const rawRows = projectAllocs
+                .filter((a) => !isStale(a))
+                .map((a) => {
+                  const emp = employeeIndex.get(String(a.employee_id));
+                  const empIdStr = String(a.employee_id);
+                  return {
+                    alloc: a,
+                    emp,
+                    name: formatDisplayName(emp?.name) || "Unnamed",
+                    hasImg: !!emp?.avatar_url,
+                    isPm: pmIdSet.has(empIdStr) || (a.role_tags || []).includes("Manager"),
+                    isLead: (a.role_tags || []).includes("Team Lead")
+                  };
+                });
+
+              const allocatedEmpIds = new Set(rawRows.map(r => String(r.alloc.employee_id)));
+
+              const allPmIds = new Set([...pmIdSet, ...(row.pmIds || [])]);
+              allPmIds.forEach((id) => {
+                if (!allocatedEmpIds.has(id) && employeeIndex.has(id)) {
+                  const emp = employeeIndex.get(id);
+                  rawRows.push({
+                    alloc: { employee_id: id, role_tags: ["Manager"] },
+                    emp,
+                    name: formatDisplayName(emp?.name) || "Unnamed",
+                    hasImg: !!emp?.avatar_url,
+                    isPm: true,
+                    isLead: false,
+                  });
+                  allocatedEmpIds.add(id);
+                }
+              });
+
+              (row.leadIds || []).forEach((id) => {
+                if (!allocatedEmpIds.has(id) && employeeIndex.has(id)) {
+                  const emp = employeeIndex.get(id);
+                  rawRows.push({
+                    alloc: { employee_id: id, role_tags: ["Team Lead"] },
+                    emp,
+                    name: formatDisplayName(emp?.name) || "Unnamed",
+                    hasImg: !!emp?.avatar_url,
+                    isPm: false,
+                    isLead: true,
+                  });
+                  allocatedEmpIds.add(id);
+                }
+              });
+
+              const ordered = rawRows.sort((a, b) => {
+                if (a.isPm && !b.isPm) return -1;
+                if (!a.isPm && b.isPm) return 1;
+                if (a.isLead && !b.isLead) return -1;
+                if (!a.isLead && b.isLead) return 1;
+                return a.name.localeCompare(b.name);
+              });
+              return (
+                <div className="flex items-center gap-2">
+                  <div className="flex -space-x-1.5 overflow-hidden">
+                    {ordered.slice(0, 6).map(({ alloc, emp, name, hasImg }) => {
+                      const initials = name
+                        .split(/\s+/)
+                        .slice(0, 2)
+                        .map((p) => p[0])
+                        .join("")
+                        .toUpperCase();
+                      const gradient = getAvatarGradient(name);
+                      return (
+                        <UserAvatar
+                          key={alloc.id}
+                          src={emp.avatar_url}
+                          name={name}
+                          size="sm"
+                          className="w-8 h-8 border-2 border-white shadow-xs shrink-0"
+                          fallbackClassName="w-8 h-8 text-[11px]"
+                        />
+                      );
+                    })}
+                    {ordered.length > 6 && (
+                      <div className="w-8 h-8 rounded-full bg-slate-100 border-2 border-white text-[10px] font-bold text-slate-500 flex items-center justify-center shadow-sm shrink-0">
+                        +{ordered.length - 6}
+                      </div>
+                    )}
+                  </div>
+
+                  <button
+                    onClick={() => {
+                      setSelectedProject(project);
+                      setIsModalOpen(true);
+                    }}
+                    className="w-8 h-8 rounded-full border border-dashed border-slate-300 text-slate-400 hover:text-indigo-600 hover:border-indigo-500 hover:bg-indigo-50/50 flex items-center justify-center transition-all shrink-0"
+                    title="Add employees"
+                  >
+                    <UserPlus className="w-3.5 h-3.5" />
+                  </button>
                 </div>
-                <button
-                  onClick={() => {
-                    setSelectedProject({ id: row.project_id, name: row.project_name });
-                    setIsModalOpen(true);
-                  }}
-                  className="w-8 h-8 rounded-full border border-dashed border-slate-300 text-slate-400 hover:text-indigo-600 hover:border-indigo-500 hover:bg-indigo-50/50 flex items-center justify-center transition-all shrink-0"
-                  title="Add employees"
-                >
-                  <UserPlus className="w-3.5 h-3.5" />
-                </button>
-              </div>
-            ),
+              );
+            },
           },
+          // Required sits immediately left of the current head-count it is read
+          // against, so the comparison is a glance sideways rather than across
+          // the avatar strip.
           {
-            key: "required_manpower",
+            key: "requiredManpower",
             label: "Required",
             align: "left",
             width: "w-[12%]",
-            render: (_, row) => (
+            render: (value, row) => (
               <span
                 className="text-[13px] font-medium text-slate-700 tabular-nums"
                 title={
-                  row.pm_slots > 0 || row.lead_slots > 0
-                    ? `${row.requested_manpower} role slot(s) + ${row.pm_slots} manager(s) + ${row.lead_slots} lead(s)`
+                  row.pmSlots > 0 || row.leadSlots > 0
+                    ? `${row.requestedManpower} role slot(s) + ${row.pmSlots} manager(s) + ${row.leadSlots} lead(s)`
                     : undefined
                 }
               >
-                {row.required_manpower}
-                {(row.pm_slots > 0 || row.lead_slots > 0) && (
+                {value}
+                {(row.pmSlots > 0 || row.leadSlots > 0) && (
                   <span className="ml-1 text-[11px] font-normal text-slate-400">
-                    ({row.pm_slots} PM &middot; {row.lead_slots} Lead)
+                    ({row.pmSlots || 0} PM &middot; {row.leadSlots || 0} Lead)
                   </span>
                 )}
               </span>
@@ -477,27 +841,51 @@ const AllocationsPage = () => {
             key: "_fill",
             label: "Current Team Status",
             width: "w-[26%]",
-            // CHANGED: wfo/wfh/on-leave counts come straight from the row —
-            // no per-employee leave/WFH scan in the browser.
             render: (_, row) => {
-              const full = row.assigned_manpower >= row.required_manpower && row.required_manpower > 0;
+              const project = row.project;
+              const activeAllocations = row.allocations.filter((a) => !isStale(a));
+              const assigned = row.assignedManpower || 0;
+              const required = row.requiredManpower || 0;
+              const full = assigned >= required && required > 0;
+
+              const allocPm = row.pmSlots || 0;
+              const allocLead = row.leadSlots || 0;
+
+              // Split allocated employees into on-leave / WFH / WFO for today.
+              let onLeaveToday = 0,
+                wfhCount = 0,
+                wfoCount = 0;
+              row.allocations.forEach((a) => {
+                // Somebody who has left is neither in the office nor at home.
+                if (isStale(a)) return;
+                if (leaveEmployeeIds.has(a.employee_id)) {
+                  onLeaveToday += 1;
+                  return;
+                }
+                if (locationByEmployeeId.get(a.employee_id) === "WFH")
+                  wfhCount += 1;
+                else wfoCount += 1;
+              });
               return (
                 <div className="flex items-center gap-3">
                   <AllocationPopover
-                    project={{ id: row.project_id, name: row.project_name }}
-                    // Lazily loads full detail on open — see fetchDetail below.
-                    fetchDetail={() => allocationApi.getProjectDetail(row.project_id)}
+                    project={project}
+                    allocations={row.allocations}
+                    employees={employees}
+                    formerEmployees={formerEmployees}
+                    onLeaveEmployeeIds={leaveEmployeeIds}
+                    locationByEmployeeId={locationByEmployeeId}
                     triggerClassName="inline-flex items-center rounded-md focus:outline-none"
                     badgeContent={
                       <div className="flex items-center gap-3 cursor-pointer select-none">
                         <span
                           className={`text-[13px] font-semibold tabular-nums ${full ? "text-emerald-600" : "text-slate-700"}`}
-                          title={`${row.assigned_manpower} allocated of ${row.required_manpower} required`}
+                          title={`${assigned} allocated of ${required} required`}
                         >
-                          {row.assigned_manpower}
-                          {(row.pm_slots > 0 || row.lead_slots > 0) && (
+                          {assigned}
+                          {(allocPm > 0 || allocLead > 0) && (
                             <span className="ml-1 text-[11px] font-normal text-slate-400">
-                              ({row.pm_slots} PM &middot; {row.lead_slots} Lead)
+                              ({allocPm || 0} PM &middot; {allocLead || 0} Lead)
                             </span>
                           )}
                         </span>
@@ -506,29 +894,29 @@ const AllocationsPage = () => {
                           title="Working from office today"
                         >
                           <Building2 className="w-3.5 h-3.5 text-slate-400" />
-                          {row.wfo_count} WFO
+                          {wfoCount} WFO
                         </span>
                         <span
                           className="inline-flex items-center gap-1 text-[12px] text-slate-500"
                           title="Working from home today"
                         >
                           <Home className="w-3.5 h-3.5 text-slate-400" />
-                          {row.wfh_count} WFH
+                          {wfhCount} WFH
                         </span>
                       </div>
                     }
                     onOpenAllocations={() => {
-                      setSelectedProject({ id: row.project_id, name: row.project_name });
+                      setSelectedProject(project);
                       setIsModalOpen(true);
                     }}
                   />
-                  {row.on_leave_count > 0 && (
+                  {onLeaveToday > 0 && (
                     <span
                       className="inline-flex items-center gap-1.5 text-[12px] font-medium text-amber-600 shrink-0"
-                      title={`${row.on_leave_count} on approved leave today`}
+                      title={`${onLeaveToday} on approved leave today`}
                     >
                       <span className="w-1.5 h-1.5 rounded-full bg-amber-500" />
-                      {row.on_leave_count} on leave
+                      {onLeaveToday} on leave
                     </span>
                   )}
                 </div>
@@ -543,7 +931,10 @@ const AllocationsPage = () => {
             render: (_, row) => (
               <button
                 onClick={() =>
-                  setEditingAllocation({ projectId: row.project_id, projectName: row.project_name })
+                  setEditingAllocation({
+                    project: row.project,
+                    allocations: row.allocations,
+                  })
                 }
                 className="p-2 text-slate-500 hover:text-indigo-600 hover:bg-indigo-50 rounded-lg transition-colors"
                 title="Edit"
@@ -553,13 +944,8 @@ const AllocationsPage = () => {
             ),
           },
         ]}
-        data={rows}
-        // CHANGED: pagination is now server-driven. `rows` is already exactly
-        // one page, so Table should render it as-is; page controls below.
-        serverPagination
+        data={filteredProjectAllocations}
         currentPage={currentPage}
-        totalPages={totalPages}
-        totalItems={totalItems}
         pageSize={PAGE_SIZE}
         onPageChange={setCurrentPage}
         emptyState={{
@@ -569,29 +955,37 @@ const AllocationsPage = () => {
             : "Create your first allocation to get started",
         }}
       />
-
       {/* Create Allocation Modal */}
-      <Modal isOpen={isModalOpen} onClose={closeCreateModal} size="3xl" maxHeight="95vh">
+      <Modal
+        isOpen={isModalOpen}
+        onClose={closeCreateModal}
+        size="3xl"
+        maxHeight="95vh"
+      >
         <Modal.Header onClose={closeCreateModal} className="!py-4">
-          <h2 className="text-base font-semibold text-slate-900">Create Allocation</h2>
+          <h2 className="text-base font-semibold text-slate-900">
+            Create Allocation
+          </h2>
         </Modal.Header>
 
         <form onSubmit={handleSubmit} className="flex-1 flex flex-col min-h-0">
           <Modal.Body className="space-y-3.5 !pt-3">
+            {/* Project select + inline stats (one row) */}
             <div className="flex flex-wrap items-end gap-x-4 gap-y-2">
               <div className="flex-1 min-w-[240px]">
                 <label className="block text-[13px] font-medium text-slate-700 mb-1">
                   Select Project <span className="text-red-500">*</span>
                 </label>
                 <Dropdown
-                  options={projects.map((project) => {
-                    const row = rows.find((r) => r.project_id === project.id);
-                    const req = row ? row.required_manpower : project.required_manpower || 0;
-                    return { value: project.id.toString(), label: `${project.name} - Required: ${req}` };
-                  })}
-                  value={selectedProject?.id?.toString() || ""}
+                  options={visibleProjects.map((project) => ({
+                    value: project.id.toString(),
+                    label: `${project.name} - Required: ${manpowerFor(project).required}`,
+                  }))}
+                  value={selectedProject?.id.toString() || ""}
                   onChange={(val) => {
-                    const project = projects.find((p) => p.id === parseInt(val));
+                    const project = visibleProjects.find(
+                      (p) => p.id === parseInt(val),
+                    );
                     setSelectedProject(project);
                     setSelectedEmployees([]);
                   }}
@@ -600,7 +994,10 @@ const AllocationsPage = () => {
               </div>
               {selectedProject &&
                 (() => {
-                  const { required, assigned: filled } = selectedProjectStats;
+                  // Same numbers as the table row behind this modal: people, with
+                  // PMs on both sides of the ratio.
+                  const { assigned: filled, required } =
+                    manpowerFor(selectedProject);
                   const skills = selectedProject.required_expertise || [];
                   return (
                     <div className="flex items-center gap-3 flex-wrap pb-0.5">
@@ -608,7 +1005,9 @@ const AllocationsPage = () => {
                         <span className="text-[11px] font-medium text-slate-400 uppercase tracking-wide">
                           Required
                         </span>
-                        <span className="text-[13px] font-bold text-blue-700">{required}</span>
+                        <span className="text-[13px] font-bold text-blue-700">
+                          {required}
+                        </span>
                       </div>
                       <div className="flex items-center gap-1.5">
                         <span className="text-[11px] font-medium text-slate-400 uppercase tracking-wide">
@@ -635,7 +1034,9 @@ const AllocationsPage = () => {
                               </span>
                             ))}
                             {skills.length > 3 && (
-                              <span className="text-[11px] text-slate-400">+{skills.length - 3}</span>
+                              <span className="text-[11px] text-slate-400">
+                                +{skills.length - 3}
+                              </span>
                             )}
                           </div>
                         </div>
@@ -647,12 +1048,26 @@ const AllocationsPage = () => {
 
             {selectedProject && (
               <>
-                {/* On this project — uses the lazily-fetched project detail */}
+                {/* On this project — single row + see more */}
                 {(() => {
-                  const items = projectDetail?.project_id === selectedProject.id ? projectDetail.items : [];
-                  const liveEmps = items.filter((x) => !x.stale);
-                  const staleEmps = items.filter((x) => x.stale);
-                  const distinctCount = new Set(liveEmps.map((x) => x.employee_id)).size;
+                  const { projectAllocs } = manpowerFor(selectedProject);
+                  // Stale rows are LISTED here, in red — this is where people get
+                  // removed from a project, so hiding them left no way to clear
+                  // them. They sort last and are not part of the headcount.
+                  const allocatedEmps = projectAllocs
+                    .map((a) => ({
+                      alloc: a,
+                      emp: employeeIndex.get(String(a.employee_id)),
+                      stale: isStale(a),
+                    }))
+                    .sort((a, b) => Number(a.stale) - Number(b.stale));
+                  const liveEmps = allocatedEmps.filter((x) => !x.stale);
+                  const staleEmps = allocatedEmps.filter((x) => x.stale);
+                  // People, not rows: somebody holding two allocations here is one
+                  // employee, and this count sits beside the table's own ratio.
+                  const distinctCount = new Set(
+                    liveEmps.map((x) => String(x.emp.id)),
+                  ).size;
 
                   return (
                     <div className="bg-blue-50/60 border border-blue-100 rounded-lg p-3">
@@ -670,46 +1085,81 @@ const AllocationsPage = () => {
                               {staleEmps.length} archived
                             </span>
                           )}
-                          <span className="text-[11px] text-blue-900/60">
-                            {distinctCount} employee{distinctCount === 1 ? "" : "s"}
+                          <span
+                            className="text-[11px] text-blue-900/60"
+                            title={
+                              liveEmps.length !== distinctCount
+                                ? `${liveEmps.length} allocation rows — ${liveEmps.length - distinctCount} duplicate${liveEmps.length - distinctCount === 1 ? "" : "s"}`
+                                : undefined
+                            }
+                          >
+                            {distinctCount} employee
+                            {distinctCount === 1 ? "" : "s"}
                           </span>
                         </span>
                       </div>
-                      {items.length === 0 ? (
-                        <p className="text-xs text-slate-500 italic">No one allocated yet</p>
+                      {allocatedEmps.length === 0 ? (
+                        <p className="text-xs text-slate-500 italic">
+                          No one allocated yet
+                        </p>
                       ) : (
                         <div className="flex flex-wrap gap-1.5">
-                          {(showAllAllocated ? items : [...liveEmps.slice(0, 3), ...staleEmps]).map((it) => {
-                            const name = formatDisplayName(it.name);
+                          {/* Collapsed shows 3 of the team but ALWAYS every stale
+                              row — they are the ones needing action. */}
+                          {(showAllAllocated
+                            ? allocatedEmps
+                            : [...liveEmps.slice(0, 3), ...staleEmps]
+                          ).map(({ alloc, emp, stale }) => {
+                            const rawName = stale ? staleName(alloc) : emp.name;
+                            const name = formatDisplayName(rawName);
                             const initials =
-                              (name || "").trim().split(/\s+/).map((p) => p.charAt(0).toUpperCase()).slice(0, 2).join("") || "?";
+                              (name || "")
+                                .trim()
+                                .split(/\s+/)
+                                .map((p) => p.charAt(0).toUpperCase())
+                                .slice(0, 2)
+                                .join("") || "?";
                             const isRemoving =
-                              deleteMutation.isPending && deleteMutation.variables === it.allocation_id;
+                              deleteMutation.isPending &&
+                              deleteMutation.variables === alloc.id;
                             return (
                               <div
-                                key={it.allocation_id}
+                                key={alloc.id}
+                                // Hover carries the FULL stored name; the chip
+                                // shows the shortened one. Built from `name`
+                                // before, which meant the middle name was
+                                // dropped in both places and unreachable.
                                 title={
-                                  it.stale
-                                    ? `${it.name} — archived, not counted towards manpower`
-                                    : `${it.name}${it.total_daily_hours ? ` · ${it.total_daily_hours}h/day` : ""}`
+                                  stale
+                                    ? `${rawName} — archived, not counted towards manpower`
+                                    : `${rawName}${alloc.total_daily_hours ? ` · ${alloc.total_daily_hours}h/day` : ""}`
                                 }
-                                className={`group inline-flex items-center gap-1.5 pl-1 pr-1 py-0.5 rounded-full shadow-sm transition-opacity ${
-                                  it.stale ? "border border-rose-300 bg-rose-50" : "border border-slate-200 bg-white"
-                                } ${isRemoving ? "opacity-50" : ""}`}
+                                className={`group inline-flex items-center gap-1.5 pl-1 pr-1 py-0.5 rounded-full shadow-sm transition-opacity ${stale
+                                  ? "border border-rose-300 bg-rose-50"
+                                  : "border border-slate-200 bg-white"
+                                  } ${isRemoving ? "opacity-50" : ""}`}
                               >
                                 <span
-                                  className={`w-5 h-5 rounded-full text-[10px] font-semibold flex items-center justify-center ${
-                                    it.stale ? "bg-rose-200 text-rose-700" : "bg-indigo-500 text-white"
-                                  }`}
+                                  className={`w-5 h-5 rounded-full text-[10px] font-semibold flex items-center justify-center ${stale
+                                    ? "bg-rose-200 text-rose-700"
+                                    : "bg-indigo-500 text-white"
+                                    }`}
                                 >
-                                  {it.stale ? <UserX className="w-3 h-3" /> : initials}
+                                  {stale ? (
+                                    <UserX className="w-3 h-3" />
+                                  ) : (
+                                    initials
+                                  )}
                                 </span>
                                 <span
-                                  className={`text-xs max-w-[120px] truncate ${it.stale ? "font-medium text-rose-700" : "text-slate-700"}`}
+                                  className={`text-xs max-w-[120px] truncate ${stale
+                                    ? "font-medium text-rose-700"
+                                    : "text-slate-700"
+                                    }`}
                                 >
                                   {name}
                                 </span>
-                                {it.stale && (
+                                {stale && (
                                   <span className="text-[9px] font-bold uppercase tracking-wide text-rose-500">
                                     archived
                                   </span>
@@ -722,22 +1172,23 @@ const AllocationsPage = () => {
                                     e.stopPropagation();
                                     setConfirmState({
                                       variant: "danger",
-                                      title: it.stale ? "Remove stale allocation" : "Remove team member",
-                                      message: it.stale
+                                      title: stale
+                                        ? "Remove stale allocation"
+                                        : "Remove team member",
+                                      message: stale
                                         ? `${name} is no longer on the roster. Remove their leftover allocation from "${selectedProject.name}"?`
                                         : `Remove ${name} from "${selectedProject.name}"?`,
                                       confirmText: "Remove",
                                       onConfirm: () => {
-                                        deleteMutation.mutate(it.allocation_id);
+                                        deleteMutation.mutate(alloc.id);
                                         setConfirmState(null);
                                       },
                                     });
                                   }}
-                                  className={`ml-0.5 w-4 h-4 rounded-full flex items-center justify-center transition-colors disabled:cursor-not-allowed ${
-                                    it.stale
-                                      ? "text-rose-500 hover:text-white hover:bg-rose-500"
-                                      : "text-slate-400 hover:text-white hover:bg-rose-500"
-                                  }`}
+                                  className={`ml-0.5 w-4 h-4 rounded-full flex items-center justify-center transition-colors disabled:cursor-not-allowed ${stale
+                                    ? "text-rose-500 hover:text-white hover:bg-rose-500"
+                                    : "text-slate-400 hover:text-white hover:bg-rose-500"
+                                    }`}
                                   title={`Remove ${name}`}
                                 >
                                   <X className="w-3 h-3" />
@@ -751,7 +1202,9 @@ const AllocationsPage = () => {
                               onClick={() => setShowAllAllocated((v) => !v)}
                               className="inline-flex items-center px-2.5 py-1 rounded-full border border-blue-200 bg-white text-[11px] font-semibold text-blue-600 hover:bg-blue-50 transition-colors shrink-0"
                             >
-                              {showAllAllocated ? "Show less" : `+${liveEmps.length - 3}`}
+                              {showAllAllocated
+                                ? "Show less"
+                                : `+${liveEmps.length - 3}`}
                             </button>
                           )}
                         </div>
@@ -773,30 +1226,38 @@ const AllocationsPage = () => {
                     >
                       <CheckSquare className="w-3.5 h-3.5" />
                       {selectedEmployees.length ===
-                      (filterTab === "unallocated"
-                        ? availableEmployees
-                        : [...availableEmployees, ...allocatedEmployeesOther]
-                      ).length
+                        (filterTab === "unallocated"
+                          ? availableEmployees
+                          : filterTab === "allocated"
+                            ? allocatedEmployeesOther
+                            : [...availableEmployees, ...allocatedEmployeesOther]
+                        ).length
                         ? "Deselect All"
                         : "Select All"}
                     </button>
                   </div>
 
+                  {/* Tabs · search · filter — one row */}
                   <div className="flex items-center gap-2 mb-2.5">
                     <div className="inline-flex items-center rounded-lg border border-slate-200 bg-slate-50 p-0.5 shrink-0">
                       {[
-                        { key: "all", label: `All (${availableEmployees.length + allocatedEmployeesOther.length})` },
-                        { key: "unallocated", label: `Available (${availableEmployees.length})` },
+                        {
+                          key: "all",
+                          label: `All (${availableEmployees.length + allocatedEmployeesOther.length})`,
+                        },
+                        {
+                          key: "unallocated",
+                          label: `Available (${availableEmployees.length})`,
+                        },
                       ].map((t) => (
                         <button
                           key={t.key}
                           type="button"
                           onClick={() => setFilterTab(t.key)}
-                          className={`px-3 py-1.5 text-[13px] font-semibold rounded-md transition-all whitespace-nowrap ${
-                            filterTab === t.key
-                              ? "bg-white text-slate-900 shadow-sm ring-1 ring-slate-200/70"
-                              : "text-slate-500 hover:text-slate-800"
-                          }`}
+                          className={`px-3 py-1.5 text-[13px] font-semibold rounded-md transition-all whitespace-nowrap ${filterTab === t.key
+                            ? "bg-white text-slate-900 shadow-sm ring-1 ring-slate-200/70"
+                            : "text-slate-500 hover:text-slate-800"
+                            }`}
                         >
                           {t.label}
                         </button>
@@ -821,14 +1282,19 @@ const AllocationsPage = () => {
                     </button>
                   </div>
 
+                  {/* Employee List */}
                   {(() => {
                     const allTabEmployees =
-                      filterTab === "unallocated" ? availableEmployees : [...availableEmployees, ...allocatedEmployeesOther];
+                      filterTab === "unallocated"
+                        ? availableEmployees
+                        : [...availableEmployees, ...allocatedEmployeesOther];
                     const q = employeeSearch.trim().toLowerCase();
                     const displayEmployees = q
                       ? allTabEmployees.filter(
-                          (emp) => emp.name.toLowerCase().includes(q) || (emp.email || "").toLowerCase().includes(q),
-                        )
+                        (emp) =>
+                          emp.name.toLowerCase().includes(q) ||
+                          (emp.email || "").toLowerCase().includes(q),
+                      )
                       : allTabEmployees;
 
                     if (displayEmployees.length === 0) {
@@ -846,21 +1312,24 @@ const AllocationsPage = () => {
                     return (
                       <div className="border border-slate-200 rounded-lg max-h-72 overflow-y-auto divide-y divide-slate-100">
                         {displayEmployees.map((employee) => {
-                          const isSelected = !!selectedEmployees.find((e) => e.id === employee.id);
+                          const isSelected = !!selectedEmployees.find(
+                            (e) => e.id === employee.id,
+                          );
                           return (
                             <div
                               key={employee.id}
-                              onClick={() => !employee.alreadyInProject && handleEmployeeToggle(employee)}
-                              className={`px-3 py-2.5 ${
-                                employee.alreadyInProject ? "opacity-50 cursor-not-allowed bg-slate-50" : "cursor-pointer hover:bg-slate-50"
-                              } ${isSelected ? "bg-blue-50/70" : ""}`}
+                              onClick={() =>
+                                !employee.alreadyInProject &&
+                                handleEmployeeToggle(employee)
+                              }
+                              className={`px-3 py-2.5 ${employee.alreadyInProject ? "opacity-50 cursor-not-allowed bg-slate-50" : "cursor-pointer hover:bg-slate-50"} ${isSelected ? "bg-blue-50/70" : ""}`}
                             >
                               <div className="flex items-center gap-2.5 min-w-0">
                                 <input
                                   type="checkbox"
                                   checked={isSelected}
                                   disabled={employee.alreadyInProject}
-                                  onChange={() => {}}
+                                  onChange={() => { }}
                                   className="rounded border-slate-300 text-blue-600 focus:ring-blue-500 disabled:opacity-40 shrink-0"
                                 />
                                 <span className="text-[13px] font-semibold text-slate-900 shrink-0">
@@ -876,22 +1345,34 @@ const AllocationsPage = () => {
                                     In This Project
                                   </span>
                                 )}
-                                {employee.currentProjects && !employee.alreadyInProject && (
-                                  <span className="px-1.5 py-0.5 text-[10px] bg-orange-100 text-orange-700 rounded-full font-semibold shrink-0">
-                                    Other Project
-                                  </span>
-                                )}
-                                <div className="ml-auto flex items-center gap-1.5 shrink-0">
-                                  {employee.skills?.slice(0, 3).map((skill, idx) => (
-                                    <span key={idx} className="px-1.5 py-0.5 text-[10px] bg-slate-100 text-slate-600 rounded">
-                                      {skill}
+                                {employee.currentProjects &&
+                                  !employee.alreadyInProject && (
+                                    <span className="px-1.5 py-0.5 text-[10px] bg-orange-100 text-orange-700 rounded-full font-semibold shrink-0">
+                                      Other Project
                                     </span>
-                                  ))}
+                                  )}
+                                <div className="ml-auto flex items-center gap-1.5 shrink-0">
+                                  {employee.skills
+                                    ?.slice(0, 3)
+                                    .map((skill, idx) => (
+                                      <span
+                                        key={idx}
+                                        className="px-1.5 py-0.5 text-[10px] bg-slate-100 text-slate-600 rounded"
+                                      >
+                                        {skill}
+                                      </span>
+                                    ))}
                                   {employee.skills?.length > 3 && (
-                                    <span className="text-[10px] text-slate-400">+{employee.skills.length - 3}</span>
+                                    <span className="text-[10px] text-slate-400">
+                                      +{employee.skills.length - 3}
+                                    </span>
                                   )}
                                   {isSelected && (
-                                    <svg className="w-5 h-5 text-blue-600" fill="currentColor" viewBox="0 0 20 20">
+                                    <svg
+                                      className="w-5 h-5 text-blue-600"
+                                      fill="currentColor"
+                                      viewBox="0 0 20 20"
+                                    >
                                       <path
                                         fillRule="evenodd"
                                         d="M10 18a8 8 0 100-16 8 8 0 000 16zm3.707-9.293a1 1 0 00-1.414-1.414L9 10.586 7.707 9.293a1 1 0 00-1.414 1.414l2 2a1 1 0 001.414 0l4-4z"
@@ -918,58 +1399,99 @@ const AllocationsPage = () => {
                   )}
                 </div>
 
-                {/* Time Division Section */}
+                {/* Time Division Section - shown when employees are selected */}
                 {selectedEmployees.length > 0 && (
                   <div className="border border-gray-200 rounded-lg p-4 bg-gray-50">
-                    <h4 className="text-sm font-semibold text-gray-700 mb-3">Time Division (Optional)</h4>
+                    <h4 className="text-sm font-semibold text-gray-700 mb-3">
+                      Time Division (Optional)
+                    </h4>
                     <p className="text-xs text-gray-500 mb-4">
-                      Configure how allocated hours are distributed across roles. If no roles are selected,
-                      employees work full hours without role distinction.
+                      Configure how allocated hours are distributed across
+                      roles. If no roles are selected, employees work full hours
+                      without role distinction.
                     </p>
 
+                    {/* Total Daily Hours */}
                     <div className="mb-4">
-                      <label className="block text-sm font-medium text-gray-700 mb-1">Total Daily Hours</label>
+                      <label className="block text-sm font-medium text-gray-700 mb-1">
+                        Total Daily Hours
+                      </label>
                       <Dropdown
-                        options={["", ...["4 hours", "6 hours", "8 hours", "10 hours", "12 hours"]].map((h, i) =>
-                          h ? { value: (4 + i * 2).toString(), label: h } : { value: "", label: "Not specified" },
+                        options={[
+                          "",
+                          ...[
+                            "4 hours",
+                            "6 hours",
+                            "8 hours",
+                            "10 hours",
+                            "12 hours",
+                          ],
+                        ].map((h, i) =>
+                          h
+                            ? { value: (4 + i * 2).toString(), label: h }
+                            : { value: "", label: "Not specified" },
                         )}
                         value={totalDailyHours.toString()}
                         onChange={(val) => {
                           const newHours = val === "" ? "" : parseInt(val);
                           setTotalDailyHours(newHours);
                           if (newHours !== "") {
-                            const currentSum = Object.values(timeDistribution).reduce((a, b) => a + b, 0);
-                            if (currentSum > newHours) setTimeDistribution({});
+                            const currentSum = Object.values(
+                              timeDistribution,
+                            ).reduce((a, b) => a + b, 0);
+                            if (currentSum > newHours) {
+                              setTimeDistribution({});
+                            }
                           }
                         }}
                         placeholder="Not specified"
                       />
                     </div>
 
+                    {/* Role Tags Selection */}
                     <div className="mb-4">
-                      <label className="block text-sm font-medium text-gray-700 mb-2">Role Tags</label>
+                      <label className="block text-sm font-medium text-gray-700 mb-2">
+                        Role Tags
+                      </label>
                       <div className="flex flex-wrap gap-3">
                         {ROLE_TAGS.map((tag) => (
-                          <label key={tag} className="flex items-center gap-2 cursor-pointer">
+                          <label
+                            key={tag}
+                            className="flex items-center gap-2 cursor-pointer"
+                          >
                             <input
                               type="checkbox"
                               checked={selectedRoleTags.includes(tag)}
                               onChange={(e) => {
                                 if (e.target.checked) {
-                                  setSelectedRoleTags([...selectedRoleTags, tag]);
+                                  setSelectedRoleTags([
+                                    ...selectedRoleTags,
+                                    tag,
+                                  ]);
                                   if (totalDailyHours !== "") {
                                     const newTags = [...selectedRoleTags, tag];
-                                    const hoursPerRole = Math.floor(totalDailyHours / newTags.length);
+                                    const hoursPerRole = Math.floor(
+                                      totalDailyHours / newTags.length,
+                                    );
                                     const newDist = {};
                                     newTags.forEach((t, idx) => {
-                                      newDist[t] = idx === 0 ? totalDailyHours - hoursPerRole * (newTags.length - 1) : hoursPerRole;
+                                      newDist[t] =
+                                        idx === 0
+                                          ? totalDailyHours -
+                                          hoursPerRole * (newTags.length - 1)
+                                          : hoursPerRole;
                                     });
                                     setTimeDistribution(newDist);
                                   } else {
-                                    setTimeDistribution((prev) => ({ ...prev, [tag]: 0 }));
+                                    setTimeDistribution((prev) => ({
+                                      ...prev,
+                                      [tag]: 0,
+                                    }));
                                   }
                                 } else {
-                                  setSelectedRoleTags(selectedRoleTags.filter((t) => t !== tag));
+                                  setSelectedRoleTags(
+                                    selectedRoleTags.filter((t) => t !== tag),
+                                  );
                                   const newDist = { ...timeDistribution };
                                   delete newDist[tag];
                                   setTimeDistribution(newDist);
@@ -983,6 +1505,8 @@ const AllocationsPage = () => {
                       </div>
                     </div>
 
+                    {/* Team lead — separate from the role tags above because it takes
+                        no share of the working day. */}
                     <div className="mb-4">
                       <label className="flex items-start gap-2 cursor-pointer">
                         <input
@@ -994,20 +1518,25 @@ const AllocationsPage = () => {
                         <span className="text-sm text-gray-700">
                           Team lead on this project
                           <span className="block text-xs text-gray-500">
-                            Applies to this project only. Leads manage it like its PM; their own requests go to
-                            the PM or an admin.
+                            Applies to this project only. Leads manage it like its PM;
+                            their own requests go to the PM or an admin.
                           </span>
                         </span>
                       </label>
                     </div>
 
+                    {/* Hours Distribution */}
                     {selectedRoleTags.length > 0 && (
                       <div className="space-y-3">
-                        <label className="block text-sm font-medium text-gray-700">Hours per Role</label>
+                        <label className="block text-sm font-medium text-gray-700">
+                          Hours per Role
+                        </label>
                         <div className="grid grid-cols-1 sm:grid-cols-3 gap-3">
                           {selectedRoleTags.map((tag) => (
                             <div key={tag} className="flex items-center gap-2">
-                              <span className="text-sm text-gray-600 min-w-[60px] sm:min-w-[80px]">{tag}:</span>
+                              <span className="text-sm text-gray-600 min-w-[60px] sm:min-w-[80px]">
+                                {tag}:
+                              </span>
                               <input
                                 type="number"
                                 min="0"
@@ -1015,7 +1544,10 @@ const AllocationsPage = () => {
                                 value={timeDistribution[tag] || 0}
                                 onChange={(e) => {
                                   const hours = parseInt(e.target.value) || 0;
-                                  setTimeDistribution({ ...timeDistribution, [tag]: Math.min(hours, totalDailyHours) });
+                                  setTimeDistribution({
+                                    ...timeDistribution,
+                                    [tag]: Math.min(hours, totalDailyHours),
+                                  });
                                 }}
                                 onWheel={(e) => e.target.blur()}
                                 className="input w-20 text-center"
@@ -1025,20 +1557,22 @@ const AllocationsPage = () => {
                           ))}
                         </div>
 
+                        {/* Validation */}
                         {(() => {
-                          const totalAssigned = Object.values(timeDistribution).reduce((a, b) => a + b, 0);
+                          const totalAssigned = Object.values(
+                            timeDistribution,
+                          ).reduce((a, b) => a + b, 0);
                           const isValid = totalAssigned === totalDailyHours;
                           return (
                             <div
-                              className={`mt-2 p-2 rounded text-sm ${
-                                isValid
-                                  ? "bg-green-50 text-green-700 border border-green-200"
-                                  : "bg-red-50 text-red-700 border border-red-200"
-                              }`}
+                              className={`mt-2 p-2 rounded text-sm ${isValid
+                                ? "bg-green-50 text-green-700 border border-green-200"
+                                : "bg-red-50 text-red-700 border border-red-200"
+                                }`}
                             >
                               {isValid
-                                ? `✓ Hours correctly distributed: ${totalAssigned}/${totalDailyHours}`
-                                : `⚠ Hours mismatch: ${totalAssigned}/${totalDailyHours} (adjust to match)`}
+                                ? `âœ“ Hours correctly distributed: ${totalAssigned}/${totalDailyHours}`
+                                : `âš  Hours mismatch: ${totalAssigned}/${totalDailyHours} (adjust to match)`}
                             </div>
                           );
                         })()}
@@ -1050,13 +1584,22 @@ const AllocationsPage = () => {
             )}
           </Modal.Body>
           <Modal.Footer>
-            <Button type="button" variant="cancel" size="sm" onClick={closeCreateModal}>
+            <Button
+              type="button"
+              variant="cancel"
+              size="sm"
+              onClick={closeCreateModal}
+            >
               Cancel
             </Button>
             <Button
               type="submit"
               size="sm"
-              disabled={!selectedProject || selectedEmployees.length === 0 || createMutation.isPending}
+              disabled={
+                !selectedProject ||
+                selectedEmployees.length === 0 ||
+                createMutation.isPending
+              }
               isLoading={createMutation.isPending}
             >
               {!createMutation.isPending &&
@@ -1065,45 +1608,69 @@ const AllocationsPage = () => {
           </Modal.Footer>
         </form>
       </Modal>
-
-      {/* Edit Allocation Modal — uses the same lazy project-detail fetch */}
+      {/* Edit Allocation Modal */}
       {editingAllocation && (
-        <Modal isOpen onClose={() => setEditingAllocation(null)} size="2xl" maxHeight="95vh">
+        <Modal
+          isOpen
+          onClose={() => setEditingAllocation(null)}
+          size="2xl"
+          maxHeight="95vh"
+        >
           <Modal.Header onClose={() => setEditingAllocation(null)}>
             <h2 className="text-xl font-semibold text-gray-900">
-              Manage Allocations - {editingAllocation.projectName}
+              Manage Allocations - {editingAllocation.project.name}
             </h2>
           </Modal.Header>
 
           <Modal.Body className="space-y-4">
-            {(projectDetail?.project_id === editingAllocation.projectId ? projectDetail.items : []).map((it) => {
-              const name = formatDisplayName(it.name);
+            {editingAllocation.allocations.map((alloc) => {
+              const emp = employeeIndex.get(String(alloc.employee_id));
+              // A stale row is the one thing this modal must not render blank or
+              // anonymous: this is where it gets deleted, so name whoever it
+              // belonged to and flag it in red.
+              const stale = !emp;
+              const former = formerIndex.get(String(alloc.employee_id));
+              const rawName = stale ? staleName(alloc) : emp.name;
+              const name = formatDisplayName(rawName);
               return (
                 <div
-                  key={it.allocation_id}
-                  className={`flex items-center justify-between p-4 border rounded-md ${
-                    it.stale ? "border-rose-200 bg-rose-50" : "border-gray-200 hover:bg-gray-50"
-                  }`}
+                  key={alloc.id}
+                  className={`flex items-center justify-between p-4 border rounded-md ${stale
+                    ? "border-rose-200 bg-rose-50"
+                    : "border-gray-200 hover:bg-gray-50"
+                    }`}
                 >
                   <div className="flex items-center gap-3">
                     <div
-                      className={`w-10 h-10 rounded-full flex items-center justify-center font-medium ${
-                        it.stale ? "bg-rose-200 text-rose-700" : "bg-blue-500 text-white"
-                      }`}
+                      className={`w-10 h-10 rounded-full flex items-center justify-center font-medium ${stale
+                        ? "bg-rose-200 text-rose-700"
+                        : "bg-blue-500 text-white"
+                        }`}
                     >
-                      {it.stale ? <UserX className="w-4 h-4" /> : name.charAt(0).toUpperCase()}
+                      {stale ? (
+                        <UserX className="w-4 h-4" />
+                      ) : (
+                        name.charAt(0).toUpperCase()
+                      )}
                     </div>
                     <div>
-                      <p className={`font-medium ${it.stale ? "text-rose-700" : "text-gray-900"}`} title={it.name}>
+                      <p
+                        className={`font-medium ${stale ? "text-rose-700" : "text-gray-900"}`}
+                        title={rawName}
+                      >
                         {name}
-                        {it.stale && (
+                        {stale && (
                           <span className="ml-2 rounded-full bg-rose-100 px-1.5 py-0.5 text-[10px] font-semibold text-rose-700 align-middle">
-                            Archived
+                            {former ? "Archived" : "Removed"}
                           </span>
                         )}
                       </p>
-                      <p className={`text-sm ${it.stale ? "text-rose-500/90" : "text-gray-500"}`}>
-                        {it.stale ? `${it.email ? `${it.email} · ` : ""}no longer on the roster — safe to remove` : it.email}
+                      <p
+                        className={`text-sm ${stale ? "text-rose-500/90" : "text-gray-500"}`}
+                      >
+                        {stale
+                          ? `${former?.email ? `${former.email} · ` : ""}no longer on the roster — safe to remove`
+                          : emp.email}
                       </p>
                     </div>
                   </div>
@@ -1111,13 +1678,15 @@ const AllocationsPage = () => {
                     onClick={() => {
                       setConfirmState({
                         variant: "danger",
-                        title: it.stale ? "Remove stale allocation" : "Remove team member",
-                        message: it.stale
-                          ? `${name} is no longer on the roster. Remove their leftover allocation from "${editingAllocation.projectName}"?`
+                        title: stale
+                          ? "Remove stale allocation"
+                          : "Remove team member",
+                        message: stale
+                          ? `${name} is no longer on the roster. Remove their leftover allocation from "${editingAllocation.project.name}"?`
                           : `Remove ${name} from this project?`,
                         confirmText: "Remove",
                         onConfirm: () => {
-                          deleteMutation.mutate(it.allocation_id);
+                          deleteMutation.mutate(alloc.id);
                           setEditingAllocation(null);
                           setConfirmState(null);
                         },
@@ -1133,13 +1702,16 @@ const AllocationsPage = () => {
             })}
           </Modal.Body>
           <Modal.Footer>
-            <Button variant="cancel" onClick={() => setEditingAllocation(null)} className="w-full">
+            <Button
+              variant="cancel"
+              onClick={() => setEditingAllocation(null)}
+              className="w-full"
+            >
               Close
             </Button>
           </Modal.Footer>
         </Modal>
       )}
-
       <ConfirmDialog
         isOpen={!!confirmState}
         onClose={() => setConfirmState(null)}
@@ -1149,7 +1721,7 @@ const AllocationsPage = () => {
         details={confirmState?.details}
         variant={confirmState?.variant}
         confirmText={confirmState?.confirmText}
-      />
+      />{" "}
     </div>
   );
 };

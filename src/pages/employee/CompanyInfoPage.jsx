@@ -32,12 +32,12 @@ const CompanyInfoPage = () => {
 
   const { data: wifiNetworks = [], isLoading: wifiLoading } = useQuery({
     queryKey: ["wifiNetworks"],
-    queryFn: () => wifiNetworksApi.getAll(),
+    queryFn: wifiNetworksApi.getAll,
   });
 
   const { data: settingsData = [], isLoading: settingsLoading } = useQuery({
     queryKey: ["companySettings"],
-    queryFn: () => companySettingsApi.getAll(),
+    queryFn: companySettingsApi.getAll,
   });
 
   const generalSettings = useMemo(() => {

@@ -29,12 +29,12 @@ const AdminCompanySettingsPage = () => {
 
   const { data: networks = [], isLoading: networksLoading } = useQuery({
     queryKey: ["wifiNetworks"],
-    queryFn: () => wifiNetworksApi.getAll(),
+    queryFn: wifiNetworksApi.getAll,
   });
 
   const { data: settingsData = [], isLoading: settingsLoading } = useQuery({
     queryKey: ["companySettings"],
-    queryFn: () => companySettingsApi.getAll(),
+    queryFn: companySettingsApi.getAll,
   });
 
   // WiFi Form state

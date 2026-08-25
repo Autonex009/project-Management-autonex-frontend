@@ -563,23 +563,46 @@ const MyTeamPage = () => {
   const [assignModalEmployee, setAssignModalEmployee] = useState(null);
   const [perfNoteEmployee, setPerfNoteEmployee] = useState(null);
 
-  const todayStr = todayLocalISO();
-  const { data: teamData, isLoading: teamDataLoading } = useQuery({
-    queryKey: ["team-data"],
-    queryFn: () => employeeApi.getTeamData(),
+  const { data: parentProjects = [], isLoading: parentLoading } = useQuery({
+    queryKey: ["parent-projects"],
+    queryFn: parentProjectApi.getAll,
   });
-  
+  const { data: projects = [], isLoading: projectsLoading } = useQuery({
+    queryKey: ["sub-projects"],
+    queryFn: subProjectApi.getAll,
+  });
+  const { data: employees = [], isLoading: employeesLoading } = useQuery({
+    queryKey: ["employees"],
+    queryFn: employeeApi.getAll,
+  });
+  const { data: allocations = [], isLoading: allocationsLoading } = useQuery({
+    queryKey: ["allocations"],
+    queryFn: allocationApi.getAll,
+  });
+
+  const todayStr = todayLocalISO();
   const { data: leavesToday = [], isLoading: leavesLoading } = useQuery({
     queryKey: ["leaves", "today", todayStr],
     queryFn: () => leaveApi.getAll({ start_date: todayStr, end_date: todayStr }),
   });
 
-  const isLoading = teamDataLoading || leavesLoading;
-  
-  const employees = teamData?.employees || [];
-  const scopedProjects = teamData?.projects || [];
-  const scopedAllocations = teamData?.allocations || [];
+  const isLoading =
+    projectsLoading || employeesLoading || allocationsLoading || parentLoading || leavesLoading;
 
+  // Resolve PM scoped projects & allocations
+  const scopedProjects = useMemo(
+    () => getPmSubProjects(projects, parentProjects, pmEmployeeId, allocations),
+    [projects, parentProjects, pmEmployeeId, allocations]
+  );
+  const scopedProjectIds = useMemo(
+    () => new Set(scopedProjects.map((p) => p.id)),
+    [scopedProjects]
+  );
+
+  const scopedAllocations = useMemo(
+    () => allocations.filter((a) => scopedProjectIds.has(a.sub_project_id)),
+    [allocations, scopedProjectIds]
+  );
 
   // Map employee -> projects inside PM scope
   const employeeProjectMap = useMemo(() => {
@@ -1291,19 +1314,7 @@ const MyTeamPage = () => {
             label: "Contact No.",
             width: "w-[14%] min-w-[130px]",
             render: (_, row) => {
-              const rawPhone = row.phone || row.contact_number || row.mobile;
-              const formatPhoneNumber = (phone) => {
-                if (!phone) return "";
-                const str = String(phone).trim();
-                if (!str) return "";
-                if (str.startsWith("+91") || str.startsWith("+ 91")) return str;
-                const cleanDigits = str.replace(/\D/g, "");
-                if (cleanDigits.length === 12 && cleanDigits.startsWith("91")) return `+91 ${cleanDigits.slice(2)}`;
-                if (cleanDigits.length === 10) return `+91 ${cleanDigits}`;
-                if (str.startsWith("91")) return `+${str}`;
-                return `+91 ${str}`;
-              };
-              const phoneNum = formatPhoneNumber(rawPhone);
+              const phoneNum = row.phone || row.contact_number || row.mobile;
               if (!phoneNum) {
                 return <span className="text-[13px] text-slate-400">—</span>;
               }
