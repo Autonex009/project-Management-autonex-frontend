@@ -138,7 +138,7 @@ const ReferralsPage = () => {
   // phone and LinkedIn, so their monogram is the most the data allows.
   const { data: employees = [] } = useQuery({
     queryKey: ["employees"],
-    queryFn: employeeApi.getAll,
+    queryFn: () => employeeApi.getAll(),
   });
   const referrerAvatar = (referrerId) =>
     employees.find((e) => e.id === referrerId)?.avatar_url;

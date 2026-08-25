@@ -390,7 +390,7 @@ const Dashboard = () => {
   const roleBreakdown = useMemo(
     () => {
       const byDesig = dashboardKpis?.employees?.by_designation || {};
-      return Object.entries(byDesig).map(([label, value]) => ({ label, value })).sort((a, b) => b.value - a.value);
+      return Object.entries(byDesig).map(([label, value]) => ({ label, value })).sort((a,b) => b.value - a.value);
     },
     [dashboardKpis],
   );
@@ -398,7 +398,7 @@ const Dashboard = () => {
   const typeBreakdown = useMemo(
     () => {
       const byType = dashboardKpis?.employees?.by_type || {};
-      return Object.entries(byType).map(([label, value]) => ({ label, value })).sort((a, b) => b.value - a.value);
+      return Object.entries(byType).map(([label, value]) => ({ label, value })).sort((a,b) => b.value - a.value);
     },
     [dashboardKpis],
   );

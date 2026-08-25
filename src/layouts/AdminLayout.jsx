@@ -38,10 +38,10 @@ const AdminLayout = () => {
   const detailTitle = usePageDetailTitle();
   let breadcrumbTrail = detailTitle
     ? rawBreadcrumbTrail.map((c) =>
-      c.key === "admin-analytics-detail" || c.key === "admin-employees-detail"
-        ? { ...c, name: detailTitle }
-        : c,
-    )
+        c.key === "admin-analytics-detail" || c.key === "admin-employees-detail"
+          ? { ...c, name: detailTitle }
+          : c,
+      )
     : rawBreadcrumbTrail;
 
   const isEmployeeDetail =
