@@ -259,7 +259,9 @@ const EmployeeDashboard = () => {
   const [showFullFeedback, setShowFullFeedback] = useState(false);
   const [imgError, setImgError] = useState(false);
   const [showLogsModal, setShowLogsModal] = useState(false);
+  const [showBadgeLogsModal, setShowBadgeLogsModal] = useState(false);
   const [editEmail, setEditEmail] = useState("");
+  const [activeNoteTab, setActiveNoteTab] = useState("daily");
   const [emailError, setEmailError] = useState("");
   const [profileTab, setProfileTab] = useState("attendance");
   const [bottomTab, setBottomTab] = useState("notes");
@@ -1181,8 +1183,8 @@ const EmployeeDashboard = () => {
                   type="button"
                   onClick={() => setProfileTab("attendance")}
                   className={`flex items-center gap-1.5 pb-1 border-b-[2px] font-semibold text-[10px] transition-colors ${profileTab === "attendance"
-                      ? "border-indigo-500 text-indigo-600"
-                      : "border-transparent text-stone-400 hover:text-stone-600"
+                    ? "border-indigo-500 text-indigo-600"
+                    : "border-transparent text-stone-400 hover:text-stone-600"
                     }`}
                 >
                   <Calendar className="w-3.5 h-3.5" /> Attendance
@@ -1191,8 +1193,8 @@ const EmployeeDashboard = () => {
                   type="button"
                   onClick={() => setProfileTab("notes")}
                   className={`flex items-center gap-1.5 pb-1 border-b-[2px] font-semibold text-[10px] transition-colors ${profileTab === "notes"
-                      ? "border-indigo-500 text-indigo-600"
-                      : "border-transparent text-stone-400 hover:text-stone-600"
+                    ? "border-indigo-500 text-indigo-600"
+                    : "border-transparent text-stone-400 hover:text-stone-600"
                     }`}
                 >
                   <FileText className="w-3.5 h-3.5" /> Notes
@@ -1284,10 +1286,10 @@ const EmployeeDashboard = () => {
                     >
                       <div
                         className={`w-7 h-7 rounded-full flex items-center justify-center ${label === "Recognition"
-                            ? "bg-indigo-50"
-                            : label === "Warnings"
-                              ? "bg-amber-50"
-                              : "bg-rose-50"
+                          ? "bg-indigo-50"
+                          : label === "Warnings"
+                            ? "bg-amber-50"
+                            : "bg-rose-50"
                           }`}
                       >
                         {icon}
