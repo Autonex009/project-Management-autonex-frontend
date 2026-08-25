@@ -250,17 +250,15 @@ const PMDashboard = () => {
                 label: "Staff",
                 align: "center",
                 render: (id, project) => {
-                  const projAllocs = allocations.filter(
-                    (a) => a.sub_project_id === id,
-                  );
+                  const allocated = getAllocatedManpower(project);
                   const isUnder =
                     project.required_manpower &&
-                    projAllocs.length < project.required_manpower;
+                    allocated < project.required_manpower;
                   return (
                     <span
                       className={`text-sm font-semibold ${isUnder ? "text-red-600" : "text-slate-700"}`}
                     >
-                      {projAllocs.length}/{project.required_manpower || "—"}
+                      {allocated}/{project.required_manpower || "—"}
                     </span>
                   );
                 },
