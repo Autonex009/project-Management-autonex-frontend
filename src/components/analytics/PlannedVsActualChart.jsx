@@ -13,6 +13,7 @@ import {
 } from "recharts";
 import { format, parseISO } from "date-fns";
 import { Target, CheckCircle2, AlertCircle } from "lucide-react";
+import { ChartWrapper, ChartTooltip, ChartDefs } from "./ChartWrapper";
 
 const shortDate = (s) => {
   try {
@@ -23,28 +24,21 @@ const shortDate = (s) => {
 };
 
 const PlannedVsActualChart = ({ data = [], height = 250 }) => {
-  if (!data || data.length === 0) {
-    return (
-      <div
-        className="flex items-center justify-center text-xs text-slate-400 font-medium"
-        style={{ height }}
-      >
-        No planned vs actual allocation data available
-      </div>
-    );
-  }
-
   // Calculate totals for top summary strip
   const totals = useMemo(() => {
-    const plannedSum = data.reduce((sum, item) => sum + (item.plannedHours || 0), 0);
-    const actualSum = data.reduce((sum, item) => sum + (item.actualHours || 0), 0);
+    const safeData = data || [];
+    const plannedSum = safeData.reduce((sum, item) => sum + (item.plannedHours || 0), 0);
+    const actualSum = safeData.reduce((sum, item) => sum + (item.actualHours || 0), 0);
     const variance = actualSum - plannedSum;
     const ratio = plannedSum > 0 ? Math.round((actualSum / plannedSum) * 100) : 0;
     return { plannedSum, actualSum, variance, ratio };
   }, [data]);
 
+  const { plannedSum, actualSum, variance, ratio } = totals;
+
   return (
-    <div className="space-y-3">
+    <ChartWrapper data={data} height={height} emptyMessage="No planned vs actual allocation data available">
+      <div className="space-y-3">
       {/* Top Variance & Target Summary Strip */}
       <div className="flex items-center justify-between text-xs border-b border-slate-100 pb-2">
         <div className="flex items-center gap-3 font-semibold">
@@ -77,16 +71,7 @@ const PlannedVsActualChart = ({ data = [], height = 250 }) => {
             data={data}
             margin={{ top: 12, right: 16, bottom: 4, left: -4 }}
           >
-            <defs>
-              <linearGradient id="actualBarGradient" x1="0" y1="0" x2="0" y2="1">
-                <stop offset="0%" stopColor="#2563eb" />
-                <stop offset="100%" stopColor="#0284c7" />
-              </linearGradient>
-              <linearGradient id="plannedBarGradient" x1="0" y1="0" x2="0" y2="1">
-                <stop offset="0%" stopColor="#e2e8f0" />
-                <stop offset="100%" stopColor="#cbd5e1" />
-              </linearGradient>
-            </defs>
+            <ChartDefs />
 
             <CartesianGrid strokeDasharray="3 3" stroke="#f1f5f9" vertical={false} />
 
@@ -107,20 +92,9 @@ const PlannedVsActualChart = ({ data = [], height = 250 }) => {
               tickFormatter={(v) => `${v}h`}
             />
 
-            <Tooltip
-              isAnimationActive={false}
-              wrapperStyle={{ pointerEvents: "none", outline: "none" }}
+            <ChartTooltip
               labelFormatter={shortDate}
               formatter={(value, name) => [`${value}h`, name]}
-              contentStyle={{
-                borderRadius: 14,
-                border: "1px solid #e2e8f0",
-                boxShadow: "0 10px 30px rgba(15,23,42,0.1)",
-                fontSize: 12,
-                backgroundColor: "rgba(255, 255, 255, 0.95)",
-                backdropFilter: "blur(6px)",
-                pointerEvents: "none",
-              }}
             />
 
             <Legend
@@ -166,7 +140,8 @@ const PlannedVsActualChart = ({ data = [], height = 250 }) => {
           </ComposedChart>
         </ResponsiveContainer>
       </div>
-    </div>
+      </div>
+    </ChartWrapper>
   );
 };
 

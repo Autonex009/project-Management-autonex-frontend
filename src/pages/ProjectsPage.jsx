@@ -73,6 +73,7 @@ import StatCard from "../components/dashboard/StatCard";
 import useScrollStore from "../store/useScrollStore";
 import useProjectsStore from "../store/useProjectsStore";
 import { formatDisplayName } from "../utils/displayName";
+import { getWorkingDayCount } from "../utils/leaveTypes";
 
 import { 
   STATUS_CONFIG, 
@@ -924,20 +925,11 @@ const ProjectsPage = () => {
     return Math.round(project.total_tasks / manpower);
   };
 
-  // Helper: count working days (exclude weekends) between two dates.
+  // Helper: count working days (exclude weekends and company holidays) between two dates.
   // Parse date-only strings as LOCAL midnight (never via Date.toISOString) so
   // counts don't shift by a day in timezones offset from UTC (e.g. IST).
   const getWorkingDays = (startStr, endStr) => {
-    const start = new Date(startStr + "T00:00:00");
-    const end = new Date(endStr + "T00:00:00");
-    let count = 0;
-    const current = new Date(start);
-    while (current <= end) {
-      const day = current.getDay(); // 0=Sun, 6=Sat
-      if (day !== 0 && day !== 6) count++;
-      current.setDate(current.getDate() + 1);
-    }
-    return count || 1; // at least 1 to avoid division by zero
+    return getWorkingDayCount(startStr, endStr) || 1; // at least 1 to avoid division by zero
   };
 
   // Helper: count leave working days for an employee during a project period.
@@ -953,7 +945,7 @@ const ProjectsPage = () => {
       const leaveEnd =
         leave.end_date < projectEnd ? leave.end_date : projectEnd;
       if (leaveStart <= leaveEnd) {
-        totalLeaveDays += getWorkingDays(leaveStart, leaveEnd);
+        totalLeaveDays += getWorkingDayCount(leaveStart, leaveEnd, leave.is_half_day);
       }
     }
     return totalLeaveDays;

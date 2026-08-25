@@ -631,11 +631,11 @@ const EmployeeDashboard = () => {
   const [saveError, setSaveError] = useState("");
 
   const enterEditMode = () => {
+    setEditEmail(profile.email || "");
     setEditPhone(profile.phone || "");
     setEditSkills([...(profile.skills || [])]);
     setEditSlackId(profile.slackUserId || "");
     setEditEncordId(profile.encordId || "");
-    setEditEmail(profile.email || "");
     setSaveError("");
     setEmailError("");
     setIsEditing(true);
@@ -644,28 +644,10 @@ const EmployeeDashboard = () => {
   const cancelEdit = () => {
     setIsEditing(false);
     setSaveError("");
+    setEmailError("");
   };
 
-  const changeEmailMutation = useMutation({
-    mutationFn: (newEmail) => employeeApi.changeEmail(employeeId, newEmail),
-    onSuccess: (updated) => {
-      try {
-        const cached = JSON.parse(localStorage.getItem("user") || "{}");
-        localStorage.setItem(
-          "user",
-          JSON.stringify({ ...cached, email: updated.email })
-        );
-      } catch { }
-      queryClient.invalidateQueries({ queryKey: ["auth-me"] });
-      queryClient.invalidateQueries({
-        queryKey: ["employee-profile", employeeId],
-      });
-      setEmailError("");
-    },
-    onError: (err) => {
-      setEmailError(err?.response?.data?.detail || "Could not change email.");
-    },
-  });
+
 
   const saveMutation = useMutation({
     mutationFn: (data) => employeeApi.update(employeeId, data),
@@ -674,34 +656,56 @@ const EmployeeDashboard = () => {
         queryKey: ["employee-profile", employeeId],
       });
       queryClient.invalidateQueries({ queryKey: ["auth-me"] });
-      setIsEditing(false);
-      setSaveError("");
     },
     onError: (err) => {
       setSaveError(err?.response?.data?.detail || "Failed to save changes.");
     },
   });
 
+  const requestEmailChangeMutation = useMutation({
+    mutationFn: (newEmail) => employeeApi.requestEmailChange(employeeId, { new_email: newEmail }),
+    onError: (err) => {
+      setEmailError(err?.response?.data?.detail || "Could not send OTP.");
+    },
+  });
+
   const COMPANY_DOMAIN = "autonexai360.com";
 
   const handleSave = async () => {
-    saveMutation.mutate({
-      phone: editPhone || null,
-      skills: editSkills,
-      slack_user_id: editSlackId || null,
-      encord_id: editEncordId || null,
-    });
-
+    setSaveError("");
+    setEmailError("");
+    
     const trimmedEmail = editEmail.trim().toLowerCase();
     const originalEmail = (profile.email || "").trim().toLowerCase();
+    const emailChanged = !!trimmedEmail && trimmedEmail !== originalEmail;
+    
+    if (emailChanged) {
+      if (!trimmedEmail.endsWith(`@${COMPANY_DOMAIN}`) || trimmedEmail.split("@")[0].length === 0) {
+        setEmailError(`Email must be a valid @${COMPANY_DOMAIN} address.`);
+        return; 
+      }
+    }
+      
+    try {
+      const promises = [];
+      
+      promises.push(
+        saveMutation.mutateAsync({
+          phone: editPhone || null,
+          skills: editSkills,
+          slack_user_id: editSlackId || null,
+          encord_id: editEncordId || null,
+        })
+      );
 
-    if (
-      trimmedEmail &&
-      trimmedEmail !== originalEmail &&
-      trimmedEmail.endsWith(`@${COMPANY_DOMAIN}`) &&
-      trimmedEmail.split("@")[0].length > 0
-    ) {
-      changeEmailMutation.mutate(trimmedEmail);
+      if (emailChanged) {
+        promises.push(requestEmailChangeMutation.mutateAsync(trimmedEmail));
+      }
+
+      await Promise.all(promises);
+      setIsEditing(false);
+    } catch (err) {
+      // Errors are caught and set by the mutation onError handlers
     }
   };
 
@@ -3034,23 +3038,15 @@ const EmployeeDashboard = () => {
             <div className="p-4 space-y-4 overflow-y-auto">
               <div>
                 <label className="text-[10px] font-bold uppercase tracking-wider text-stone-400">
-                  Login Email
+                  Email Address
                 </label>
                 <input
                   type="email"
                   value={editEmail}
                   onChange={(e) => setEditEmail(e.target.value)}
-                  placeholder={`you@${COMPANY_DOMAIN}`}
+                  placeholder="employee@autonexai360.com"
                   className="mt-1 w-full rounded-xl border border-stone-200 bg-white px-3 py-2 text-xs outline-none focus:border-indigo-500 focus:ring-1 focus:ring-indigo-500"
                 />
-                <p className="mt-1 text-[10px] text-stone-400">
-                  Must end with @{COMPANY_DOMAIN}
-                </p>
-                {emailError && (
-                  <p className="mt-1 text-[11px] font-medium text-rose-600">
-                    {emailError}
-                  </p>
-                )}
               </div>
               <div>
                 <label className="text-[10px] font-bold uppercase tracking-wider text-stone-400">
@@ -3099,8 +3095,11 @@ const EmployeeDashboard = () => {
                   isLoading={skillsLoading}
                 />
               </div>
-              {saveError && (
-                <p className="text-xs font-medium text-rose-600">{saveError}</p>
+              {(saveError || emailError) && (
+                <div className="bg-rose-50 px-3 py-2 rounded-lg border border-rose-100">
+                  {saveError && <p className="text-xs font-medium text-rose-600">{saveError}</p>}
+                  {emailError && <p className="text-xs font-medium text-rose-600">{emailError}</p>}
+                </div>
               )}
             </div>
 
@@ -3113,12 +3112,10 @@ const EmployeeDashboard = () => {
               </button>
               <button
                 onClick={handleSave}
-                disabled={
-                  saveMutation.isPending || changeEmailMutation.isPending
-                }
+                disabled={saveMutation.isPending}
                 className="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-lg bg-teal-600 text-white text-xs font-semibold hover:bg-indigo-600 disabled:opacity-60"
               >
-                {saveMutation.isPending || changeEmailMutation.isPending ? (
+                {saveMutation.isPending ? (
                   <Loader2 className="w-3.5 h-3.5 animate-spin" />
                 ) : (
                   <Save className="w-3.5 h-3.5" />
