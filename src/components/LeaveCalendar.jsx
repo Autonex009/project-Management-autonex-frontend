@@ -56,15 +56,6 @@ const LEAVE_COLORS = {
   default: { bg: "#f1f5f9", text: "#475569", dot: "#94a3b8", label: "Leave" },
 };
 
-const WFH_COLOR = {
-  bg: "#ede9fe",
-  text: "#5b21b6",
-  dot: "#8b5cf6",
-  label: "WFH",
-};
-
-const PENDING_OPACITY = 0.65;
-
 // ─── Theme palette for dynamic calendar range selection (employee mode) ─────
 const SELECTION_THEMES = {
   paid: { border: "#2563eb", rangeBg: "#f0f7ff", rangeBorder: "#bfdbfe" },

@@ -2,7 +2,6 @@ import { useState, useEffect, useRef, useMemo } from "react";
 import { useQuery, useMutation, useQueryClient, keepPreviousData } from "@tanstack/react-query";
 import { useNavigate, useSearchParams } from "react-router-dom";
 import Button from "../components/ui/Button";
-import Spinner from "../components/ui/LoadingSpinner";
 import {
   subProjectApi,
   parentProjectApi,
@@ -16,36 +15,26 @@ import {
 } from "../services/api";
 import {
   Plus,
-  Minus,
-  Trash2,
   X,
   UserCheck,
   Users,
   ChevronDown,
-  ArrowRight,
-  Edit,
   Settings,
   UploadCloud,
   FileText,
   BarChart3,
   SlidersHorizontal,
-  Check,
-  Download,
   Clock,
   Smile,
   PauseCircle,
   CheckCircle2,
   XCircle,
-  Eye,
 } from "lucide-react";
 import { Link } from "react-router-dom";
-import { format, parseISO } from "date-fns";
 import toast from "react-hot-toast";
 import SearchBar from "../components/ui/SearchBar";
 import {
   getPmEmployeeId,
-  getPmProjects,
-  getPmSubProjects,
 } from "../utils/pmScope";
 import {
   TEAM_LEAD_TAG,
@@ -59,13 +48,10 @@ import {
   getEndDateValidationMessage,
   isEndDateBeforeStartDate,
 } from "../utils/dateValidation";
-import AllocationPopover from "../components/AllocationPopover";
 import {
-  buildEmployeeIndex,
   manpowerEmployeeIds,
   totalRequiredManpower,
 } from "../utils/workforce";
-import Table, { ColumnTemplates } from "../components/ui/Table";
 import Dropdown from "../components/ui/Dropdown";
 import ConfirmDialog from "../components/ui/ConfirmDialog";
 import Modal from "../components/ui/Modal";
@@ -73,7 +59,6 @@ import StatCard from "../components/dashboard/StatCard";
 import useScrollStore from "../store/useScrollStore";
 import useProjectsStore from "../store/useProjectsStore";
 import { formatDisplayName } from "../utils/displayName";
-import { getWorkingDayCount } from "../utils/leaveTypes";
 
 import {
   STATUS_CONFIG,
@@ -81,13 +66,13 @@ import {
   isArchivedStatus,
   getStatusBadgeConfig,
   formatCreatedDate,
-  PROJECT_TYPE_CATEGORIES,
   typeLabel,
   DEVELOPER_TYPE_KEY,
-  isDeveloperProject
+  isDeveloperProject, 
+  PROJECT_TYPE_CATEGORIES, 
 } from "../utils/projectConstants";
 import ProjectCard from "../components/projects/ProjectCard";
-import { SkillMultiSelect, EmployeeMultiSelect, TeamLeadMultiSelect, PmMultiSelect } from "../components/projects/ProjectDropdowns";
+import { TeamLeadMultiSelect, PmMultiSelect } from "../components/projects/ProjectDropdowns";
 
 
 const ProjectsPage = () => {
@@ -130,7 +115,12 @@ const ProjectsPage = () => {
   const [formOrg, setFormOrg] = useState("");
   const [formPriority, setFormPriority] = useState("auto");
   const [prioritySuggestion, setPrioritySuggestion] = useState("P1");
-  const [manpowerTrigger, setManpowerTrigger] = useState(0);
+  // Controlled team-composition counts that drive the priority suggestion. Kept in
+  // React state (not read from the live form DOM) so adding a new input that should
+  // affect the suggestion is just another dependency — no FormData/getElementById
+  // wiring required.
+  const [formAutonexAnnotators, setFormAutonexAnnotators] = useState(0);
+  const [formAutonexReviewers, setFormAutonexReviewers] = useState(0);
 
   const [formProjectStatus, setFormProjectStatus] = useState("active");
   const [formSentiment, setFormSentiment] = useState("");
@@ -172,11 +162,8 @@ const ProjectsPage = () => {
   const [docsOpenId, setDocsOpenId] = useState(null);
 
   useEffect(() => {
-    const form = document.getElementById("project-form");
-    if (!form) return;
-    const formData = new FormData(form);
-    const ann = parseInt(formData.get("autonex_annotators")) || 0;
-    const rev = parseInt(formData.get("autonex_reviewers")) || 0;
+    const ann = formAutonexAnnotators || 0;
+    const rev = formAutonexReviewers || 0;
     const tl = selectedTeamLeadIds.length;
     const total = ann + rev + tl;
     let sugg = "P1";
@@ -184,7 +171,7 @@ const ProjectsPage = () => {
     else if (ann + rev === 0 && tl > 0) sugg = "P2";
     else if (total >= 5) sugg = "P0";
     setPrioritySuggestion(sugg);
-  }, [manpowerTrigger, selectedTeamLeadIds, isModalOpen]);
+  }, [formAutonexAnnotators, formAutonexReviewers, selectedTeamLeadIds]);
 
   const { data: projectKpis } = useQuery({
     queryKey: ["sub-projects-kpi"],
@@ -469,6 +456,8 @@ const ProjectsPage = () => {
     setFormMainProjectId("");
     setFormOrg("");
     setFormPriority("auto");
+    setFormAutonexAnnotators(0);
+    setFormAutonexReviewers(0);
     setFormProjectStatus("active");
     setFormSentiment("");
     setModalInfoTab("status");
@@ -929,98 +918,6 @@ const ProjectsPage = () => {
     return names;
   };
 
-  const calculateManpowerBalance = (project) => {
-    const matchingTotal = getMatchingEmployees(project).length;
-    const allocatedCount = getAllocatedManpower(project);
-    return matchingTotal - allocatedCount;
-  };
-
-  const calculateTasksPerEmployee = (project) => {
-    const manpower = getAllocatedManpower(project);
-    if (manpower === 0) return 0;
-    return Math.round(project.total_tasks / manpower);
-  };
-
-  // Helper: count working days (exclude weekends and company holidays) between two dates.
-  // Parse date-only strings as LOCAL midnight (never via Date.toISOString) so
-  // counts don't shift by a day in timezones offset from UTC (e.g. IST).
-  const getWorkingDays = (startStr, endStr) => {
-    return getWorkingDayCount(startStr, endStr) || 1; // at least 1 to avoid division by zero
-  };
-
-  // Helper: count leave working days for an employee during a project period.
-  // Clamp the overlap on the YYYY-MM-DD strings directly (lexicographic order =
-  // chronological) to avoid UTC round-trips.
-  const getEmployeeLeaveDays = (employeeId, projectStart, projectEnd) => {
-    const empLeaves = leaves.filter((l) => l.employee_id === employeeId);
-    let totalLeaveDays = 0;
-    for (const leave of empLeaves) {
-      if (!leave.start_date || !leave.end_date) continue;
-      const leaveStart =
-        leave.start_date > projectStart ? leave.start_date : projectStart;
-      const leaveEnd =
-        leave.end_date < projectEnd ? leave.end_date : projectEnd;
-      if (leaveStart <= leaveEnd) {
-        totalLeaveDays += getWorkingDayCount(leaveStart, leaveEnd, leave.is_half_day);
-      }
-    }
-    return totalLeaveDays;
-  };
-
-  const getSystemRecommendation = (project) => {
-    const projectAllocations = allocations.filter(
-      (a) => a.sub_project_id === project.id,
-    );
-    const allocatedPersonnel = projectAllocations.length;
-    const totalTasks = project.total_tasks || 0;
-    const avgTimePerTask = project.estimated_time_per_task || 0; // in hours
-    const totalEstimatedHours = totalTasks * avgTimePerTask;
-
-    if (allocatedPersonnel === 0) {
-      return {
-        label: "Overburdened",
-        dailyHours: 0,
-        details: "No employees allocated",
-      };
-    }
-
-    const workingDays = getWorkingDays(project.start_date, project.end_date);
-
-    // Calculate effective capacity: subtract leave days per employee
-    let totalEffectiveEmployeeDays = 0;
-    for (const alloc of projectAllocations) {
-      const leaveDays = getEmployeeLeaveDays(
-        alloc.employee_id,
-        project.start_date,
-        project.end_date,
-      );
-      totalEffectiveEmployeeDays += workingDays - leaveDays;
-    }
-
-    // Per-employee average daily required hours
-    const avgDailyHoursPerEmployee =
-      totalEffectiveEmployeeDays > 0
-        ? totalEstimatedHours / totalEffectiveEmployeeDays
-        : 999;
-
-    let label;
-    if (avgDailyHoursPerEmployee > 8.5) {
-      label = "Overburdened";
-    } else if (avgDailyHoursPerEmployee >= 7.5) {
-      label = "Balanced";
-    } else {
-      label = "Underutilized";
-    }
-
-    return {
-      label,
-      dailyHours: avgDailyHoursPerEmployee,
-      workingDays,
-      effectiveDays: totalEffectiveEmployeeDays,
-    };
-  };
-
-
   const [deleteConfirm, setDeleteConfirm] = useState(null);
   const [highlightId, setHighlightId] = useState(null);
 
@@ -1134,11 +1031,6 @@ const ProjectsPage = () => {
     setSearchParams(params, { replace: true });
   }, [focusId, isLoading, filteredProjects]);
 
-  const currentMainProject = visibleMainProjects.find(
-    (p) => p.id === parseInt(filterMainProjectId),
-  );
-
-
 
   // Open the full create/edit modal, prefilled from a project. `copy` clones it.
   const openProjectModal = (project, { copy = false } = {}) => {
@@ -1160,8 +1052,10 @@ const ProjectsPage = () => {
     setFormMainProjectId(String(project.main_project_id || ""));
     setFormOrg(orgOfMainProject(project.main_project_id));
     setFormPriority(project.priority || "auto");
+    setFormAutonexAnnotators(project.autonex_annotators ?? 0);
+    setFormAutonexReviewers(project.autonex_reviewers ?? 0);
     setFormProjectStatus(project.project_status || "active");
-    setFormSentiment(project.sentiment || "");
+        setFormSentiment(project.sentiment || "");
     setModalInfoTab("status");
     setModalBuildTab("types");
     // Prefill both rosters from the project. The PM list matters even though the field is
@@ -1290,7 +1184,6 @@ const ProjectsPage = () => {
                 <button
                   key={t.key}
                   onClick={() => {
-                    console.log("Tab clicked:", t.key);
                     setProjectView(t.key);
                     setSelectedStatus("all");
                   }}
@@ -1408,6 +1301,8 @@ const ProjectsPage = () => {
               filterMainProjectId ? orgOfMainProject(filterMainProjectId) : "",
             );
             setFormPriority("auto");
+            setFormAutonexAnnotators(0);
+            setFormAutonexReviewers(0);
             setFormProjectStatus("active");
             setFormSentiment("");
             setModalInfoTab("status");
@@ -2583,25 +2478,46 @@ const ProjectsPage = () => {
                       isDevelopmentSelected && ["developers_count", "Developers"],
                     ]
                       .filter(Boolean)
-                      .map(([field, label]) => (
-                        <div key={field}>
-                          <label className="block text-[11px] font-medium text-slate-500 mb-1 truncate">
-                            {label}
-                          </label>
-                          <input
-                            type="number"
-                            name={field}
-                            min="0"
-                            defaultValue={
-                              (editingProject || copyingProject)?.[field] ?? ""
-                            }
-                            onChange={() => setManpowerTrigger(v => v + 1)}
-                            onWheel={(e) => e.target.blur()}
-                            className="input"
-                            placeholder="0"
-                          />
-                        </div>
-                      ))}
+                      .map(([field, label]) => {
+                        const isPriorityDriver =
+                          field === "autonex_annotators" ||
+                          field === "autonex_reviewers";
+                        return (
+                          <div key={field}>
+                            <label className="block text-[11px] font-medium text-slate-500 mb-1 truncate">
+                              {label}
+                            </label>
+                            <input
+                              type="number"
+                              name={field}
+                              min="0"
+                              {...(isPriorityDriver
+                                ? {
+                                    value:
+                                      field === "autonex_annotators"
+                                        ? formAutonexAnnotators
+                                        : formAutonexReviewers,
+                                    onChange: (e) => {
+                                      const n = parseInt(e.target.value, 10);
+                                      const next = Number.isFinite(n) ? n : 0;
+                                      if (field === "autonex_annotators") {
+                                        setFormAutonexAnnotators(next);
+                                      } else {
+                                        setFormAutonexReviewers(next);
+                                      }
+                                    },
+                                  }
+                                : {
+                                    defaultValue:
+                                      (editingProject || copyingProject)?.[field] ?? "",
+                                  })}
+                              onWheel={(e) => e.target.blur()}
+                              className="input"
+                              placeholder="0"
+                            />
+                          </div>
+                        );
+                      })}
                     {/* Derived from the two pickers above rather than typed. They were
                         editable numbers that could disagree with the people actually
                         chosen — a project could name three leads and claim one. */}

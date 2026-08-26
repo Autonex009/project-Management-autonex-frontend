@@ -1113,6 +1113,58 @@ const SortMenu = ({ sortBy, setSortBy }) => {
   );
 };
 
+/** Single clickable metric tile used inside KPI cards */
+const StatTile = ({
+  label,
+  value,
+  active,
+  onClick,
+  activeBg,
+  idleBg,
+  textClass,
+}) => (
+  <button
+    type="button"
+    onClick={onClick}
+    className={`p-2 rounded-xl text-center border transition-all hover:scale-[1.02] ${
+      active ? activeBg : idleBg
+    }`}
+  >
+    <div
+      className={`text-base sm:text-lg font-extrabold font-mono leading-none ${textClass}`}
+    >
+      {value}
+    </div>
+    <div
+      className={`text-[10px] font-bold uppercase tracking-wider mt-1 truncate ${textClass}`}
+    >
+      {label}
+    </div>
+  </button>
+);
+
+/** Shared KPI card shell (icon + title + 3-tile grid) */
+const KpiCard = ({ icon: Icon, iconBg, title, children }) => (
+  <div className="bg-white border border-slate-200/70 rounded-2xl p-3.5 shadow-[0_1px_3px_rgba(0,0,0,0.04)] flex flex-col justify-between hover:shadow-md transition-all duration-200">
+    <div className="flex items-center justify-between gap-2 mb-2.5 min-h-[32px]">
+      <div className="flex items-center gap-2.5 min-w-0">
+        <div
+          className={`w-8 h-8 rounded-lg ${iconBg} flex items-center justify-center flex-shrink-0`}
+        >
+          <Icon className="w-4 h-4" />
+        </div>
+        <div className="text-[12.5px] font-bold text-slate-800 uppercase tracking-wider truncate">
+          {title}
+        </div>
+      </div>
+      {/* Optional right-side total can be passed as children header if needed */}
+    </div>
+    <div className="grid grid-cols-3 gap-1.5 pt-2 border-t border-slate-100">
+      {children}
+    </div>
+  </div>
+);
+
 function EmployeeActionMenu({
   row,
   statusParam,
@@ -1643,8 +1695,9 @@ const EmployeesPage = () => {
     onSuccess: (emp) => {
       queryClient.invalidateQueries(["employees"]);
       queryClient.invalidateQueries(["all-employees-kpis"]);
-      toast.success(`${formatDisplayName(emp?.name) || emp?.name || "Employee"} converted to Full-time`);
-      toast.success(`${formatDisplayName(emp.name || "Employee")} converted to Full-time`);
+      toast.success(
+        `${formatDisplayName(emp?.name) || emp?.name || "Employee"} converted to Full-time`,
+      );
       logChange({
         category: "Employees",
         action: "Promoted Employee to Full-time",
@@ -1717,25 +1770,6 @@ const EmployeesPage = () => {
     } else {
       createMutation.mutate(data);
     }
-  };
-
-  const getStatusBadge = (status) => {
-    const badges = {
-      active: "badge-green",
-      inactive: "badge-gray",
-      "on-leave": "badge-yellow",
-    };
-    return badges[status?.toLowerCase()] || "badge-blue";
-  };
-
-  const getTypeBadge = (type) => {
-    const badges = {
-      "Full-time": "badge-blue",
-      "Part-time": "badge-purple",
-      Intern: "badge-orange",
-      Contract: "badge-gray",
-    };
-    return badges[type] || "badge-gray";
   };
 
   const designationOptions = Array.from(
@@ -1884,279 +1918,179 @@ const EmployeesPage = () => {
   return (
     <div className="space-y-3">
       {/* KPI Overview Cards Grid */}
-        <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-3.5">
-          {/* KPI 1: Total Employees */}
-          <div className="bg-white border border-slate-200/70 rounded-2xl p-3.5 shadow-[0_1px_3px_rgba(0,0,0,0.04)] flex flex-col justify-between hover:shadow-md transition-all duration-200">
-            <div className="flex items-center justify-between gap-2 mb-2.5">
-              <div className="flex items-center gap-2.5 min-w-0">
-                <div className="w-8 h-8 rounded-lg bg-indigo-50 text-indigo-600 flex items-center justify-center flex-shrink-0">
-                  <Users className="w-4 h-4" />
-                </div>
-                <div className="text-[12.5px] font-bold text-slate-800 uppercase tracking-wider truncate">
-                  TOTAL EMPLOYEES
-                </div>
-              </div>
-              <div className="text-xl sm:text-2xl font-bold text-slate-900 tracking-tight font-mono flex-shrink-0">
-                {onRosterCount}
-              </div>
-            </div>
-
-            {/* Highlighted Metric Stat Tiles */}
-            <div className="grid grid-cols-3 gap-1.5 pt-2 border-t border-slate-100">
-              <button
-                type="button"
-                onClick={() => {
-                  const params = new URLSearchParams(searchParams);
-                  if (statusParam === "active") params.delete("status");
-                  else params.set("status", "active");
-                  setSearchParams(params);
-                }}
-                className={`p-2 rounded-xl text-center border transition-all hover:scale-[1.02] ${statusParam === "active"
-                  ? "bg-emerald-100/90 border-emerald-300 ring-2 ring-emerald-500/20"
-                  : "bg-emerald-50/60 border-emerald-100/80 hover:bg-emerald-100/60"
-                  }`}
-              >
-                <div className="text-base sm:text-lg font-extrabold text-emerald-700 font-mono leading-none">
-                  {activeCount}
-                </div>
-                <div className="text-[10px] font-bold text-emerald-600 uppercase tracking-wider mt-1 truncate">
-                  Active
-                </div>
-              </button>
-
-              <button
-                type="button"
-                onClick={() => {
-                  const params = new URLSearchParams(searchParams);
-                  if (statusParam === "inactive") params.delete("status");
-                  else params.set("status", "inactive");
-                  setSearchParams(params);
-                }}
-                className={`p-2 rounded-xl text-center border transition-all hover:scale-[1.02] ${statusParam === "inactive"
-                  ? "bg-slate-200 border-slate-400 ring-2 ring-slate-500/20"
-                  : "bg-slate-50 border-slate-100 hover:bg-slate-100"
-                  }`}
-              >
-                <div className="text-base sm:text-lg font-extrabold text-slate-700 font-mono leading-none">
-                  {inactiveCount}
-                </div>
-                <div className="text-[10px] font-bold text-slate-500 uppercase tracking-wider mt-1 truncate">
-                  Inactive
-                </div>
-              </button>
-
-              <button
-                type="button"
-                onClick={() => {
-                  const params = new URLSearchParams(searchParams);
-                  if (statusParam === "idle") params.delete("status");
-                  else params.set("status", "idle");
-                  setSearchParams(params);
-                }}
-                className={`p-2 rounded-xl text-center border transition-all hover:scale-[1.02] ${statusParam === "idle"
-                  ? "bg-amber-100/90 border-amber-300 ring-2 ring-amber-500/20"
-                  : "bg-amber-50/60 border-amber-100/80 hover:bg-amber-100/60"
-                  }`}
-              >
-                <div className="text-base sm:text-lg font-extrabold text-amber-700 font-mono leading-none">
-                  {idleCount}
-                </div>
-                <div className="text-[10px] font-bold text-amber-600 uppercase tracking-wider mt-1 truncate">
-                  Idle
-                </div>
-              </button>
-            </div>
-          </div>
-
-          {/* KPI 2: Work Model */}
-          <div className="bg-white border border-slate-200/70 rounded-2xl p-3.5 shadow-[0_1px_3px_rgba(0,0,0,0.04)] flex flex-col justify-between hover:shadow-md transition-all duration-200">
-            <div className="flex items-center gap-2.5 mb-2.5 min-h-[32px]">
-              <div className="w-8 h-8 rounded-lg bg-emerald-50 text-emerald-600 flex items-center justify-center flex-shrink-0">
-                <UserCheck className="w-4 h-4" />
+      <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-3.5">
+        {/* KPI 1: Total Employees (keeps the big total on the right) */}
+        <div className="bg-white border border-slate-200/70 rounded-2xl p-3.5 shadow-[0_1px_3px_rgba(0,0,0,0.04)] flex flex-col justify-between hover:shadow-md transition-all duration-200">
+          <div className="flex items-center justify-between gap-2 mb-2.5">
+            <div className="flex items-center gap-2.5 min-w-0">
+              <div className="w-8 h-8 rounded-lg bg-indigo-50 text-indigo-600 flex items-center justify-center flex-shrink-0">
+                <Users className="w-4 h-4" />
               </div>
               <div className="text-[12.5px] font-bold text-slate-800 uppercase tracking-wider truncate">
-                WORK MODEL
+                TOTAL EMPLOYEES
               </div>
             </div>
-
-            {/* Highlighted Metric Stat Tiles */}
-            <div className="grid grid-cols-3 gap-1.5 pt-2 border-t border-slate-100">
-              <button
-                type="button"
-                onClick={() => setColWorkModel((prev) => (prev === "WFO" ? "" : "WFO"))}
-                className={`p-2 rounded-xl text-center border transition-all hover:scale-[1.02] ${colWorkModel === "WFO"
-                  ? "bg-indigo-100/90 border-indigo-300 ring-2 ring-indigo-500/20"
-                  : "bg-indigo-50/60 border-indigo-100/80 hover:bg-indigo-100/60"
-                  }`}
-              >
-                <div className="text-base sm:text-lg font-extrabold text-indigo-700 font-mono leading-none">
-                  {wfoCount}
-                </div>
-                <div className="text-[10px] font-bold text-indigo-600 uppercase tracking-wider mt-1 truncate">
-                  WFO
-                </div>
-              </button>
-
-              <button
-                type="button"
-                onClick={() => setColWorkModel((prev) => (prev === "WFH" ? "" : "WFH"))}
-                className={`p-2 rounded-xl text-center border transition-all hover:scale-[1.02] ${colWorkModel === "WFH"
-                  ? "bg-cyan-100/90 border-cyan-300 ring-2 ring-cyan-500/20"
-                  : "bg-cyan-50/60 border-cyan-100/80 hover:bg-cyan-100/60"
-                  }`}
-              >
-                <div className="text-base sm:text-lg font-extrabold text-cyan-700 font-mono leading-none">
-                  {wfhCount}
-                </div>
-                <div className="text-[10px] font-bold text-cyan-600 uppercase tracking-wider mt-1 truncate">
-                  WFH
-                </div>
-              </button>
-
-              <button
-                type="button"
-                onClick={() => setColWorkModel((prev) => (prev === "Hybrid" ? "" : "Hybrid"))}
-                className={`p-2 rounded-xl text-center border transition-all hover:scale-[1.02] ${colWorkModel === "Hybrid"
-                  ? "bg-purple-100/90 border-purple-300 ring-2 ring-purple-500/20"
-                  : "bg-purple-50/60 border-purple-100/80 hover:bg-purple-100/60"
-                  }`}
-              >
-                <div className="text-base sm:text-lg font-extrabold text-purple-700 font-mono leading-none">
-                  {hybridCount}
-                </div>
-                <div className="text-[10px] font-bold text-purple-600 uppercase tracking-wider mt-1 truncate">
-                  Hybrid
-                </div>
-              </button>
+            <div className="text-xl sm:text-2xl font-bold text-slate-900 tracking-tight font-mono flex-shrink-0">
+              {onRosterCount}
             </div>
           </div>
-
-          {/* KPI 3: Employment Type */}
-          <div className="bg-white border border-slate-200/70 rounded-2xl p-3.5 shadow-[0_1px_3px_rgba(0,0,0,0.04)] flex flex-col justify-between hover:shadow-md transition-all duration-200">
-            <div className="flex items-center gap-2.5 mb-2.5 min-h-[32px]">
-              <div className="w-8 h-8 rounded-lg bg-purple-50 text-purple-600 flex items-center justify-center flex-shrink-0">
-                <Briefcase className="w-4 h-4" />
-              </div>
-              <div className="text-[12.5px] font-bold text-slate-800 uppercase tracking-wider truncate">
-                EMPLOYEE TYPES
-              </div>
-            </div>
-
-            {/* Highlighted Metric Stat Tiles */}
-            <div className="grid grid-cols-3 gap-1.5 pt-2 border-t border-slate-100">
-              <button
-                type="button"
-                onClick={() => setColType((prev) => (prev === "Full-time" ? "" : "Full-time"))}
-                className={`p-2 rounded-xl text-center border transition-all hover:scale-[1.02] ${colType === "Full-time"
-                  ? "bg-emerald-100/90 border-emerald-300 ring-2 ring-emerald-500/20"
-                  : "bg-emerald-50/60 border-emerald-100/80 hover:bg-emerald-100/60"
-                  }`}
-              >
-                <div className="text-base sm:text-lg font-extrabold text-emerald-700 font-mono leading-none">
-                  {fullTimeCount}
-                </div>
-                <div className="text-[10px] font-bold text-emerald-600 uppercase tracking-wider mt-1 truncate">
-                  Full-time
-                </div>
-              </button>
-
-              <button
-                type="button"
-                onClick={() => setColType((prev) => (prev === "Intern" ? "" : "Intern"))}
-                className={`p-2 rounded-xl text-center border transition-all hover:scale-[1.02] ${colType === "Intern"
-                  ? "bg-amber-100/90 border-amber-300 ring-2 ring-amber-500/20"
-                  : "bg-amber-50/60 border-amber-100/80 hover:bg-amber-100/60"
-                  }`}
-              >
-                <div className="text-base sm:text-lg font-extrabold text-amber-700 font-mono leading-none">
-                  {internCount}
-                </div>
-                <div className="text-[10px] font-bold text-amber-600 uppercase tracking-wider mt-1 truncate">
-                  Intern
-                </div>
-              </button>
-
-              <button
-                type="button"
-                onClick={() => setColType((prev) => (prev === "Contract" ? "" : "Contract"))}
-                className={`p-2 rounded-xl text-center border transition-all hover:scale-[1.02] ${colType === "Contract"
-                  ? "bg-sky-100/90 border-sky-300 ring-2 ring-sky-500/20"
-                  : "bg-sky-50/60 border-sky-100/80 hover:bg-sky-100/60"
-                  }`}
-              >
-                <div className="text-base sm:text-lg font-extrabold text-sky-700 font-mono leading-none">
-                  {contractCount}
-                </div>
-                <div className="text-[10px] font-bold text-sky-600 uppercase tracking-wider mt-1 truncate">
-                  Contract
-                </div>
-              </button>
-            </div>
-          </div>
-
-          {/* KPI 4: Role Designations */}
-          <div className="bg-white border border-slate-200/70 rounded-2xl p-3.5 shadow-[0_1px_3px_rgba(0,0,0,0.04)] flex flex-col justify-between hover:shadow-md transition-all duration-200">
-            <div className="flex items-center gap-2.5 mb-2.5 min-h-[32px]">
-              <div className="w-8 h-8 rounded-lg bg-sky-50 text-sky-600 flex items-center justify-center flex-shrink-0">
-                <Award className="w-4 h-4" />
-              </div>
-              <div className="text-[12.5px] font-bold text-slate-800 uppercase tracking-wider truncate">
-                DESIGNATION ROLES
-              </div>
-            </div>
-
-            {/* Highlighted Metric Stat Tiles */}
-            <div className="grid grid-cols-3 gap-1.5 pt-2 border-t border-slate-100">
-              <button
-                type="button"
-                onClick={() => handleSelectColDesignation("Manager")}
-                className={`p-2 rounded-xl text-center border transition-all hover:scale-[1.02] ${colDesignation === "Manager"
-                  ? "bg-indigo-100/90 border-indigo-300 ring-2 ring-indigo-500/20"
-                  : "bg-indigo-50/60 border-indigo-100/80 hover:bg-indigo-100/60"
-                  }`}
-              >
-                <div className="text-base sm:text-lg font-extrabold text-indigo-700 font-mono leading-none">
-                  {pmCount}
-                </div>
-                <div className="text-[10px] font-bold text-indigo-600 uppercase tracking-wider mt-1 truncate">
-                  PMs
-                </div>
-              </button>
-
-              <button
-                type="button"
-                onClick={() => handleSelectColDesignation("TL")}
-                className={`p-2 rounded-xl text-center border transition-all hover:scale-[1.02] ${colDesignation === "TL"
-                  ? "bg-purple-100/90 border-purple-300 ring-2 ring-purple-500/20"
-                  : "bg-purple-50/60 border-purple-100/80 hover:bg-purple-100/60"
-                  }`}
-              >
-                <div className="text-base sm:text-lg font-extrabold text-purple-700 font-mono leading-none">
-                  {tlCount}
-                </div>
-                <div className="text-[10px] font-bold text-purple-600 uppercase tracking-wider mt-1 truncate">
-                  TL
-                </div>
-              </button>
-
-              <button
-                type="button"
-                onClick={() => handleSelectColDesignation("Annotator")}
-                className={`p-2 rounded-xl text-center border transition-all hover:scale-[1.02] ${colDesignation === "Annotator"
-                  ? "bg-sky-100/90 border-sky-300 ring-2 ring-sky-500/20"
-                  : "bg-sky-50/60 border-sky-100/80 hover:bg-sky-100/60"
-                  }`}
-              >
-                <div className="text-base sm:text-lg font-extrabold text-sky-700 font-mono leading-none">
-                  {annotatorCount}
-                </div>
-                <div className="text-[10px] font-bold text-sky-600 uppercase tracking-wider mt-1 truncate">
-                  Annotators
-                </div>
-              </button>
-            </div>
+          <div className="grid grid-cols-3 gap-1.5 pt-2 border-t border-slate-100">
+            <StatTile
+              label="Active"
+              value={activeCount}
+              active={statusParam === "active"}
+              onClick={() => {
+                const params = new URLSearchParams(searchParams);
+                if (statusParam === "active") params.delete("status");
+                else params.set("status", "active");
+                setSearchParams(params);
+              }}
+              activeBg="bg-emerald-100/90 border-emerald-300 ring-2 ring-emerald-500/20"
+              idleBg="bg-emerald-50/60 border-emerald-100/80 hover:bg-emerald-100/60"
+              textClass="text-emerald-700"
+            />
+            <StatTile
+              label="Inactive"
+              value={inactiveCount}
+              active={statusParam === "inactive"}
+              onClick={() => {
+                const params = new URLSearchParams(searchParams);
+                if (statusParam === "inactive") params.delete("status");
+                else params.set("status", "inactive");
+                setSearchParams(params);
+              }}
+              activeBg="bg-slate-200 border-slate-400 ring-2 ring-slate-500/20"
+              idleBg="bg-slate-50 border-slate-100 hover:bg-slate-100"
+              textClass="text-slate-700"
+            />
+            <StatTile
+              label="Idle"
+              value={idleCount}
+              active={statusParam === "idle"}
+              onClick={() => {
+                const params = new URLSearchParams(searchParams);
+                if (statusParam === "idle") params.delete("status");
+                else params.set("status", "idle");
+                setSearchParams(params);
+              }}
+              activeBg="bg-amber-100/90 border-amber-300 ring-2 ring-amber-500/20"
+              idleBg="bg-amber-50/60 border-amber-100/80 hover:bg-amber-100/60"
+              textClass="text-amber-700"
+            />
           </div>
         </div>
+
+        {/* KPI 2: Work Model */}
+        <KpiCard
+          icon={UserCheck}
+          iconBg="bg-emerald-50 text-emerald-600"
+          title="WORK MODEL"
+        >
+          <StatTile
+            label="WFO"
+            value={wfoCount}
+            active={colWorkModel === "WFO"}
+            onClick={() => setColWorkModel((prev) => (prev === "WFO" ? "" : "WFO"))}
+            activeBg="bg-indigo-100/90 border-indigo-300 ring-2 ring-indigo-500/20"
+            idleBg="bg-indigo-50/60 border-indigo-100/80 hover:bg-indigo-100/60"
+            textClass="text-indigo-700"
+          />
+          <StatTile
+            label="WFH"
+            value={wfhCount}
+            active={colWorkModel === "WFH"}
+            onClick={() => setColWorkModel((prev) => (prev === "WFH" ? "" : "WFH"))}
+            activeBg="bg-cyan-100/90 border-cyan-300 ring-2 ring-cyan-500/20"
+            idleBg="bg-cyan-50/60 border-cyan-100/80 hover:bg-cyan-100/60"
+            textClass="text-cyan-700"
+          />
+          <StatTile
+            label="Hybrid"
+            value={hybridCount}
+            active={colWorkModel === "Hybrid"}
+            onClick={() =>
+              setColWorkModel((prev) => (prev === "Hybrid" ? "" : "Hybrid"))
+            }
+            activeBg="bg-purple-100/90 border-purple-300 ring-2 ring-purple-500/20"
+            idleBg="bg-purple-50/60 border-purple-100/80 hover:bg-purple-100/60"
+            textClass="text-purple-700"
+          />
+        </KpiCard>
+
+        {/* KPI 3: Employment Type */}
+        <KpiCard
+          icon={Briefcase}
+          iconBg="bg-purple-50 text-purple-600"
+          title="EMPLOYEE TYPES"
+        >
+          <StatTile
+            label="Full-time"
+            value={fullTimeCount}
+            active={colType === "Full-time"}
+            onClick={() =>
+              setColType((prev) => (prev === "Full-time" ? "" : "Full-time"))
+            }
+            activeBg="bg-emerald-100/90 border-emerald-300 ring-2 ring-emerald-500/20"
+            idleBg="bg-emerald-50/60 border-emerald-100/80 hover:bg-emerald-100/60"
+            textClass="text-emerald-700"
+          />
+          <StatTile
+            label="Intern"
+            value={internCount}
+            active={colType === "Intern"}
+            onClick={() => setColType((prev) => (prev === "Intern" ? "" : "Intern"))}
+            activeBg="bg-amber-100/90 border-amber-300 ring-2 ring-amber-500/20"
+            idleBg="bg-amber-50/60 border-amber-100/80 hover:bg-amber-100/60"
+            textClass="text-amber-700"
+          />
+          <StatTile
+            label="Contract"
+            value={contractCount}
+            active={colType === "Contract"}
+            onClick={() =>
+              setColType((prev) => (prev === "Contract" ? "" : "Contract"))
+            }
+            activeBg="bg-sky-100/90 border-sky-300 ring-2 ring-sky-500/20"
+            idleBg="bg-sky-50/60 border-sky-100/80 hover:bg-sky-100/60"
+            textClass="text-sky-700"
+          />
+        </KpiCard>
+
+        {/* KPI 4: Role Designations */}
+        <KpiCard
+          icon={Award}
+          iconBg="bg-sky-50 text-sky-600"
+          title="DESIGNATION ROLES"
+        >
+          <StatTile
+            label="PMs"
+            value={pmCount}
+            active={colDesignation === "Manager"}
+            onClick={() => handleSelectColDesignation("Manager")}
+            activeBg="bg-indigo-100/90 border-indigo-300 ring-2 ring-indigo-500/20"
+            idleBg="bg-indigo-50/60 border-indigo-100/80 hover:bg-indigo-100/60"
+            textClass="text-indigo-700"
+          />
+          <StatTile
+            label="TL"
+            value={tlCount}
+            active={colDesignation === "TL"}
+            onClick={() => handleSelectColDesignation("TL")}
+            activeBg="bg-purple-100/90 border-purple-300 ring-2 ring-purple-500/20"
+            idleBg="bg-purple-50/60 border-purple-100/80 hover:bg-purple-100/60"
+            textClass="text-purple-700"
+          />
+          <StatTile
+            label="Annotators"
+            value={annotatorCount}
+            active={colDesignation === "Annotator"}
+            onClick={() => handleSelectColDesignation("Annotator")}
+            activeBg="bg-sky-100/90 border-sky-300 ring-2 ring-sky-500/20"
+            idleBg="bg-sky-50/60 border-sky-100/80 hover:bg-sky-100/60"
+            textClass="text-sky-700"
+          />
+        </KpiCard>
+      </div>
         {/* Tabs for Active Team vs Archived */}
         <div className="flex border-b border-slate-200">
           <button

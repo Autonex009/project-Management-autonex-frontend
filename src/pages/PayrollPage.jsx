@@ -30,7 +30,7 @@ import Modal from "../components/ui/Modal";
 import DatePicker from "../components/ui/DatePicker";
 import Dropdown from "../components/ui/Dropdown";
 import UserAvatar from "../components/ui/UserAvatar";
-import { formatDisplayName, getNameInitials } from "../utils/displayName";
+import { formatDisplayName } from "../utils/displayName";
 
 const LEAVE_LABELS = {
   paid: "Paid",
@@ -386,11 +386,6 @@ const PayrollPage = () => {
     } finally {
       setUnlocking(false);
     }
-  };
-
-  const handleLock = () => {
-    sessionStorage.removeItem("payroll_passcode");
-    setUnlocked(false);
   };
 
   const {

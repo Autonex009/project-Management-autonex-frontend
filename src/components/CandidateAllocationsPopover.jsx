@@ -1,15 +1,9 @@
-import React, {
-  useState,
-  useRef,
-  useEffect,
-  useLayoutEffect,
-  useCallback,
-} from "react";
+import React from "react";
 import { createPortal } from "react-dom";
 import { Briefcase, Layers } from "lucide-react";
+import { usePopoverPosition } from "./usePopoverPosition";
 
 const POPOVER_WIDTH = 320;
-const POPOVER_MARGIN = 12;
 
 const statusPill = (status) => {
   switch (status) {
@@ -36,104 +30,15 @@ const CandidateAllocationsPopover = ({
   candidateName = "",
   badgeContent,
 }) => {
-  const [open, setOpen] = useState(false);
-  const [position, setPosition] = useState({
-    top: 0,
-    left: 0,
-    placement: "bottom",
-    arrowLeft: 0,
-  });
-  const triggerRef = useRef(null);
-  const popoverRef = useRef(null);
-  const closeTimerRef = useRef(null);
-
-  const updatePosition = useCallback(() => {
-    const trigger = triggerRef.current;
-    if (!trigger) return;
-    const rect = trigger.getBoundingClientRect();
-    const popoverHeight = popoverRef.current?.offsetHeight || 320;
-    const vw = window.innerWidth;
-    const vh = window.innerHeight;
-    const triggerCenter = rect.left + rect.width / 2;
-    let left = triggerCenter - POPOVER_WIDTH / 2;
-    left = Math.max(
-      POPOVER_MARGIN,
-      Math.min(left, vw - POPOVER_WIDTH - POPOVER_MARGIN),
-    );
-    const spaceBelow = vh - rect.bottom - POPOVER_MARGIN;
-    const spaceAbove = rect.top - POPOVER_MARGIN;
-    const placeBelow = spaceBelow >= popoverHeight || spaceBelow >= spaceAbove;
-    const top = placeBelow ? rect.bottom + 8 : rect.top - popoverHeight - 8;
-    const arrowLeft = Math.max(
-      16,
-      Math.min(POPOVER_WIDTH - 16, triggerCenter - left),
-    );
-    setPosition({
-      top,
-      left,
-      placement: placeBelow ? "bottom" : "top",
-      arrowLeft,
-    });
-  }, []);
-
-  useLayoutEffect(() => {
-    if (!open) return;
-    updatePosition();
-    const id = requestAnimationFrame(updatePosition);
-    return () => cancelAnimationFrame(id);
-  }, [open, allocations.length, updatePosition]);
-
-  useEffect(() => {
-    if (!open) return;
-    const handler = () => updatePosition();
-    window.addEventListener("scroll", handler, true);
-    window.addEventListener("resize", handler);
-    return () => {
-      window.removeEventListener("scroll", handler, true);
-      window.removeEventListener("resize", handler);
-    };
-  }, [open, updatePosition]);
-
-  useEffect(() => {
-    if (!open) return;
-    const handler = (e) => {
-      if (
-        (triggerRef.current && triggerRef.current.contains(e.target)) ||
-        (popoverRef.current && popoverRef.current.contains(e.target))
-      )
-        return;
-      setOpen(false);
-    };
-    document.addEventListener("mousedown", handler);
-    return () => document.removeEventListener("mousedown", handler);
-  }, [open]);
-
-  useEffect(() => {
-    if (!open) return;
-    const handler = (e) => {
-      if (e.key === "Escape") setOpen(false);
-    };
-    document.addEventListener("keydown", handler);
-    return () => document.removeEventListener("keydown", handler);
-  }, [open]);
-
-  useEffect(
-    () => () => {
-      if (closeTimerRef.current) clearTimeout(closeTimerRef.current);
-    },
-    [],
-  );
-
-  const scheduleClose = () => {
-    if (closeTimerRef.current) clearTimeout(closeTimerRef.current);
-    closeTimerRef.current = setTimeout(() => setOpen(false), 140);
-  };
-  const cancelClose = () => {
-    if (closeTimerRef.current) {
-      clearTimeout(closeTimerRef.current);
-      closeTimerRef.current = null;
-    }
-  };
+  const {
+    open,
+    setOpen,
+    position,
+    triggerRef,
+    popoverRef,
+    scheduleClose,
+    cancelClose,
+  } = usePopoverPosition({ deps: [allocations.length] });
 
   const popover = open
     ? createPortal(

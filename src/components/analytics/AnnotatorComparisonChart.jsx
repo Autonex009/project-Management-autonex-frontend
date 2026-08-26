@@ -134,7 +134,8 @@ const AnnotatorComparisonChart = ({
               const displayName =
                 formatDisplayName(a.employee_name) ||
                 a.employee_name ||
-                a.user_email.split("@")[0];
+                a.user_email?.split("@")[0] ||
+                "Unknown";
 
               return (
                 <div

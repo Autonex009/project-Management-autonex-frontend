@@ -1100,11 +1100,6 @@ const LeaderboardPage = () => {
     }
   };
 
-  // ── Monthly aliases ──
-  const top3Month_ = top3Month;
-  const canGoPrevMonth_ = canGoPrevMonth;
-  const canGoNextMonth_ = canGoNextMonth;
-
   return (
     <div className="flex flex-col gap-2.5 sm:gap-3">
       {/* 2-Column Leaderboard Showcase (Monthly on Left, Annual + Weekly/Daily on Right) */}
@@ -1120,7 +1115,7 @@ const LeaderboardPage = () => {
           <button
             type="button"
             onClick={handlePrevMonthClick}
-            disabled={!canGoPrevMonth_}
+            disabled={!canGoPrevMonth}
             className="absolute -left-3.5 top-1/2 -translate-y-1/2 z-20 inline-flex items-center justify-center w-8 h-8 rounded-full border border-indigo-200 bg-white/95 text-indigo-700 shadow-md hover:bg-white active:scale-95 disabled:opacity-20 disabled:cursor-not-allowed transition-all cursor-pointer backdrop-blur-xs"
             title="Previous month"
           >
@@ -1130,7 +1125,7 @@ const LeaderboardPage = () => {
           <button
             type="button"
             onClick={handleNextMonthClick}
-            disabled={!canGoNextMonth_}
+            disabled={!canGoNextMonth}
             className="absolute -right-3.5 top-1/2 -translate-y-1/2 z-20 inline-flex items-center justify-center w-8 h-8 rounded-full border border-indigo-200 bg-white/95 text-indigo-700 shadow-md hover:bg-white active:scale-95 disabled:opacity-20 disabled:cursor-not-allowed transition-all cursor-pointer backdrop-blur-xs"
             title="Next month"
           >
@@ -1164,11 +1159,11 @@ const LeaderboardPage = () => {
                 <TableSkeleton rows={7} />
               </div>
             </div>
-          ) : top3Month_.length > 0 ? (
+          ) : top3Month.length > 0 ? (
             <div className="px-1 py-1">
               <div className="grid grid-cols-3 items-stretch gap-2.5 sm:gap-3 max-w-xl mx-auto">
                 {/* 2nd Place (Silver) */}
-                {top3Month_[1] ? (
+                {top3Month[1] ? (
                   <div className="flex flex-col items-center justify-between bg-gradient-to-b from-slate-200/90 via-slate-100/70 to-white/95 border-2 border-slate-400/80 rounded-xl p-2 shadow-xs relative text-center min-h-[135px]">
                     <span className="absolute -top-2 px-2 py-0.5 rounded-full bg-gradient-to-r from-slate-500 via-slate-600 to-slate-800 text-white font-black text-[9px] uppercase tracking-wider shadow-xs border border-white">
                       #2
@@ -1176,24 +1171,24 @@ const LeaderboardPage = () => {
                     <div className="mt-3 mb-1 relative">
                       <div className="rounded-full ring-2 ring-slate-400/90 p-[2px] bg-gradient-to-b from-slate-300 via-slate-100 to-white shadow-xs">
                         <LeaderboardAvatar
-                          src={top3Month_[1]?.avatar_url}
-                          name={top3Month_[1].employee_name || top3Month_[1].user_email}
+                          src={top3Month[1]?.avatar_url}
+                          name={top3Month[1].employee_name || top3Month[1].user_email}
                           size="w-13 h-13 text-sm"
                         />
                       </div>
                     </div>
                     <h3 className="text-xs font-bold text-slate-900 truncate max-w-[110px] mb-0.5">
-                      {formatFirstAndLastName(top3Month_[1].employee_name, top3Month_[1].user_email)}
+                      {formatFirstAndLastName(top3Month[1].employee_name, top3Month[1].user_email)}
                     </h3>
                     <div className="flex items-center gap-1 mb-1">
                       <RankChangeBadge
                         currentRank={2}
-                        prevRank={prevMonthRankMap[(top3Month_[1]?.user_email || "").toLowerCase().trim()]}
+                        prevRank={prevMonthRankMap[(top3Month[1]?.user_email || "").toLowerCase().trim()]}
                         hasPrevData={hasPrevMonthData}
                       />
                     </div>
                     <div className="font-mono text-base font-black text-slate-900 bg-slate-200/90 px-2.5 py-0.5 rounded-full border border-slate-300 shadow-2xs">
-                      {top3Month_[1].total_hours || 0}h
+                      {top3Month[1].total_hours || 0}h
                     </div>
                   </div>
                 ) : (
@@ -1201,7 +1196,7 @@ const LeaderboardPage = () => {
                 )}
 
                 {/* 1st Place (Champion) */}
-                {top3Month_[0] && (
+                {top3Month[0] && (
                   <div className="flex flex-col items-center justify-between bg-gradient-to-b from-amber-100/95 via-amber-50/90 to-white/95 border-2 border-amber-400 rounded-xl p-2 shadow-sm relative text-center ring-2 ring-amber-400/40 z-10 min-h-[135px]">
                     <span className="absolute -top-2 px-2 py-0.5 rounded-full bg-gradient-to-r from-amber-500 via-amber-600 to-orange-600 text-white font-black text-[9px] uppercase tracking-wider shadow-md flex items-center gap-0.5 border border-white">
                       <Crown className="w-2.5 h-2.5 text-amber-200 fill-amber-100" /> #1 MVP
@@ -1209,30 +1204,30 @@ const LeaderboardPage = () => {
                     <div className="mt-3 mb-1 relative">
                       <div className="rounded-full ring-2 ring-amber-500/90 p-[2px] bg-gradient-to-b from-amber-400 via-amber-200 to-white shadow-xs">
                         <LeaderboardAvatar
-                          src={top3Month_[0]?.avatar_url}
-                          name={top3Month_[0].employee_name || top3Month_[0].user_email}
+                          src={top3Month[0]?.avatar_url}
+                          name={top3Month[0].employee_name || top3Month[0].user_email}
                           size="w-13 h-13 text-sm font-bold"
                         />
                       </div>
                     </div>
                     <h3 className="text-xs font-black text-slate-900 truncate max-w-[110px] mb-0.5">
-                      {formatFirstAndLastName(top3Month_[0].employee_name, top3Month_[0].user_email)}
+                      {formatFirstAndLastName(top3Month[0].employee_name, top3Month[0].user_email)}
                     </h3>
                     <div className="flex items-center gap-1 mb-1">
                       <RankChangeBadge
                         currentRank={1}
-                        prevRank={prevMonthRankMap[(top3Month_[0]?.user_email || "").toLowerCase().trim()]}
+                        prevRank={prevMonthRankMap[(top3Month[0]?.user_email || "").toLowerCase().trim()]}
                         hasPrevData={hasPrevMonthData}
                       />
                     </div>
                     <div className="font-mono text-lg font-black text-amber-950 bg-amber-200/60 px-3 py-0.5 rounded-full border border-amber-300/70 shadow-2xs">
-                      {top3Month_[0].total_hours || 0}h
+                      {top3Month[0].total_hours || 0}h
                     </div>
                   </div>
                 )}
 
                 {/* 3rd Place (Bronze) */}
-                {top3Month_[2] ? (
+                {top3Month[2] ? (
                   <div className="flex flex-col items-center justify-between bg-gradient-to-b from-[#fcf5f0]/95 via-[#f9ebd9]/70 to-white/95 border-2 border-[#d99b73] rounded-xl p-2 shadow-xs relative text-center min-h-[135px]">
                     <span className="absolute -top-2 px-2 py-0.5 rounded-full bg-gradient-to-r from-[#b35924] via-[#8c4217] to-[#59280b] text-white font-black text-[9px] uppercase tracking-wider shadow-xs border border-white">
                       #3
@@ -1240,24 +1235,24 @@ const LeaderboardPage = () => {
                     <div className="mt-3 mb-1 relative">
                       <div className="rounded-full ring-2 ring-[#a04e1e]/60 p-[2px] bg-gradient-to-b from-[#e6a175] via-[#f7e6dc] to-white shadow-xs">
                         <LeaderboardAvatar
-                          src={top3Month_[2]?.avatar_url}
-                          name={top3Month_[2].employee_name || top3Month_[2].user_email}
+                          src={top3Month[2]?.avatar_url}
+                          name={top3Month[2].employee_name || top3Month[2].user_email}
                           size="w-13 h-13 text-sm"
                         />
                       </div>
                     </div>
                     <h3 className="text-xs font-bold text-slate-900 truncate max-w-[110px] mb-0.5">
-                      {formatFirstAndLastName(top3Month_[2].employee_name, top3Month_[2].user_email)}
+                      {formatFirstAndLastName(top3Month[2].employee_name, top3Month[2].user_email)}
                     </h3>
                     <div className="flex items-center gap-1 mb-1">
                       <RankChangeBadge
                         currentRank={3}
-                        prevRank={prevMonthRankMap[(top3Month_[2]?.user_email || "").toLowerCase().trim()]}
+                        prevRank={prevMonthRankMap[(top3Month[2]?.user_email || "").toLowerCase().trim()]}
                         hasPrevData={hasPrevMonthData}
                       />
                     </div>
                     <div className="font-mono text-base font-black text-[#59280b] bg-[#f0d5c4]/90 px-2.5 py-0.5 rounded-full border border-[#c47d52]/60 shadow-2xs">
-                      {top3Month_[2].total_hours || 0}h
+                      {top3Month[2].total_hours || 0}h
                     </div>
                   </div>
                 ) : (
@@ -1280,7 +1275,7 @@ const LeaderboardPage = () => {
           )}
 
           {/* ── Monthly Top 4-10 Table + User Row (Inside Podium Card) ── */}
-          {top3Month_.length > 0 && (
+          {top3Month.length > 0 && (
             <div className="mt-2">
               <TopRankingsCards
                 data={filteredMonthLeaderboard.slice(3)}
