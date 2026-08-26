@@ -929,7 +929,7 @@ const PMLeavesPage = () => {
             {
               key: "employee_name",
               label: "Employee",
-              width: "w-[20%]",
+              width: "w-[18%]",
               render: (value, w) => {
                 const emp = employees.find((e) => e.id === w.employee_id);
                 const empName = value
@@ -965,22 +965,60 @@ const PMLeavesPage = () => {
               },
             },
             {
-              key: "wfh_date",
-              label: "Date",
+              key: "created_at",
+              label: "Applied Date",
               align: "center",
-              width: "w-[13%]",
-              render: (value) => (
-                <span className="text-[13px] text-slate-700 whitespace-nowrap">
-                  {format(new Date(value + "T00:00:00"), "MMM d, yyyy")}
-                </span>
-              ),
+              width: "w-[11%]",
+              render: (value, w) => {
+                const dateVal = value || w.created_at || w.wfh_date;
+                if (!dateVal) return <span className="text-[13px] text-slate-400">—</span>;
+                const d = new Date(String(dateVal).slice(0, 10) + "T00:00:00");
+                if (isNaN(d.getTime())) return <span className="text-[13px] text-slate-400">—</span>;
+                return (
+                  <span className="text-[13px] text-slate-700 whitespace-nowrap">
+                    {format(d, "MMM d, yyyy")}
+                  </span>
+                );
+              },
+            },
+            {
+              key: "start_wfh_date",
+              label: "Start Date",
+              align: "center",
+              width: "w-[11%]",
+              render: (_, w) => {
+                if (!w.wfh_date) return <span className="text-[13px] text-slate-400">—</span>;
+                const d = new Date(String(w.wfh_date).slice(0, 10) + "T00:00:00");
+                if (isNaN(d.getTime())) return <span className="text-[13px] text-slate-400">—</span>;
+                return (
+                  <span className="text-[13px] text-slate-700 whitespace-nowrap">
+                    {format(d, "MMM d, yyyy")}
+                  </span>
+                );
+              },
+            },
+            {
+              key: "end_wfh_date",
+              label: "End Date",
+              align: "center",
+              width: "w-[11%]",
+              render: (_, w) => {
+                if (!w.wfh_date) return <span className="text-[13px] text-slate-400">—</span>;
+                const d = new Date(String(w.wfh_date).slice(0, 10) + "T00:00:00");
+                if (isNaN(d.getTime())) return <span className="text-[13px] text-slate-400">—</span>;
+                return (
+                  <span className="text-[13px] text-slate-700 whitespace-nowrap">
+                    {format(d, "MMM d, yyyy")}
+                  </span>
+                );
+              },
             },
             // Five columns here against Leave Requests' nine, so the note is
             // spelled out in the row rather than folded behind an icon.
             {
               key: "reason",
               label: "Reason",
-              width: "w-[44%]",
+              width: "w-[26%]",
               render: (value, w) => (
                 <ReasonText
                   reason={value}
