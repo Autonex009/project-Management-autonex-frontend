@@ -11,15 +11,14 @@ import {
 import {
   ClipboardList,
   Search,
-  CheckCircle2,
-  Lock,
   Gift,
   UserCog,
   Star,
   ChevronDown,
+  History as HistoryIcon,
 } from "lucide-react";
-import StarRating, { formatPeriod } from "../../components/perf/StarRating";
-import { normalizeParamValues } from "../../components/perf/perfParams";
+import StarRating, { formatPeriod, currentPeriod, shiftPeriod } from "../../components/perf/StarRating";
+import { StatusPill, fmtDate, RatingCell, MonthStepper } from "../../components/perf/perfTableCells";
 import EvaluationDetail from "../../components/perf/EvaluationDetail";
 import EvalReviewCard from "../../components/perf/EvalReviewCard";
 import StatCard from "../../components/dashboard/StatCard";
@@ -52,68 +51,6 @@ const matchesRole = (emp, key) => {
   return true;
 };
 
-const StatusPill = ({ status }) =>
-  status === "reviewed" ? (
-    <span className="inline-flex items-center gap-1 rounded-full bg-emerald-50 px-2 py-0.5 text-xs font-medium text-emerald-700">
-      <CheckCircle2 className="h-3 w-3" /> Reviewed
-    </span>
-  ) : (
-    <span className="inline-flex items-center gap-1 rounded-full bg-amber-50 px-2 py-0.5 text-xs font-medium text-amber-700">
-      <Lock className="h-3 w-3" /> Submitted
-    </span>
-  );
-
-const fmtDate = (v) =>
-  v
-    ? new Date(v).toLocaleDateString("en-US", {
-      month: "short",
-      day: "numeric",
-      year: "numeric",
-    })
-    : "—";
-
-// Overall-rating cell: compact stars + score, with a hover popover that breaks
-// the score down into per-parameter stars (PM rating once reviewed, else self).
-const RatingCell = ({ evaluation }) => {
-  const rating =
-    evaluation.overall_rating ?? evaluation.employee_overall_rating;
-  const reviewed = evaluation.status === "reviewed";
-  const params = normalizeParamValues(evaluation.parameter_values);
-  return (
-    <div className="group/rt relative inline-flex cursor-help items-center justify-end gap-2">
-      <span className="rounded-full bg-amber-50 px-2 py-0.5 text-xs font-semibold tabular-nums text-amber-700">
-        {rating != null ? Number(rating).toFixed(1) : "—"} / 5
-      </span>
-      <div className="pointer-events-none absolute right-0 top-full z-40 mt-2 hidden w-64 rounded-xl border border-slate-200 bg-white p-3 text-left shadow-xl group-hover/rt:block">
-        <p className="mb-2 text-[11px] font-semibold uppercase tracking-wide text-slate-400">
-          {reviewed ? "PM rating breakdown" : "Self rating breakdown"}
-        </p>
-        <div className="space-y-1.5">
-          {params.length === 0 && (
-            <p className="text-xs text-slate-400">No parameter ratings</p>
-          )}
-          {params.map((p) => (
-            <div
-              key={formatDisplayName(p.name)}
-              className="flex items-center justify-between gap-3"
-            >
-              <span className="truncate text-xs text-slate-600">{formatDisplayName(p.name)}</span>
-              <StarRating
-                value={Math.round(
-                  (reviewed ? p.pm_rating : p.employee_rating) || 0,
-                )}
-                readOnly
-                showLabel={false}
-                size="text-xs"
-              />
-            </div>
-          ))}
-        </div>
-      </div>
-    </div>
-  );
-};
-
 const AdminPerformancePage = () => {
   const user = JSON.parse(localStorage.getItem("user") || "{}");
   const { data: employees = [], isLoading: empLoading } = useQuery({
@@ -134,7 +71,7 @@ const AdminPerformancePage = () => {
   const setPageState = usePageStateStore((s) => s.setPageState);
   const getPageState = usePageStateStore((s) => s.getPageState);
 
-  const [tab, setTab] = useState("employees"); // 'employees' | 'pm'
+  const [tab, setTab] = useState("employees"); // 'employees' | 'history' | 'pm'
   const [search, setSearch] = useState("");
   const [roleFilter, setRoleFilter] = useState("all");
   const [perfPage, setPerfPage] = useState(1);
@@ -142,13 +79,17 @@ const AdminPerformancePage = () => {
   const [bonusOpen, setBonusOpen] = useState(false);
   const [expandedEval, setExpandedEval] = useState(null); // not persisted (row expand is transient)
 
+  const activePeriod = currentPeriod();
+  const maxHistoryMonth = shiftPeriod(activePeriod, -1);
+  const [historyMonth, setHistoryMonth] = useState(maxHistoryMonth);
+
   const [ready, setReady] = useState(false);
 
   // Restore after zustand rehydration
   useEffect(() => {
     const restore = () => {
       const s = getPageState(PAGE_KEY);
-      if (s.tab === "employees" || s.tab === "pm") setTab(s.tab);
+      if (s.tab === "employees" || s.tab === "pm" || s.tab === "history") setTab(s.tab);
       if (s.search != null) setSearch(s.search);
       if (s.roleFilter != null) setRoleFilter(s.roleFilter);
       if (s.perfPage != null) setPerfPage(s.perfPage);
@@ -210,6 +151,16 @@ const AdminPerformancePage = () => {
   const evaluations = evaluationsData?.items || [];
   const evaluationsTotal = evaluationsData?.total || 0;
 
+  // One prior cycle at a time — fetched lazily, only once the History tab is opened.
+  const { data: historyData = {}, isLoading: historyLoading, isError: historyError } = useQuery({
+    queryKey: ["perf-evals", "history", historyMonth],
+    queryFn: () => perfEvalApi.getAll({ period: historyMonth, limit: 500 }),
+    placeholderData: (prev) => prev,
+    staleTime: 1000 * 60 * 5,
+    enabled: tab === "history",
+  });
+  const historyItems = historyData?.items || [];
+
   const isLoading = empLoading || evalFetching || projectsLoading || mainProjectsLoading;
 
   const empById = useMemo(
@@ -256,6 +207,10 @@ const AdminPerformancePage = () => {
     () => evaluations.filter((e) => e.project_id !== 0),
     [evaluations],
   );
+  const historyEvals = useMemo(
+    () => historyItems.filter((e) => e.project_id !== 0),
+    [historyItems],
+  );
 
   // PM self-reports (project_id 0) — admin reviews/approves these.
   const pmSelfEvals = useMemo(
@@ -282,6 +237,16 @@ const AdminPerformancePage = () => {
       .sort((a, b) => (b.period || "").localeCompare(a.period || ""));
   }, [employeeEvals, search, roleFilter, empById]);
 
+  const filteredHistory = useMemo(() => {
+    const term = search.trim().toLowerCase();
+    return historyEvals
+      .filter((e) => matchesRole(empById.get(e.employee_id), roleFilter))
+      .filter(
+        (e) => !term || empName(e.employee_id).toLowerCase().includes(term),
+      )
+      .sort((a, b) => empName(a.employee_id).localeCompare(empName(b.employee_id)));
+  }, [historyEvals, search, roleFilter, empById]);
+
   const bonusEvals = useMemo(
     () =>
       evaluations
@@ -300,7 +265,9 @@ const AdminPerformancePage = () => {
     );
   }, [employeeEvals]);
 
-  const reviewColumns = [
+  // Shared row shape for the active-cycle table — the only difference call-to-call is
+  // which rows/page they're handed (for the reporting-manager popover's positioning).
+  const makeReviewColumns = (rowsAll, page) => [
     {
       key: "employee",
       label: "Employee",
@@ -347,9 +314,9 @@ const AdminPerformancePage = () => {
         if (managers.length === 0)
           return <span className="text-slate-400">—</span>;
 
-        const visibleRows = filtered.slice(
-          (perfPage - 1) * PAGE_SIZE,
-          perfPage * PAGE_SIZE,
+        const visibleRows = rowsAll.slice(
+          (page - 1) * PAGE_SIZE,
+          page * PAGE_SIZE,
         );
         const pageIndex = visibleRows.indexOf(ev);
         const isNearTop =
@@ -426,6 +393,75 @@ const AdminPerformancePage = () => {
       label: "Rating",
       align: "right",
       width: "w-[8%]",
+      render: (_, ev) => <RatingCell evaluation={ev} />,
+    },
+  ];
+
+  const currentColumns = makeReviewColumns(filtered, perfPage);
+
+  // History is browsed one month at a time (see the MonthStepper below), so a
+  // per-row "Period" column would just repeat the same value on every line —
+  // dropped here, along with the Program Manager popover (no longer worth the
+  // positioning complexity once there's no multi-page window to reason about).
+  const historyColumns = [
+    {
+      key: "employee",
+      label: "Employee",
+      width: "w-[24%]",
+      render: (_, ev) => (
+        <div className="flex min-w-0 items-center gap-2.5">
+          <UserAvatar
+            src={empById.get(ev.employee_id)?.avatar_url}
+            name={empName(ev.employee_id)}
+            size="w-8 h-8 text-[13px]"
+          />
+          <span className="truncate font-medium text-slate-800">
+            {empName(ev.employee_id)}
+          </span>
+        </div>
+      ),
+    },
+    {
+      key: "project",
+      label: "Project",
+      width: "w-[28%]",
+      render: (_, ev) => (
+        <span className="block truncate text-slate-600">
+          {projName(ev.project_id)}
+        </span>
+      ),
+    },
+    {
+      key: "submitted",
+      label: "Submitted",
+      width: "w-[18%]",
+      render: (_, ev) => (
+        <span className="whitespace-nowrap text-slate-500 tabular-nums">
+          {fmtDate(ev.submitted_at || ev.created_at)}
+        </span>
+      ),
+    },
+    {
+      key: "status",
+      label: "Status",
+      width: "w-[16%]",
+      render: (_, ev) => (
+        <span className="inline-flex items-center gap-1.5">
+          <StatusPill status={ev.status} />
+          {ev.bonus_suggested && (
+            <Gift
+              className="h-3.5 w-3.5 text-amber-500"
+              title="Suggested for bonus"
+            />
+          )}
+        </span>
+      ),
+    },
+    {
+      key: "rating",
+      label: "Rating",
+      align: "right",
+      width: "w-[14%]",
       render: (_, ev) => <RatingCell evaluation={ev} />,
     },
   ];
@@ -542,6 +578,14 @@ const AdminPerformancePage = () => {
           </button>
           <button
             type="button"
+            onClick={() => setTab("history")}
+            className={`-mb-px flex items-center gap-1.5 border-b-2 pb-2.5 text-[13px] font-semibold transition-colors ${tab === "history" ? "border-indigo-600 text-slate-900" : "border-transparent text-slate-500 hover:text-slate-800"}`}
+          >
+            <HistoryIcon className="h-3.5 w-3.5" />
+            History
+          </button>
+          <button
+            type="button"
             onClick={() => setTab("pm")}
             className={`-mb-px flex items-center gap-1.5 border-b-2 pb-2.5 text-[13px] font-semibold transition-colors ${tab === "pm" ? "border-indigo-600 text-slate-900" : "border-transparent text-slate-500 hover:text-slate-800"}`}
           >
@@ -554,7 +598,7 @@ const AdminPerformancePage = () => {
           </button>
         </div>
 
-        {tab === "employees" && !isLoading && employeeEvals.length > 0 && (
+        {((tab === "employees" && !isLoading) || (tab === "history" && !historyLoading)) && (
           <div className="flex flex-col gap-2 pb-2.5 sm:flex-row sm:items-center">
             <div className="relative w-full sm:w-60">
               <Search className="pointer-events-none absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-slate-400" />
@@ -613,6 +657,71 @@ const AdminPerformancePage = () => {
             ))}
           </div>
         )
+      ) : tab === "history" ? (
+        <div className="space-y-3">
+          <MonthStepper
+            period={historyMonth}
+            onChange={setHistoryMonth}
+            max={maxHistoryMonth}
+          />
+          {historyLoading ? (
+            <Table
+              variant="untitled"
+              columns={historyColumns}
+              data={[]}
+              loading
+              skeletonRows={6}
+            />
+          ) : historyError ? (
+            <div className="rounded-3xl border border-dashed border-red-200 bg-red-50/40 p-12 text-center shadow-sm">
+              <h2 className="text-lg font-semibold text-red-700">
+                Couldn't load reviews for {formatPeriod(historyMonth)}
+              </h2>
+              <p className="mt-2 text-sm text-red-500">
+                Something went wrong fetching this month. Try again or pick a different month.
+              </p>
+            </div>
+          ) : historyEvals.length === 0 ? (
+            <div className="rounded-3xl border border-dashed border-slate-200 bg-white p-12 text-center shadow-sm">
+              <HistoryIcon className="mx-auto h-10 w-10 text-slate-300" />
+              <h2 className="mt-4 text-lg font-semibold text-slate-800">
+                No reviews for {formatPeriod(historyMonth)}
+              </h2>
+              <p className="mt-2 text-sm text-slate-500">
+                Step to a different month, or check back once this cycle closes.
+              </p>
+            </div>
+          ) : filteredHistory.length === 0 ? (
+            <div className="rounded-3xl border border-dashed border-slate-200 bg-white p-12 text-center shadow-sm">
+              <Search className="mx-auto h-10 w-10 text-slate-300" />
+              <h2 className="mt-4 text-lg font-semibold text-slate-800">
+                No results match your filters
+              </h2>
+            </div>
+          ) : (
+            <Table
+              variant="untitled"
+              allowOverflow
+              columns={historyColumns}
+              data={filteredHistory}
+              pageSize={filteredHistory.length}
+              onRowClick={(row) =>
+                setExpandedEval((cur) => (cur === row.id ? null : row.id))
+              }
+              expandedRowId={expandedEval}
+              getRowId={(row) => row.id}
+              renderExpandedRow={(row) => (
+                <div className="border-t border-slate-100 bg-slate-50/40 p-4">
+                  <EvaluationDetail evaluation={row} />
+                </div>
+              )}
+              emptyState={{
+                title: "No reviews",
+                description: "Nothing to show here.",
+              }}
+            />
+          )}
+        </div>
       ) : (
         <>
           {/* Suggested for Bonus — collapsible; click header to reveal the table */}
@@ -653,7 +762,7 @@ const AdminPerformancePage = () => {
           {isLoading ? (
             <Table
               variant="untitled"
-              columns={reviewColumns}
+              columns={currentColumns}
               data={[]}
               loading
               skeletonRows={10}
@@ -679,7 +788,7 @@ const AdminPerformancePage = () => {
             <Table
               variant="untitled"
               allowOverflow
-              columns={reviewColumns}
+              columns={currentColumns}
               data={filtered}
               totalItems={evaluationsTotal}
               currentPage={perfPage}
