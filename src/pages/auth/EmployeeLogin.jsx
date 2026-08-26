@@ -1,5 +1,5 @@
 import React, { useState } from "react";
-import { useNavigate } from "react-router-dom";
+import { useNavigate, useLocation } from "react-router-dom";
 import {
   Lock,
   Mail,
@@ -21,6 +21,7 @@ import { validateLoginForm } from "../../utils/loginValidation";
 
 const EmployeeLogin = () => {
   const navigate = useNavigate();
+  const location = useLocation();
   const [formData, setFormData] = useState({ email: "", password: "" });
   const [showPassword, setShowPassword] = useState(false);
   const [errors, setErrors] = useState({});
@@ -52,7 +53,8 @@ const EmployeeLogin = () => {
       localStorage.removeItem("employee-sidebar-width");
       window.dispatchEvent(new Event("auth-change"));
       toast.success("Signed in successfully");
-      navigate("/employee/dashboard");
+      const destination = location.state?.from?.pathname || "/employee/dashboard";
+      navigate(destination, { replace: true });
     },
     onError: (err) => {
       // ONE place for the sentence — the banner. The field the API blames only

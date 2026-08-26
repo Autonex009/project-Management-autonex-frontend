@@ -122,6 +122,7 @@ function toYMD(dateStr) {
 // ─── Event chip in calendar cells ───────────────────────────────────────────
 function EventChip({ ev }) {
   const isWfh = ev.kind === "wfh";
+  const isRejected = ev.status === "rejected";
   const label = isWfh
     ? `🏠 ${formatDisplayName(ev.employee_name)}`
     : formatDisplayName(ev.employee_name);
@@ -129,6 +130,7 @@ function EventChip({ ev }) {
   return (
     <div
       className={`truncate text-[9.5px] font-semibold leading-tight ${
+        isRejected ? "line-through opacity-60 text-slate-500" :
         isWfh ? "text-purple-700 font-bold" : "text-blue-700 font-bold"
       }`}
     >
@@ -396,7 +398,6 @@ export default function LeaveCalendar({
       : data.wfh || [];
 
     for (const leave of leaves) {
-      if (leave.status === "rejected") continue;
       const start = new Date(leave.start_date + "T00:00:00");
       const end = new Date(leave.end_date + "T00:00:00");
       for (let d = new Date(start); d <= end; d.setDate(d.getDate() + 1)) {
@@ -409,7 +410,6 @@ export default function LeaveCalendar({
       }
     }
     for (const wfh of wfhs) {
-      if (wfh.status === "rejected") continue;
       const key = toYMD(wfh.date || wfh.wfh_date || "");
       if (!key) continue;
       if (!map[key]) map[key] = [];
@@ -486,6 +486,22 @@ export default function LeaveCalendar({
       );
   }, [wfhEvents]);
 
+  const rejectedLeaves = useMemo(() => {
+    return leaveEvents
+      .filter((ev) => ev.status === "rejected")
+      .sort((a, b) =>
+        (a.employee_name || "").localeCompare(b.employee_name || ""),
+      );
+  }, [leaveEvents]);
+
+  const rejectedWfh = useMemo(() => {
+    return wfhEvents
+      .filter((ev) => ev.status === "rejected")
+      .sort((a, b) =>
+        (a.employee_name || "").localeCompare(b.employee_name || ""),
+      );
+  }, [wfhEvents]);
+
   const allPending = useMemo(() => {
     return selectedDateEvents
       .filter((ev) => ev.status === "pending")
@@ -499,6 +515,20 @@ export default function LeaveCalendar({
     if (attendanceFilter === "wfh") return pendingWfh;
     return allPending;
   }, [attendanceFilter, pendingLeaves, pendingWfh, allPending]);
+
+  const allRejected = useMemo(() => {
+    return selectedDateEvents
+      .filter((ev) => ev.status === "rejected")
+      .sort((a, b) =>
+        (a.employee_name || "").localeCompare(b.employee_name || ""),
+      );
+  }, [selectedDateEvents]);
+
+  const visibleRejected = useMemo(() => {
+    if (attendanceFilter === "leaves") return rejectedLeaves;
+    if (attendanceFilter === "wfh") return rejectedWfh;
+    return allRejected;
+  }, [attendanceFilter, rejectedLeaves, rejectedWfh, allRejected]);
 
   const selectedHoliday = selectedDate ? HOLIDAYS[selectedDate] : null;
   const selectedDow = selectedDate
@@ -641,6 +671,7 @@ export default function LeaveCalendar({
       ev.avatar_url || empProfile?.avatar_url || empProfile?.avatar;
 
     const isWfh = ev.kind === "wfh";
+    const isRejected = ev.status === "rejected";
     const leaveConfig = LEAVE_COLORS[ev.leave_type] || LEAVE_COLORS.default;
 
     const isHalfDay =
@@ -680,13 +711,14 @@ export default function LeaveCalendar({
         key={`${ev.kind}-${ev.id || ev.employee_id}-${ev.start_date || ev.date || Math.random()}`}
         className={`rounded-xl p-2.5 transition-all ${isPending
           ? "bg-amber-100/70 border-2 border-amber-400 ring-1 ring-amber-400/25 shadow-[0_2px_8px_rgba(245,158,11,0.12)] hover:border-amber-500"
-          : isWfh
-            ? "bg-white border border-purple-200/90 hover:border-purple-300 hover:shadow-xs shadow-[0_1px_3px_rgba(28,25,23,0.04)]"
-            : "bg-white border border-stone-200 hover:border-stone-300 hover:shadow-xs shadow-[0_1px_3px_rgba(28,25,23,0.04)]"
+          : isRejected
+            ? "bg-rose-50 border border-rose-200/90 shadow-[0_1px_3px_rgba(28,25,23,0.04)] opacity-90"
+            : isWfh
+              ? "bg-white border border-purple-200/90 hover:border-purple-300 hover:shadow-xs shadow-[0_1px_3px_rgba(28,25,23,0.04)]"
+              : "bg-white border border-stone-200 hover:border-stone-300 hover:shadow-xs shadow-[0_1px_3px_rgba(28,25,23,0.04)]"
           }`}
       >
         <div className="flex items-center justify-between gap-2">
-          {/* Left: Avatar + Name + Secondary Tags (HalfDay / MultiDay) */}
           <div className="flex items-center gap-2.5 min-w-0">
             <UserAvatar
               src={avatarUrl}
@@ -697,27 +729,28 @@ export default function LeaveCalendar({
             />
             <div className="min-w-0 flex flex-col justify-center">
               <div className="flex items-center gap-1.5 flex-wrap">
-                <span className={`text-xs font-bold truncate ${isPending ? "text-amber-950" : "text-stone-800"}`}>
+                <span className={`text-xs font-bold truncate ${isPending ? "text-amber-950" : isRejected ? "text-rose-950 line-through opacity-80" : "text-stone-800"}`}>
                   {formatDisplayName(ev.employee_name)}
                 </span>
                 {empProfile?.role && (
-                  <span className={`text-[10px] font-normal ${isPending ? "text-amber-800/70" : "text-stone-400"}`}>
+                  <span className={`text-[10px] font-normal ${isPending ? "text-amber-800/70" : isRejected ? "text-rose-700/70" : "text-stone-400"}`}>
                     · {empProfile.role}
                   </span>
                 )}
               </div>
 
-              {/* Secondary Tags (Multi Day only) */}
               {isMultiDay && (
                 <div className="flex items-center gap-1.5 mt-1 flex-wrap">
                   <span
                     className={`inline-flex items-center gap-1 text-[10px] font-bold px-1.5 py-0.5 rounded border shadow-2xs ${isPending
                       ? "bg-amber-50 text-amber-950 border-amber-300"
-                      : "bg-slate-100 text-slate-800 border-slate-300"
+                      : isRejected
+                        ? "bg-rose-100 text-rose-900 border-rose-300"
+                        : "bg-slate-100 text-slate-800 border-slate-300"
                       }`}
                   >
                     <Calendar
-                      className={`w-2.5 h-2.5 shrink-0 ${isPending ? "text-amber-700" : "text-slate-700"
+                      className={`w-2.5 h-2.5 shrink-0 ${isPending ? "text-amber-700" : isRejected ? "text-rose-700" : "text-slate-700"
                         }`}
                     />
                     {format(parseISO(ev.start_date), "MMM d")} –{" "}
@@ -728,14 +761,14 @@ export default function LeaveCalendar({
             </div>
           </div>
 
-          {/* Right: Leave Type Badge + Actions or Approved Status Tick */}
           <div className="shrink-0 flex items-center gap-2">
-            {/* Leave / WFH / Half-day Type Badge */}
             {isWfh ? (
               <span
                 className={`inline-flex items-center gap-1.5 px-2.5 py-1 rounded-lg text-xs font-bold border shadow-2xs ${isPending
                   ? "bg-purple-100 text-purple-900 border-purple-300"
-                  : "bg-purple-50 text-purple-700 border-purple-200/90"
+                  : isRejected
+                    ? "bg-rose-100 text-rose-800 border-rose-200"
+                    : "bg-purple-50 text-purple-700 border-purple-200/90"
                   }`}
               >
                 <Home className="w-3.5 h-3.5 text-purple-600 shrink-0" /> WFH
@@ -744,7 +777,9 @@ export default function LeaveCalendar({
               <span
                 className={`inline-flex items-center gap-1.5 px-2.5 py-1 rounded-lg text-xs font-bold border shadow-2xs ${isPending
                   ? "bg-indigo-100 text-indigo-900 border-indigo-300"
-                  : "bg-indigo-50 text-indigo-700 border-indigo-200/90"
+                  : isRejected
+                    ? "bg-rose-100 text-rose-800 border-rose-200"
+                    : "bg-indigo-50 text-indigo-700 border-indigo-200/90"
                   }`}
               >
                 <Clock className="w-3.5 h-3.5 text-indigo-600 shrink-0" /> {halfDayText}
@@ -753,22 +788,23 @@ export default function LeaveCalendar({
               <span
                 className={`inline-flex items-center gap-1.5 px-2.5 py-1 rounded-lg text-xs font-bold border shadow-2xs ${isPending
                   ? "bg-amber-200/90 text-amber-950 border-amber-400"
-                  : ev.leave_type === "paid"
-                    ? "bg-blue-50 text-blue-700 border-blue-200/90"
-                    : ev.leave_type === "casual_sick" ||
-                      ev.leave_type === "casual" ||
-                      ev.leave_type === "sick"
-                      ? "bg-emerald-50 text-emerald-700 border-emerald-200/90"
-                      : ev.leave_type === "floater"
-                        ? "bg-amber-50 text-amber-700 border-amber-200/90"
-                        : "bg-stone-50 text-stone-700 border-stone-200/90"
+                  : isRejected
+                    ? "bg-rose-100 text-rose-800 border-rose-200"
+                    : ev.leave_type === "paid"
+                      ? "bg-blue-50 text-blue-700 border-blue-200/90"
+                      : ev.leave_type === "casual_sick" ||
+                        ev.leave_type === "casual" ||
+                        ev.leave_type === "sick"
+                        ? "bg-emerald-50 text-emerald-700 border-emerald-200/90"
+                        : ev.leave_type === "floater"
+                          ? "bg-amber-50 text-amber-700 border-amber-200/90"
+                          : "bg-stone-50 text-stone-700 border-stone-200/90"
                   }`}
               >
                 {leaveConfig.label}
               </span>
             )}
 
-            {/* Approval Actions (for pending) */}
             {isPending && isAdminOrPm ? (
               <div className="flex items-center gap-1.5">
                 <button
@@ -808,16 +844,21 @@ export default function LeaveCalendar({
               <span className="inline-flex items-center gap-1 px-1.5 py-0.5 rounded text-[10px] font-bold bg-amber-200 text-amber-900 border border-amber-400 shadow-2xs">
                 <Clock className="w-2.5 h-2.5" /> Pending
               </span>
+            ) : isRejected ? (
+              <span className="inline-flex items-center gap-1 px-1.5 py-0.5 rounded text-[10px] font-bold bg-rose-100 text-rose-700 border border-rose-300 shadow-2xs">
+                <X className="w-2.5 h-2.5" /> Rejected
+              </span>
             ) : null}
           </div>
         </div>
 
-        {/* Reason / Notes */}
         {ev.reason && ev.reason.trim() && (
           <div
             className={`mt-2 text-xs font-medium px-2.5 py-1.5 rounded-lg border leading-relaxed ${isPending
               ? "bg-white/95 text-stone-900 border-amber-300 shadow-2xs"
-              : "bg-stone-100/80 text-stone-800 border-stone-200/90"
+              : isRejected
+                ? "bg-rose-100/50 text-rose-900 border-rose-200 shadow-2xs opacity-85"
+                : "bg-stone-100/80 text-stone-800 border-stone-200/90"
               }`}
           >
             "{ev.reason.trim()}"
@@ -1340,6 +1381,27 @@ export default function LeaveCalendar({
                               )}
                             </div>
                           )}
+                        </div>
+                      )}
+
+                      {/* ─── SECTION 4: REJECTED REQUESTS ─── */}
+                      {visibleRejected.length > 0 && (
+                        <div className="space-y-2 pt-2 border-t border-stone-200/60 mt-4">
+                          <div className="flex items-center gap-1.5 pb-1.5 border-b-2 border-rose-400/90 mb-2">
+                            <X className="w-3.5 h-3.5 text-rose-600 shrink-0" />
+                            <h4 className="text-[11px] font-extrabold text-rose-900 uppercase tracking-wider">
+                              Rejected
+                            </h4>
+                            <span className="px-1.5 py-0.5 text-[10px] font-extrabold rounded-full bg-rose-100 text-rose-700 border border-rose-200 leading-none ml-0.5">
+                              {visibleRejected.length}
+                            </span>
+                          </div>
+
+                          <div className="space-y-2">
+                            {visibleRejected.map((ev) =>
+                              renderLeaveCard(ev, false),
+                            )}
+                          </div>
                         </div>
                       )}
                   </>

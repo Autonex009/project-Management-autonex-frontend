@@ -549,7 +549,7 @@ const EmployeeDashboard = () => {
 
   const getEmployeeRank = (leaderboard) => {
     if (!leaderboard?.leaderboard || !loggedInEncordId) return null;
-    const ranked = [...leaderboard.leaderboard].sort(
+    const ranked = [...(leaderboard.leaderboard || [])].sort(
       (a, b) => (b.total_hours || 0) - (a.total_hours || 0)
     );
     const index = ranked.findIndex(
@@ -762,7 +762,7 @@ const EmployeeDashboard = () => {
 
   /* ── Performance ─────────────────────────────────── */
   const latestPmReview = useMemo(() => {
-    return [...perfReviews]
+    return [...(perfReviews || [])]
       .filter((review) => review.status === "reviewed")
       .sort(
         (a, b) =>
@@ -1918,7 +1918,7 @@ const EmployeeDashboard = () => {
                   <div className="flex flex-col gap-1.5 flex-1 overflow-y-auto db-scroll">
                     {openComplaints.length > 0 ? (
                       <>
-                        {[...openComplaints]
+                        {[...(openComplaints || [])]
                           .reverse()
                           .map((item, idx) => (
                             <div
@@ -2030,7 +2030,7 @@ const EmployeeDashboard = () => {
                   <div className="flex flex-col gap-1.5 flex-1 overflow-y-auto db-scroll">
                     {openWarnings.length > 0 ? (
                       <>
-                        {[...openWarnings]
+                        {[...(openWarnings || [])]
                           .reverse()
                           .map((item, idx) => (
                             <div
@@ -2140,7 +2140,7 @@ const EmployeeDashboard = () => {
                   <div className="flex flex-col gap-1.5 flex-1 overflow-y-auto db-scroll">
                     {openRecognitions.length > 0 ? (
                       <>
-                        {[...openRecognitions]
+                        {[...(openRecognitions || [])]
                           .reverse()
                           .map((item, idx) => (
                             <div
@@ -2213,7 +2213,7 @@ const EmployeeDashboard = () => {
             ) : (
               <div className="flex flex-col gap-2 flex-1 overflow-y-auto db-scroll">
                 {perfReviews.length > 0 ? (
-                  [...perfReviews].reverse().map((review, idx) => {
+                  [...(perfReviews || [])].reverse().map((review, idx) => {
                     const rts = review.parameter_values?.map((p) => p.pm_rating).filter((r) => r != null) || [];
                     const rAvg = rts.length ? (rts.reduce((s, v) => s + v, 0) / rts.length).toFixed(1) : null;
                     return (
@@ -2517,7 +2517,7 @@ const EmployeeDashboard = () => {
                   No records available.
                 </p>
               ) : (
-                [...notesModal.data].reverse().map((item, idx) => (
+                [...(notesModal.data || [])].reverse().map((item, idx) => (
                   <div
                     key={item.id ?? idx}
                     className={`p-3 rounded-xl border ${notesModal.type === "complaints"
