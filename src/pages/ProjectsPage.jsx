@@ -1,5 +1,5 @@
 import { useState, useEffect, useRef, useMemo } from "react";
-import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
+import { useQuery, useMutation, useQueryClient, keepPreviousData } from "@tanstack/react-query";
 import { useNavigate, useSearchParams } from "react-router-dom";
 import Button from "../components/ui/Button";
 import Spinner from "../components/ui/LoadingSpinner";
@@ -73,1183 +73,31 @@ import StatCard from "../components/dashboard/StatCard";
 import useScrollStore from "../store/useScrollStore";
 import useProjectsStore from "../store/useProjectsStore";
 import { formatDisplayName } from "../utils/displayName";
+import { getWorkingDayCount } from "../utils/leaveTypes";
 
-const STATUS_CONFIG = {
-  poc: {
-    label: "POC",
-    style: "bg-purple-50 text-purple-700 border border-purple-200",
-  },
-  active: {
-    label: "In Progress",
-    style: "bg-emerald-50 text-emerald-700 border border-emerald-200",
-  },
-  "in-progress": {
-    label: "In Progress",
-    style: "bg-emerald-50 text-emerald-700 border border-emerald-200",
-  },
-  "in progress": {
-    label: "In Progress",
-    style: "bg-emerald-50 text-emerald-700 border border-emerald-200",
-  },
-  completed: {
-    label: "Completed",
-    style: "bg-blue-50 text-blue-700 border border-blue-200",
-  },
-  "on-hold": {
-    label: "On Hold",
-    style: "bg-amber-50 text-amber-700 border border-amber-200",
-  },
-  cancelled: {
-    label: "Cancelled",
-    style: "bg-red-50 text-red-700 border border-red-200",
-  },
-};
+import {
+  STATUS_CONFIG,
+  ARCHIVED_STATUSES,
+  isArchivedStatus,
+  getStatusBadgeConfig,
+  formatCreatedDate,
+  PROJECT_TYPE_CATEGORIES,
+  typeLabel,
+  DEVELOPER_TYPE_KEY,
+  isDeveloperProject
+} from "../utils/projectConstants";
+import ProjectCard from "../components/projects/ProjectCard";
+import { SkillMultiSelect, EmployeeMultiSelect, TeamLeadMultiSelect, PmMultiSelect } from "../components/projects/ProjectDropdowns";
 
-// Projects with these statuses live under the "Archived" tab; everything else
-// (active, in-progress, poc, blank) is treated as an active project.
-const ARCHIVED_STATUSES = ["completed", "on-hold", "cancelled"];
-const isArchivedStatus = (statusRaw) =>
-  ARCHIVED_STATUSES.includes((statusRaw || "active").toLowerCase().trim());
-
-const getStatusBadgeConfig = (statusRaw) => {
-  const key = (statusRaw || "active").toLowerCase().trim();
-  return (
-    STATUS_CONFIG[key] || {
-      label: statusRaw || "In Progress",
-      style: "bg-slate-100 text-slate-600 border border-slate-200",
-    }
-  );
-};
-
-const formatCreatedDate = (dateStr) => {
-  if (!dateStr) return null;
-  try {
-    const parsed = typeof dateStr === "string" ? parseISO(dateStr) : dateStr;
-    if (!parsed || isNaN(parsed.getTime())) return null;
-    return format(parsed, "MMM dd, yyyy");
-  } catch {
-    return null;
-  }
-};
-
-// Project type classification: category → available subtypes. One subtype may be
-// selected per category (stored as { category: subtype }).
-const PROJECT_TYPE_CATEGORIES = [
-  {
-    key: "Data Modalities",
-    subtypes: [
-      "Image (RGB)",
-      "Video",
-      "Medical Imaging",
-      "3D & Point Cloud",
-      "Multimodal Data (e.g., RGB + 3D Cloud)",
-      "Audio",
-      "Text & Documents",
-      "Time Series & Signals",
-    ],
-  },
-  {
-    key: "Annotation Types (By Data)",
-    subtypes: [
-      "VLA Captions",
-      "Image Segmentation",
-      "Video Segmentation",
-      "Video Segmentation + Tracking",
-      "Classification",
-      "3D Point Cloud Segmentation",
-      "Text Segmentation",
-    ],
-  },
-  {
-    key: "Object Segmentation Types",
-    subtypes: ["2D Bounding Box"],
-  },
-  {
-    key: "Development",
-    subtypes: ["Coding"],
-  },
-];
-
-/** The label to show for a stored project-type category. */
-const typeLabel = (key) =>
-  PROJECT_TYPE_CATEGORIES.find((c) => c.key === key)?.key || key;
-
-// The project-type category that marks a project as a development/coding project.
-// Such projects are surfaced under the dedicated "Development" tab.
-//
-// Stored rows were renamed "Developer" -> "Development" in place by
-// sync_daily_sheet_schema (backend/app/main.py), keeping each project's subtype —
-// so there is no second key to recognise here.
-const DEVELOPER_TYPE_KEY = "Development";
-const isDeveloperProject = (project) => {
-  const t = project?.project_types;
-  return !!(t && typeof t === "object" && t[DEVELOPER_TYPE_KEY]);
-};
-
-const SkillMultiSelect = ({ options, value, onChange }) => {
-  const [isOpen, setIsOpen] = useState(false);
-  const dropdownRef = useRef(null);
-
-  useEffect(() => {
-    const handleClickOutside = (event) => {
-      if (dropdownRef.current && !dropdownRef.current.contains(event.target)) {
-        setIsOpen(false);
-      }
-    };
-
-    document.addEventListener("mousedown", handleClickOutside);
-    return () => document.removeEventListener("mousedown", handleClickOutside);
-  }, []);
-
-  const toggleSkill = (skill) => {
-    if (skill === "Any Skill") {
-      onChange([]);
-      setIsOpen(false);
-      return;
-    }
-    onChange(
-      value.includes(skill)
-        ? value.filter((item) => item !== skill)
-        : [...value, skill],
-    );
-  };
-
-  return (
-    <div ref={dropdownRef} className="relative">
-      <button
-        type="button"
-        onClick={() => setIsOpen(!isOpen)}
-        className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-blue-500 outline-none bg-white flex items-center justify-between min-h-[42px]"
-      >
-        <div className="flex flex-wrap gap-1 flex-1 text-left">
-          {value.length > 0 ? (
-            value.map((skill) => (
-              <span
-                key={skill}
-                className="inline-flex items-center px-2 py-0.5 rounded text-xs bg-indigo-100 text-indigo-700 border border-indigo-200"
-              >
-                {skill}
-              </span>
-            ))
-          ) : (
-            <span className="text-gray-500 text-sm font-medium">Any Skill</span>
-          )}
-        </div>
-        <div className="flex items-center gap-2 pl-2">
-          <span className="text-xs text-gray-500">{value.length} selected</span>
-          <ChevronDown
-            className={`w-4 h-4 text-gray-400 transition-transform ${isOpen ? "rotate-180" : ""}`}
-          />
-        </div>
-      </button>
-
-      {isOpen && (
-        <div className="absolute z-50 w-full mt-1 bg-white border border-gray-300 rounded-lg shadow-lg max-h-64 overflow-y-auto">
-          {/* Any Skill option — clears all skill filters */}
-          <label className="flex items-center gap-3 px-4 py-2 hover:bg-gray-50 cursor-pointer text-sm border-b border-gray-100">
-            <input
-              type="radio"
-              checked={value.length === 0}
-              onChange={() => toggleSkill("Any Skill")}
-              className="w-4 h-4 text-blue-600 border-gray-300 focus:ring-blue-500"
-            />
-            <span className="text-gray-700 font-medium">Any Skill</span>
-          </label>
-          {options.length > 0 ? (
-            options.map((skill) => (
-              <label
-                key={skill}
-                className="flex items-center gap-3 px-4 py-2 hover:bg-gray-50 cursor-pointer text-sm"
-              >
-                <input
-                  type="checkbox"
-                  checked={value.includes(skill)}
-                  onChange={() => toggleSkill(skill)}
-                  className="w-4 h-4 text-blue-600 rounded border-gray-300 focus:ring-blue-500"
-                />
-                <span className="text-gray-700">{skill}</span>
-              </label>
-            ))
-          ) : (
-            <div className="px-4 py-3 text-sm text-gray-500">
-              No skills available
-            </div>
-          )}
-        </div>
-      )}
-    </div>
-  );
-};
-
-// Employee Multi-Select Dropdown Component
-const EmployeeMultiSelect = ({
-  name,
-  defaultValue = [],
-  employees,
-  requiredSkills,
-}) => {
-  const [isOpen, setIsOpen] = useState(false);
-  const [selectedEmployeeIds, setSelectedEmployeeIds] = useState(defaultValue);
-  const dropdownRef = useRef(null);
-
-  useEffect(() => {
-    const handleClickOutside = (event) => {
-      if (dropdownRef.current && !dropdownRef.current.contains(event.target)) {
-        setIsOpen(false);
-      }
-    };
-
-    document.addEventListener("mousedown", handleClickOutside);
-    return () => document.removeEventListener("mousedown", handleClickOutside);
-  }, []);
-
-  // Filter employees by matching skills
-  const matchingEmployees = employees.filter((emp) => {
-    if (emp.status !== "active") return false;
-    if (!requiredSkills || requiredSkills.length === 0) return true;
-
-    return requiredSkills.some((skill) =>
-      emp.skills?.some((empSkill) =>
-        empSkill.toLowerCase().includes(skill.toLowerCase()),
-      ),
-    );
-  });
-
-  // Get employees that don't match skills
-  const otherEmployees = employees.filter(
-    (emp) => emp.status === "active" && !matchingEmployees.includes(emp),
-  );
-
-  const toggleEmployee = (empId) => {
-    setSelectedEmployeeIds((prev) =>
-      prev.includes(empId)
-        ? prev.filter((id) => id !== empId)
-        : [...prev, empId],
-    );
-  };
-
-  const selectedEmployees = employees.filter((emp) =>
-    selectedEmployeeIds.includes(emp.id),
-  );
-
-  return (
-    <div ref={dropdownRef} className="relative">
-      <input
-        type="hidden"
-        name={name}
-        value={JSON.stringify(selectedEmployeeIds)}
-      />
-
-
-
-      <div
-        onClick={() => setIsOpen(!isOpen)}
-        className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-blue-500 outline-none bg-white cursor-pointer flex items-center justify-between min-h-[42px]"
-      >
-        <div className="flex flex-wrap gap-1 flex-1">
-          {selectedEmployees.length > 0 ? (
-            selectedEmployees.map((emp) => (
-              <span
-                key={emp.id}
-                className="inline-flex items-center px-2 py-0.5 rounded text-xs bg-blue-100 text-blue-700 border border-blue-200"
-              >
-                {formatDisplayName(emp.name)}
-              </span>
-            ))
-          ) : (
-            <span className="text-gray-400 text-sm">Select employees...</span>
-          )}
-        </div>
-        <div className="flex items-center gap-2">
-          <span className="text-xs text-gray-500">
-            {selectedEmployeeIds.length} selected
-          </span>
-          <ChevronDown
-            className={`w-4 h-4 text-gray-400 transition-transform ${isOpen ? "rotate-180" : ""}`}
-          />
-        </div>
-      </div>
-
-      {isOpen && (
-        <div className="absolute z-50 w-full mt-1 bg-white border border-gray-300 rounded-lg shadow-lg max-h-96 overflow-hidden">
-          {matchingEmployees.length > 0 && (
-            <>
-              <div className="px-3 py-2 bg-green-50 border-b border-green-200">
-                <div className="flex items-center gap-2">
-                  <UserCheck className="w-4 h-4 text-green-600" />
-                  <span className="text-xs font-semibold text-green-700">
-                    Matching Skills ({matchingEmployees.length})
-                  </span>
-                </div>
-              </div>
-              <div className="max-h-48 overflow-y-auto">
-                {matchingEmployees.map((emp) => (
-                  <label
-                    key={emp.id}
-                    className="flex items-start px-4 py-2 hover:bg-gray-50 cursor-pointer transition-colors border-l-2 border-green-500"
-                  >
-                    <input
-                      type="checkbox"
-                      checked={selectedEmployeeIds.includes(emp.id)}
-                      onChange={() => toggleEmployee(emp.id)}
-                      className="w-4 h-4 text-blue-600 rounded border-gray-300 focus:ring-blue-500 mt-0.5"
-                    />
-                    <div className="ml-3 flex-1">
-                      <div className="text-sm font-medium text-gray-900">
-                        {formatDisplayName(emp.name)}
-                      </div>
-                      <div className="text-xs text-gray-500">{emp.email}</div>
-                      <div className="flex flex-wrap gap-1 mt-1">
-                        {emp.skills?.slice(0, 3).map((skill, idx) => (
-                          <span
-                            key={idx}
-                            className="text-xs px-1.5 py-0.5 bg-gray-100 text-gray-600 rounded"
-                          >
-                            {skill}
-                          </span>
-                        ))}
-                      </div>
-                    </div>
-                  </label>
-                ))}
-              </div>
-            </>
-          )}
-
-          {otherEmployees.length > 0 && (
-            <>
-              <div className="px-3 py-2 bg-gray-50 border-b border-gray-200">
-                <span className="text-xs font-semibold text-gray-600">
-                  Other Available Employees ({otherEmployees.length})
-                </span>
-              </div>
-              <div className="max-h-48 overflow-y-auto">
-                {otherEmployees.map((emp) => (
-                  <label
-                    key={emp.id}
-                    className="flex items-start px-4 py-2 hover:bg-gray-50 cursor-pointer transition-colors"
-                  >
-                    <input
-                      type="checkbox"
-                      checked={selectedEmployeeIds.includes(emp.id)}
-                      onChange={() => toggleEmployee(emp.id)}
-                      className="w-4 h-4 text-blue-600 rounded border-gray-300 focus:ring-blue-500 mt-0.5"
-                    />
-                    <div className="ml-3 flex-1">
-                      <div className="text-sm font-medium text-gray-900">
-                        {formatDisplayName(emp.name)}
-                      </div>
-                      <div className="text-xs text-gray-500">{emp.email}</div>
-                      <div className="flex flex-wrap gap-1 mt-1">
-                        {emp.skills?.slice(0, 3).map((skill, idx) => (
-                          <span
-                            key={idx}
-                            className="text-xs px-1.5 py-0.5 bg-gray-100 text-gray-600 rounded"
-                          >
-                            {skill}
-                          </span>
-                        ))}
-                      </div>
-                    </div>
-                  </label>
-                ))}
-              </div>
-            </>
-          )}
-
-          {matchingEmployees.length === 0 && otherEmployees.length === 0 && (
-            <div className="px-4 py-8 text-center text-sm text-gray-500">
-              No active employees available
-            </div>
-          )}
-        </div>
-      )}
-    </div>
-  );
-};
-
-// "(2 PM · 1 Lead)" after a manpower count, or nothing when the project has
-// neither. Both the required and the current figure carry it, so they stay
-// comparable at a glance.
-const SlotBreakdown = ({ pmSlots = 0, leadSlots = 0 }) => {
-  if (pmSlots <= 0 && leadSlots <= 0) return null;
-  return (
-    <span className="ml-1 text-[11px] font-normal text-slate-400">
-      ({pmSlots || 0} PM &middot; {leadSlots || 0} Lead)
-    </span>
-  );
-};
-
-// Field label above a value/input inside the card (small uppercase caption).
-const CardField = ({ label, children, className = "" }) => (
-  <div className={`min-w-0 ${className}`}>
-    <span className="mb-1 block text-[10px] font-semibold uppercase tracking-wider text-slate-400">
-      {label}
-    </span>
-    {children}
-  </div>
-);
-
-const cardInputClass =
-  "w-full rounded-md border border-slate-200 px-2 py-1 text-[13px] text-slate-800 focus:border-indigo-400 focus:outline-none focus:ring-2 focus:ring-indigo-100";
-
-// Status: label inside a soft pill. No leading dot — the pill is already
-// colour-coded, so the bullet repeated that in miniature and cost width the
-// project name needs.
-const STATUS_STYLE = {
-  active: { label: "In Progress", pill: "bg-indigo-50 text-indigo-700" },
-  poc: { label: "POC", pill: "bg-purple-50 text-purple-700" },
-  completed: { label: "Completed", pill: "bg-emerald-50 text-emerald-700" },
-  "on-hold": { label: "On Hold", pill: "bg-amber-50 text-amber-700" },
-  cancelled: { label: "Cancelled", pill: "bg-rose-50 text-rose-700" },
-};
-
-// Client sentiment: friendly label + pill colors.
-const SENTIMENT_STYLE = {
-  GOOD: { label: "Good", pill: "bg-emerald-50 text-emerald-700" },
-  AVG: { label: "Avg", pill: "bg-amber-50 text-amber-700" },
-  Poor: { label: "Poor", pill: "bg-red-50 text-red-600" },
-};
-
-// Small title accent bar — a different gradient per project (picked by id).
-const CARD_ACCENTS = [
-  "from-indigo-500 to-violet-500",
-  "from-emerald-500 to-teal-500",
-  "from-amber-500 to-orange-500",
-  "from-rose-500 to-pink-500",
-  "from-sky-500 to-blue-500",
-  "from-fuchsia-500 to-purple-500",
-  "from-lime-500 to-green-500",
-  "from-cyan-500 to-sky-500",
-];
-
-// Truncated text that reveals its full value in a light (white) tooltip on hover.
-/** "Eknath Niraj Agrawal, Kisan Kumar Jena" -> "Eknath Agrawal, Kisan Jena". */
-const shortenNames = (names = []) =>
-  names.map((n) => formatDisplayName(n) || n).filter(Boolean).join(", ") || "—";
-
-// `title` lets the hover card carry something the label does not — for people,
-// the full stored name behind a first-and-last-only label.
-const TruncTip = ({ text, title, className = "" }) => (
-  <div className="group/tip relative min-w-0">
-    <div className={`truncate ${className}`}>{text}</div>
-    <span className="pointer-events-none absolute left-0 top-full z-30 mt-1 hidden w-max max-w-[240px] whitespace-normal break-words rounded-lg border border-slate-200 bg-white px-2.5 py-1.5 text-[11px] font-medium text-slate-600 shadow-lg group-hover/tip:block">
-      {title || text}
-    </span>
-  </div>
-);
-
-// A single project card. It shows the project at a glance; editing happens
-// through the pencil in the footer, which opens the full editor modal. The
-// inline "edit" mode below is kept for that state but is no longer triggered by
-// double-clicking the card — stray double-clicks put cards into edit by accident.
-const ProjectCard = ({
-  id,
-  highlighted,
-  project,
-  parentProject,
-  pmNames,
-  teamLeadNames = [],
-  pmIds = [],
-  // Passed straight through to the popover so its headcount matches the ratio printed on
-  // the card — a lead recorded on the project but holding no allocation belongs in both.
-  leadIds = [],
-  onLeaveEmployeeIds,
-  locationByEmployeeId,
-  allocatedManpower,
-  requiredManpower,
-  pmSlots = 0,
-  leadSlots = 0,
-  allocations,
-  employees,
-  formerEmployees,
-  prefix,
-  navigate,
-  docs,
-  isEditing,
-  draft,
-  onStartEdit,
-  onCancelEdit,
-  onSaveEdit,
-  onDraftChange,
-  saving,
-  docsOpen,
-  onToggleDocs,
-  onCloseDocs,
-  onAdvanced,
-  onDelete,
-}) => {
-  const typeText =
-    project.project_types && Object.keys(project.project_types).length
-      ? Object.values(project.project_types).join(", ")
-      : "—";
-  const vendorText = (project.workforce_vendors || []).join(", ");
-  const hasEncord = !!project.encord_project_hash?.trim();
-  const stop = (e) => e.stopPropagation();
-
-  const status = STATUS_STYLE[project.project_status] || {
-    label: project.project_status,
-    pill: "bg-slate-100 text-slate-600",
-  };
-  const sentiment = SENTIMENT_STYLE[project.sentiment];
-  const accent = CARD_ACCENTS[(project.id || 0) % CARD_ACCENTS.length];
-  const goToAllocations = (e) => {
-    stop(e);
-    navigate(`${prefix}/allocations`, { state: { projectId: project.id } });
-  };
-
-  return (
-    <div
-      id={id}
-      className={`group flex flex-col rounded-lg border bg-white p-5 shadow-sm transition-all duration-200 ${isEditing
-        ? "border-indigo-300 ring-2 ring-indigo-100"
-        : "border-slate-200 hover:shadow-md"
-        } ${highlighted ? "ring-2 ring-indigo-400 ring-offset-2" : ""}`}
-    >
-      {/* Header */}
-      <div className="flex items-start justify-between gap-3">
-        <div className="flex min-w-0 flex-1 items-start gap-2.5">
-          {/* Small title accent — gradient varies per project */}
-          <span
-            className={`mt-0.5 h-9 w-1.5 shrink-0 rounded-full bg-gradient-to-b ${accent}`}
-          />
-          {/* Name + org reserve the height of a two-line name TOGETHER, not
-              individually. Reserving it on the name alone pushed the org down a
-              blank line on every single-line card; reserving it here keeps the
-              org tight under the name and still lands the divider — and every
-              row below it — at the same height across the row. */}
-          <div className="min-h-[3.9rem] min-w-0 flex-1">
-            {isEditing ? (
-              <input
-                value={draft.name}
-                onChange={(e) => onDraftChange("name", e.target.value)}
-                onClick={stop}
-                className="w-full rounded-md border border-slate-200 px-2 py-1 text-[15px] font-bold text-slate-900 focus:border-indigo-400 focus:outline-none focus:ring-2 focus:ring-indigo-100"
-              />
-            ) : (
-              <div className="group/tip relative">
-                <h3 className="line-clamp-2 text-[15px] font-bold leading-snug text-slate-900">
-                  {project.name}
-                </h3>
-                <span className="pointer-events-none absolute left-0 top-full z-30 mt-1 hidden w-max max-w-[240px] whitespace-normal break-words rounded-lg border border-slate-200 bg-white px-2.5 py-1.5 text-[11px] font-medium text-slate-600 shadow-lg group-hover/tip:block">
-                  {project.name}
-                </span>
-              </div>
-            )}
-            <p className="mt-0.5 truncate text-[13px] font-medium text-slate-600">
-              {parentProject?.client || "—"}
-            </p>
-          </div>
-        </div>
-
-        {/* Project status, with the client sentiment badge sitting right of it */}
-        <div className="flex shrink-0 flex-col items-end gap-1.5">
-          {isEditing ? (
-            <>
-              <div onClick={stop} className="w-36">
-                <Dropdown
-                  value={draft.project_status}
-                  onChange={(val) => onDraftChange("project_status", val)}
-                  options={[
-                    { value: "active", label: "In Progress" },
-                    { value: "poc", label: "POC" },
-                    { value: "completed", label: "Completed" },
-                    { value: "on-hold", label: "On Hold" },
-                    { value: "cancelled", label: "Cancelled" },
-                  ]}
-                  className="w-full"
-                  optionsClassName="w-full"
-                />
-              </div>
-              <div className="flex gap-1" onClick={stop}>
-                {[
-                  ["GOOD", "Good"],
-                  ["AVG", "Avg"],
-                  ["Poor", "Poor"],
-                ].map(([val, label]) => {
-                  const on = draft.sentiment === val;
-                  const active =
-                    val === "GOOD"
-                      ? "bg-emerald-500 ring-emerald-500"
-                      : val === "AVG"
-                        ? "bg-amber-500 ring-amber-500"
-                        : "bg-red-500 ring-red-500";
-                  return (
-                    <button
-                      key={val}
-                      type="button"
-                      onClick={() => onDraftChange("sentiment", on ? "" : val)}
-                      className={`rounded px-1.5 py-0.5 text-[11px] font-semibold ring-1 ring-inset ${on
-                        ? `${active} text-white`
-                        : "bg-slate-50 text-slate-500 ring-slate-200 hover:bg-slate-100"
-                        }`}
-                    >
-                      {label}
-                    </button>
-                  );
-                })}
-              </div>
-            </>
-          ) : (
-            <div className="flex items-center gap-1.5">
-              {project.priority && (
-                <span
-                  className={`inline-flex items-center rounded-full px-2.5 py-1 text-xs font-bold ${project.priority === "P0"
-                    ? "bg-red-50 text-red-700"
-                    : project.priority === "P1"
-                      ? "bg-orange-50 text-orange-700"
-                      : project.priority === "P2"
-                        ? "bg-blue-50 text-blue-700"
-                        : project.priority === "P3"
-                          ? "bg-purple-50 text-purple-700"
-                          : "bg-slate-50 text-slate-700"
-                    }`}
-                >
-                  {project.priority}
-                </span>
-              )}
-              <span
-                className={`inline-flex items-center rounded-full px-2.5 py-1 text-xs font-medium ${status.pill}`}
-              >
-                {status.label}
-              </span>
-              {sentiment && (
-                <span
-                  title="Client sentiment"
-                  className={`inline-flex items-center rounded-full px-2.5 py-1 text-xs font-semibold ${sentiment.pill}`}
-                >
-                  {sentiment.label}
-                </span>
-              )}
-            </div>
-          )}
-          {project.created_at && (
-            <span className="text-right text-[11px] text-slate-400">
-              Created {format(new Date(project.created_at), "MMM d, yyyy")}
-            </span>
-          )}
-        </div>
-      </div>
-
-      <div className="my-3 border-t border-slate-100" />
-
-      {/* PM / Team lead / Type / Vendor */}
-      <div className="grid grid-cols-2 gap-x-4 gap-y-3">
-        {/* Both carry stored names: shortened for the label, full in the hover. */}
-        <CardField label="Project Manager">
-          <TruncTip
-            text={shortenNames(pmNames)}
-            title={pmNames.join(", ")}
-            className="text-sm font-semibold text-slate-800"
-          />
-        </CardField>
-
-        <CardField label="Team lead">
-          <TruncTip
-            text={shortenNames(teamLeadNames)}
-            title={teamLeadNames.join(", ")}
-            className="text-sm font-semibold text-slate-800"
-          />
-        </CardField>
-
-        <CardField label="Type">
-          <TruncTip
-            text={typeText}
-            className="text-sm font-semibold text-slate-800"
-          />
-        </CardField>
-
-        <CardField label="Vendor">
-          {isEditing ? (
-            <input
-              value={draft.vendorsText}
-              onChange={(e) => onDraftChange("vendorsText", e.target.value)}
-              onClick={stop}
-              placeholder="Comma separated"
-              className={cardInputClass}
-            />
-          ) : (
-            <TruncTip
-              text={vendorText || "—"}
-              className="text-sm font-semibold text-slate-800"
-            />
-          )}
-        </CardField>
-      </div>
-
-      {/* Delivery figures — how the project is staffed and how long a task
-          takes. Boxed as one block so they read apart from the identity fields
-          above (who runs it, what it is, who supplies it), and paired down the
-          rows: required beside current, annotators beside reviewers, their two
-          per-task times beside each other.
-
-          This replaced a boxed "10 / 12" ratio, which made the reader work out
-          which side was which and framed a derived, read-only figure as though
-          it were editable. */}
-      <div className="mt-3.5 mb-4 rounded-md bg-slate-50/40 p-3.5 ring-1 ring-slate-200">
-        <div className="grid grid-cols-2 gap-x-4 gap-y-3">
-          <CardField label="Manpower required">
-            {/* Both counts spell out their manager and lead slots, because the
-                requirement includes them — otherwise 2 against a project asking
-                for one reviewer reads as wrong. */}
-            <p className="text-sm font-semibold text-slate-800 tabular-nums">
-              {requiredManpower}
-              <SlotBreakdown pmSlots={pmSlots} leadSlots={leadSlots} />
-            </p>
-          </CardField>
-
-          <CardField label="Manpower current">
-            {/* Hovering the count opens the roster popover — who is on the
-                project, and the way through to Allocations. */}
-            <AllocationPopover
-              project={project}
-              allocations={allocations}
-              employees={employees}
-              formerEmployees={formerEmployees}
-              onLeaveEmployeeIds={onLeaveEmployeeIds}
-              locationByEmployeeId={locationByEmployeeId}
-              onOpenAllocations={() =>
-                navigate(`${prefix}/allocations`, {
-                  state: { projectId: project.id },
-                })
-              }
-              triggerClassName="text-sm font-semibold tabular-nums hover:text-indigo-600 transition-colors cursor-pointer"
-              badgeContent={
-                <span
-                  className={
-                    allocatedManpower >= requiredManpower &&
-                      requiredManpower > 0
-                      ? "text-emerald-600"
-                      : "text-slate-800"
-                  }
-                >
-                  {allocatedManpower}
-                  <SlotBreakdown pmSlots={pmSlots} leadSlots={leadSlots} />
-                </span>
-              }
-            />
-          </CardField>
-
-          {[
-            ["Annotators", "autonex_annotators"],
-            ["Reviewers", "autonex_reviewers"],
-          ].map(([label, field]) => (
-            <CardField key={field} label={label}>
-              {isEditing ? (
-                <input
-                  type="number"
-                  min="0"
-                  value={draft[field]}
-                  onChange={(e) => onDraftChange(field, e.target.value)}
-                  onClick={stop}
-                  onWheel={(e) => e.target.blur()}
-                  className={cardInputClass}
-                />
-              ) : (
-                <p className="text-sm font-semibold text-slate-800 tabular-nums">
-                  {project[field] ?? 0}
-                </p>
-              )}
-            </CardField>
-          ))}
-
-          {/* Both times are stored in hours and shown in minutes — the figures
-              people quote are "30 min a task", not "0.5 h". */}
-          {[
-            [
-              "Annotation time / task",
-              "annotation_minutes",
-              project.estimated_time_per_task,
-            ],
-            [
-              "Review time / task",
-              "review_minutes",
-              project.review_time_per_task,
-            ],
-          ].map(([label, draftKey, hours]) => (
-            <CardField key={draftKey} label={label}>
-              {isEditing ? (
-                <div className="flex items-center gap-1" onClick={stop}>
-                  <input
-                    type="number"
-                    min="0"
-                    step="0.1"
-                    value={draft[draftKey]}
-                    onChange={(e) => onDraftChange(draftKey, e.target.value)}
-                    onWheel={(e) => e.target.blur()}
-                    className={cardInputClass}
-                  />
-                  <span className="text-[11px] text-slate-400">min</span>
-                </div>
-              ) : (
-                <p className="text-sm font-semibold text-slate-800 tabular-nums">
-                  {hours ? (
-                    <>
-                      {Math.round(hours * 60)}{" "}
-                      <span className="text-[11px] font-medium text-slate-400">
-                        min
-                      </span>
-                    </>
-                  ) : (
-                    "—"
-                  )}
-                </p>
-              )}
-            </CardField>
-          ))}
-        </div>
-      </div>
-
-      {/* Footer — mt-auto pins it to the bottom edge. Cards in a row stretch to
-          the tallest, and any slack belongs in one place at the bottom rather
-          than opening a gap above the actions on every short card. */}
-      <div className="mt-auto flex items-center justify-between border-t border-slate-100 pt-3.5">
-        <div className="flex items-center gap-2">
-          {/* Analytics */}
-          <div className="group/an relative inline-block">
-            <button
-              type="button"
-              disabled={!hasEncord}
-              onClick={(e) => {
-                stop(e);
-                navigate(`${prefix}/analytics/${project.id}`);
-              }}
-              className={`inline-flex items-center gap-1.5 rounded-lg border px-3 py-1.5 text-xs font-medium transition-colors ${hasEncord
-                ? "border-slate-200 bg-white text-slate-700 hover:bg-slate-50"
-                : "cursor-not-allowed border-slate-100 bg-slate-50 text-slate-400"
-                }`}
-            >
-              <BarChart3 className="h-4 w-4" /> Analytics
-            </button>
-            {!hasEncord && (
-              <div className="pointer-events-none absolute bottom-full left-1/2 z-20 mb-2 -translate-x-1/2 whitespace-nowrap rounded-lg border border-slate-200 bg-white px-3 py-2 text-xs font-medium text-slate-600 opacity-0 shadow-lg transition-opacity duration-200 group-hover/an:opacity-100">
-                Encord Project ID is not configured.
-              </div>
-            )}
-          </div>
-
-          {/* Docs — project guideline documents (req 4) */}
-          <div className="relative inline-block">
-            <button
-              type="button"
-              onClick={(e) => {
-                stop(e);
-                onToggleDocs();
-              }}
-              className="inline-flex items-center gap-1.5 rounded-lg border border-slate-200 bg-white px-3 py-1.5 text-xs font-medium text-slate-700 hover:bg-slate-50"
-            >
-              <FileText className="h-4 w-4" /> Docs
-              {docs.length > 0 && (
-                <span className="rounded-full bg-indigo-100 px-1.5 text-[10px] font-bold text-indigo-700">
-                  {docs.length}
-                </span>
-              )}
-            </button>
-            {docsOpen && (
-              <>
-                <div
-                  className="fixed inset-0 z-30"
-                  onClick={(e) => {
-                    stop(e);
-                    onCloseDocs();
-                  }}
-                />
-                <div
-                  className="absolute bottom-full left-0 z-40 mb-2 w-64 rounded-xl border border-slate-200 bg-white p-2 shadow-xl"
-                  onClick={stop}
-                >
-                  <p className="px-2 py-1 text-[11px] font-semibold uppercase tracking-wide text-slate-400">
-                    Project guidelines
-                  </p>
-                  {docs.length === 0 ? (
-                    <p className="px-2 py-3 text-center text-xs text-slate-400">
-                      No documents uploaded
-                    </p>
-                  ) : (
-                    <ul className="max-h-48 overflow-y-auto">
-                      {docs.map((g) => (
-                        <li key={g.id}>
-                          {g.file_url ? (
-                            <div className="flex items-center gap-1 rounded-lg px-2 py-1.5 text-xs text-slate-700 hover:bg-slate-50">
-                              <span className="flex-1 flex items-center gap-2 text-left min-w-0">
-                                <FileText className="h-3.5 w-3.5 shrink-0 text-indigo-500" />
-                                <span className="truncate">
-                                  {g.title || g.file_name || "Document"}
-                                </span>
-                              </span>
-                              <div className="flex items-center gap-1 shrink-0">
-                                <a
-                                  href={g.file_url}
-                                  target="_blank"
-                                  rel="noreferrer"
-                                  download
-                                  className="p-1 hover:bg-indigo-100 hover:text-indigo-600 rounded text-slate-400 transition-colors"
-                                  title="Download"
-                                >
-                                  <Download className="w-3.5 h-3.5" />
-                                </a>
-                              </div>
-                            </div>
-                          ) : (
-                            <div className="flex items-center gap-2 rounded-lg px-2 py-1.5 text-xs cursor-default text-slate-400">
-                              <FileText className="h-3.5 w-3.5 shrink-0 text-indigo-500" />
-                              <span className="truncate">
-                                {g.title || g.file_name || "Document"}
-                              </span>
-                            </div>
-                          )}
-                        </li>
-                      ))}
-                    </ul>
-                  )}
-                </div>
-              </>
-            )}
-          </div>
-        </div>
-
-        {/* Right: tick / cross while editing, else edit / delete (req 5) */}
-        <div className="flex items-center gap-0.5" onClick={stop}>
-          {isEditing ? (
-            <>
-              <button
-                type="button"
-                onClick={onCancelEdit}
-                title="Cancel"
-                aria-label="Cancel"
-                className="rounded-lg p-1.5 text-slate-400 hover:bg-slate-100 hover:text-slate-600"
-              >
-                <X className="h-4 w-4" />
-              </button>
-              <button
-                type="button"
-                onClick={onSaveEdit}
-                disabled={saving}
-                title="Save"
-                aria-label="Save"
-                className="rounded-lg p-1.5 text-emerald-600 hover:bg-emerald-50 disabled:opacity-50"
-              >
-                <Check className="h-4 w-4" />
-              </button>
-            </>
-          ) : (
-            // A missing handler means the viewer may not perform that action, so the
-            // control is omitted rather than rendered inert — a button that silently does
-            // nothing reads as a bug.
-            <>
-              {onAdvanced && (
-                <button
-                  type="button"
-                  onClick={onAdvanced}
-                  title="Edit"
-                  aria-label="Edit"
-                  className="rounded-lg p-1.5 text-slate-400 hover:bg-indigo-50 hover:text-indigo-600"
-                >
-                  <Edit className="h-4 w-4" />
-                </button>
-              )}
-              {onDelete && (
-                <button
-                  type="button"
-                  onClick={onDelete}
-                  title="Delete"
-                  aria-label="Delete"
-                  className="rounded-lg p-1.5 text-slate-400 hover:bg-red-50 hover:text-red-600"
-                >
-                  <Trash2 className="h-4 w-4" />
-                </button>
-              )}
-            </>
-          )}
-        </div>
-      </div>
-    </div>
-  );
-};
-
-// Team-lead multi-select. Same shape as PmMultiSelect, but there is no "primary" — a lead
-// list has no head — and anyone already chosen as the project's manager is filtered out,
-// since the same person should not hold both seats on one project.
-//
-// Offers Team Leads only; adding another *manager* is done through the Program Manager
-// picker. Selections become allocations tagged "Team Lead" and never enter
-// `assigned_employee_ids`, so a lead does not gain rank over the project's other leads.
-const TeamLeadMultiSelect = ({
-  employees,
-  value,
-  onChange,
-  excludeIds = [],
-  // A lead cannot drop themselves from a project they are creating: the server allocates
-  // the creator regardless, so allowing it would show a state that does not survive a save.
-  lockedId = null,
-}) => {
-  const [open, setOpen] = useState(false);
-  const [search, setSearch] = useState("");
-  const ref = useRef(null);
-
-  useEffect(() => {
-    const handler = (e) => {
-      if (ref.current && !ref.current.contains(e.target)) setOpen(false);
-    };
-    document.addEventListener("mousedown", handler);
-    return () => document.removeEventListener("mousedown", handler);
-  }, []);
-
-  const q = search.trim().toLowerCase();
-  const excluded = new Set(excludeIds.map(Number));
-  const list = employees
-    .filter((e) => e.status === "active" && !excluded.has(Number(e.id)))
-    .filter((e) => !q || (e.name || "").toLowerCase().includes(q));
-
-  const toggle = (id) => {
-    if (value.includes(id)) {
-      if (lockedId != null && Number(id) === Number(lockedId)) return;
-      onChange(value.filter((v) => v !== id));
-    } else {
-      onChange([...value, id]);
-    }
-  };
-
-  return (
-    <div ref={ref} className="relative">
-      <div className="flex w-full items-center gap-1.5 rounded-lg border border-slate-200 bg-white px-3 py-1.5 text-sm transition-colors hover:border-slate-300">
-        <input
-          type="text"
-          value={search}
-          placeholder={value.length ? "Add another" : "Add team lead"}
-          onChange={(e) => {
-            setSearch(e.target.value);
-            setOpen(true);
-          }}
-          onFocus={() => setOpen(true)}
-          className="min-w-0 flex-1 bg-transparent text-slate-700 outline-none placeholder:text-slate-400"
-        />
-        <ChevronDown
-          className={`h-3.5 w-3.5 shrink-0 text-slate-400 transition-transform ${open ? "rotate-180" : ""}`}
-        />
-      </div>
-      {open && (
-        <div className="absolute left-0 top-full z-[9999] mt-1 max-h-64 w-full overflow-y-auto rounded-xl border border-slate-200 bg-white py-1 shadow-lg">
-          {list.length ? (
-            list.map((emp) => {
-              const selected = value.includes(emp.id);
-              return (
-                <button
-                  key={emp.id}
-                  type="button"
-                  onClick={() => toggle(emp.id)}
-                  className={`flex w-full items-center gap-2 px-3 py-1.5 text-left text-sm transition-colors ${selected ? "bg-emerald-50 font-medium text-emerald-700" : "text-slate-700 hover:bg-slate-50"}`}
-                >
-                  <span className="flex w-4 shrink-0 justify-center">
-                    {selected && (
-                      <Check className="h-3.5 w-3.5 text-emerald-600" />
-                    )}
-                  </span>
-                  <span className="flex-1 truncate">
-                    {formatDisplayName(emp.name)}
-                  </span>
-                </button>
-              );
-            })
-          ) : (
-            <div className="px-3 py-2 text-sm text-slate-400">
-              No matches found
-            </div>
-          )}
-        </div>
-      )}
-    </div>
-  );
-};
-
-// Program-manager multi-select styled like Dropdown. Selected managers stay in
-// the list with a tick (and "primary" on the first); clicking one toggles it.
-const PmMultiSelect = ({ employees, value, onChange, isPm, pmEmployeeId }) => {
-  const [open, setOpen] = useState(false);
-  const [search, setSearch] = useState("");
-  const ref = useRef(null);
-
-  useEffect(() => {
-    const handler = (e) => {
-      if (ref.current && !ref.current.contains(e.target)) setOpen(false);
-    };
-    document.addEventListener("mousedown", handler);
-    return () => document.removeEventListener("mousedown", handler);
-  }, []);
-
-  const q = search.trim().toLowerCase();
-  const list = employees
-    .filter((e) => e.status === "active")
-    .filter((e) => !q || (e.name || "").toLowerCase().includes(q));
-
-  const toggle = (id) => {
-    if (value.includes(id)) {
-      if (isPm && id === pmEmployeeId) return; // a PM can't remove themselves
-      onChange(value.filter((v) => v !== id));
-    } else {
-      onChange([...value, id]);
-    }
-  };
-
-  return (
-    <div ref={ref} className="relative">
-      <div className="flex w-full items-center gap-1.5 rounded-lg border border-slate-200 bg-white px-3 py-1.5 text-sm transition-colors hover:border-slate-300">
-        <input
-          type="text"
-          value={search}
-          placeholder={value.length ? "Add another" : "Add manager"}
-          onChange={(e) => {
-            setSearch(e.target.value);
-            setOpen(true);
-          }}
-          onFocus={() => setOpen(true)}
-          className="min-w-0 flex-1 bg-transparent text-slate-700 outline-none placeholder:text-slate-400"
-        />
-        <ChevronDown
-          className={`h-3.5 w-3.5 shrink-0 text-slate-400 transition-transform ${open ? "rotate-180" : ""}`}
-        />
-      </div>
-      {open && (
-        <div className="absolute left-0 top-full z-[9999] mt-1 max-h-64 w-full overflow-y-auto rounded-xl border border-slate-200 bg-white py-1 shadow-lg">
-          {list.length ? (
-            list.map((emp) => {
-              const selected = value.includes(emp.id);
-              const isPrimary = value[0] === emp.id;
-              return (
-                <button
-                  key={emp.id}
-                  type="button"
-                  onClick={() => toggle(emp.id)}
-                  className={`flex w-full items-center gap-2 px-3 py-1.5 text-left text-sm transition-colors ${selected ? "bg-indigo-50 text-indigo-700 font-medium" : "text-slate-700 hover:bg-slate-50"}`}
-                >
-                  <span className="flex w-4 shrink-0 justify-center">
-                    {selected && (
-                      <Check className="h-3.5 w-3.5 text-indigo-600" />
-                    )}
-                  </span>
-                  <span className="flex-1 truncate">{formatDisplayName(emp.name)}</span>
-                  {isPrimary && (
-                    <span className="text-[9px] font-semibold uppercase tracking-wide text-indigo-400">
-                      primary
-                    </span>
-                  )}
-                </button>
-              );
-            })
-          ) : (
-            <div className="px-3 py-2 text-sm text-slate-400">
-              No matches found
-            </div>
-          )}
-        </div>
-      )}
-    </div>
-  );
-};
 
 const ProjectsPage = () => {
   const queryClient = useQueryClient();
   const navigate = useNavigate();
+  const [searchParams, setSearchParams] = useSearchParams();
+  const filterMainProjectId = searchParams.get("project");
+  const statusParam = searchParams.get("status");
+  const recommendationParam = searchParams.get("recommendation");
+  const focusId = searchParams.get("focus"); // scroll to + highlight this sub-project (e.g. from Allocations)
   const user = JSON.parse(localStorage.getItem("user") || "{}");
   const role = localStorage.getItem("role") || "admin";
   // `isPm` means "owns projects" — it drives self-assignment as a project's manager, so a
@@ -1338,83 +186,122 @@ const ProjectsPage = () => {
     setPrioritySuggestion(sugg);
   }, [manpowerTrigger, selectedTeamLeadIds, isModalOpen]);
 
-  const { data: projects = [], isLoading } = useQuery({
-    queryKey: ["sub-projects"],
-    queryFn: subProjectApi.getAll,
+  const { data: projectKpis } = useQuery({
+    queryKey: ["sub-projects-kpi"],
+    queryFn: () => subProjectApi.getKpi(),
+    staleTime: 60000,
   });
 
-  const { data: mainProjects = [] } = useQuery({
+  const { data: paginatedData, isLoading, isFetching } = useQuery({
+    queryKey: [
+      "sub-projects-paginated",
+      currentPage,
+      12,
+      subProjectSearch,
+      filterMainProjectId,
+      statusParam,
+      recommendationParam,
+      selectedOrganization,
+      selectedPm,
+      selectedTeamLead,
+      selectedStatus,
+      selectedPriority,
+      projectView,
+      autonexOnly,
+    ],
+    queryFn: () =>
+      subProjectApi.getPaginated({
+        page: currentPage,
+        limit: 12,
+        search: subProjectSearch || undefined,
+        main_project_id: filterMainProjectId || undefined,
+        project_view: projectView,
+        status: statusParam || (selectedStatus !== "all" ? selectedStatus : undefined),
+        priority: selectedPriority !== "all" ? selectedPriority : undefined,
+        organization: selectedOrganization !== "all" ? selectedOrganization : undefined,
+        autonex_only: autonexOnly ? true : undefined,
+        pm_id: selectedPm !== "all" ? selectedPm : undefined,
+        team_lead_id: selectedTeamLead !== "all" ? selectedTeamLead : undefined,
+        recommendation: recommendationParam || undefined,
+      }),
+    placeholderData: keepPreviousData,
+    staleTime: 5 * 60 * 1000, // 5 minutes
+  });
+
+  const projects = paginatedData?.items || [];
+  const totalItems = paginatedData?.total || 0;
+  const projectMetrics = projectKpis?.metrics || {
+    totalProjects: 0,
+    activeProjects: 0,
+    overburdenedProjects: 0,
+    balancedProjects: 0,
+    onHoldProjects: 0,
+    completedProjects: 0,
+    cancelledProjects: 0,
+  };
+  const tabCounts = projectKpis?.tab_counts || {
+    active: 0,
+    archived: 0,
+    development: 0,
+  };
+
+  const { data: parentProjects = [] } = useQuery({
     queryKey: ["parent-projects"],
-    queryFn: parentProjectApi.getAll,
+    queryFn: () => parentProjectApi.getAll(),
   });
 
+  // Lazy-load employees only when needed for add/edit modal? No, employeeIndex
+  // is required for resolving PMs and Team Leads on the initial render of the
+  // project cards, otherwise they show as 0 or empty until the modal opens.
   const { data: employees = [] } = useQuery({
     queryKey: ["employees"],
-    queryFn: employeeApi.getAll,
+    queryFn: () => employeeApi.getSlim(),
   });
-
-  // Only active Program Managers (used in Add Project modal)
-  const pmEmployees = useMemo(() => {
-    return employees.filter(
-      (emp) =>
-        emp.status === "active" &&
-        (emp.designation || "").toLowerCase().includes("program manager")
-    );
-  }, [employees]);
-
-  // Each picker offers exactly its own designation: Team Leads here, Program Managers in
-  // pmEmployees above. Needing an extra manager on a project is now served by adding a
-  // co-manager to that list rather than by borrowing one as a lead.
-  //
-  // The underlying "program manager acting as a lead" record still works and is still
-  // honoured wherever leads are resolved — it is set from the Allocations page, so a project
-  // that already has one keeps showing it. This dropdown simply does not create them.
-  const teamLeadEmployees = useMemo(() => {
-    return employees.filter(
-      (emp) => emp.status === "active" && isTeamLeadDesignation(emp.designation),
-    );
-  }, [employees]);
-
-  // Roster lookup — also the test for a stale allocation, since `GET /employees`
-  // omits archived staff that `GET /allocations` still references.
-  const employeeIndex = useMemo(
-    () => buildEmployeeIndex(employees),
-    [employees],
-  );
-
-  // Archived staff, so a stale allocation names who left instead of reading
-  // "Former employee". Naming only — never counted towards manpower.
   const { data: formerEmployees = [] } = useQuery({
     queryKey: ["employees", "archived"],
-    queryFn: () => employeeApi.getAll({ status: "archived" }),
-    staleTime: 5 * 60 * 1000,
+    queryFn: () => employeeApi.getSlim({ status: "archived" }),
   });
-
+  const employeeIndex = useMemo(() => {
+    return new Map(employees.map((e) => [String(e.id), e]));
+  }, [employees]);
+  const pmEmployees = useMemo(() => {
+    return employees.filter((e) =>
+      (e.designation || "").toLowerCase().includes("program manager"),
+    );
+  }, [employees]);
+  const teamLeadEmployees = useMemo(() => {
+    return employees.filter((e) =>
+      (e.designation || "").toLowerCase().includes("team lead"),
+    );
+  }, [employees]);
+  const createVendorMutation = useMutation({
+    mutationFn: (name) => vendorApi.create({ name }),
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ["vendors"] });
+    },
+  });
   const { data: skillsData = [] } = useQuery({
     queryKey: ["skills"],
-    queryFn: skillApi.getAll,
+    queryFn: () => skillApi.getAll(),
+    enabled: isModalOpen || !!editingProject,
   });
-
   const { data: vendorsData = [] } = useQuery({
     queryKey: ["vendors"],
-    queryFn: vendorApi.getAll,
-  });
-
-  const createVendorMutation = useMutation({
-    mutationFn: (name) => vendorApi.create(name),
-    onSuccess: () => queryClient.invalidateQueries(["vendors"]),
+    queryFn: () => vendorApi.getAll(),
+    enabled: isModalOpen || !!editingProject,
   });
 
   const { data: allocations = [] } = useQuery({
     queryKey: ["allocations"],
-    queryFn: allocationApi.getAll,
+    queryFn: () => allocationApi.getSlim(),
+    staleTime: 5 * 60 * 1000,
   });
 
   // Guideline docs, filtered per-card by sub_project_id for the card "Docs" popover.
-  const { data: guidelinesData = [] } = useQuery({
-    queryKey: ["guidelines", "cards"],
-    queryFn: () => guidelineApi.getAll(),
-  });
+  // const { data: guidelinesData = [] } = useQuery({
+  //   queryKey: ["guidelines", "cards"],
+  //   queryFn: () => guidelineApi.getAll(),
+  // });
 
   const { startStr, endStr } = useMemo(() => {
     const today = new Date();
@@ -1426,15 +313,19 @@ const ProjectsPage = () => {
   }, []);
 
   const { data: leaves = [] } = useQuery({
-    queryKey: ["leaves", startStr, endStr],
-    queryFn: () => leaveApi.getAll({ start_date: startStr, end_date: endStr }),
+    queryKey: ["leaves"],
+    queryFn: () => leaveApi.getTodayIds(),
+    staleTime: 5 * 60 * 1000,
   });
-
-  // Approved WFH-for-a-day requests, so the allocation popover can say where
-  // each person actually is today.
   const { data: wfh = [] } = useQuery({
     queryKey: ["wfh"],
-    queryFn: () => wfhApi.getAll(),
+    queryFn: () => wfhApi.getTodayIds(),
+    staleTime: 5 * 60 * 1000,
+  });
+  const { data: guidelinesData = [] } = useQuery({
+    queryKey: ["guidelines"],
+    queryFn: () => guidelineApi.getAll(),
+    staleTime: 5 * 60 * 1000,
   });
 
   // Local calendar date — never via toISOString(), which is UTC and would report
@@ -1445,32 +336,9 @@ const ProjectsPage = () => {
   }, []);
 
   // Employees on approved leave today.
-  const leaveEmployeeIds = useMemo(() => {
-    const ids = new Set();
-    leaves.forEach((l) => {
-      if (
-        (l.status || "").toLowerCase() === "approved" &&
-        String(l.start_date).slice(0, 10) <= todayStr &&
-        String(l.end_date).slice(0, 10) >= todayStr
-      ) {
-        ids.add(l.employee_id);
-      }
-    });
-    return ids;
-  }, [leaves, todayStr]);
+  const leaveEmployeeIds = useMemo(() => new Set(leaves || []), [leaves]);
 
-  const wfhTodayIds = useMemo(() => {
-    const ids = new Set();
-    wfh.forEach((w) => {
-      if (
-        (w.status || "").toLowerCase() === "approved" &&
-        String(w.wfh_date).slice(0, 10) === todayStr
-      ) {
-        ids.add(w.employee_id);
-      }
-    });
-    return ids;
-  }, [wfh, todayStr]);
+  const wfhTodayIds = useMemo(() => new Set(wfh || []), [wfh]);
 
   // Where each employee is TODAY: WFH if that's their standing work model or they
   // have an approved WFH day; otherwise WFO.
@@ -1488,26 +356,13 @@ const ProjectsPage = () => {
   // PM *or* allocated to it, so a lead sees exactly the projects they lead — and nothing
   // else. Keyed on isScoped, not isPm: a lead failing an isPm test would fall through to
   // the unscoped admin branch and be shown every project in the organisation.
-  const visibleProjects = isScoped
-    ? getPmSubProjects(projects, mainProjects, pmEmployeeId, allocations)
-    : projects;
+  const visibleProjects = projects;
 
   // Organisations to show: those the person manages, plus the parent of every project they
   // can see. The second half matters for a team lead, who manages no organisation at all —
   // without it `resolvePmIds` would find no parent to fall back to and a project whose PM is
   // recorded only at organisation level would render with no manager.
-  const visibleMainProjects = useMemo(() => {
-    if (!isScoped) return mainProjects;
-    const managedIds = new Set(
-      getPmProjects(mainProjects, pmEmployeeId).map((p) => p.id),
-    );
-    const parentIds = new Set(
-      visibleProjects.map((p) => p.main_project_id).filter(Boolean),
-    );
-    return mainProjects.filter(
-      (mp) => managedIds.has(mp.id) || parentIds.has(mp.id),
-    );
-  }, [isScoped, mainProjects, visibleProjects, pmEmployeeId]);
+  const visibleMainProjects = parentProjects;
 
   // Organization → Project cascade for the create/edit modal. "Organization" is
   // the free-text `client` on a main project (same concept as the Organizations
@@ -1521,7 +376,7 @@ const ProjectsPage = () => {
   // The create/edit modal lets a PM pick ANY existing organization (not just their
   // own), so they reuse "Autonex" etc. instead of creating a duplicate. The top
   // filter above stays PM-scoped (organizations); this is modal-only.
-  const allOrganizations = [...new Set(mainProjects.map(clientOf))].sort(
+  const allOrganizations = [...new Set(parentProjects.map(clientOf))].sort(
     (a, b) => (a === NO_ORG ? 1 : b === NO_ORG ? -1 : a.localeCompare(b)),
   );
   // The organization a given main-project id belongs to (used to prefill on edit/copy).
@@ -1775,10 +630,10 @@ const ProjectsPage = () => {
       // Match against ALL organizations (not just the PM's own) so a PM reuses an
       // existing org like "Autonex" instead of silently creating a duplicate.
       const existingOrg =
-        mainProjects.find(
+        parentProjects.find(
           (p) => (p.name || "").trim().toLowerCase() === orgName.toLowerCase(),
         ) ||
-        mainProjects.find(
+        parentProjects.find(
           (p) => (p.client || "").trim().toLowerCase() === orgName.toLowerCase(),
         );
 
@@ -2086,20 +941,11 @@ const ProjectsPage = () => {
     return Math.round(project.total_tasks / manpower);
   };
 
-  // Helper: count working days (exclude weekends) between two dates.
+  // Helper: count working days (exclude weekends and company holidays) between two dates.
   // Parse date-only strings as LOCAL midnight (never via Date.toISOString) so
   // counts don't shift by a day in timezones offset from UTC (e.g. IST).
   const getWorkingDays = (startStr, endStr) => {
-    const start = new Date(startStr + "T00:00:00");
-    const end = new Date(endStr + "T00:00:00");
-    let count = 0;
-    const current = new Date(start);
-    while (current <= end) {
-      const day = current.getDay(); // 0=Sun, 6=Sat
-      if (day !== 0 && day !== 6) count++;
-      current.setDate(current.getDate() + 1);
-    }
-    return count || 1; // at least 1 to avoid division by zero
+    return getWorkingDayCount(startStr, endStr) || 1; // at least 1 to avoid division by zero
   };
 
   // Helper: count leave working days for an employee during a project period.
@@ -2115,7 +961,7 @@ const ProjectsPage = () => {
       const leaveEnd =
         leave.end_date < projectEnd ? leave.end_date : projectEnd;
       if (leaveStart <= leaveEnd) {
-        totalLeaveDays += getWorkingDays(leaveStart, leaveEnd);
+        totalLeaveDays += getWorkingDayCount(leaveStart, leaveEnd, leave.is_half_day);
       }
     }
     return totalLeaveDays;
@@ -2174,11 +1020,7 @@ const ProjectsPage = () => {
     };
   };
 
-  const [searchParams, setSearchParams] = useSearchParams();
-  const filterMainProjectId = searchParams.get("project");
-  const statusParam = searchParams.get("status");
-  const recommendationParam = searchParams.get("recommendation");
-  const focusId = searchParams.get("focus"); // scroll to + highlight this sub-project (e.g. from Allocations)
+
   const [deleteConfirm, setDeleteConfirm] = useState(null);
   const [highlightId, setHighlightId] = useState(null);
 
@@ -2249,84 +1091,7 @@ const ProjectsPage = () => {
     return () => document.removeEventListener("mousedown", handler);
   }, []);
 
-  const filteredProjects = (
-    filterMainProjectId
-      ? visibleProjects.filter(
-        (p) => p.main_project_id === parseInt(filterMainProjectId),
-      )
-      : visibleProjects
-  )
-    .filter((project) => {
-      // Tabs are admin-only. PMs have no tabs and see every project together.
-      if (!isAdmin) return true;
-      // Top-level tabs. Development is a separate bucket (by project type); Active vs
-      // Archived split the rest by status (Completed / On Hold / Cancelled = archived).
-      const dev = isDeveloperProject(project);
-      if (projectView === "development") return dev;
-      if (dev) return false; // developer projects live only under the Development tab
-      return projectView === "archived"
-        ? isArchivedStatus(project.project_status)
-        : !isArchivedStatus(project.project_status);
-    })
-    .filter((project) => {
-      // "Autonex" quick filter: only projects staffed with ≥1 Autonex employee
-      // (team composition = Autonex annotators + reviewers + QC).
-      if (!autonexOnly) return true;
-      return (
-        (project.autonex_annotators || 0) + (project.autonex_reviewers || 0) > 0
-      );
-    })
-    .filter((project) => {
-      if (selectedOrganization === "all") return true;
-
-      const parentProject = visibleMainProjects.find(
-        (p) => p.id === project.main_project_id,
-      );
-
-      return (parentProject?.client || NO_ORG) === selectedOrganization;
-    })
-    .filter((project) => {
-      if (selectedPm === "all") return true;
-      return resolvePmIds(project).includes(Number(selectedPm));
-    })
-    .filter((project) => {
-      if (selectedTeamLead === "all") return true;
-      return (teamLeadIdsByProject.get(project.id) || new Set()).has(
-        Number(selectedTeamLead),
-      );
-    })
-    .filter((project) => {
-      if (selectedStatus === "all") return true;
-      const status = (project.project_status || "active").toLowerCase().trim();
-      if (selectedStatus === "active") {
-        return (
-          status === "active" ||
-          status === "in-progress" ||
-          status === "in progress"
-        );
-      }
-      if (selectedStatus === "poc") {
-        return status === "poc";
-      }
-      return status === selectedStatus.toLowerCase();
-    })
-    .filter((project) => {
-      if (selectedPriority === "all") return true;
-      return (project.priority || "medium") === selectedPriority;
-    })
-    .filter((p) => {
-      if (statusParam && p.project_status !== statusParam) return false;
-
-      if (recommendationParam) {
-        const recResult = getSystemRecommendation(p);
-
-        if (recResult.label.toLowerCase() !== recommendationParam.toLowerCase())
-          return false;
-      }
-
-      return p.name.toLowerCase().includes(subProjectSearch.toLowerCase());
-    })
-    .sort((a, b) => a.name.localeCompare(b.name));
+  const filteredProjects = projects;
 
   // Reset to page 1 when filters change
   useEffect(() => {
@@ -2373,69 +1138,7 @@ const ProjectsPage = () => {
     (p) => p.id === parseInt(filterMainProjectId),
   );
 
-  const projectMetrics = useMemo(() => {
-    const totalProjects = filteredProjects.length;
 
-    const activeProjects = filteredProjects.filter(
-      (p) => p.project_status === "active",
-    ).length;
-
-    const overburdenedProjects = filteredProjects.filter((p) => {
-      const required = getRequiredManpower(p);
-      const allocated = getAllocatedManpower(p);
-      return required > 0 ? allocated < required : false;
-    }).length;
-
-    const balancedProjects = filteredProjects.filter((p) => {
-      const required = getRequiredManpower(p);
-      const allocated = getAllocatedManpower(p);
-      return required > 0 ? allocated >= required : allocated > 0;
-    }).length;
-
-    // Archived-tab breakdown by status.
-    const statusOf = (p) => (p.project_status || "active").toLowerCase().trim();
-    const onHoldProjects = filteredProjects.filter(
-      (p) => statusOf(p) === "on-hold",
-    ).length;
-    const completedProjects = filteredProjects.filter(
-      (p) => statusOf(p) === "completed",
-    ).length;
-    const cancelledProjects = filteredProjects.filter(
-      (p) => statusOf(p) === "cancelled",
-    ).length;
-
-    return {
-      totalProjects,
-      activeProjects,
-      overburdenedProjects,
-      balancedProjects,
-      onHoldProjects,
-      completedProjects,
-      cancelledProjects,
-    };
-  }, [filteredProjects, allocations, employees, leaves]);
-
-  // Per-tab totals shown as badges next to each tab label (independent of the
-  // currently selected tab, but respecting the org/project scope filter).
-  const tabCounts = useMemo(() => {
-    const base = filterMainProjectId
-      ? visibleProjects.filter(
-        (p) => p.main_project_id === parseInt(filterMainProjectId),
-      )
-      : visibleProjects;
-    let active = 0,
-      archived = 0,
-      development = 0;
-    base.forEach((project) => {
-      if (isDeveloperProject(project)) {
-        development += 1;
-        return;
-      }
-      if (isArchivedStatus(project.project_status)) archived += 1;
-      else active += 1;
-    });
-    return { active, archived, development };
-  }, [visibleProjects, filterMainProjectId]);
 
   // Open the full create/edit modal, prefilled from a project. `copy` clones it.
   const openProjectModal = (project, { copy = false } = {}) => {
@@ -3020,7 +1723,7 @@ const ProjectsPage = () => {
         </div>
       )}
 
-      {isLoading ? (
+      {(isLoading || isFetching) ? (
         <div className="grid grid-cols-1 md:grid-cols-2 xl:grid-cols-3 gap-2.5">
           {[...Array(6)].map((_, index) => (
             <div
@@ -3101,7 +1804,7 @@ const ProjectsPage = () => {
             </div>
           ))}
         </div>
-      ) : filteredProjects.length === 0 ? (
+      ) : totalItems === 0 ? (
         <div className="rounded-2xl border border-slate-200 bg-white p-12 text-center">
           <h3 className="text-lg font-semibold text-slate-800">
             {filterMainProjectId
@@ -3120,17 +1823,13 @@ const ProjectsPage = () => {
               of room first. */}
           <div className="grid grid-cols-1 md:grid-cols-2 xl:grid-cols-3 gap-2.5">
             {filteredProjects
-              .slice((currentPage - 1) * PAGE_SIZE, currentPage * PAGE_SIZE)
               .map((project) => {
                 const parentProject = visibleMainProjects.find(
                   (p) => p.id === project.main_project_id,
                 );
 
                 const pmIds = resolvePmIds(project);
-                const pmNames = pmIds
-                  .map((id) => employees.find((e) => e.id === id)?.name)
-                  .filter(Boolean);
-
+                const pmNames = pmIds.map(id => employeeIndex.get(String(id))?.name).filter(Boolean);
                 const allocatedManpower = getAllocatedManpower(project);
 
                 return (
@@ -3147,9 +1846,9 @@ const ProjectsPage = () => {
                     onLeaveEmployeeIds={leaveEmployeeIds}
                     locationByEmployeeId={locationByEmployeeId}
                     allocatedManpower={allocatedManpower}
-                    requiredManpower={getRequiredManpower(project)}
+                    requiredManpower={project.required_manpower || 0}
                     pmSlots={getPmSlots(project)}
-                    leadSlots={getTeamLeadIds(project).length}
+                    leadSlots={getTeamLeadIds(project).filter(id => employeeIndex.has(String(id))).length}
                     allocations={allocations}
                     employees={employees}
                     formerEmployees={formerEmployees}
@@ -3182,15 +1881,15 @@ const ProjectsPage = () => {
           </div>
 
           {/* Pagination */}
-          {filteredProjects.length > 0 && (
+          {totalItems > 0 && (
             <div className="flex items-center justify-between px-5 py-3 border-t border-slate-100 mt-4">
               <p className="text-sm text-slate-500">
                 Showing{" "}
-                {filteredProjects.length === 0
+                {totalItems === 0
                   ? 0
                   : (currentPage - 1) * PAGE_SIZE + 1}
-                –{Math.min(currentPage * PAGE_SIZE, filteredProjects.length)} of{" "}
-                {filteredProjects.length} items
+                –{Math.min(currentPage * PAGE_SIZE, totalItems)} of{" "}
+                {totalItems} items
               </p>
 
               <div className="flex items-center gap-1">
@@ -3204,14 +1903,14 @@ const ProjectsPage = () => {
 
                 {Array.from(
                   {
-                    length: Math.ceil(filteredProjects.length / PAGE_SIZE),
+                    length: Math.ceil(totalItems / PAGE_SIZE),
                   },
                   (_, i) => i + 1,
                 )
                   .filter(
                     (p) =>
                       p === 1 ||
-                      p === Math.ceil(filteredProjects.length / PAGE_SIZE) ||
+                      p === Math.ceil(totalItems / PAGE_SIZE) ||
                       Math.abs(p - currentPage) <= 1,
                   )
                   .reduce((acc, p, idx, arr) => {
@@ -3248,14 +1947,14 @@ const ProjectsPage = () => {
                   onClick={() =>
                     setCurrentPage(
                       Math.min(
-                        Math.ceil(filteredProjects.length / PAGE_SIZE),
+                        Math.ceil(totalItems / PAGE_SIZE),
                         currentPage + 1,
                       ),
                     )
                   }
                   disabled={
                     currentPage ===
-                    Math.ceil(filteredProjects.length / PAGE_SIZE)
+                    Math.ceil(totalItems / PAGE_SIZE)
                   }
                   className="px-3 py-1.5 text-sm rounded-lg border border-slate-200 text-slate-600 hover:bg-slate-50 disabled:opacity-40 disabled:cursor-not-allowed transition-colors"
                 >
@@ -3336,7 +2035,7 @@ const ProjectsPage = () => {
                   value={formOrg}
                   onChange={(val) => {
                     setFormOrg(val);
-                    const projs = mainProjects.filter(
+                    const projs = parentProjects.filter(
                       (p) => clientOf(p) === val,
                     );
                     setFormMainProjectId(
@@ -3928,10 +2627,8 @@ const ProjectsPage = () => {
                       Annotators" is informational and deliberately not in the sum
                       — it counts the vendor's people as well as ours. */}
                   <p className="mt-2 text-[11px] text-slate-400">
-                    Required headcount = Autonex Annotators + Autonex Reviewers +
-                    Others + Team Leads + Team Managers
-                    {isDevelopmentSelected ? " + Developers" : ""}. Leads and
-                    managers are counted from the fields above, not typed.
+                    {`Required headcount = Autonex Annotators + Autonex Reviewers + Others + Team Leads + Team Managers${isDevelopmentSelected ? " + Developers" : ""
+                      }. Leads and managers are counted from the fields above, not typed.`}
                   </p>
                 </div>
               </div>

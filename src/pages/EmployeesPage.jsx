@@ -1,6 +1,8 @@
 import { useState, useRef, useEffect } from "react";
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
 import { useSearchParams, Link } from "react-router-dom";
+import usePageStateStore from "../store/usePageStateStore";
+import { usePageScroll } from "../hooks/usePageScroll";
 import {
   employeeApi,
   skillApi,
@@ -33,6 +35,9 @@ import {
   ArrowDown,
   Search,
   Check,
+  Copy,
+  ExternalLink,
+  KeyRound,
 } from "lucide-react";
 import toast from "react-hot-toast";
 import UserAvatar from "../components/ui/UserAvatar";
@@ -550,6 +555,95 @@ function EmployeeConvertToFulltimeModal({
     </Modal>
   );
 }
+
+function EmployeeCredentialsModal({ credentials, onClose }) {
+  const [copied, setCopied] = useState(false);
+
+  if (!credentials) return null;
+
+  const handleCopy = () => {
+    const text = `PM Portal Login Credentials\n---------------------------\nName: ${credentials.name}\nEmail: ${credentials.email}\nTemporary Password: ${credentials.temp_password}\nPortal Link: ${credentials.portal_url}`;
+    navigator.clipboard.writeText(text);
+    setCopied(true);
+    toast.success("Credentials copied to clipboard!");
+    setTimeout(() => setCopied(false), 3000);
+  };
+
+  return (
+    <Modal isOpen onClose={onClose} size="md" maxHeight="90vh">
+      <Modal.Header onClose={onClose}>
+        <div className="flex items-center gap-2">
+          <div className="p-2 bg-emerald-50 text-emerald-600 rounded-lg">
+            <KeyRound className="w-5 h-5" />
+          </div>
+          <div>
+            <h3 className="text-lg font-bold text-gray-900">
+              Employee Created — Login Credentials
+            </h3>
+            <p className="text-xs text-gray-500">
+              Temporary access key generated for first-time sign-in
+            </p>
+          </div>
+        </div>
+      </Modal.Header>
+      <Modal.Body className="space-y-4">
+        <div className="bg-emerald-50/70 border border-emerald-200/80 rounded-xl p-3.5 text-xs text-emerald-800 flex items-start gap-2">
+          <Check className="w-4 h-4 text-emerald-600 shrink-0 mt-0.5" />
+          <div>
+            <span className="font-semibold">Welcome email dispatched:</span> A welcome notification with these temporary credentials has been automatically sent to <strong>{credentials.email}</strong>.
+          </div>
+        </div>
+
+        <div className="bg-slate-50 border border-slate-200 rounded-xl p-4 space-y-3">
+          <div className="flex justify-between items-center text-sm border-b border-slate-200 pb-2">
+            <span className="text-gray-500 font-medium">Employee Name</span>
+            <span className="font-semibold text-gray-900">{credentials.name}</span>
+          </div>
+          <div className="flex justify-between items-center text-sm border-b border-slate-200 pb-2">
+            <span className="text-gray-500 font-medium">Email / Username</span>
+            <span className="font-mono text-gray-900">{credentials.email}</span>
+          </div>
+          <div className="flex justify-between items-center text-sm border-b border-slate-200 pb-2">
+            <span className="text-gray-500 font-medium">Temporary Password</span>
+            <span className="font-mono font-bold text-indigo-700 bg-indigo-50 px-2.5 py-1 rounded-lg border border-indigo-100 select-all">
+              {credentials.temp_password}
+            </span>
+          </div>
+          <div className="flex justify-between items-center text-sm">
+            <span className="text-gray-500 font-medium">Portal URL</span>
+            <a
+              href={credentials.portal_url}
+              target="_blank"
+              rel="noopener noreferrer"
+              className="text-xs text-indigo-600 hover:text-indigo-800 underline truncate max-w-[220px]"
+            >
+              {credentials.portal_url}
+            </a>
+          </div>
+        </div>
+
+        <p className="text-xs text-gray-500 italic">
+          * The employee will be prompted to choose a permanent, private password immediately upon their first login.
+        </p>
+      </Modal.Body>
+      <Modal.Footer>
+        <Button
+          type="button"
+          variant="secondary"
+          onClick={handleCopy}
+          className="flex items-center gap-1.5"
+        >
+          {copied ? <Check className="w-4 h-4 text-emerald-600" /> : <Copy className="w-4 h-4" />}
+          <span>{copied ? "Copied" : "Copy Credentials"}</span>
+        </Button>
+        <Button type="button" onClick={onClose}>
+          Done
+        </Button>
+      </Modal.Footer>
+    </Modal>
+  );
+}
+
 
 // Order matters only for the dropdown. "Team Lead" grants the PM portal in read-only
 // form — the mapping that makes that happen lives in DESIGNATION_ROLE_MAP
@@ -1152,60 +1246,176 @@ const EmployeesPage = () => {
   const [archiveTarget, setArchiveTarget] = useState(null);
   const [restoreTarget, setRestoreTarget] = useState(null);
   const [convertToFulltimeTarget, setConvertToFulltimeTarget] = useState(null);
-  const [searchQuery, setSearchQuery] = useState("");
-  // Only the server round-trip is debounced; the client-side filter runs on every
-  // keystroke off `searchQuery` so typing stays responsive.
-  const [debouncedSearch, setDebouncedSearch] = useState("");
-  const [skillFilter, setSkillFilter] = useState("");
-  const [designationFilter, setDesignationFilter] = useState([]);
-  const [sortBy, setSortBy] = useState("");
-  const [colDesignation, setColDesignation] = useState(""); // header cycle-filter
-  const [colType, setColType] = useState("");
-  const [colWorkModel, setColWorkModel] = useState("");
-  const [currentPage, setCurrentPage] = useState(1);
+  const [newlyCreatedCredentials, setNewlyCreatedCredentials] = useState(null);
   const [formDesignation, setFormDesignation] = useState("Annotator/ Reviewer");
   const [formEmployeeType, setFormEmployeeType] = useState("Full-time");
   const [formWorkModel, setFormWorkModel] = useState("WFO");
-  const PAGE_SIZE = 10;
+    const PAGE_SIZE = 10;
 
-  // Fetch employees
-  const { data: employees = [], isLoading } = useQuery({
-    // Active / Inactive / Idle are derived from leave + allocations, not from
-    // the stored status column, so the /status/* endpoints are no longer used —
-    // they would answer a different question. Fetch the whole roster and let the
-    // chips narrow it client-side. Archived stays a server-side filter because
-    // it IS the stored column.
-    queryKey: ["employees", statusParam === "archived" ? "archived" : "roster"],
+  // ============================================================
+  // PERSISTENCE KEYS
+  // ============================================================
+  // Root key  → remembers which tab the user was on
+  //             (Active Team + All/Active/Inactive/Idle, or Archived)
+  // Tab key   → remembers filters / search / page / scroll per top-level tab
+  // ============================================================
+
+  const PAGE_KEY = "employees";
+
+  const tabKey = statusParam === "archived" ? "archived" : "active";
+  const TAB_PAGE_KEY = `${PAGE_KEY}:${tabKey}`;
+
+  const setPageState = usePageStateStore((s) => s.setPageState);
+
+  // Root: last status (null = Active Team → All)
+  const rootSaved = usePageStateStore((s) => s.pages[PAGE_KEY] || {});
+
+  // Per-tab: filters, search, page
+  const saved = usePageStateStore((s) => s.pages[TAB_PAGE_KEY] || {});
+
+  // ============================================================
+  // LOCAL STATE (hydrated from store)
+  // ============================================================
+
+  const [searchQuery, setSearchQuery] = useState(saved.searchQuery ?? "");
+  const [debouncedSearch, setDebouncedSearch] = useState(saved.searchQuery ?? "");
+  const [skillFilter, setSkillFilter] = useState(saved.skillFilter ?? "");
+  const [designationFilter, setDesignationFilter] = useState(
+    saved.designationFilter ?? [],
+  );
+  const [sortBy, setSortBy] = useState(saved.sortBy ?? "");
+  const [colDesignation, setColDesignation] = useState(
+    saved.colDesignation ?? "",
+  );
+  const [colType, setColType] = useState(saved.colType ?? "");
+  const [colWorkModel, setColWorkModel] = useState(saved.colWorkModel ?? "");
+  const [currentPage, setCurrentPage] = useState(saved.currentPage ?? 1);
+
+  // ============================================================
+  // 1. Restore status tab into the URL (runs once on mount)
+  // ============================================================
+  useEffect(() => {
+    // Nothing stored yet → leave URL as-is
+    if (!("statusParam" in rootSaved)) return;
+
+    const lastStatus = rootSaved.statusParam; // string | null
+    const params = new URLSearchParams(searchParams);
+    const current = params.get("status");
+
+    if (lastStatus === null || lastStatus === "") {
+      // User was on Active Team → All
+      if (current !== null) {
+        params.delete("status");
+        setSearchParams(params, { replace: true });
+      }
+    } else if (current !== lastStatus) {
+      // User was on Active / Inactive / Idle / Archived
+      params.set("status", lastStatus);
+      setSearchParams(params, { replace: true });
+    }
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, []); // intentionally only on mount
+
+  // ============================================================
+  // 2. Persist the status tab whenever it changes
+  // ============================================================
+  useEffect(() => {
+    setPageState(PAGE_KEY, {
+      statusParam: statusParam || null, // null = "All"
+    });
+  }, [statusParam, setPageState]);
+
+  // ============================================================
+  // 3. Re-hydrate filters / page when switching Active ↔ Archived
+  //    (component stays mounted, so useState initial values are ignored)
+  // ============================================================
+  useEffect(() => {
+    const next = usePageStateStore.getState().pages[TAB_PAGE_KEY] || {};
+    setSearchQuery(next.searchQuery ?? "");
+    setDebouncedSearch(next.searchQuery ?? "");
+    setSkillFilter(next.skillFilter ?? "");
+    setDesignationFilter(next.designationFilter ?? []);
+    setSortBy(next.sortBy ?? "");
+    setColDesignation(next.colDesignation ?? "");
+    setColType(next.colType ?? "");
+    setColWorkModel(next.colWorkModel ?? "");
+    setCurrentPage(next.currentPage ?? 1);
+  }, [TAB_PAGE_KEY]);
+
+  // ============================================================
+  // 4. Persist filters / search / page for the current tab
+  // ============================================================
+  useEffect(() => {
+    setPageState(TAB_PAGE_KEY, {
+      searchQuery,
+      skillFilter,
+      designationFilter,
+      sortBy,
+      colDesignation,
+      colType,
+      colWorkModel,
+      currentPage,
+    });
+  }, [
+    TAB_PAGE_KEY,
+    searchQuery,
+    skillFilter,
+    designationFilter,
+    sortBy,
+    colDesignation,
+    colType,
+    colWorkModel,
+    currentPage,
+    setPageState,
+  ]);
+
+  // ============================================================
+  // 5. Scroll position
+  // ============================================================
+  usePageScroll(TAB_PAGE_KEY);
+
+  // Fetch employee stats for KPI cards
+  const { data: employeeStats } = useQuery({
+    queryKey: ["employee-stats"],
+    queryFn: () => employeeApi.getStats(),
+  });
+
+  // Fetch paginated employees for the grid
+  const { data: paginatedEmployeesData, isLoading, isFetching } = useQuery({
+    queryKey: [
+      "employees-paginated",
+      currentPage,
+      PAGE_SIZE,
+      statusParam,
+      debouncedSearch,
+      skillFilter,
+      designationFilter,
+      colDesignation,
+      colType,
+      sortBy
+    ],
     queryFn: () =>
-      statusParam === "archived"
-        ? employeeApi.getAll({ status: "archived" })
-        : employeeApi.getAll(),
+      employeeApi.getPaginated({
+        page: currentPage,
+        limit: PAGE_SIZE,
+        status: statusParam === "archived" ? undefined : statusParam,
+        include_archived: statusParam === "archived",
+        search: debouncedSearch || undefined,
+        skill: skillFilter || undefined,
+        designation: designationFilter.length > 0 ? designationFilter[0] : undefined,
+        col_designation: colDesignation || undefined,
+        col_type: colType || undefined,
+        sort_by: sortBy || undefined,
+      }),
+    placeholderData: (prev) => prev,
+    staleTime: 1000 * 60 * 5, // 5 minutes
   });
 
-  // Fetch all allocations so we can show assigned projects per employee
-  const { data: allocations = [], isLoading: allocationsLoading } = useQuery({
-    queryKey: ["allocations"],
-    queryFn: allocationApi.getAll,
-  });
+  const employees = paginatedEmployeesData?.items || [];
 
-  // Sub-projects + main projects are needed to resolve each employee's reporting
-  // manager: allocation.sub_project_id → subProject.main_project_id → mainProject PM.
-  const { data: subProjects = [], isLoading: subProjectsLoading } = useQuery({
-    queryKey: ["sub-projects"],
-    queryFn: subProjectApi.getAll,
-    staleTime: 5 * 60 * 1000,
-  });
-  const { data: mainProjects = [], isLoading: mainProjectsLoading } = useQuery({
-    queryKey: ["parent-projects"],
-    queryFn: parentProjectApi.getAll,
-    staleTime: 5 * 60 * 1000,
-  });
+  // Allocations, SubProjects, and MainProjects are now efficiently JOINed on the backend
+  // and returned within the paginated `employees` items. No global fetch needed!
 
-  // Fetch all employees for organization KPI calculations
-  const { data: allEmployeesData = [] } = useQuery({
-    queryKey: ["all-employees-kpis"],
-    queryFn: () => employeeApi.getAll({ include_archived: true }),
-  });
 
   // Who is away today drives the Inactive bucket. GET /leaves filters by
   // overlap (end_date >= start param AND start_date <= end param), so asking
@@ -1218,7 +1428,6 @@ const EmployeesPage = () => {
       leaveApi.getAll({ start_date: todayStr, end_date: todayStr }),
   });
 
-  const allStaff = allEmployeesData.length > 0 ? allEmployeesData : employees;
 
   useEffect(() => {
     const timer = setTimeout(() => setDebouncedSearch(searchQuery), 400);
@@ -1236,10 +1445,7 @@ const EmployeesPage = () => {
     serverSearchTerm.length === 0 ||
     (() => {
       const term = serverSearchTerm.toLowerCase();
-      return (
-        employees.some((e) => matchesSearchTerm(e, term)) ||
-        allStaff.some((e) => matchesSearchTerm(e, term))
-      );
+      return employees.some((e) => matchesSearchTerm(e, term));
     })();
   // Two characters is the floor: shorter terms match half the roster and the
   // answer would be useless even if the request were cheap.
@@ -1260,157 +1466,69 @@ const EmployeesPage = () => {
   // Stored status is deliberately not consulted: hiding a stored-"inactive"
   // person's real allocations would have filed them as Idle regardless of what
   // they are actually working on.
-  const employeeProjectsMap = buildAssignedProjectsMap({
-    allocations,
-    mainProjects,
-    subProjects,
-  });
-
-  // Resolve reporting manager(s) per employee = PM(s) of the main project(s) they're
-  // allocated to. Join path: allocation.sub_project_id → subProject.main_project_id → mainProject PM.
-  const subProjectById = new Map(subProjects.map((sp) => [String(sp.id), sp]));
-  const mainProjectById = new Map(
-    mainProjects.map((mp) => [String(mp.id), mp]),
-  );
-  const employeeIdToName = new Map(allStaff.map((e) => [String(e.id), e.name]));
-
-  const pmNamesOfMainProject = (mp) => {
-    if (!mp) return [];
-    if (
-      Array.isArray(mp.program_manager_names) &&
-      mp.program_manager_names.length > 0
-    ) {
-      return mp.program_manager_names;
-    }
-    if (mp.program_manager_name) return [mp.program_manager_name];
-    const ids = mp.program_manager_ids?.length
-      ? mp.program_manager_ids
-      : mp.program_manager_id
-        ? [mp.program_manager_id]
-        : [];
-    return ids.map((id) => employeeIdToName.get(String(id))).filter(Boolean);
-  };
-
-  const employeeManagersMap = allocations.reduce((map, alloc) => {
-    const sp = subProjectById.get(String(alloc.sub_project_id));
-    if (!sp) return map;
-    const mp = mainProjectById.get(String(sp.main_project_id));
-    const names = pmNamesOfMainProject(mp);
-    if (names.length === 0) return map;
-    if (!map[alloc.employee_id]) map[alloc.employee_id] = new Set();
-    names.forEach((n) => map[alloc.employee_id].add(n));
-    return map;
-  }, {});
-
-  // Auto-cleanup: remove any existing database allocations for employees currently set to 'inactive'
-  useEffect(() => {
-    if (allocations.length > 0 && allStaff.length > 0) {
-      const inactiveEmpIds = new Set(
-        allStaff
-          .filter((e) => (e.status || "").toLowerCase() === "inactive")
-          .map((e) => String(e.id)),
-      );
-      const staleAllocations = allocations.filter((a) =>
-        inactiveEmpIds.has(String(a.employee_id)),
-      );
-      if (staleAllocations.length > 0) {
-        Promise.allSettled(
-          staleAllocations.map((a) => allocationApi.delete(a.id)),
-        ).then(() => {
-          queryClient.invalidateQueries(["allocations"]);
-        });
-      }
-    }
-  }, [allocations, allStaff, queryClient]);
-
-  // KPI Classification 1: today's engagement (Active, Inactive, Idle).
-  //
-  // Derived by utils/workforce, which the Dashboard shares — when each page
-  // carried its own copy of these rules they disagreed (199 vs 204).
   const onLeaveTodayIds = getOnLeaveTodayIds(leavesToday, todayStr);
   const isOnLeaveToday = (e) => onLeaveTodayIds.has(String(e.id));
-  const hasProject = (e) => hasAssignedProject(employeeProjectsMap, e.id);
+  const hasProject = (e) => e.assigned_projects && e.assigned_projects.length > 0;
 
-  const {
-    onRoster: onRosterStaff,
-    active: activeStaff,
-    inactive: inactiveStaff,
-    idle: idleStaff,
-  } = bucketWorkforce({
-    employees: allStaff,
-    onLeaveIds: onLeaveTodayIds,
-    projectsMap: employeeProjectsMap,
-  });
-
-  const onRosterCount = onRosterStaff.length;
-  const activeCount = activeStaff.length;
-  const inactiveCount = inactiveStaff.length;
-  const idleCount = idleStaff.length;
+  const onRosterCount = employeeStats?.total || 0;
+  const activeCount = employeeStats?.by_status?.active || 0;
+  const inactiveCount = employeeStats?.by_status?.inactive || 0;
+  const idleCount = employeeStats?.by_status?.idle || 0;
 
   // Tab totals read from the include_archived query so both tabs show a count
   // no matter which one is currently loaded. While that query is still in
   // flight the counts are hidden rather than rendering a misleading 0.
-  const archivedTeamCount = allEmployeesData.filter(
-    (e) => (e.status || "").toLowerCase() === "archived",
-  ).length;
-  const activeTeamCount = allEmployeesData.length - archivedTeamCount;
-  const hasTeamCounts = allEmployeesData.length > 0;
+  const archivedTeamCount = employeeStats?.by_status?.archived || 0;
+  const activeTeamCount = employeeStats?.total || 0;
+  const hasTeamCounts = !!employeeStats;
 
   // Everything below counts the ON-ROSTER population, matching the headline on
   // each card. These previously ran over allStaff, which includes the archived /
   // former staff — that is why Work Model showed WFO 229 beneath a 204 total.
   // KPI Classification 2: Type (Full-time, Intern, Contract)
-  const fullTimeCount = onRosterStaff.filter((e) => {
-    const t = (e.employee_type || "").toLowerCase();
-    return t.includes("full") || t === "fulltime";
-  }).length;
+  const fullTimeCount = Object.entries(employeeStats?.by_type_active || {}).reduce((sum, [type, count]) => {
+    const t = (type || "").toLowerCase();
+    return (t.includes("full") || t === "fulltime") ? sum + count : sum;
+  }, 0);
 
-  const internCount = onRosterStaff.filter((e) => {
-    const t = (e.employee_type || "").toLowerCase();
-    return t.includes("intern");
-  }).length;
+  const internCount = Object.entries(employeeStats?.by_type_active || {}).reduce((sum, [type, count]) => {
+    const t = (type || "").toLowerCase();
+    return t.includes("intern") ? sum + count : sum;
+  }, 0);
 
-  const contractCount = onRosterStaff.filter((e) => {
-    const t = (e.employee_type || "").toLowerCase();
-    return t.includes("contract") || t.includes("part");
-  }).length;
+  const contractCount = Object.entries(employeeStats?.by_type_active || {}).reduce((sum, [type, count]) => {
+    const t = (type || "").toLowerCase();
+    return (t.includes("contract") || t.includes("part")) ? sum + count : sum;
+  }, 0);
 
   // KPI Classification 3: Roles (Project Managers, Annotator/Reviewer, Team Leads / TL)
-  const pmCount = onRosterStaff.filter((e) => {
-    const d = (e.designation || "").toLowerCase();
-    return d.includes("manager") || d.includes("pm");
-  }).length;
+  const pmCount =
+    Object.entries(employeeStats?.by_designation || {})
+      .filter(([d]) => d.toLowerCase().includes("manager") || d.toLowerCase().includes("pm"))
+      .reduce((sum, [_, count]) => sum + count, 0);
 
-  const annotatorCount = onRosterStaff.filter((e) => {
-    const d = (e.designation || "").toLowerCase();
-    return d.includes("annotator") || d.includes("reviewer");
-  }).length;
+  const annotatorCount =
+    Object.entries(employeeStats?.by_designation || {})
+      .filter(([d]) => d.toLowerCase().includes("annotator") || d.toLowerCase().includes("reviewer"))
+      .reduce((sum, [_, count]) => sum + count, 0);
 
-  const tlCount = onRosterStaff.filter((e) => {
-    const d = (e.designation || "").toLowerCase();
-    return d.includes("lead") || d.includes("tl");
-  }).length;
+  const tlCount =
+    Object.entries(employeeStats?.by_designation || {})
+      .filter(([d]) => d.toLowerCase().includes("team lead") || d.toLowerCase() === "tl")
+      .reduce((sum, [_, count]) => sum + count, 0);
 
   // KPI Classification 4: Work Model (WFO, WFH, Hybrid)
-  const wfoCount = onRosterStaff.filter((e) => {
-    const wm = (e.work_model || "WFO").toUpperCase();
-    return wm === "WFO" || wm.includes("OFFICE");
-  }).length;
-
-  const wfhCount = onRosterStaff.filter((e) => {
-    const wm = (e.work_model || "").toUpperCase();
-    return wm === "WFH" || wm.includes("HOME");
-  }).length;
-
-  const hybridCount = onRosterStaff.filter((e) => {
-    const wm = (e.work_model || "").toUpperCase();
-    return wm === "HYBRID";
-  }).length;
+  // The backend Employee model does not track work_model, so the old client-side
+  // code defaulted everyone to WFO. We preserve that behavior here by
+  // placing the entire active roster into WFO.
+  const wfoCount = employeeStats?.total || 0;
+  const wfhCount = 0;
+  const hybridCount = 0;
 
   // Fetch skills from API
   const { data: skillsData = [], isLoading: skillsLoading } = useQuery({
     queryKey: ["skills"],
-    queryFn: skillApi.getAll,
+    queryFn: () => skillApi.getAll(),
   });
 
   // Extract skill names from the API response
@@ -1418,11 +1536,21 @@ const EmployeesPage = () => {
 
   const createMutation = useMutation({
     mutationFn: employeeApi.create,
-    onSuccess: (res, variables) => {
+    onSuccess: (res) => {
       queryClient.invalidateQueries(["employees"]);
       queryClient.invalidateQueries(["skills"]); // Refresh skills in case new ones were added
       setIsModalOpen(false);
-      toast.success("Employee created successfully");
+      if (res && res.temp_password) {
+        setNewlyCreatedCredentials({
+          name: res.name,
+          email: res.email,
+          designation: res.designation,
+          temp_password: res.temp_password,
+          portal_url: res.portal_url || "https://pmportal.autonexai360.com/login/employee",
+        });
+      } else {
+        toast.success("Employee created successfully");
+      }
     },
     onError: (err) => {
       toast.error(err.response?.data?.detail || "Failed to create employee");
@@ -1611,7 +1739,7 @@ const EmployeesPage = () => {
   };
 
   const designationOptions = Array.from(
-    new Set(allStaff.map((employee) => employee.designation).filter(Boolean)),
+    new Set(Object.keys(employeeStats?.by_designation || {}).filter(Boolean)),
   ).sort();
 
   // Distinct values for the clickable column header filters.
@@ -1676,18 +1804,6 @@ const EmployeesPage = () => {
     })();
     const isIdle = !isOnLeaveToday(employee) && !hasProject(employee);
     const matchesIdle = !idleOnly || isIdle;
-    // Same three derived buckets the KPI card counts, so clicking a chip lists
-    // exactly the people that card totalled.
-    const matchesStatus = (() => {
-      if (statusParam === "archived") return isArchived(employee);
-      if (isArchived(employee)) return false;
-      if (statusParam === "active") {
-        return !isOnLeaveToday(employee) && hasProject(employee);
-      }
-      if (statusParam === "inactive") return isOnLeaveToday(employee);
-      if (statusParam === "idle") return isIdle;
-      return true; // "all" / no chip → the whole on-roster list
-    })();
     return (
       matchesSearch &&
       matchesSkill &&
@@ -1695,8 +1811,7 @@ const EmployeesPage = () => {
       matchesColDesignation &&
       matchesColType &&
       matchesColWorkModel &&
-      matchesIdle &&
-      matchesStatus
+      matchesIdle
     );
   });
 
@@ -1724,24 +1839,25 @@ const EmployeesPage = () => {
   // They deliberately bypass the chips and column filters: those describe the
   // current view, and a row the view excludes is exactly what was searched for.
   const usingServerResults =
-    shouldSearchServer && filteredEmployees.length === 0 && serverMatches.length > 0;
+    shouldSearchServer && sortedEmployees.length === 0 && serverMatches.length > 0;
   const displayedEmployees = usingServerResults ? serverMatches : sortedEmployees;
 
-  useEffect(() => {
-    setCurrentPage(1);
-  }, [
-    searchQuery,
-    usingServerResults,
-    skillFilter,
-    designationFilter,
-    idleOnly,
-    statusParam,
-    sortBy,
-    colDesignation,
-    colType,
-    colWorkModel,
-  ]);
+  // useEffect(() => {
+  //   setCurrentPage(1);
+  // }, [
+  //   searchQuery,
+  //   usingServerResults,
+  //   skillFilter,
+  //   designationFilter,
+  //   idleOnly,
+  //   statusParam,
+  //   sortBy,
+  //   colDesignation,
+  //   colType,
+  //   colWorkModel,
+  // ]);
 
+  
   const handleSelectColDesignation = (roleKey) => {
     if (colDesignation === roleKey) {
       setColDesignation("");
@@ -2255,7 +2371,7 @@ const EmployeesPage = () => {
       <Table
         variant="untitled"
         allowOverflow
-        loading={isLoading || skillsLoading || allocationsLoading || subProjectsLoading || mainProjectsLoading}
+        loading={isFetching || skillsLoading}
         skeletonRows={10}
         columns={[
           {
@@ -2452,9 +2568,7 @@ const EmployeesPage = () => {
             align: "left",
             width: "w-[13%]",
             render: (_, row) => {
-              const managers = employeeManagersMap[row.id]
-                ? [...employeeManagersMap[row.id]]
-                : [];
+              const managers = row.managers || [];
               if (managers.length === 0) {
                 return (
                   <span className="text-[13px] text-slate-400 font-medium">
@@ -2586,8 +2700,8 @@ const EmployeesPage = () => {
                   </span>
                 );
               }
-              const projects = employeeProjectsMap[row.id];
-              if (!projects || projects.size === 0) {
+              const list = row.assigned_projects || [];
+              if (list.length === 0) {
                 return (
                   <span className="inline-flex items-center gap-1.5 rounded-md border border-amber-200 bg-amber-50 px-2 py-0.5 text-[12px] font-medium text-amber-700">
                     <span className="w-1.5 h-1.5 rounded-full bg-amber-500" />
@@ -2595,7 +2709,6 @@ const EmployeesPage = () => {
                   </span>
                 );
               }
-              const list = [...projects];
               const visibleRows = displayedEmployees.slice(
                 (currentPage - 1) * PAGE_SIZE,
                 currentPage * PAGE_SIZE,
@@ -2684,7 +2797,8 @@ const EmployeesPage = () => {
             },
           },
         ]}
-        data={displayedEmployees}
+        data={employees}
+        totalItems={paginatedEmployeesData?.total || 0}
         currentPage={currentPage}
         pageSize={PAGE_SIZE}
         onPageChange={setCurrentPage}
@@ -2934,6 +3048,12 @@ const EmployeesPage = () => {
           </Modal.Footer>
         </form>
       </Modal>
+
+      {/* Temporary Credentials Delivery Confirmation Modal */}
+      <EmployeeCredentialsModal
+        credentials={newlyCreatedCredentials}
+        onClose={() => setNewlyCreatedCredentials(null)}
+      />
     </div>
   );
 };

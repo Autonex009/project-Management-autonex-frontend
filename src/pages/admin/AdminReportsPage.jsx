@@ -1,4 +1,4 @@
-import React, { useState, useEffect } from "react";
+import React, { useState, useEffect, useMemo } from "react";
 import {
   Download,
   Users,
@@ -35,9 +35,13 @@ export default function AdminReportsPage() {
   // ["employees"] cache entry with the rest of the admin portal.
   const { data: employees = [] } = useQuery({
     queryKey: ["employees"],
-    queryFn: employeeApi.getAll,
+    queryFn: () => employeeApi.getAll(),
   });
-  const avatarByEmployeeId = new Map(employees.map((e) => [e.id, e.avatar_url]));
+  
+  const avatarByEmployeeId = useMemo(
+    () => new Map(employees.map((e) => [e.id, e.avatar_url])),
+    [employees],
+  );
 
   const handleExportCSV = () => {
     onboardingApi

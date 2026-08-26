@@ -2,7 +2,8 @@ import { useState, useRef, useEffect } from "react";
 import { useSearchParams } from "react-router-dom";
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
 import { leaveApi, employeeApi, wfhApi } from "../services/api";
-import Spinner from "../components/ui/LoadingSpinner";
+import usePageStateStore from "../store/usePageStateStore";
+import { usePageScroll } from "../hooks/usePageScroll";
 import Button from "../components/ui/Button";
 import DatePicker from "../components/ui/DatePicker";
 import UserAvatar from "../components/ui/UserAvatar";
@@ -51,52 +52,159 @@ import { LEAVE_STATUS_TEXT } from "../components/ui/LeaveStatusText";
 import { makeOpensUpward } from "../utils/tableRows";
 import { checkHalfDayTiming } from "../utils/halfDayTiming";
 
-
-const TABS = ["Leave List", "Calendar", "WFH Requests", "Employee KPI"];
+const TABS = ["Calendar", "Leave List", "WFH Requests", "Employee KPI"];
+const PAGE_SIZE = 10;
 
 const LeavesPage = () => {
   const queryClient = useQueryClient();
-  // ?tab= lets other screens deep-link a specific tab (the Dashboard's WFH card
-  // opens "WFH Requests" directly). Unknown values fall back to the default.
+  // const [searchParams] = useSearchParams();
+  // const tabParam = searchParams.get("tab");
+  // const [activeTab, setActiveTab] = useState(
+  //   TABS.includes(tabParam) ? tabParam : "Calendar",
+  // );
+  // const queryParam = searchParams.get("q");
+  // const [currentPage, setCurrentPage] = useState(1);
+  // const [isModalOpen, setIsModalOpen] = useState(false);
+  // const [selectedLeaveType, setSelectedLeaveType] = useState("");
+  // const [formStartDate, setFormStartDate] = useState("");
+  // const [formEndDate, setFormEndDate] = useState("");
+  // const [searchQuery, setSearchQuery] = useState(queryParam || "");
+
+  // useEffect(() => {
+  //   if (tabParam && TABS.includes(tabParam)) setActiveTab(tabParam);
+  // }, [tabParam]);
+
+  // useEffect(() => {
+  //   setCurrentPage(1);
+  // }, [activeTab]);
+
+  // useEffect(() => {
+  //   if (queryParam === null) return;
+  //   setSearchQuery(queryParam);
+  //   setCurrentPage(1);
+  // }, [queryParam]);
+
+  // const [statusFilter, setStatusFilter] = useState("all");
+  // const [todayOnly, setTodayOnly] = useState(false);
+  // const [dateSort, setDateSort] = useState("");
+  // const [filtersOpen, setFiltersOpen] = useState(false);
+  // const filtersRef = useRef(null);
+
+  // useEffect(() => {
+  //   const handler = (e) => {
+  //     if (filtersRef.current && !filtersRef.current.contains(e.target))
+  //       setFiltersOpen(false);
+  //   };
+  //   document.addEventListener("mousedown", handler);
+  //   return () => document.removeEventListener("mousedown", handler);
+  // }, []);
+
+  // Reset to page 1 whenever any filter / search / sort changes
+  // useEffect(() => {
+  //   setCurrentPage(1);
+  // }, [searchQuery, statusFilter, todayOnly, dateSort]);
+
   const [searchParams] = useSearchParams();
   const tabParam = searchParams.get("tab");
-  const [activeTab, setActiveTab] = useState(
-    TABS.includes(tabParam) ? tabParam : "Leave List",
-  );
   const queryParam = searchParams.get("q");
+
+  const PAGE_KEY = "leaves";
+  const setPageState = usePageStateStore((s) => s.setPageState);
+  const getPageState = usePageStateStore((s) => s.getPageState);
+
+  const defaultListState = {
+    searchQuery: "",
+    statusFilter: "all",
+    todayOnly: false,
+    dateSort: "",
+    currentPage: 1,
+  };
+
+  const [activeTab, setActiveTab] = useState(
+    TABS.includes(tabParam) ? tabParam : "Calendar",
+  );
+  const [searchQuery, setSearchQuery] = useState(queryParam || "");
+  const [statusFilter, setStatusFilter] = useState("all");
+  const [todayOnly, setTodayOnly] = useState(false);
+  const [dateSort, setDateSort] = useState("");
   const [currentPage, setCurrentPage] = useState(1);
-  const PAGE_SIZE = 10;
+
+  // Block writes until we restored from storage (avoids overwriting page with 1)
+  const [ready, setReady] = useState(false);
+
+  // Restore after zustand rehydration
+  useEffect(() => {
+    const restore = () => {
+      const root = getPageState(PAGE_KEY);
+
+      const tab =
+        tabParam && TABS.includes(tabParam)
+          ? tabParam
+          : TABS.includes(root.activeTab)
+            ? root.activeTab
+            : "Calendar";
+
+      setActiveTab(tab);
+
+      if (tab === "Leave List" || tab === "WFH Requests") {
+        const t = root.tabs?.[tab] || defaultListState;
+        setSearchQuery(queryParam != null ? queryParam : t.searchQuery || "");
+        setStatusFilter(t.statusFilter ?? "all");
+        setTodayOnly(!!t.todayOnly);
+        setDateSort(t.dateSort || "");
+        setCurrentPage(t.currentPage ?? 1);
+      }
+
+      setReady(true);
+    };
+
+    if (usePageStateStore.persist.hasHydrated()) {
+      restore();
+      return;
+    }
+    return usePageStateStore.persist.onFinishHydration(restore);
+  }, [tabParam, queryParam, getPageState]);
+
+  // Save current tab state (only after restore)
+  useEffect(() => {
+    if (!ready) return;
+
+    const root = getPageState(PAGE_KEY);
+    const tabs = { ...(root.tabs || {}) };
+
+    if (activeTab === "Leave List" || activeTab === "WFH Requests") {
+      tabs[activeTab] = {
+        searchQuery,
+        statusFilter,
+        todayOnly,
+        dateSort,
+        currentPage,
+      };
+    }
+
+    setPageState(PAGE_KEY, { activeTab, tabs });
+  }, [
+    ready,
+    activeTab,
+    searchQuery,
+    statusFilter,
+    todayOnly,
+    dateSort,
+    currentPage,
+    setPageState,
+    getPageState,
+  ]);
+
+  // Scroll position per tab
+  usePageScroll(`leaves:${activeTab}`);
+
   const [isModalOpen, setIsModalOpen] = useState(false);
   const [selectedLeaveType, setSelectedLeaveType] = useState("");
   const [formStartDate, setFormStartDate] = useState("");
   const [formEndDate, setFormEndDate] = useState("");
-  // ?q= seeds the search box so a Dashboard card can deep-link straight to one
-  // person's requests. It stays editable — clearing the box just clears it.
-  const [searchQuery, setSearchQuery] = useState(queryParam || "");
-
-  // Also react to the params changing while the page is already mounted — e.g.
-  // clicking a second name in the Dashboard popover without leaving the page.
-  // Declared after the state above so the setters are initialised.
-  useEffect(() => {
-    if (tabParam && TABS.includes(tabParam)) setActiveTab(tabParam);
-  }, [tabParam]);
-
-  // Reset page when switching tabs
-  useEffect(() => {
-    setCurrentPage(1);
-  }, [activeTab]);
-  useEffect(() => {
-    if (queryParam === null) return;
-    setSearchQuery(queryParam);
-    // Match handleSearchChange: a narrowed list must start at page 1, or the
-    // deep-linked person can land off-screen on a stale page.
-    setCurrentPage(1);
-  }, [queryParam]);
-  const [statusFilter, setStatusFilter] = useState("all"); // all | pending | approved | rejected
-  const [todayOnly, setTodayOnly] = useState(false); // only leaves that start today
-  const [dateSort, setDateSort] = useState(""); // '' | 'asc' (Jan→Dec) | 'desc' (Dec→Jan)
   const [filtersOpen, setFiltersOpen] = useState(false);
   const filtersRef = useRef(null);
+
   useEffect(() => {
     const handler = (e) => {
       if (filtersRef.current && !filtersRef.current.contains(e.target))
@@ -105,20 +213,42 @@ const LeavesPage = () => {
     document.addEventListener("mousedown", handler);
     return () => document.removeEventListener("mousedown", handler);
   }, []);
+
+  // URL tab wins
+  useEffect(() => {
+    if (tabParam && TABS.includes(tabParam)) setActiveTab(tabParam);
+  }, [tabParam]);
+
+  // URL ?q= wins
+  useEffect(() => {
+    if (queryParam === null) return;
+    setSearchQuery(queryParam);
+    setCurrentPage(1);
+  }, [queryParam]);
+
+  // Reset page only when filters change inside the same list tab
+  const skipPageReset = useRef(true);
+  useEffect(() => {
+    if (!ready) return;
+    if (skipPageReset.current) {
+      skipPageReset.current = false;
+      return;
+    }
+    setCurrentPage(1);
+  }, [searchQuery, statusFilter, todayOnly, dateSort, ready]);
+
   const activeFilterCount =
     (statusFilter !== "all" ? 1 : 0) + (todayOnly ? 1 : 0);
-  const [remarkModal, setRemarkModal] = useState(null); // { leaveId }
+
+  const [remarkModal, setRemarkModal] = useState(null);
   const [remark, setRemark] = useState("");
-  const [wfhRemarkModal, setWfhRemarkModal] = useState(null); // { wfhId, employeeName }
+  const [wfhRemarkModal, setWfhRemarkModal] = useState(null);
   const [wfhRemark, setWfhRemark] = useState("");
   const [deleteTarget, setDeleteTarget] = useState(null);
   const [wfhDeleteConfirm, setWfhDeleteConfirm] = useState(null);
   const [formEmployeeId, setFormEmployeeId] = useState("");
   const user = JSON.parse(localStorage.getItem("user") || "{}");
 
-  // Quick-fill options for the flagged-WFH justification. The first is derived from
-  // the signed-in user's actual role rather than a generic "PM/Admin", so the stored
-  // remark stays truthful — it is kept as the approval's audit trail.
   const approverLabel =
     { admin: "Admin", pm: "PM", hr: "HR", team_lead: "Team Lead" }[user.role] ||
     "Admin";
@@ -128,26 +258,103 @@ const LeavesPage = () => {
     "Approved — one-off exception",
   ];
 
-  const { data: leaves = [], isLoading } = useQuery({
+  // ── Employees (always needed for names / form / KPI) ─────────────────────
+  const isPmOrLead = user.role === "pm" || user.role === "team_lead";
+  const { data: employees = [], isLoading: employeesLoading } = useQuery({
+    queryKey: ["employees", { team_only: isPmOrLead }],
+    queryFn: () => employeeApi.getAll({ team_only: isPmOrLead }),
+  });
+
+  // ── Leaves – server-side page (same pattern as Guidelines) ───────────────
+  const {
+    data: leavePageData,
+    isLoading: leavesLoading,
+    isFetching: leavesFetching,
+  } = useQuery({
+    queryKey: [
+      "leaves-page",
+      currentPage,
+      searchQuery,
+      statusFilter,
+      todayOnly,
+      dateSort,
+    ],
+    queryFn: () =>
+      leaveApi.getPage({
+        page: currentPage,
+        page_size: PAGE_SIZE,
+        search: searchQuery || undefined,
+        status: statusFilter,
+        today_only: todayOnly,
+        sort: dateSort || undefined,
+      }),
+    enabled: activeTab === "Leave List",
+    keepPreviousData: true,
+  });
+
+  const leaves = leavePageData?.items || [];
+  // Support both the shape we return and the shape Guidelines uses
+  const leaveTotalItems =
+    leavePageData?.total_items ?? leavePageData?.total ?? 0;
+  const leaveTotalPages =
+    leavePageData?.total_pages ??
+    leavePageData?.pages ??
+    (Math.ceil(leaveTotalItems / PAGE_SIZE) || 0);
+
+  // Full leaves only when KPI / Calendar need them
+  const { data: allLeaves = [] } = useQuery({
     queryKey: ["leaves"],
     queryFn: leaveApi.getAll,
+    enabled: activeTab === "Employee KPI"
   });
 
-  const { data: employees = [], isLoading: employeesLoading } = useQuery({
-    queryKey: ["employees"],
-    queryFn: employeeApi.getAll,
+  // ── WFH – server-side page ───────────────────────────────────────────────
+  const {
+    data: wfhPageData,
+    isLoading: wfhPageLoading,
+    isFetching: wfhFetching,
+  } = useQuery({
+    queryKey: [
+      "wfh-page",
+      currentPage,
+      searchQuery,
+      statusFilter,
+      todayOnly,
+      dateSort,
+    ],
+    queryFn: () =>
+      wfhApi.getPage({
+        page: currentPage,
+        page_size: PAGE_SIZE,
+        search: searchQuery || undefined,
+        status: statusFilter,
+        today_only: todayOnly,
+        sort: dateSort || undefined,
+      }),
+    enabled: activeTab === "WFH Requests",
+    keepPreviousData: true,
   });
 
-  const { data: wfhRequests = [], isLoading: wfhLoading } = useQuery({
+  const wfhRequests = wfhPageData?.items || [];
+  const wfhTotalItems = wfhPageData?.total_items ?? wfhPageData?.total ?? 0;
+  const wfhTotalPages =
+    wfhPageData?.total_pages ??
+    wfhPageData?.pages ??
+    (Math.ceil(wfhTotalItems / PAGE_SIZE) || 0);
+
+  // Full WFH only for KPI / Calendar
+  const { data: allWfhRequests = [] } = useQuery({
     queryKey: ["wfh"],
     queryFn: () => wfhApi.getAll(),
+    enabled: activeTab === "Employee KPI",
   });
 
-  // ── Leave mutations ──────────────────────────────────────────────
+  // ── Mutations (unchanged) ────────────────────────────────────────────────
   const approveMutation = useMutation({
     mutationFn: ({ id, remark }) => leaveApi.approve(id, user.id, remark),
-    onSuccess: (res, variables) => {
-      queryClient.invalidateQueries(["leaves"]);
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ["leaves-page"] });
+      queryClient.invalidateQueries({ queryKey: ["leaves"] });
       setRemarkModal(null);
       setRemark("");
       toast.success("Leave approved");
@@ -158,8 +365,9 @@ const LeavesPage = () => {
 
   const rejectMutation = useMutation({
     mutationFn: (id) => leaveApi.reject(id, user.id),
-    onSuccess: (_, id) => {
-      queryClient.invalidateQueries(["leaves"]);
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ["leaves-page"] });
+      queryClient.invalidateQueries({ queryKey: ["leaves"] });
       toast.success("Leave rejected");
     },
     onError: (err) =>
@@ -169,8 +377,9 @@ const LeavesPage = () => {
   const undoApproveMutation = useMutation({
     mutationFn: (id) => leaveApi.undoApprove(id, user.id),
     onSuccess: () => {
-      queryClient.invalidateQueries(["leaves"]);
-      queryClient.invalidateQueries(["leave-calendar"]);
+      queryClient.invalidateQueries({ queryKey: ["leaves-page"] });
+      queryClient.invalidateQueries({ queryKey: ["leaves"] });
+      queryClient.invalidateQueries({ queryKey: ["leave-calendar"] });
       toast.success("Leave approval undone");
     },
     onError: (err) =>
@@ -180,8 +389,9 @@ const LeavesPage = () => {
   const undoRejectMutation = useMutation({
     mutationFn: (id) => leaveApi.undoReject(id, user.id),
     onSuccess: () => {
-      queryClient.invalidateQueries(["leaves"]);
-      queryClient.invalidateQueries(["leave-calendar"]);
+      queryClient.invalidateQueries({ queryKey: ["leaves-page"] });
+      queryClient.invalidateQueries({ queryKey: ["leaves"] });
+      queryClient.invalidateQueries({ queryKey: ["leave-calendar"] });
       toast.success("Leave rejection undone");
     },
     onError: (err) =>
@@ -192,14 +402,14 @@ const LeavesPage = () => {
     mutationFn: leaveApi.create,
     onSuccess: (res, variables) => {
       recordLeaveApplication({ ...variables, id: res?.id || res?.leave_id });
-      queryClient.invalidateQueries(["leaves"]);
+      queryClient.invalidateQueries({ queryKey: ["leaves-page"] });
+      queryClient.invalidateQueries({ queryKey: ["leaves"] });
       setIsModalOpen(false);
       setSelectedLeaveType("");
       setFormEmployeeId("");
       setFormStartDate("");
       setFormEndDate("");
       toast.success("Leave record created successfully");
-
     },
     onError: (err) =>
       toast.error(
@@ -210,19 +420,20 @@ const LeavesPage = () => {
   const deleteMutation = useMutation({
     mutationFn: leaveApi.delete,
     onSuccess: () => {
-      queryClient.invalidateQueries(["leaves"]);
+      queryClient.invalidateQueries({ queryKey: ["leaves-page"] });
+      queryClient.invalidateQueries({ queryKey: ["leaves"] });
       toast.success("Leave deleted");
     },
     onError: (err) =>
       toast.error(err.response?.data?.detail || "Failed to delete leave"),
   });
 
-  // ── WFH mutations ────────────────────────────────────────────────
   const wfhApproveMutation = useMutation({
     mutationFn: ({ id, remark }) => wfhApi.approve(id, user.id, remark),
     onSuccess: () => {
-      queryClient.invalidateQueries(["wfh"]);
-      queryClient.invalidateQueries(["leave-calendar"]);
+      queryClient.invalidateQueries({ queryKey: ["wfh-page"] });
+      queryClient.invalidateQueries({ queryKey: ["wfh"] });
+      queryClient.invalidateQueries({ queryKey: ["leave-calendar"] });
       setWfhRemarkModal(null);
       setWfhRemark("");
       toast.success("WFH approved");
@@ -234,7 +445,8 @@ const LeavesPage = () => {
   const wfhRejectMutation = useMutation({
     mutationFn: (id) => wfhApi.reject(id, user.id),
     onSuccess: () => {
-      queryClient.invalidateQueries(["wfh"]);
+      queryClient.invalidateQueries({ queryKey: ["wfh-page"] });
+      queryClient.invalidateQueries({ queryKey: ["wfh"] });
       toast.success("WFH rejected");
     },
     onError: (err) =>
@@ -244,8 +456,9 @@ const LeavesPage = () => {
   const wfhUndoApproveMutation = useMutation({
     mutationFn: (id) => wfhApi.undoApprove(id, user.id),
     onSuccess: () => {
-      queryClient.invalidateQueries(["wfh"]);
-      queryClient.invalidateQueries(["leave-calendar"]);
+      queryClient.invalidateQueries({ queryKey: ["wfh-page"] });
+      queryClient.invalidateQueries({ queryKey: ["wfh"] });
+      queryClient.invalidateQueries({ queryKey: ["leave-calendar"] });
       toast.success("WFH approval undone");
     },
     onError: (err) =>
@@ -255,7 +468,8 @@ const LeavesPage = () => {
   const wfhUndoRejectMutation = useMutation({
     mutationFn: (id) => wfhApi.undoReject(id, user.id),
     onSuccess: () => {
-      queryClient.invalidateQueries(["wfh"]);
+      queryClient.invalidateQueries({ queryKey: ["wfh-page"] });
+      queryClient.invalidateQueries({ queryKey: ["wfh"] });
       toast.success("WFH rejection undone");
     },
     onError: (err) =>
@@ -265,7 +479,8 @@ const LeavesPage = () => {
   const wfhDeleteMutation = useMutation({
     mutationFn: wfhApi.delete,
     onSuccess: () => {
-      queryClient.invalidateQueries(["wfh"]);
+      queryClient.invalidateQueries({ queryKey: ["wfh-page"] });
+      queryClient.invalidateQueries({ queryKey: ["wfh"] });
       toast.success("WFH request deleted");
     },
   });
@@ -278,8 +493,6 @@ const LeavesPage = () => {
     }
   };
 
-  // Mirrors handleApprove: the backend rejects a flagged WFH approval that carries no
-  // remark, so ask for one up front instead of letting the request 400.
   const handleWfhApprove = (w) => {
     if (w.flagged) {
       setWfhRemarkModal({ wfhId: w.id, employeeName: w.employee_name });
@@ -301,7 +514,6 @@ const LeavesPage = () => {
       toast.error("Please select an employee");
       return;
     }
-    // The API rejects a blank reason (LeaveCreate requires min_length 1).
     if (!reason) {
       toast.error("Please enter a reason for this leave");
       return;
@@ -321,9 +533,10 @@ const LeavesPage = () => {
     }
 
     const empIdInt = parseInt(employeeId);
-    const empLeaves = leaves.filter((l) => l.employee_id === empIdInt);
+    const empLeaves = (allLeaves.length ? allLeaves : leaves).filter(
+      (l) => l.employee_id === empIdInt,
+    );
 
-    // Validate consecutive leaves safeguard
     if (
       leaveType !== "wfh" &&
       !validateConsecutiveLeaves(startDate, endDate, empLeaves, null, isHalf)
@@ -350,77 +563,72 @@ const LeavesPage = () => {
   };
 
   const getEmployeeName = (id) =>
-    formatDisplayName(employees.find((e) => e.id === id)?.name) || `Employee #${id}`;
+    formatDisplayName(employees.find((e) => e.id === id)?.name) ||
+    `Employee #${id}`;
   const activeEmployees = employees.filter((e) => e.status === "active");
 
-  // Pagination: reset to page 1 when tab changes
+  // const handleTabChange = (tab) => {
+  //   setActiveTab(tab);
+  //   setCurrentPage(1);
+  //   setSearchQuery("");
+  // };
   const handleTabChange = (tab) => {
+    if (tab === activeTab) return;
+
+    // Save current list tab before leaving it
+    if (ready && (activeTab === "Leave List" || activeTab === "WFH Requests")) {
+      const root = getPageState(PAGE_KEY);
+      setPageState(PAGE_KEY, {
+        activeTab: tab,
+        tabs: {
+          ...(root.tabs || {}),
+          [activeTab]: {
+            searchQuery,
+            statusFilter,
+            todayOnly,
+            dateSort,
+            currentPage,
+          },
+        },
+      });
+    } else if (ready) {
+      setPageState(PAGE_KEY, {
+        ...getPageState(PAGE_KEY),
+        activeTab: tab,
+      });
+    }
+
     setActiveTab(tab);
-    setCurrentPage(1);
-    setSearchQuery("");
+
+    // Load target tab's saved filters / pagination
+    if (tab === "Leave List" || tab === "WFH Requests") {
+      const next = getPageState(PAGE_KEY).tabs?.[tab] || defaultListState;
+      setSearchQuery(next.searchQuery || "");
+      setStatusFilter(next.statusFilter ?? "all");
+      setTodayOnly(!!next.todayOnly);
+      setDateSort(next.dateSort || "");
+      setCurrentPage(next.currentPage ?? 1);
+      // Allow page-reset effect to skip this load
+      skipPageReset.current = true;
+    }
   };
 
   const handleSearchChange = (val) => {
     setSearchQuery(val);
-    setCurrentPage(1);
+    // page reset is handled by the useEffect above
   };
-
-  const todayStr = format(new Date(), "yyyy-MM-dd");
-  const filteredLeaves = leaves.filter((leave) => {
-    if (!leave.start_date || !leave.end_date) return false;
-    // Searched against the stored name as well as the shortened label, so a middle
-    // name still finds its owner — see nameSearchText.
-    const name = nameSearchText(
-      employees.find((e) => e.id === leave.employee_id)?.name,
-    );
-    const typeLabel = getLeaveTypeLabel(leave.leave_type).toLowerCase();
-    const q = searchQuery.toLowerCase();
-    const matchesSearch = name.includes(q) || typeLabel.includes(q);
-    const matchesStatus =
-      statusFilter === "all" || (leave.status || "pending") === statusFilter;
-    const matchesToday =
-      !todayOnly || (leave.start_date || "").slice(0, 10) === todayStr;
-    return matchesSearch && matchesStatus && matchesToday;
-  });
-  // Sort by start date. 'YYYY-MM-DD' sorts lexicographically = chronologically,
-  // so ascending = Jan→Dec (1→31) and descending = Dec→Jan (31→1).
-  if (dateSort) {
-    filteredLeaves.sort((a, b) => {
-      const cmp = (a.start_date || "").localeCompare(b.start_date || "");
-      return dateSort === "asc" ? cmp : -cmp;
-    });
-  }
-
-  const filteredWFH = wfhRequests.filter((w) => {
-    const name = nameSearchText(
-      w.employee_name ||
-        employees.find((e) => e.id === w.employee_id)?.name,
-    );
-    const reason = (w.reason || "").toLowerCase();
-    const q = searchQuery.toLowerCase();
-    const matchesSearch = name.includes(q) || reason.includes(q);
-    const matchesStatus =
-      statusFilter === "all" || (w.status || "pending") === statusFilter;
-    const matchesToday =
-      !todayOnly || (w.wfh_date || "").slice(0, 10) === todayStr;
-    return matchesSearch && matchesStatus && matchesToday;
-  });
-  // Sort by WFH date, same chronological rule as leaves.
-  if (dateSort) {
-    filteredWFH.sort((a, b) => {
-      const cmp = (a.wfh_date || "").localeCompare(b.wfh_date || "");
-      return dateSort === "asc" ? cmp : -cmp;
-    });
-  }
 
   const STATUS_BADGE = LEAVE_STATUS_TEXT;
   const opensUpward = makeOpensUpward(currentPage, PAGE_SIZE);
 
+  const isLeaveListLoading =
+    activeTab === "Leave List" && (leavesLoading || employeesLoading);
+  const isWfhLoading =
+    activeTab === "WFH Requests" && (wfhPageLoading || employeesLoading);
+
   return (
     <div className="space-y-3">
-
-
-      {/* Tabs · Search · Add Leave */}
+      {/* Tabs · Search · Add Leave – unchanged */}
       <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3">
         <div className="inline-flex items-center rounded-lg border border-slate-200 bg-slate-50 p-0.5 w-fit">
           {TABS.map((tab) => {
@@ -487,10 +695,7 @@ const LeavesPage = () => {
                         { value: "rejected", label: "Rejected" },
                       ]}
                       value={statusFilter}
-                      onChange={(v) => {
-                        setStatusFilter(v);
-                        setCurrentPage(1);
-                      }}
+                      onChange={(v) => setStatusFilter(v)}
                       placeholder="All Status"
                       optionsClassName="w-full"
                     />
@@ -503,14 +708,13 @@ const LeavesPage = () => {
                     </span>
                     <button
                       type="button"
-                      onClick={() => {
-                        setTodayOnly((t) => !t);
-                        setCurrentPage(1);
-                      }}
-                      className={`inline-flex h-5 w-9 items-center rounded-full transition-colors ${todayOnly ? "bg-indigo-600" : "bg-slate-200"}`}
+                      onClick={() => setTodayOnly((t) => !t)}
+                      className={`inline-flex h-5 w-9 items-center rounded-full transition-colors ${todayOnly ? "bg-indigo-600" : "bg-slate-200"
+                        }`}
                     >
                       <span
-                        className={`inline-block h-4 w-4 transform rounded-full bg-white transition-transform ${todayOnly ? "translate-x-4" : "translate-x-0.5"}`}
+                        className={`inline-block h-4 w-4 transform rounded-full bg-white transition-transform ${todayOnly ? "translate-x-4" : "translate-x-0.5"
+                          }`}
                       />
                     </button>
                   </div>
@@ -520,7 +724,6 @@ const LeavesPage = () => {
                       onClick={() => {
                         setStatusFilter("all");
                         setTodayOnly(false);
-                        setCurrentPage(1);
                       }}
                       className="w-full text-center pt-2.5 text-xs font-medium text-indigo-600 hover:text-indigo-700 border-t border-slate-100"
                     >
@@ -552,10 +755,7 @@ const LeavesPage = () => {
                   },
                 ]}
                 value={dateSort}
-                onChange={(v) => {
-                  setDateSort(v);
-                  setCurrentPage(1);
-                }}
+                onChange={(v) => setDateSort(v)}
                 placeholder="Sort by date"
               />
             </div>
@@ -592,14 +792,26 @@ const LeavesPage = () => {
           columns={[
             {
               key: "employee_id",
-              // Sized to the longest name plus the avatar and not a pixel more:
-              // a wider share here is dead space that pushes Reason away from the
-              // name it belongs to, since the names are far shorter than the column.
               label: "Employee",
               width: "w-[19%]",
               render: (_, leave) => {
                 const emp = employees.find((e) => e.id === leave.employee_id);
                 const empName = getEmployeeName(leave.employee_id);
+                const approvedBy =
+                  leave.status === "approved" && leave.approved_by_name
+                    ? `Approved by ${leave.approved_by_name}`
+                    : null;
+
+                const remark = (leave.approval_remark || "").trim();
+                const remarkAlreadyHasApprover = /^approved by\b/i.test(remark);
+
+                let underName = null;
+                if (approvedBy && remark) {
+                  underName = remarkAlreadyHasApprover ? remark : `${approvedBy} — ${remark}`;
+                } else {
+                  underName = remark || approvedBy;
+                }
+
                 return (
                   <div className="flex items-center gap-3 min-w-0">
                     <UserAvatar src={emp?.avatar_url} name={empName} size="sm" />
@@ -615,14 +827,14 @@ const LeavesPage = () => {
                           <OverLimitHoverCard leave={leave} allLeaves={leaves} />
                         )}
                         {leave.is_emergency && (
-                          <FlagChip
-                            icon={Siren}
-                            label="Emergency"
-                            tone="red"
-                            pulse
-                          />
+                          <FlagChip icon={Siren} label="Emergency" tone="red" pulse />
                         )}
                       </div>
+                      {underName && (
+                        <p className="text-xs text-slate-400 mt-0.5 truncate" title={underName}>
+                          {underName}
+                        </p>
+                      )}
                     </div>
                   </div>
                 );
@@ -641,13 +853,10 @@ const LeavesPage = () => {
                     new Date(leave.start_date + "T00:00:00"),
                     "MMM d, yyyy",
                   )}`}
-                  openUpward={opensUpward(filteredLeaves, leave)}
+                  openUpward={opensUpward(leaves, leave)}
                 />
               ),
             },
-            // Every column past the employee is centred on an even 12–14% share,
-            // so the row reads as a regular grid instead of left-hugging text with
-            // wide gaps opening up between the columns.
             {
               key: "leave_type",
               label: "Leave Type",
@@ -655,7 +864,9 @@ const LeavesPage = () => {
               width: "w-[13%]",
               render: (value) => (
                 <span
-                  className={`inline-flex whitespace-nowrap px-2.5 py-1 rounded-full text-xs font-medium ${getLeaveTypeBadgeClass(value)}`}
+                  className={`inline-flex whitespace-nowrap px-2.5 py-1 rounded-full text-xs font-medium ${getLeaveTypeBadgeClass(
+                    value,
+                  )}`}
                 >
                   {getLeaveTypeLabel(value)
                     .replace("Second Half-day Leave", "2nd Half-day")
@@ -668,22 +879,32 @@ const LeavesPage = () => {
               label: "Start Date",
               align: "center",
               width: "w-[11%]",
-              render: (value) => (
-                <span className="text-[13px] text-slate-700 whitespace-nowrap">
-                  {format(new Date(value + "T00:00:00"), "MMM d, yyyy")}
-                </span>
-              ),
+              render: (value) => {
+                if (!value) return <span className="text-[13px] text-slate-400">—</span>;
+                const d = new Date(String(value).slice(0, 10) + "T00:00:00");
+                if (isNaN(d.getTime())) return <span className="text-[13px] text-slate-400">—</span>;
+                return (
+                  <span className="text-[13px] text-slate-700 whitespace-nowrap">
+                    {format(d, "MMM d, yyyy")}
+                  </span>
+                );
+              },
             },
             {
               key: "end_date",
               label: "End Date",
               align: "center",
               width: "w-[11%]",
-              render: (value) => (
-                <span className="text-[13px] text-slate-700 whitespace-nowrap">
-                  {format(new Date(value + "T00:00:00"), "MMM d, yyyy")}
-                </span>
-              ),
+              render: (value) => {
+                if (!value) return <span className="text-[13px] text-slate-400">—</span>;
+                const d = new Date(String(value).slice(0, 10) + "T00:00:00");
+                if (isNaN(d.getTime())) return <span className="text-[13px] text-slate-400">—</span>;
+                return (
+                  <span className="text-[13px] text-slate-700 whitespace-nowrap">
+                    {format(d, "MMM d, yyyy")}
+                  </span>
+                );
+              },
             },
             {
               key: "applied_on",
@@ -692,13 +913,15 @@ const LeavesPage = () => {
               width: "w-[11%]",
               render: (_, leave) => {
                 const rawApplied = resolveLeaveAppliedDate(leave);
-                if (!rawApplied) return <span className="text-[13px] text-slate-400">—</span>;
-                // Extract YYYY-MM-DD from the ISO string to avoid UTC→local timezone shifts
+                if (!rawApplied)
+                  return <span className="text-[13px] text-slate-400">—</span>;
                 const dateStr = String(rawApplied).slice(0, 10);
                 const [y, m, day] = dateStr.split("-").map(Number);
-                if (!y || !m || !day) return <span className="text-[13px] text-slate-400">—</span>;
+                if (!y || !m || !day)
+                  return <span className="text-[13px] text-slate-400">—</span>;
                 const d = new Date(y, m - 1, day);
-                if (isNaN(d.getTime())) return <span className="text-[13px] text-slate-400">—</span>;
+                if (isNaN(d.getTime()))
+                  return <span className="text-[13px] text-slate-400">—</span>;
                 return (
                   <span className="text-[13px] text-slate-700 whitespace-nowrap">
                     {format(d, "MMM d, yyyy")}
@@ -726,7 +949,8 @@ const LeavesPage = () => {
                       {leave.is_half_day ? (
                         <>
                           day (
-                          {leave.half_day_slot === "first_half" || leave.half_day_slot === "1st Half"
+                          {leave.half_day_slot === "first_half" ||
+                            leave.half_day_slot === "1st Half"
                             ? "1st Half"
                             : "2nd Half"}
                           )
@@ -758,7 +982,7 @@ const LeavesPage = () => {
                 return (
                   <div className="flex items-center justify-center">
                     <RowActionMenu
-                      openUpward={opensUpward(filteredLeaves, leave)}
+                      openUpward={opensUpward(leaves, leave)}
                       actions={[
                         isPending && {
                           label: "Approve",
@@ -802,12 +1026,14 @@ const LeavesPage = () => {
               },
             },
           ]}
-          data={filteredLeaves}
+          data={leaves}
+          loading={isLeaveListLoading || leavesFetching}
+          skeletonRows={10}
           currentPage={currentPage}
           pageSize={PAGE_SIZE}
+          totalItems={leaveTotalItems}
+          totalPages={leaveTotalPages}
           onPageChange={setCurrentPage}
-          loading={isLoading || employeesLoading}
-          skeletonRows={10}
           emptyState={{
             title: "No leaves recorded yet",
             description: "Try adjusting your search query",
@@ -823,7 +1049,7 @@ const LeavesPage = () => {
         <Table
           variant="untitled"
           allowOverflow
-          loading={wfhLoading || employeesLoading}
+          loading={isWfhLoading || wfhFetching}
           skeletonRows={10}
           columns={[
             {
@@ -831,8 +1057,26 @@ const LeavesPage = () => {
               label: "Employee",
               width: "w-[20%]",
               render: (value, w) => {
-                const emp = employees.find(e => e.id === w.employee_id);
-                const empName = value ? formatDisplayName(value) : getEmployeeName(w.employee_id);
+                const emp = employees.find((e) => e.id === w.employee_id);
+                const empName = value
+                  ? formatDisplayName(value)
+                  : getEmployeeName(w.employee_id);
+                const approvedBy =
+                  w.status === "approved" && w.approved_by_name
+                    ? `Approved by ${w.approved_by_name}`
+                    : null;
+
+                const remark = (w.remark || "").trim();
+                const remarkAlreadyHasApprover = /^approved by\b/i.test(remark);
+
+                let underName = null;
+                if (approvedBy && remark) {
+                  // Remark already says "Approved by …" → show only the remark (or only approvedBy)
+                  underName = remarkAlreadyHasApprover ? remark : `${approvedBy} — ${remark}`;
+                } else {
+                  underName = remark || approvedBy;
+                }
+
                 return (
                   <div className="flex items-center gap-3">
                     <UserAvatar src={emp?.avatar_url} name={empName} size="sm" />
@@ -848,11 +1092,9 @@ const LeavesPage = () => {
                           <FlagChip icon={AlertTriangle} label="Over limit" />
                         )}
                       </div>
-                      {/* The remark is the justification for approving an over-limit
-                          request, so it belongs on the row rather than only in the DB. */}
-                      {w.remark && (
-                        <p className="text-xs text-slate-400 mt-0.5 truncate">
-                          Remark: {w.remark}
+                      {underName && (
+                        <p className="text-xs text-slate-400 mt-0.5 truncate" title={underName}>
+                          {underName}
                         </p>
                       )}
                     </div>
@@ -865,14 +1107,18 @@ const LeavesPage = () => {
               label: "Date",
               align: "center",
               width: "w-[13%]",
-              render: (value) => (
-                <span className="text-[13px] text-slate-700 whitespace-nowrap">
-                  {format(new Date(value + "T00:00:00"), "MMM d, yyyy")}
-                </span>
-              ),
+              render: (value) => {
+                if (!value) return <span className="text-[13px] text-slate-400">—</span>;
+                const d = new Date(String(value).slice(0, 10) + "T00:00:00");
+                if (isNaN(d.getTime()))
+                  return <span className="text-[13px] text-slate-400">—</span>;
+                return (
+                  <span className="text-[13px] text-slate-700 whitespace-nowrap">
+                    {format(d, "MMM d, yyyy")}
+                  </span>
+                );
+              },
             },
-            // Five columns here against the Leave List's eight, so the note is
-            // spelled out in the row rather than folded behind an icon.
             {
               key: "reason",
               label: "Reason",
@@ -880,7 +1126,7 @@ const LeavesPage = () => {
               render: (value, w) => (
                 <ReasonText
                   reason={value}
-                  openUpward={opensUpward(filteredWFH, w)}
+                  openUpward={opensUpward(wfhRequests, w)}
                 />
               ),
             },
@@ -899,7 +1145,7 @@ const LeavesPage = () => {
               render: (_, w) => (
                 <div className="flex items-center justify-center">
                   <RowActionMenu
-                    openUpward={opensUpward(filteredWFH, w)}
+                    openUpward={opensUpward(wfhRequests, w)}
                     actions={[
                       w.status === "pending" && {
                         label: "Approve",
@@ -940,9 +1186,11 @@ const LeavesPage = () => {
               ),
             },
           ]}
-          data={filteredWFH}
+          data={wfhRequests}
           currentPage={currentPage}
           pageSize={PAGE_SIZE}
+          totalItems={wfhTotalItems}
+          totalPages={wfhTotalPages}
           onPageChange={setCurrentPage}
           emptyState={{
             title: "No WFH requests yet",
@@ -955,8 +1203,8 @@ const LeavesPage = () => {
       {activeTab === "Employee KPI" && (
         <EmployeeKPIPanel
           employees={employees}
-          leaves={leaves}
-          wfhRequests={wfhRequests}
+          leaves={allLeaves}
+          wfhRequests={allWfhRequests}
         />
       )}
 
@@ -1046,7 +1294,6 @@ const LeavesPage = () => {
               </div>
             </div>
 
-            {/* Quick-fill presets — click to use as-is, or edit afterwards. */}
             <div className="flex flex-wrap items-center gap-1.5 mb-2">
               <span className="text-[11px] font-semibold text-slate-400">
                 Quick fill:
@@ -1056,11 +1303,10 @@ const LeavesPage = () => {
                   key={preset}
                   type="button"
                   onClick={() => setWfhRemark(preset)}
-                  className={`px-2.5 py-1 rounded-lg border text-[11px] font-semibold transition-colors ${
-                    wfhRemark === preset
-                      ? "bg-indigo-600 text-white border-indigo-600"
-                      : "bg-slate-50 text-slate-600 border-slate-200 hover:bg-slate-100"
-                  }`}
+                  className={`px-2.5 py-1 rounded-lg border text-[11px] font-semibold transition-colors ${wfhRemark === preset
+                    ? "bg-indigo-600 text-white border-indigo-600"
+                    : "bg-slate-50 text-slate-600 border-slate-200 hover:bg-slate-100"
+                    }`}
                 >
                   {preset}
                 </button>
@@ -1163,7 +1409,7 @@ const LeavesPage = () => {
             </div>
             <div>
               {selectedLeaveType === "first_half" ||
-              selectedLeaveType === "second_half" ? (
+                selectedLeaveType === "second_half" ? (
                 <div>
                   <label className="block text-sm font-medium text-gray-700 mb-1">
                     Date <span className="text-red-500">*</span>
@@ -1184,7 +1430,8 @@ const LeavesPage = () => {
               ) : (
                 <div>
                   <label className="block text-sm font-medium text-gray-700 mb-1">
-                    Leave Duration (Start & End Date) <span className="text-red-500">*</span>
+                    Leave Duration (Start & End Date){" "}
+                    <span className="text-red-500">*</span>
                   </label>
                   <input type="hidden" name="start_date" value={formStartDate} />
                   <input type="hidden" name="end_date" value={formEndDate} />
@@ -1220,7 +1467,7 @@ const LeavesPage = () => {
                 <div className="rounded-xl border border-indigo-150 bg-indigo-50/50 p-4 text-sm text-indigo-900 space-y-2">
                   <div className="flex items-center gap-1.5 font-semibold text-indigo-950">
                     <Clock className="w-4 h-4 text-indigo-600" /> Half-day Leave
-                    Policy & Slots
+                    Policy &amp; Slots
                   </div>
                   <div className="grid grid-cols-1 sm:grid-cols-2 gap-3 text-xs">
                     <div className="p-2.5 bg-white rounded-lg border border-indigo-100/80">
@@ -1273,6 +1520,7 @@ const LeavesPage = () => {
           </Modal.Footer>
         </form>
       </Modal>
+
       {deleteTarget && (
         <ConfirmDialog
           isOpen={!!deleteTarget}
@@ -1286,7 +1534,10 @@ const LeavesPage = () => {
           }}
           isPending={deleteMutation.isPending}
           title="Delete Leave Record"
-          message={`Are you sure you want to delete the ${getLeaveTypeLabel(deleteTarget.leave_type)} record for ${getEmployeeName(deleteTarget.employee_id)} (${deleteTarget.start_date} — ${deleteTarget.end_date})?`}
+          message={`Are you sure you want to delete the ${getLeaveTypeLabel(
+            deleteTarget.leave_type,
+          )} record for ${getEmployeeName(deleteTarget.employee_id)} (${deleteTarget.start_date
+            } — ${deleteTarget.end_date})?`}
           variant="danger"
           confirmText="Delete"
           cancelText="Cancel"

@@ -169,9 +169,9 @@ const NotificationBell = () => {
 
   // Event-driven (no polling): React Query refetches on mount + tab refocus; we add
   // refetch-on-navigation and refetch-on-open below. Cuts the constant 15s drumbeat.
-  const { data: notifications = [], refetch } = useQuery({
+  const { data: bellData = { unread_count: 0, latest: [] }, refetch } = useQuery({
     queryKey: ["notifications", userId],
-    queryFn: () => notificationApi.getAll(userId),
+    queryFn: () => notificationApi.getUnreadSummary(),
     enabled: !!userId && mounted,
     staleTime: 15_000,
     refetchOnWindowFocus: true, // global default is false; enable just for notifications
@@ -186,8 +186,9 @@ const NotificationBell = () => {
     if (userId) refetch();
   }, [location.pathname]); // eslint-disable-line react-hooks/exhaustive-deps
 
-  const unreadCount = notifications.filter((n) => !n.is_read).length;
-  const readCount = notifications.filter((n) => n.is_read).length;
+  const notifications = bellData.latest || [];
+  const unreadCount = bellData.unread_count;
+  const readCount = notifications.filter((n) => n.is_read).length; // Approximated from latest
 
   const markReadMutation = useMutation({
     mutationFn: (id) => notificationApi.markRead(id, userId),
@@ -244,18 +245,14 @@ const NotificationBell = () => {
         }
         aria-expanded={open}
       >
-        {/* No hover rotate: the badge stayed put while the glyph tilted under it. */}
-        <Bell className="h-[18px] w-[18px]" />
+        <Bell className="h-5 w-5" />
         {unreadCount > 0 && (
-          // A 6px dot centred ON the bell's outline, at the top-right shoulder —
-          // viewBox (18,8), which is exactly where lucide's own BellDot puts it,
-          // mapped through the 18px render inside this 36px button. A count here
-          // was a chip of text competing with the icon; the exact number lives in
-          // the panel, and in this button's aria-label.
           <span
             aria-hidden="true"
-            className="pointer-events-none absolute right-[10px] top-[9px] h-1.5 w-1.5 rounded-full bg-rose-500 ring-[1.5px] ring-white"
-          />
+            className="pointer-events-none absolute right-[3px] top-[3px] flex h-[14px] min-w-[14px] items-center justify-center rounded-full bg-rose-500 px-1 text-[8px] font-medium leading-[0] tracking-normal text-white ring-[1.5px] ring-white"
+          >
+            <span className="mt-[1px] block">{unreadCount > 9 ? '9+' : unreadCount}</span>
+          </span>
         )}
       </button>
 

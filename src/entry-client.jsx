@@ -12,7 +12,7 @@ import "@fontsource/plus-jakarta-sans";
 hydrateRoot(
   document.getElementById("root"),
   <React.StrictMode>
-    <BrowserRouter>
+    <BrowserRouter future={{ v7_startTransition: true, v7_relativeSplatPath: true }}>
       <App />
     </BrowserRouter>
   </React.StrictMode>,

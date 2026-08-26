@@ -51,8 +51,10 @@ const INK_MUTED = "#94a3b8";
 const GRID = "#f1f5f9";
 
 const RANGES = [
+  { key: "day", label: "Last day" },
   { key: "week", label: "Last 7 days" },
-  { key: "month", label: "This month" },
+  { key: "30", label: "Last 30 days" },
+  { key: "month", label: "Current month" },
   { key: "custom", label: "Custom Range" },
 ];
 
@@ -62,21 +64,33 @@ const PROJECT_TABS = [
   { id: "roster", label: "Team Roster & Utilization", icon: Users },
 ];
 
-const iso = (d) => d.toISOString().slice(0, 10);
-
 function computeRange(mode, custom) {
   const today = new Date();
+  const pad = (n) => String(n).padStart(2, "0");
+  const formatLocalDate = (d) =>
+    `${d.getFullYear()}-${pad(d.getMonth() + 1)}-${pad(d.getDate())}`;
+
+  if (mode === "day") {
+    const from = new Date(today);
+    from.setDate(today.getDate() - 1);
+    return { date_from: formatLocalDate(from), date_to: formatLocalDate(today) };
+  }
   if (mode === "week") {
     const from = new Date(today);
     from.setDate(today.getDate() - 6);
-    return { date_from: iso(from), date_to: iso(today) };
+    return { date_from: formatLocalDate(from), date_to: formatLocalDate(today) };
+  }
+  if (mode === "30") {
+    const from = new Date(today);
+    from.setDate(today.getDate() - 29);
+    return { date_from: formatLocalDate(from), date_to: formatLocalDate(today) };
   }
   if (mode === "custom" && custom.from && custom.to) {
     return { date_from: custom.from, date_to: custom.to };
   }
   return {
-    date_from: iso(new Date(today.getFullYear(), today.getMonth(), 1)),
-    date_to: iso(today),
+    date_from: `${today.getFullYear()}-${pad(today.getMonth() + 1)}-01`,
+    date_to: formatLocalDate(today),
   };
 }
 
@@ -149,12 +163,12 @@ const ProjectAnalyticsPage = () => {
 
   const { data: allocations = [] } = useQuery({
     queryKey: ["allocations"],
-    queryFn: allocationApi.getAll,
+    queryFn: () => allocationApi.getAll(),
   });
 
   const { data: employees = [] } = useQuery({
     queryKey: ["employees"],
-    queryFn: employeeApi.getAll,
+    queryFn: () => employeeApi.getAll(),
   });
 
   const annotators = data?.annotators || [];
@@ -245,17 +259,25 @@ const ProjectAnalyticsPage = () => {
 
     return annotators.map((a) => {
       const emp = empMap[a.user_email?.toLowerCase()] || {};
+      // Match only by employee — projectAllocations is already scoped to this project,
+      // so an OR on sub_project_id was always true and returned the first row for everyone. (Bug resolved)
       const alloc = projectAllocations.find(
-        (al) => al.employee_id === emp.id || String(al.sub_project_id) === String(mainProjectId)
+        (al) => emp.id != null && al.employee_id === emp.id
       );
+
+      const dailyHours = alloc?.total_daily_hours ?? alloc?.hours_per_day ?? 0;
+      const role =
+        (Array.isArray(alloc?.role_tags) && alloc.role_tags[0]) ||
+        alloc?.role ||
+        "Annotator";
 
       return {
         id: emp.id || a.user_email,
         name: emp.name || a.employee_name || a.user_email,
         email: a.user_email,
         avatar_url: emp.avatar_url,
-        role: alloc?.role || "Annotator",
-        planned_hours: alloc ? (alloc.hours_per_day || 0) * 20 : 80,
+        role,
+        planned_hours: alloc ? dailyHours * 20 : 80,
         actual_hours: a.total_hours || 0,
         tasks_submitted: a.tasks_submitted || 0,
         labels_created: a.labels_created || 0,
@@ -288,26 +310,26 @@ const ProjectAnalyticsPage = () => {
     );
 
   return (
-    <div className="space-y-6">
+    <div className="space-y-3">
       {/* Back Button Bar */}
-      <div className="flex items-center justify-between pb-2 border-b border-slate-200/80">
+      <div className="flex items-center justify-between pb-2 border-b border-stone-200">
         <button
           type="button"
           onClick={() => navigate(`${basePath}/analytics`)}
-          className="inline-flex items-center gap-1.5 text-xs font-bold text-slate-500 hover:text-indigo-600 transition-colors cursor-pointer"
+          className="inline-flex items-center gap-1.5 text-xs font-semibold text-stone-500 hover:text-indigo-600 transition-colors cursor-pointer"
         >
           <ChevronLeft className="w-4 h-4" /> Back to Global Dashboard
         </button>
 
-        <span className="text-xs font-bold text-slate-700 bg-slate-100 px-3 py-1 rounded-full border border-slate-200/80">
+        <span className="text-xs font-bold text-stone-700 bg-stone-100 px-3 py-1 rounded-full border border-stone-200">
           {data.name}
         </span>
       </div>
 
       {/* ── PANEL 1: EXECUTION & VARIANCE ───────────────────────────────── */}
       {activePanel === "execution" && (
-        <div className="space-y-6">
-          <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-5 gap-3.5">
+        <div className="space-y-3">
+          <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-5 gap-3">
             <GlassKpiCard icon={Clock} label="Platform Hours" value={`${data.month.platform_hours}h`} subtitle="Selected range" tone="indigo" />
             <GlassKpiCard icon={Gauge} label="Annotation Avg" value={`${data.month.avg_hours_per_annotator}h`} subtitle="Per active annotator" tone="emerald" />
             <GlassKpiCard icon={Gauge} label="Avg Hr / Person" value={`${data.month.avg_hours_per_person ?? 0}h`} subtitle="Per person in project" tone="sky" />
@@ -321,19 +343,19 @@ const ProjectAnalyticsPage = () => {
             <GlassKpiCard icon={Gauge} label="Platform / Person" value={`${data.fixed?.today?.avg_hours_per_annotator ?? 0}h`} subtitle="Daily average" tone="amber" />
           </div>
 
-          {/* Navigation Tabs & Range Selection Bar (BELOW KPI CARDS - NO HORIZONTAL SCROLL) */}
-          <div className="flex items-center justify-between gap-2 pb-3 border-b border-slate-200/80">
+          {/* Navigation Tabs & Range Selection Bar */}
+          <div className="flex items-center justify-between gap-2 pb-2.5 border-b border-stone-200">
             <AnalyticsTabNav tabs={PROJECT_TABS} activeTab={activePanel} onChange={setActivePanel} />
 
-            <div className="inline-flex items-center gap-0.5 p-1 bg-slate-100/90 rounded-xl border border-slate-200/80 select-none shrink-0">
+            <div className="inline-flex items-center gap-0.5 p-0.5 bg-stone-100/90 rounded-xl border border-stone-200 select-none shrink-0">
               {RANGES.map((r) => (
                 <button
                   key={r.key}
                   onClick={() => setRangeMode(r.key)}
                   className={`px-2.5 py-1 rounded-lg text-xs font-semibold transition-all duration-150 cursor-pointer whitespace-nowrap ${
                     rangeMode === r.key
-                      ? "bg-white text-indigo-600 shadow-sm ring-1 ring-slate-200/70 font-bold"
-                      : "text-slate-600 hover:text-slate-900 hover:bg-slate-200/50"
+                      ? "bg-white text-indigo-600 shadow-sm ring-1 ring-stone-200 font-bold"
+                      : "text-stone-600 hover:text-stone-900 hover:bg-stone-200/50"
                   }`}
                 >
                   {r.label}
@@ -343,28 +365,28 @@ const ProjectAnalyticsPage = () => {
           </div>
 
           {rangeMode === "custom" && (
-            <div className="flex items-center gap-2 text-xs p-3 rounded-xl bg-slate-50 border border-slate-200">
+            <div className="flex items-center gap-2 text-xs p-2.5 rounded-xl bg-stone-50 border border-stone-200">
               <input
                 type="date"
                 value={custom.from}
                 onChange={(e) => setCustom((c) => ({ ...c, from: e.target.value }))}
-                className="input text-xs text-slate-900 bg-white"
+                className="input text-xs text-stone-900 bg-white"
               />
-              <span className="text-slate-400">→</span>
+              <span className="text-stone-400">→</span>
               <input
                 type="date"
                 value={custom.to}
                 onChange={(e) => setCustom((c) => ({ ...c, to: e.target.value }))}
-                className="input text-xs text-slate-900 bg-white"
+                className="input text-xs text-stone-900 bg-white"
               />
             </div>
           )}
 
-          <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
-            <div className="rounded-3xl border border-slate-200/80 bg-white/90 backdrop-blur-md p-6 shadow-sm flex flex-col justify-between">
-              <div className="mb-4">
-                <h3 className="text-base font-black text-slate-900">Daily Platform Execution Trend</h3>
-                <p className="text-xs text-slate-400 font-medium">Autonex team active editor time across the project</p>
+          <div className="grid grid-cols-1 lg:grid-cols-2 gap-3">
+            <div className="rounded-2xl border border-stone-200 bg-white p-4 shadow-[0_1px_4px_rgba(28,25,23,0.06)] flex flex-col justify-between">
+              <div className="mb-3">
+                <h3 className="text-sm font-bold text-stone-900">Daily Platform Execution Trend</h3>
+                <p className="text-xs text-stone-400 font-medium">Autonex team active editor time across the project</p>
               </div>
               <DailyPlatformHoursChart
                 isGlobal={false}
@@ -375,10 +397,10 @@ const ProjectAnalyticsPage = () => {
               />
             </div>
 
-            <div className="rounded-3xl border border-slate-200/80 bg-white/90 backdrop-blur-md p-6 shadow-sm flex flex-col justify-between">
-              <div className="mb-4">
-                <h3 className="text-base font-black text-slate-900">Daily Allocation Target vs. Logged Execution</h3>
-                <p className="text-xs text-slate-400 font-medium">Comparing daily scheduled baseline hours against actual Encord logged hours</p>
+            <div className="rounded-2xl border border-stone-200 bg-white p-4 shadow-[0_1px_4px_rgba(28,25,23,0.06)] flex flex-col justify-between">
+              <div className="mb-3">
+                <h3 className="text-sm font-bold text-stone-900">Daily Allocation Target vs. Logged Execution</h3>
+                <p className="text-xs text-stone-400 font-medium">Comparing daily scheduled baseline hours against actual Encord logged hours</p>
               </div>
               <PlannedVsActualChart data={projectPlannedVsActual} height={250} />
             </div>
@@ -388,18 +410,18 @@ const ProjectAnalyticsPage = () => {
 
       {/* ── PANEL 2: WORKFLOW & THROUGHPUT ──────────────────────────────── */}
       {activePanel === "throughput" && (
-        <div className="space-y-6">
-          <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
-            <div className="lg:col-span-1 rounded-3xl border border-slate-200/80 bg-white/90 backdrop-blur-md p-6 shadow-sm">
-              <h3 className="text-base font-black text-slate-900 mb-1">Workflow Stage Split</h3>
-              <p className="text-xs text-slate-400 font-medium mb-3">Annotation vs Review split</p>
+        <div className="space-y-3">
+          <div className="grid grid-cols-1 lg:grid-cols-3 gap-3">
+            <div className="lg:col-span-1 rounded-2xl border border-stone-200 bg-white p-4 shadow-[0_1px_4px_rgba(28,25,23,0.06)]">
+              <h3 className="text-sm font-bold text-stone-900 mb-1">Workflow Stage Split</h3>
+              <p className="text-xs text-stone-400 font-medium mb-3">Annotation vs Review split</p>
               <StageDistributionChart data={stageData} height={220} />
             </div>
 
-            <div className="lg:col-span-2 rounded-3xl border border-slate-200/80 bg-white/90 backdrop-blur-md p-6 shadow-sm">
-              <div className="mb-4">
-                <h3 className="text-base font-black text-slate-900">Annotator Activity Heatmap Matrix</h3>
-                <p className="text-xs text-slate-400 font-medium">Daily editor hours intensity grid across team members</p>
+            <div className="lg:col-span-2 rounded-2xl border border-stone-200 bg-white p-4 shadow-[0_1px_4px_rgba(28,25,23,0.06)]">
+              <div className="mb-3">
+                <h3 className="text-sm font-bold text-stone-900">Annotator Activity Heatmap Matrix</h3>
+                <p className="text-xs text-stone-400 font-medium">Daily editor hours intensity grid across team members</p>
               </div>
               <AnnotatorComparisonChart annotators={annotators} dailyData={data?.daily || []} />
             </div>
@@ -409,18 +431,18 @@ const ProjectAnalyticsPage = () => {
 
       {/* ── PANEL 3: TEAM ROSTER & UTILIZATION ──────────────────────────── */}
       {activePanel === "roster" && (
-        <div className="space-y-6">
-          <div className="space-y-3">
-            <h3 className="text-base font-black text-slate-900">Project Team Utilization & Output Roster</h3>
+        <div className="space-y-3">
+          <div className="space-y-2">
+            <h3 className="text-sm font-bold text-stone-900">Project Team Utilization & Output Roster</h3>
             <ProjectTeamRosterTable roster={teamRosterData} isLoading={isLoading} />
           </div>
 
-          <div className="rounded-3xl border border-slate-200/80 bg-white/90 backdrop-blur-md p-6 shadow-sm space-y-2">
-            <h3 className="text-base font-black text-slate-900">PM Project Delivery Notes & Sentiment</h3>
-            <div className="flex items-start gap-3 pt-2">
-              <MessageSquare className="w-5 h-5 text-slate-400 mt-0.5 shrink-0" />
-              <p className="text-xs text-slate-700 whitespace-pre-wrap leading-relaxed font-medium">
-                {data.sentiment || <span className="text-slate-400">No sentiment notes recorded yet for this project.</span>}
+          <div className="rounded-2xl border border-stone-200 bg-white p-4 shadow-[0_1px_4px_rgba(28,25,23,0.06)] space-y-2">
+            <h3 className="text-sm font-bold text-stone-900">PM Project Delivery Notes & Sentiment</h3>
+            <div className="flex items-start gap-2.5 pt-1">
+              <MessageSquare className="w-4 h-4 text-stone-400 mt-0.5 shrink-0" />
+              <p className="text-xs text-stone-700 whitespace-pre-wrap leading-relaxed font-medium">
+                {data.sentiment || <span className="text-stone-400">No sentiment notes recorded yet for this project.</span>}
               </p>
             </div>
           </div>

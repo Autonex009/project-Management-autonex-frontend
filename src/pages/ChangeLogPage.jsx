@@ -1,4 +1,6 @@
-import React, { useState, useEffect, useMemo } from "react";
+import React, { useState, useEffect, useMemo, useRef } from "react";
+import usePageStateStore from "../store/usePageStateStore";
+import { usePageScroll } from "../hooks/usePageScroll";
 import { useQuery } from "@tanstack/react-query";
 import {
   Search,
@@ -30,6 +32,12 @@ const toISODate = (d) =>
   ).padStart(2, "0")}`;
 
 export default function ChangeLogPage() {
+
+    // ── Persist filters / search / page / scroll ───────────────
+  const PAGE_KEY = "change-log";
+  const setPageState = usePageStateStore((s) => s.setPageState);
+  const getPageState = usePageStateStore((s) => s.getPageState);
+
   const [page, setPage] = useState(1);
   const [searchInput, setSearchInput] = useState("");
   const [search, setSearch] = useState("");
@@ -39,16 +47,73 @@ export default function ChangeLogPage() {
   const [dateFrom, setDateFrom] = useState("");
   const [dateTo, setDateTo] = useState("");
   const [showCustomDateModal, setShowCustomDateModal] = useState(false);
-  const [expandedId, setExpandedId] = useState(null);
+  const [expandedId, setExpandedId] = useState(null); // not persisted
 
-  // Debounce search
+  const [ready, setReady] = useState(false);
+  const skipSearchPageReset = useRef(true);
+
+  useEffect(() => {
+    const restore = () => {
+      const s = getPageState(PAGE_KEY);
+      if (s.searchInput != null) setSearchInput(s.searchInput);
+      if (s.search != null) setSearch(s.search);
+      if (s.category != null) setCategory(s.category);
+      if (s.actorRole != null) setActorRole(s.actorRole);
+      if (s.timeFilter != null) setTimeFilter(s.timeFilter);
+      if (s.dateFrom != null) setDateFrom(s.dateFrom);
+      if (s.dateTo != null) setDateTo(s.dateTo);
+      if (s.timeFilter === "custom") setShowCustomDateModal(true);
+      if (s.page != null) setPage(s.page);
+      setReady(true);
+    };
+
+    if (usePageStateStore.persist.hasHydrated()) {
+      restore();
+      return;
+    }
+    return usePageStateStore.persist.onFinishHydration(restore);
+  }, [getPageState]);
+
+  useEffect(() => {
+    if (!ready) return;
+    setPageState(PAGE_KEY, {
+      page,
+      searchInput,
+      search,
+      category,
+      actorRole,
+      timeFilter,
+      dateFrom,
+      dateTo,
+    });
+  }, [
+    ready,
+    page,
+    searchInput,
+    search,
+    category,
+    actorRole,
+    timeFilter,
+    dateFrom,
+    dateTo,
+    setPageState,
+  ]);
+
+  usePageScroll(PAGE_KEY);
+
+  // Debounce search — do not force page 1 on the restore pass
   useEffect(() => {
     const t = setTimeout(() => {
       setSearch(searchInput);
+      if (!ready) return;
+      if (skipSearchPageReset.current) {
+        skipSearchPageReset.current = false;
+        return;
+      }
       setPage(1);
     }, 350);
     return () => clearTimeout(t);
-  }, [searchInput]);
+  }, [searchInput, ready]);
 
   // Handle time filter selection
   const handleTimeFilterChange = (val) => {
@@ -99,7 +164,7 @@ export default function ChangeLogPage() {
 
   const { data: filterOptions } = useQuery({
     queryKey: ["audit-log-filters"],
-    queryFn: auditLogApi.getFilters,
+    queryFn: () => auditLogApi.getFilters(),
   });
 
   const rawLogs = result?.items || [];
@@ -296,8 +361,7 @@ export default function ChangeLogPage() {
         </div>
 
         {/* RIGHT: Search + filters + refresh */}
-        <div className="flex items-center gap-2.5 shrink-0">
-          {/* Filter by keyword search box */}
+        <div className="flex flex-wrap items-center gap-2.5 shrink-0 ml-auto">
           <div className="relative shrink-0">
             <input
               type="text"
@@ -309,67 +373,50 @@ export default function ChangeLogPage() {
             <Search className="absolute right-2.5 top-2.5 h-4 w-4 text-slate-400 pointer-events-none" />
           </div>
 
-          {/* Extreme Right: Search, Time, Category & Refresh */}
-          <div className="flex flex-wrap items-center gap-3 ml-auto">
-            {/* Filter by keyword search box */}
-            <div className="relative">
-              <input
-                type="text"
-                value={searchInput}
-                onChange={(e) => setSearchInput(e.target.value)}
-                placeholder="Filter by keyword"
-                className="w-56 rounded-md border border-slate-300 bg-white px-3 py-1.5 text-sm text-slate-800 placeholder:text-slate-400 focus:border-blue-500 focus:outline-none focus:ring-1 focus:ring-blue-500"
+          <Dropdown
+            className="w-[195px] sm:w-[215px] shrink-0"
+            options={TIME_FILTER_OPTIONS}
+            value={timeFilter}
+            onChange={handleTimeFilterChange}
+          />
+
+          {showCustomDateModal && (
+            <div className="w-60 shrink-0">
+              <DatePicker
+                type="range"
+                startDate={dateFrom}
+                endDate={dateTo}
+                onRangeChange={({ startDate, endDate }) => {
+                  setDateFrom(startDate);
+                  setDateTo(endDate);
+                  setPage(1);
+                }}
+                placeholder="Select date range"
               />
-              <Search className="absolute right-2.5 top-2.5 h-4 w-4 text-slate-400 pointer-events-none" />
             </div>
+          )}
 
-            {/* Filter by Time dropdown */}
-            <Dropdown
-              className="w-[195px] sm:w-[215px] shrink-0"
-              options={TIME_FILTER_OPTIONS}
-              value={timeFilter}
-              onChange={handleTimeFilterChange}
+          <Dropdown
+            className="w-44 shrink-0"
+            options={categoryOptions}
+            value={category}
+            onChange={(v) => {
+              setCategory(v);
+              setPage(1);
+            }}
+          />
+
+          <button
+            type="button"
+            onClick={() => refetch()}
+            title="Refresh audit log"
+            className="inline-flex items-center gap-1.5 text-sm font-medium text-slate-700 hover:text-blue-600 transition-colors cursor-pointer"
+          >
+            <RefreshCw
+              className={`h-4 w-4 text-slate-500 ${isFetching ? "animate-spin" : ""}`}
             />
-
-            {/* Custom date range selector inline to the right of Filter by Time */}
-            {showCustomDateModal && (
-              <div className="w-60 shrink-0">
-                <DatePicker
-                  type="range"
-                  startDate={dateFrom}
-                  endDate={dateTo}
-                  onRangeChange={({ startDate, endDate }) => {
-                    setDateFrom(startDate);
-                    setDateTo(endDate);
-                    setPage(1);
-                  }}
-                  placeholder="Select date range"
-                />
-              </div>
-            )}
-
-            {/* Category filter */}
-            <Dropdown
-              className="w-44 shrink-0"
-              options={categoryOptions}
-              value={category}
-              onChange={(v) => {
-                setCategory(v);
-                setPage(1);
-              }}
-            />
-
-            {/* Refresh button */}
-            <button
-              type="button"
-              onClick={() => refetch()}
-              title="Refresh audit log"
-              className="inline-flex items-center gap-1.5 text-sm font-medium text-slate-700 hover:text-blue-600 transition-colors ml-1 cursor-pointer"
-            >
-              <RefreshCw className={`h-4 w-4 text-slate-500 ${isFetching ? "animate-spin" : ""}`} />
-              Refresh
-            </button>
-          </div>
+            Refresh
+          </button>
         </div>
       </div>
 

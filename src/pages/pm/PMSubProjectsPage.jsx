@@ -1,6 +1,7 @@
 import React from "react";
 import { useQuery } from "@tanstack/react-query";
-import { useSearchParams, Link } from "react-router-dom";
+import Pagination from "../../components/ui/Pagination";
+import { useSearchParams, Link, useNavigate } from "react-router-dom";
 import {
   allocationApi,
   parentProjectApi,
@@ -9,11 +10,7 @@ import {
 import { FolderKanban, Settings, Users, Clock } from "lucide-react";
 import Spinner from "../../components/ui/LoadingSpinner";
 import { format } from "date-fns";
-import {
-  getPmEmployeeId,
-  getPmProjects,
-  getPmSubProjects,
-} from "../../utils/pmScope";
+import { getPmEmployeeId, getPmProjects } from "../../utils/pmScope";
 import Table, { ColumnTemplates } from "../../components/ui/Table";
 
 const PMSubProjectsPage = () => {
@@ -23,32 +20,32 @@ const PMSubProjectsPage = () => {
   const projectParam = searchParams.get("project");
   const filterMainProjectId = projectParam ? Number(projectParam) : null;
 
-  const { data: subProjects = [], isLoading } = useQuery({
-    queryKey: ["sub-projects"],
-    queryFn: subProjectApi.getAll,
-  });
+  const page = parseInt(searchParams.get("page") || "1", 10);
   const { data: parentProjects = [] } = useQuery({
     queryKey: ["parent-projects"],
-    queryFn: parentProjectApi.getAll,
+    queryFn: () => parentProjectApi.getAll(),
   });
-  const { data: allocations = [] } = useQuery({
-    queryKey: ["allocations"],
-    queryFn: allocationApi.getAll,
+
+  const { data: paginatedData, isLoading } = useQuery({
+    queryKey: [
+      "sub-projects",
+      "paginated",
+      page,
+      filterMainProjectId,
+    ],
+    queryFn: () =>
+      subProjectApi.getPaginated({
+        page,
+        limit: 10,
+        main_project_id: filterMainProjectId || undefined,
+      }),
+    keepPreviousData: true,
   });
 
   const scopedProjects = getPmProjects(parentProjects, pmEmployeeId);
-  const scopedSubProjects = getPmSubProjects(
-    subProjects,
-    parentProjects,
-    pmEmployeeId,
-    allocations,
-  );
-  const filteredSubProjects =
-    filterMainProjectId == null || Number.isNaN(filterMainProjectId)
-      ? scopedSubProjects
-      : scopedSubProjects.filter(
-          (project) => project.main_project_id === filterMainProjectId,
-        );
+  const filteredSubProjects = paginatedData?.items || [];
+  const totalPages = paginatedData?.pages || 1;
+
   const currentProject = scopedProjects.find(
     (project) => project.id === filterMainProjectId,
   );
@@ -102,9 +99,7 @@ const PMSubProjectsPage = () => {
             label: "Manpower",
             align: "center",
             render: (required, project) => {
-              const allocated = allocations.filter(
-                (a) => a.sub_project_id === project.id,
-              ).length;
+              const allocated = project.allocated_employees || 0;
               return (
                 <div className="inline-flex items-center gap-1.5 text-slate-600">
                   <Users className="w-3.5 h-3.5" />
@@ -149,6 +144,22 @@ const PMSubProjectsPage = () => {
           description: "Sub-projects from your projects will appear here.",
         }}
       />
+      {totalPages > 1 && (
+        <Pagination
+          currentPage={page}
+          totalPages={totalPages}
+          onPageChange={(p) => {
+            setSearchParams(
+              (prev) => {
+                const params = new URLSearchParams(prev);
+                params.set("page", String(p));
+                return params;
+              },
+              { replace: true }
+            );
+          }}
+        />
+      )}
     </div>
   );
 };

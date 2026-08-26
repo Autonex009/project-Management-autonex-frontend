@@ -1,38 +1,14 @@
 import React from "react";
 import { useQuery } from "@tanstack/react-query";
-import { guidelineApi, allocationApi, subProjectApi } from "../../services/api";
+import { guidelineApi } from "../../services/api";
 import { FileText, Download } from "lucide-react";
 
 const EmployeeGuidelinesPage = () => {
-  const user = JSON.parse(localStorage.getItem("user") || "{}");
-  const employeeId = user.employee_id;
 
-  const { data: allocations = [], isLoading: allocLoading } = useQuery({
-    queryKey: ["my-allocations", employeeId],
-    queryFn: () => allocationApi.getByEmployee(employeeId),
-    enabled: !!employeeId,
+  const { data: myGuidelines = [], isLoading } = useQuery({
+    queryKey: ["guidelines-for-me"],
+    queryFn: () => guidelineApi.getForMe(),
   });
-  const { data: projects = [], isLoading: projectsLoading } = useQuery({
-    queryKey: ["sub-projects"],
-    queryFn: subProjectApi.getAll,
-  });
-  const { data: allGuidelines = [], isLoading: guidelinesLoading } = useQuery({
-    queryKey: ["guidelines"],
-    queryFn: () => guidelineApi.getAll(),
-  });
-
-  const isLoading = guidelinesLoading || allocLoading || projectsLoading;
-
-  const myProjectIds = new Set(allocations.map((a) => a.sub_project_id));
-  const myProjects = projects.filter((p) => myProjectIds.has(p.id));
-  const myMainProjectIds = new Set(
-    myProjects.map((p) => p.main_project_id).filter(Boolean),
-  );
-  const myGuidelines = allGuidelines.filter(
-    (g) =>
-      (g.sub_project_id && myProjectIds.has(g.sub_project_id)) ||
-      (g.main_project_id && myMainProjectIds.has(g.main_project_id)),
-  );
 
   return (
     <div className="space-y-6">

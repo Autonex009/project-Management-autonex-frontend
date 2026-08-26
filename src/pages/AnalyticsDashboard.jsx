@@ -1,7 +1,9 @@
-import { useMemo, useState, useEffect } from "react";
+import { useMemo, useState, useEffect, useRef } from "react";
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
 import { useNavigate, useLocation, useParams, useSearchParams } from "react-router-dom";
 import { analyticsApi, subProjectApi, allocationApi } from "../services/api";
+import usePageStateStore from "../store/usePageStateStore"; 
+import { usePageScroll } from "../hooks/usePageScroll";
 import Table from "../components/ui/Table";
 import Button from "../components/ui/Button";
 import DatePicker from "../components/ui/DatePicker";
@@ -49,6 +51,7 @@ const AUTONEX_RANGES = [
   { key: "1", label: "Last day" },
   { key: "7", label: "Last 7 days" },
   { key: "30", label: "Last 30 days" },
+  { key: "current_month", label: "Current month" },
   { key: "custom", label: "Custom Range" },
 ];
 
@@ -66,51 +69,75 @@ const AnalyticsDashboard = () => {
   const queryClient = useQueryClient();
   const basePath = location.pathname.startsWith("/pm") ? "/pm" : "/admin";
 
-  const [range, setRange] = useState("30");
-  const [dateFrom, setDateFrom] = useState("");
-  const [dateTo, setDateTo] = useState("");
-  const [heatmapSearch, setHeatmapSearch] = useState("");
+  // ============================================================
+  // PERSISTENCE
+  // ============================================================
+  const PAGE_KEY = "analytics-dashboard";
+  const setPageState = usePageStateStore((s) => s.setPageState);
+  const saved = usePageStateStore((s) => s.pages[PAGE_KEY] || {});
+
+  const [range, setRange] = useState(saved.range ?? "30");
+  const [dateFrom, setDateFrom] = useState(saved.dateFrom ?? "");
+  const [dateTo, setDateTo] = useState(saved.dateTo ?? "");
+  const [heatmapSearch, setHeatmapSearch] = useState(saved.heatmapSearch ?? "");
 
   const queryParams = useMemo(() => {
     const today = new Date();
-    const iso = (d) => d.toISOString().slice(0, 10);
+    const pad = (n) => String(n).padStart(2, "0");
+    const formatLocalDate = (d) =>
+      `${d.getFullYear()}-${pad(d.getMonth() + 1)}-${pad(d.getDate())}`;
 
     let fromStr = "";
-    let toStr = iso(today);
+    let toStr = formatLocalDate(today);
+    let backendRange = range;
 
     if (range === "1") {
       const from = new Date(today);
       from.setDate(today.getDate() - 1);
-      fromStr = iso(from);
+      fromStr = formatLocalDate(from);
+      backendRange = "1";
     } else if (range === "7") {
       const from = new Date(today);
       from.setDate(today.getDate() - 6);
-      fromStr = iso(from);
+      fromStr = formatLocalDate(from);
+      backendRange = "7";
     } else if (range === "30") {
       const from = new Date(today);
       from.setDate(today.getDate() - 29);
-      fromStr = iso(from);
+      fromStr = formatLocalDate(from);
+      backendRange = "30";
+    } else if (range === "current_month") {
+      fromStr = `${today.getFullYear()}-${pad(today.getMonth() + 1)}-01`;
+      toStr = formatLocalDate(today);
+      backendRange = "custom";
     } else if (range === "custom" && dateFrom) {
       fromStr = dateFrom;
       if (dateTo) toStr = dateTo;
+      backendRange = "custom";
     } else {
-      const from = new Date(today.getFullYear(), today.getMonth(), 1);
-      fromStr = iso(from);
+      fromStr = `${today.getFullYear()}-${pad(today.getMonth() + 1)}-01`;
+      backendRange = "custom";
     }
 
     return {
-      range,
+      range: backendRange,
       date_from: fromStr,
       date_to: toStr,
     };
   }, [range, dateFrom, dateTo]);
 
-  const [currentPage, setCurrentPage] = useState(1);
-  const [opsPage, setOpsPage] = useState(1);
-  const [healthPage, setHealthPage] = useState(1);
+  const [currentPage, setCurrentPage] = useState(saved.currentPage ?? 1);
+  const [opsPage, setOpsPage] = useState(saved.opsPage ?? 1);
+  const [healthPage, setHealthPage] = useState(saved.healthPage ?? 1);
   const pageSize = 5;
 
+  // Only reset pages when the user changes the date range, not on restore
+  const isInitialMount = useRef(true);
   useEffect(() => {
+    if (isInitialMount.current) {
+      isInitialMount.current = false;
+      return;
+    }
     setCurrentPage(1);
     setOpsPage(1);
     setHealthPage(1);
@@ -123,6 +150,7 @@ const AnalyticsDashboard = () => {
     if (jobId) setActiveJobId(jobId);
   }, []);
 
+  // Ephemeral UI — not persisted
   const [isWorkforceModalOpen, setIsWorkforceModalOpen] = useState(false);
   const [workforceSearch, setWorkforceSearch] = useState("");
   const [workforceRoleFilter, setWorkforceRoleFilter] = useState("all");
@@ -148,12 +176,12 @@ const AnalyticsDashboard = () => {
 
   const { data: allProjects = [] } = useQuery({
     queryKey: ["sub-projects"],
-    queryFn: subProjectApi.getAll,
+    queryFn: () => subProjectApi.getAll(),
   });
 
   const { data: allocations = [] } = useQuery({
     queryKey: ["allocations"],
-    queryFn: allocationApi.getAll,
+    queryFn: () => allocationApi.getAll(),
   });
 
   // Audit of Unlinked Projects
@@ -221,8 +249,13 @@ const AnalyticsDashboard = () => {
   const { mainProjectId } = useParams();
   const [searchParams] = useSearchParams();
 
+  // Prefer URL/route param → stored value → "all"
   const [selectedProjectId, setSelectedProjectId] = useState(
-    () => mainProjectId || searchParams.get("project") || "all"
+    () =>
+      mainProjectId ||
+      searchParams.get("project") ||
+      saved.selectedProjectId ||
+      "all"
   );
 
   useEffect(() => {
@@ -231,6 +264,33 @@ const AnalyticsDashboard = () => {
       setSelectedProjectId(pId);
     }
   }, [mainProjectId, searchParams]);
+
+  // Persist filters / range / project / pages
+  useEffect(() => {
+    setPageState(PAGE_KEY, {
+      range,
+      dateFrom,
+      dateTo,
+      selectedProjectId,
+      heatmapSearch,
+      currentPage,
+      opsPage,
+      healthPage,
+    });
+  }, [
+    range,
+    dateFrom,
+    dateTo,
+    selectedProjectId,
+    heatmapSearch,
+    currentPage,
+    opsPage,
+    healthPage,
+    setPageState,
+  ]);
+
+  // Scroll position
+  usePageScroll(PAGE_KEY);
 
   const isGlobal = selectedProjectId === "all";
 
@@ -335,9 +395,7 @@ const AnalyticsDashboard = () => {
 
     return {
       value: `${pct}% Active`,
-      subtitle: isGlobal
-        ? `${activeMembers} of ${totalMembers} assigned members active in period`
-        : `${activeMembers} of ${totalMembers} assigned project members active`,
+      subtitle: `${activeMembers} / ${totalMembers} active in period`,
       tone: pct >= 80 ? "emerald" : "amber",
       trend: pct >= 80 ? 6 : -4,
       trendLabel: "vs prev",
@@ -438,9 +496,9 @@ const AnalyticsDashboard = () => {
   };
 
   return (
-    <div className="space-y-6">
+    <div className="space-y-3">
       {/* 1. Top Executive KPI Cards Summary Banner */}
-      <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-5">
+      <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-3">
         <GlassKpiCard
           icon={Clock}
           label="Platform Execution"
@@ -474,8 +532,8 @@ const AnalyticsDashboard = () => {
         />
       </div>
 
-      {/* 2. Unified Controls Bar (NO HORIZONTAL SCROLL) */}
-      <div className="flex flex-wrap items-center justify-between gap-3 pb-3 border-b border-slate-200/80">
+      {/* 2. Unified Controls Bar */}
+      <div className="flex flex-wrap items-center justify-between gap-3 pb-2.5 border-b border-stone-200">
         {/* Left: Searchable Project Scope Selector */}
         <div className="flex items-center gap-2">
           <div className="w-56 sm:w-64 text-xs font-semibold">
@@ -494,7 +552,7 @@ const AnalyticsDashboard = () => {
             <button
               type="button"
               onClick={() => setSelectedProjectId("all")}
-              className="inline-flex items-center gap-1.5 px-2.5 py-1 rounded-xl bg-indigo-50 border border-indigo-200/80 text-xs font-bold text-indigo-700 hover:bg-indigo-100 transition-colors shadow-2xs cursor-pointer"
+              className="inline-flex items-center gap-1.5 px-2.5 py-1 rounded-lg bg-indigo-50 border border-indigo-200 text-xs font-semibold text-indigo-700 hover:bg-indigo-100 transition-colors shadow-xs cursor-pointer"
               title="Click to reset scope to All Projects"
             >
               <span>Scope: {selectedProjectObj?.name || "Selected Project"}</span>
@@ -505,7 +563,7 @@ const AnalyticsDashboard = () => {
 
         {/* Right: Date Range Selector Pills + Sync Data */}
         <div className="flex flex-wrap items-center gap-2 shrink-0">
-          <div className="inline-flex items-center gap-0.5 p-1 bg-slate-100/90 rounded-xl border border-slate-200/80 select-none">
+          <div className="inline-flex items-center gap-0.5 p-0.5 bg-stone-100/90 rounded-xl border border-stone-200 select-none">
             {AUTONEX_RANGES.map((r) => {
               if (r.key === "custom") {
                 return (
@@ -529,8 +587,8 @@ const AnalyticsDashboard = () => {
                         type="button"
                         className={`px-2.5 py-1 rounded-lg text-xs font-semibold transition-all duration-150 cursor-pointer whitespace-nowrap ${
                           range === "custom"
-                            ? "bg-white text-indigo-600 shadow-sm ring-1 ring-slate-200/70 font-bold"
-                            : "text-slate-600 hover:text-slate-900 hover:bg-slate-200/50"
+                            ? "bg-white text-indigo-600 shadow-sm ring-1 ring-stone-200 font-bold"
+                            : "text-stone-600 hover:text-stone-900 hover:bg-stone-200/50"
                         }`}
                       >
                         {range === "custom" && dateFrom && dateTo
@@ -552,8 +610,8 @@ const AnalyticsDashboard = () => {
                   }}
                   className={`px-2.5 py-1 rounded-lg text-xs font-semibold transition-all duration-150 cursor-pointer whitespace-nowrap ${
                     range === r.key
-                      ? "bg-white text-indigo-600 shadow-sm ring-1 ring-slate-200/70 font-bold"
-                      : "text-slate-600 hover:text-slate-900 hover:bg-slate-200/50"
+                      ? "bg-white text-indigo-600 shadow-sm ring-1 ring-stone-200 font-bold"
+                      : "text-stone-600 hover:text-stone-900 hover:bg-stone-200/50"
                   }`}
                 >
                   {r.label}
@@ -567,7 +625,7 @@ const AnalyticsDashboard = () => {
             size="sm"
             onClick={handleSyncClick}
             disabled={syncBusy}
-            className="rounded-xl font-bold px-2.5 py-1 text-xs"
+            className="rounded-lg font-bold px-2.5 py-1 text-xs"
           >
             <RefreshCw className={`w-3.5 h-3.5 ${syncBusy ? "animate-spin" : ""}`} />
             <span>
@@ -583,15 +641,15 @@ const AnalyticsDashboard = () => {
 
       {/* 3. Executive Analytics Visualizer Matrix */}
       {isGlobal ? (
-        <div className="grid grid-cols-1 md:grid-cols-2 gap-5">
+        <div className="grid grid-cols-1 md:grid-cols-2 gap-3">
           {/* Tile 1 (Top Left): Daily Platform Execution Volume Trend */}
-          <div className="rounded-3xl border border-slate-200/80 bg-white/90 backdrop-blur-md p-5 shadow-xs flex flex-col justify-between h-[320px]">
+          <div className="rounded-2xl border border-stone-200 bg-white p-4 shadow-[0_1px_4px_rgba(28,25,23,0.06)] flex flex-col justify-between h-[320px]">
             <div className="mb-2 flex items-center justify-between">
               <div>
-                <h3 className="text-base font-black text-slate-900">Daily Execution Volume Trend</h3>
-                <p className="text-xs text-slate-400 font-medium">Logged platform hours per calendar day</p>
+                <h3 className="text-sm font-bold text-stone-900">Daily Execution Volume Trend</h3>
+                <p className="text-xs text-stone-400 font-medium">Logged platform hours per calendar day</p>
               </div>
-              <span className="rounded-full bg-indigo-50 border border-indigo-200/80 px-3 py-1 text-xs font-bold text-indigo-700 font-mono shadow-2xs">
+              <span className="rounded-full bg-indigo-50 border border-indigo-200/80 px-2.5 py-0.5 text-xs font-bold text-indigo-700 font-mono shadow-xs">
                 {activeKpis?.total_hours ?? activeKpis?.autonex_platform_hours ?? 0}h Total
               </span>
             </div>
@@ -606,11 +664,11 @@ const AnalyticsDashboard = () => {
           </div>
 
           {/* Tile 2 (Top Right): Top 5 High-Volume Projects */}
-          <div className="rounded-3xl border border-slate-200/80 bg-white/90 backdrop-blur-md p-5 shadow-xs flex flex-col justify-between h-[320px]">
+          <div className="rounded-2xl border border-stone-200 bg-white p-4 shadow-[0_1px_4px_rgba(28,25,23,0.06)] flex flex-col justify-between h-[320px]">
             <div className="mb-2 flex items-center justify-between gap-3">
               <div>
-                <h3 className="text-base font-black text-slate-900">Top 5 High-Volume Projects</h3>
-                <p className="text-xs text-slate-400 font-medium">Projects ranked by logged platform hours</p>
+                <h3 className="text-sm font-bold text-stone-900">Top 5 High-Volume Projects</h3>
+                <p className="text-xs text-stone-400 font-medium">Projects ranked by logged platform hours</p>
               </div>
             </div>
             <ProjectVelocityBarChart
@@ -621,10 +679,10 @@ const AnalyticsDashboard = () => {
           </div>
 
           {/* Tile 3 (Bottom Left): Annotation vs Review Dynamics */}
-          <div className="rounded-3xl border border-slate-200/80 bg-white/90 backdrop-blur-md p-5 shadow-xs flex flex-col justify-between h-[320px]">
+          <div className="rounded-2xl border border-stone-200 bg-white p-4 shadow-[0_1px_4px_rgba(28,25,23,0.06)] flex flex-col justify-between h-[320px]">
             <div className="mb-2">
-              <h3 className="text-base font-black text-slate-900">Annotation vs Review Dynamics</h3>
-              <p className="text-xs text-slate-400 font-medium">Daily split of production annotation vs quality review time</p>
+              <h3 className="text-sm font-bold text-stone-900">Annotation vs Review Dynamics</h3>
+              <p className="text-xs text-stone-400 font-medium">Daily split of production annotation vs quality review time</p>
             </div>
             <WorkforceSplitAreaChart
               data={activeChartData}
@@ -634,9 +692,9 @@ const AnalyticsDashboard = () => {
             />
           </div>
 
-          {/* Tile 4 (Bottom Right - ORIGINAL PLACE NEXT TO ANNOTATION VS REVIEW): Dual Insight Cards */}
-          <div className="grid grid-cols-1 sm:grid-cols-2 gap-4 h-[320px]">
-            <div className="rounded-3xl border border-slate-200/80 bg-white/90 backdrop-blur-md p-4 shadow-xs flex flex-col justify-between h-full">
+          {/* Tile 4 (Bottom Right): Dual Insight Cards */}
+          <div className="grid grid-cols-1 sm:grid-cols-2 gap-3 h-[320px]">
+            <div className="rounded-2xl border border-stone-200 bg-white p-3.5 shadow-[0_1px_4px_rgba(28,25,23,0.06)] flex flex-col justify-between h-full">
               <WorkforceRoleInsightCard
                 isGlobal={true}
                 kpis={activeKpis}
@@ -644,7 +702,7 @@ const AnalyticsDashboard = () => {
                 projects={rows}
               />
             </div>
-            <div className="rounded-3xl border border-slate-200/80 bg-white/90 backdrop-blur-md p-4 shadow-xs flex flex-col justify-between h-full">
+            <div className="rounded-2xl border border-stone-200 bg-white p-3.5 shadow-[0_1px_4px_rgba(28,25,23,0.06)] flex flex-col justify-between h-full">
               <ProjectDeliveryPacingCard
                 isGlobal={true}
                 projects={rows}
@@ -655,17 +713,17 @@ const AnalyticsDashboard = () => {
           </div>
         </div>
       ) : (
-        <div className="grid grid-cols-1 lg:grid-cols-12 gap-5">
+        <div className="grid grid-cols-1 lg:grid-cols-12 gap-3">
           {/* Left Column (6 cols on lg): Project Daily Trend, Annotation vs Review, and Dual Insight Cards */}
-          <div className="lg:col-span-6 flex flex-col gap-5">
+          <div className="lg:col-span-6 flex flex-col gap-3">
             {/* Tile 1: Project Daily Workload Trend */}
-            <div className="rounded-3xl border border-slate-200/80 bg-white/90 backdrop-blur-md p-5 shadow-xs flex flex-col justify-between h-[320px]">
+            <div className="rounded-2xl border border-stone-200 bg-white p-4 shadow-[0_1px_4px_rgba(28,25,23,0.06)] flex flex-col justify-between h-[320px]">
               <div className="mb-2 flex items-center justify-between">
                 <div>
-                  <h3 className="text-base font-black text-slate-900">Project Daily Workload Trend</h3>
-                  <p className="text-xs text-slate-400 font-medium">Daily hours logged for {selectedProjectObj?.name || "project"}</p>
+                  <h3 className="text-sm font-bold text-stone-900">Project Daily Workload Trend</h3>
+                  <p className="text-xs text-stone-400 font-medium">Daily hours logged for {selectedProjectObj?.name || "project"}</p>
                 </div>
-                <span className="rounded-full bg-indigo-50 border border-indigo-200/80 px-3 py-1 text-xs font-bold text-indigo-700 font-mono shadow-2xs">
+                <span className="rounded-full bg-indigo-50 border border-indigo-200/80 px-2.5 py-0.5 text-xs font-bold text-indigo-700 font-mono shadow-xs">
                   {activeKpis?.total_hours ?? activeKpis?.autonex_platform_hours ?? 0}h Total
                 </span>
               </div>
@@ -680,10 +738,10 @@ const AnalyticsDashboard = () => {
             </div>
 
             {/* Tile 2: Annotation vs Review Dynamics */}
-            <div className="rounded-3xl border border-slate-200/80 bg-white/90 backdrop-blur-md p-5 shadow-xs flex flex-col justify-between h-[320px]">
+            <div className="rounded-2xl border border-stone-200 bg-white p-4 shadow-[0_1px_4px_rgba(28,25,23,0.06)] flex flex-col justify-between h-[320px]">
               <div className="mb-2">
-                <h3 className="text-base font-black text-slate-900">Annotation vs Review Dynamics</h3>
-                <p className="text-xs text-slate-400 font-medium">Daily split of production annotation vs quality review time</p>
+                <h3 className="text-sm font-bold text-stone-900">Annotation vs Review Dynamics</h3>
+                <p className="text-xs text-stone-400 font-medium">Daily split of production annotation vs quality review time</p>
               </div>
               <WorkforceSplitAreaChart
                 data={activeChartData}
@@ -694,8 +752,8 @@ const AnalyticsDashboard = () => {
             </div>
 
             {/* Tile 3: Dual Mini Insight Cards */}
-            <div className="grid grid-cols-1 sm:grid-cols-2 gap-4 h-[320px]">
-              <div className="rounded-3xl border border-slate-200/80 bg-white/90 backdrop-blur-md p-4 shadow-xs flex flex-col justify-between h-full">
+            <div className="grid grid-cols-1 sm:grid-cols-2 gap-3 h-[320px]">
+              <div className="rounded-2xl border border-stone-200 bg-white p-3.5 shadow-[0_1px_4px_rgba(28,25,23,0.06)] flex flex-col justify-between h-full">
                 <WorkforceRoleInsightCard
                   isGlobal={false}
                   kpis={activeKpis}
@@ -703,7 +761,7 @@ const AnalyticsDashboard = () => {
                   projects={rows}
                 />
               </div>
-              <div className="rounded-3xl border border-slate-200/80 bg-white/90 backdrop-blur-md p-4 shadow-xs flex flex-col justify-between h-full">
+              <div className="rounded-2xl border border-stone-200 bg-white p-3.5 shadow-[0_1px_4px_rgba(28,25,23,0.06)] flex flex-col justify-between h-full">
                 <ProjectDeliveryPacingCard
                   isGlobal={false}
                   projects={rows}
@@ -715,22 +773,22 @@ const AnalyticsDashboard = () => {
           </div>
 
           {/* Right Column (6 cols on lg): Project Team Activity Heatmap */}
-          <div className="lg:col-span-6 rounded-3xl border border-slate-200/80 bg-white/90 backdrop-blur-md p-5 shadow-xs flex flex-col justify-between max-h-[1000px]">
+          <div className="lg:col-span-6 rounded-2xl border border-stone-200 bg-white p-4 shadow-[0_1px_4px_rgba(28,25,23,0.06)] flex flex-col justify-between max-h-[1000px]">
             <div className="mb-1.5 flex items-center justify-between gap-3 shrink-0">
               <div>
-                <h3 className="text-base font-black text-slate-900">Project Team Activity Heatmap</h3>
-                <p className="text-xs text-slate-400 font-medium">Daily editor intensity matrix & team workload breakdown</p>
+                <h3 className="text-sm font-bold text-stone-900">Project Team Activity Heatmap</h3>
+                <p className="text-xs text-stone-400 font-medium">Daily editor intensity matrix & team workload breakdown</p>
               </div>
 
               <div className="flex items-center gap-2 shrink-0">
                 <div className="relative">
-                  <Search className="w-3.5 h-3.5 text-slate-400 absolute left-2.5 top-1/2 -translate-y-1/2 pointer-events-none" />
+                  <Search className="w-3.5 h-3.5 text-stone-400 absolute left-2.5 top-1/2 -translate-y-1/2 pointer-events-none" />
                   <input
                     type="text"
                     placeholder="Search member…"
                     value={heatmapSearch}
                     onChange={(e) => setHeatmapSearch(e.target.value)}
-                    className="h-8 pl-8 pr-2.5 rounded-xl border border-slate-200 bg-white/90 text-xs font-medium text-slate-800 placeholder-slate-400 focus:outline-none focus:ring-2 focus:ring-indigo-500/20 w-40 shadow-2xs"
+                    className="h-8 pl-8 pr-2.5 rounded-lg border border-stone-200 bg-white text-xs font-medium text-stone-800 placeholder-stone-400 focus:outline-none focus:ring-2 focus:ring-indigo-500/20 w-40 shadow-xs"
                   />
                 </div>
               </div>
@@ -768,10 +826,10 @@ const AnalyticsDashboard = () => {
             <div className="flex items-center gap-2">
               <Users className="w-5 h-5 text-sky-600" />
               <div>
-                <h3 className="text-base font-black text-slate-900">
+                <h3 className="text-base font-bold text-stone-900">
                   {isGlobal ? "Global Active Workforce" : `${selectedProjectObj?.name || "Project"} Workforce Roster`}
                 </h3>
-                <p className="text-xs text-slate-500 font-medium">
+                <p className="text-xs text-stone-500 font-medium">
                   Showing team members and activity logged in selected period
                 </p>
               </div>
@@ -779,17 +837,17 @@ const AnalyticsDashboard = () => {
           </Modal.Header>
 
           <Modal.Body>
-            <div className="space-y-4">
+            <div className="space-y-3">
               {/* Controls Bar: Search Input + Small Compact Sort Icon Button */}
-              <div className="flex items-center gap-2 bg-slate-50 p-2.5 rounded-2xl border border-slate-200/80">
+              <div className="flex items-center gap-2 bg-stone-50 p-2 rounded-xl border border-stone-200">
                 <div className="relative flex-1">
-                  <Search className="w-4 h-4 text-slate-400 absolute left-3 top-1/2 -translate-y-1/2 pointer-events-none" />
+                  <Search className="w-4 h-4 text-stone-400 absolute left-3 top-1/2 -translate-y-1/2 pointer-events-none" />
                   <input
                     type="text"
                     placeholder="Search by member name or email..."
                     value={workforceSearch}
                     onChange={(e) => setWorkforceSearch(e.target.value)}
-                    className="w-full h-9 pl-9 pr-3 rounded-xl border border-slate-200 bg-white text-xs font-medium text-slate-800 placeholder-slate-400 focus:outline-none focus:ring-2 focus:ring-sky-500/20"
+                    className="w-full h-8 pl-8 pr-3 rounded-lg border border-stone-200 bg-white text-xs font-medium text-stone-800 placeholder-stone-400 focus:outline-none focus:ring-2 focus:ring-sky-500/20"
                   />
                 </div>
 
@@ -797,17 +855,17 @@ const AnalyticsDashboard = () => {
                 <button
                   type="button"
                   onClick={() => setWorkforceSortOrder((prev) => (prev === "desc" ? "asc" : "desc"))}
-                  className="w-9 h-9 rounded-xl bg-white border border-slate-200 flex items-center justify-center text-slate-600 hover:text-sky-600 hover:border-sky-300 hover:bg-sky-50 transition-all shadow-2xs cursor-pointer shrink-0"
+                  className="w-8 h-8 rounded-lg bg-white border border-stone-200 flex items-center justify-center text-stone-600 hover:text-sky-600 hover:border-sky-300 hover:bg-sky-50 transition-all shadow-xs cursor-pointer shrink-0"
                   title={`Sort by hours: ${workforceSortOrder === "desc" ? "Highest First" : "Lowest First"}`}
                 >
-                  <ArrowUpDown className="w-4 h-4" />
+                  <ArrowUpDown className="w-3.5 h-3.5" />
                 </button>
               </div>
 
               {/* Members List */}
               <div className="max-h-[420px] overflow-y-auto space-y-2 pr-1">
                 {filteredWorkforceList.length === 0 ? (
-                  <div className="text-center py-10 text-slate-400 text-xs font-medium">
+                  <div className="text-center py-10 text-stone-400 text-xs font-medium">
                     No team members found matching your filter criteria.
                   </div>
                 ) : (
@@ -816,37 +874,37 @@ const AnalyticsDashboard = () => {
                     return (
                       <div
                         key={m.id}
-                        className={`p-3 rounded-2xl border ${statusConfig.cardBg} transition-all flex items-center justify-between gap-3`}
+                        className={`p-2.5 rounded-xl border ${statusConfig.cardBg} transition-all flex items-center justify-between gap-3`}
                       >
-                        <div className="flex items-center gap-3 min-w-0">
+                        <div className="flex items-center gap-2.5 min-w-0">
                           <UserAvatar name={m.name} size="sm" />
                           <div className="min-w-0">
-                            <div className="text-xs font-bold text-slate-900 truncate">
+                            <div className="text-xs font-bold text-stone-900 truncate">
                               {m.name}
                             </div>
                             {m.email && (
-                              <div className="text-[10px] text-slate-400 font-mono truncate">
+                              <div className="text-[10px] text-stone-400 font-mono truncate">
                                 {m.email}
                               </div>
                             )}
                           </div>
                         </div>
 
-                        <div className="flex items-center gap-3 shrink-0">
-                          <span className="text-[10px] font-bold px-2.5 py-0.5 rounded-full border bg-indigo-50 text-indigo-700 border-indigo-200">
+                        <div className="flex items-center gap-2.5 shrink-0">
+                          <span className="text-[10px] font-bold px-2 py-0.5 rounded-full border bg-indigo-50 text-indigo-700 border-indigo-200">
                             {m.role}
                           </span>
 
-                          <div className="text-right min-w-[70px]">
-                            <div className="text-xs font-mono font-black text-slate-900">
+                          <div className="text-right min-w-[60px]">
+                            <div className="text-xs font-mono font-black text-stone-900">
                               {m.hours}h
                             </div>
-                            <div className="text-[9px] text-slate-400 font-mono">
+                            <div className="text-[9px] text-stone-400 font-mono">
                               logged
                             </div>
                           </div>
 
-                          <span className={`text-[10px] px-2.5 py-0.5 rounded-md border ${statusConfig.badge}`}>
+                          <span className={`text-[10px] px-2 py-0.5 rounded-md border ${statusConfig.badge}`}>
                             {statusConfig.statusText}
                           </span>
                         </div>

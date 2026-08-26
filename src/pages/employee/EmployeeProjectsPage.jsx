@@ -15,7 +15,7 @@ const EmployeeProjectsPage = () => {
   });
   const { data: projects = [] } = useQuery({
     queryKey: ["sub-projects"],
-    queryFn: subProjectApi.getAll,
+    queryFn: () => subProjectApi.getAll(),
   });
 
   const myProjects = allocations

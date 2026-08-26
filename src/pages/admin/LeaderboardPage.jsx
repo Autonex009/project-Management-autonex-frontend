@@ -130,7 +130,7 @@ const PodiumSkeleton = ({ theme = "indigo" }) => {
         <div className="grid grid-cols-3 items-end gap-2 sm:gap-2.5 max-w-xl mx-auto">
           {/* #2 Silver Pedestal Skeleton */}
           <div className="flex flex-col items-center w-full">
-            <div className="flex flex-col items-center justify-between border-2 border-slate-300 rounded-2xl p-1.5 relative text-center w-full mb-0.5 min-h-[115px] bg-white/70">
+            <div className="flex flex-col items-center justify-between border-2 border-slate-300 rounded-xl p-1.5 relative text-center w-full mb-0.5 min-h-[115px] bg-white/70">
               <div className="w-5 h-2.5 bg-slate-200/90 rounded-full mb-0.5" />
               <div className="w-10 h-10 rounded-full bg-slate-200/90 my-0.5" />
               <div className="w-14 h-2.5 bg-slate-200/90 rounded-md my-0.5" />
@@ -141,7 +141,7 @@ const PodiumSkeleton = ({ theme = "indigo" }) => {
 
           {/* #1 Champion Pedestal Skeleton */}
           <div className="flex flex-col items-center w-full">
-            <div className="flex flex-col items-center justify-between border-2 border-amber-400 rounded-2xl p-1.5 relative text-center w-full mb-0.5 min-h-[115px] bg-white/70">
+            <div className="flex flex-col items-center justify-between border-2 border-amber-400 rounded-xl p-1.5 relative text-center w-full mb-0.5 min-h-[115px] bg-white/70">
               <div className="w-12 h-2.5 bg-amber-200/90 rounded-full mb-0.5" />
               <div className="w-10 h-10 rounded-full bg-amber-200/90 my-0.5" />
               <div className="w-14 h-2.5 bg-slate-200/90 rounded-md my-0.5" />
@@ -152,7 +152,7 @@ const PodiumSkeleton = ({ theme = "indigo" }) => {
 
           {/* #3 Bronze Pedestal Skeleton */}
           <div className="flex flex-col items-center w-full">
-            <div className="flex flex-col items-center justify-between border-2 border-[#d99b73] rounded-2xl p-1.5 relative text-center w-full mb-0.5 min-h-[115px] bg-white/70">
+            <div className="flex flex-col items-center justify-between border-2 border-[#d99b73] rounded-xl p-1.5 relative text-center w-full mb-0.5 min-h-[115px] bg-white/70">
               <div className="w-5 h-2.5 bg-slate-200/90 rounded-full mb-0.5" />
               <div className="w-10 h-10 rounded-full bg-slate-200/90 my-0.5" />
               <div className="w-14 h-2.5 bg-slate-200/90 rounded-md my-0.5" />
@@ -170,7 +170,7 @@ const PodiumSkeleton = ({ theme = "indigo" }) => {
     <div className="px-1 py-1 w-full animate-pulse">
       <div className="grid grid-cols-3 items-stretch gap-2.5 sm:gap-3 max-w-xl mx-auto">
         {/* 2nd Place Skeleton */}
-        <div className="flex flex-col items-center justify-between border-2 border-slate-300 rounded-2xl p-2 relative text-center min-h-[135px] bg-white/70">
+        <div className="flex flex-col items-center justify-between border-2 border-slate-300 rounded-xl p-2 relative text-center min-h-[135px] bg-white/70">
           <div className="w-5 h-2.5 bg-slate-200/90 rounded-full mb-0.5" />
           <div className="w-13 h-13 rounded-full bg-slate-200/90 my-0.5" />
           <div className="w-16 h-2.5 bg-slate-200/90 rounded-md my-0.5" />
@@ -178,7 +178,7 @@ const PodiumSkeleton = ({ theme = "indigo" }) => {
         </div>
 
         {/* 1st Place Skeleton */}
-        <div className="flex flex-col items-center justify-between border-2 border-amber-300 rounded-2xl p-2 relative text-center min-h-[135px] bg-white/70">
+        <div className="flex flex-col items-center justify-between border-2 border-amber-300 rounded-xl p-2 relative text-center min-h-[135px] bg-white/70">
           <div className="w-12 h-2.5 bg-amber-200/90 rounded-full mb-0.5" />
           <div className="w-13 h-13 rounded-full bg-amber-200/90 my-0.5" />
           <div className="w-16 h-2.5 bg-slate-200/90 rounded-md my-0.5" />
@@ -186,7 +186,7 @@ const PodiumSkeleton = ({ theme = "indigo" }) => {
         </div>
 
         {/* 3rd Place Skeleton */}
-        <div className="flex flex-col items-center justify-between border-2 border-[#d99b73]/80 rounded-2xl p-2 relative text-center min-h-[135px] bg-white/70">
+        <div className="flex flex-col items-center justify-between border-2 border-[#d99b73]/80 rounded-xl p-2 relative text-center min-h-[135px] bg-white/70">
           <div className="w-5 h-2.5 bg-slate-200/90 rounded-full mb-0.5" />
           <div className="w-13 h-13 rounded-full bg-slate-200/90 my-0.5" />
           <div className="w-16 h-2.5 bg-slate-200/90 rounded-md my-0.5" />
@@ -432,9 +432,9 @@ const ProjectWiseLeaderboardSection = () => {
   };
 
   return (
-    <div className="bg-white border border-slate-200/90 rounded-3xl shadow-sm overflow-hidden p-4 sm:p-5 space-y-4">
+    <div className="bg-white border border-slate-200/90 rounded-xl shadow-sm overflow-hidden p-3 space-y-3">
       {/* Outer Card Header */}
-      <div className="flex items-center justify-between border-b border-slate-100 pb-3 flex-wrap gap-2">
+      <div className="flex items-center justify-between border-b border-slate-100 pb-2.5 flex-wrap gap-2">
         <div className="flex items-center gap-2">
           <Flame className="w-4.5 h-4.5 text-amber-500 fill-amber-500/20" />
           <h2 className="text-sm font-black text-slate-800 uppercase tracking-wider">
@@ -449,7 +449,7 @@ const ProjectWiseLeaderboardSection = () => {
         <button
           type="button"
           onClick={handleScrollLeft}
-          className="absolute -left-4 top-1/2 -translate-y-1/2 z-10 inline-flex items-center justify-center w-8 h-8 rounded-full border border-slate-200/90 bg-white/95 text-slate-700 hover:bg-indigo-600 hover:text-white hover:border-indigo-600 shadow-md transition-all cursor-pointer backdrop-blur-xs active:scale-95"
+          className="absolute -left-3.5 top-1/2 -translate-y-1/2 z-10 inline-flex items-center justify-center w-8 h-8 rounded-full border border-slate-200/90 bg-white/95 text-slate-700 hover:bg-indigo-600 hover:text-white hover:border-indigo-600 shadow-md transition-all cursor-pointer backdrop-blur-xs active:scale-95"
           title="Previous 3 Projects"
         >
           <ChevronLeft className="w-4 h-4" />
@@ -458,15 +458,15 @@ const ProjectWiseLeaderboardSection = () => {
         {/* Horizontal Scrollable Container (3 Projects in View at a time) */}
         <div
           ref={scrollRef}
-          className="flex gap-4 overflow-x-auto snap-x snap-mandatory py-1 px-1 select-none scrollbar-none w-full"
+          className="flex gap-3.5 overflow-x-auto snap-x snap-mandatory py-1 px-1 select-none scrollbar-none w-full"
         >
         {DUMMY_PROJECT_LEADERBOARDS.map((project) => (
           <div
             key={project.id}
-            className="group flex flex-col justify-between bg-gradient-to-b from-slate-50/80 via-white to-slate-50/40 border border-slate-200 rounded-2xl p-3.5 shadow-2xs hover:shadow-md hover:border-indigo-300 transition-all duration-200 w-[88%] sm:w-[calc(50%-0.5rem)] lg:w-[calc(33.333%-0.67rem)] flex-shrink-0 snap-start"
+            className="group flex flex-col justify-between bg-gradient-to-b from-slate-50/80 via-white to-slate-50/40 border border-slate-200 rounded-xl p-3 shadow-sm hover:shadow-md hover:border-indigo-300 transition-all duration-200 w-[88%] sm:w-[calc(50%-0.5rem)] lg:w-[calc(33.333%-0.67rem)] flex-shrink-0 snap-start"
           >
             {/* Project Header Info */}
-            <div className="flex items-center justify-between gap-2 mb-3">
+            <div className="flex items-center justify-between gap-2 mb-2.5">
               <div className="min-w-0 flex-1">
                 <h3 className="text-xs font-black text-slate-900 truncate group-hover:text-indigo-600 transition-colors" title={project.projectName}>
                   {project.projectName}
@@ -481,11 +481,11 @@ const ProjectWiseLeaderboardSection = () => {
             </div>
 
             {/* Top 3 Employees List */}
-            <div className="space-y-1.5 bg-slate-50/90 p-2 rounded-xl border border-slate-200/60">
+            <div className="space-y-1.5 bg-slate-50/90 p-2 rounded-lg border border-slate-200/60">
               {project.top3.map((emp) => (
                 <div
                   key={emp.rank}
-                  className="flex items-center gap-2 px-2.5 py-1.5 rounded-lg border border-slate-200/70 bg-white shadow-2xs group/emp hover:border-indigo-200 transition-colors"
+                  className="flex items-center gap-2 px-2.5 py-1.5 rounded-md border border-slate-200/70 bg-white shadow-2xs group/emp hover:border-indigo-200 transition-colors"
                 >
                   <span className="w-4 h-4 rounded text-[10px] font-black flex items-center justify-center font-mono shrink-0 bg-indigo-600 text-white shadow-2xs">
                     #{emp.rank}
@@ -507,7 +507,7 @@ const ProjectWiseLeaderboardSection = () => {
         <button
           type="button"
           onClick={handleScrollRight}
-          className="absolute -right-4 top-1/2 -translate-y-1/2 z-10 inline-flex items-center justify-center w-8 h-8 rounded-full border border-slate-200/90 bg-white/95 text-slate-700 hover:bg-indigo-600 hover:text-white hover:border-indigo-600 shadow-md transition-all cursor-pointer backdrop-blur-xs active:scale-95"
+          className="absolute -right-3.5 top-1/2 -translate-y-1/2 z-10 inline-flex items-center justify-center w-8 h-8 rounded-full border border-slate-200/90 bg-white/95 text-slate-700 hover:bg-indigo-600 hover:text-white hover:border-indigo-600 shadow-md transition-all cursor-pointer backdrop-blur-xs active:scale-95"
           title="Next 3 Projects"
         >
           <ChevronRight className="w-4 h-4" />
@@ -543,7 +543,7 @@ const TopRankingsCards = ({
   return (
     <div className="space-y-2">
       {/* Top 4-10 Table Container */}
-      <div className="bg-white border border-slate-200/80 rounded-2xl shadow-xs overflow-hidden">
+      <div className="bg-white border border-slate-200/80 rounded-xl shadow-sm overflow-hidden">
         {/* Table Rows Stack */}
         <div className="divide-y divide-slate-100">
           {data.map((row, idx) => {
@@ -565,7 +565,7 @@ const TopRankingsCards = ({
               >
                 {/* Rank Badge */}
                 <div className="sm:col-span-1 flex items-center justify-center">
-                  <span className="w-7 h-7 rounded-xl text-xs font-black flex items-center justify-center font-mono bg-slate-100 text-slate-600 border border-slate-200/80 group-hover:border-indigo-300 group-hover:bg-indigo-50 group-hover:text-indigo-700 transition-colors">
+                  <span className="w-7 h-7 rounded-lg text-xs font-black flex items-center justify-center font-mono bg-slate-100 text-slate-600 border border-slate-200/80 group-hover:border-indigo-300 group-hover:bg-indigo-50 group-hover:text-indigo-700 transition-colors">
                     #{row.rank}
                   </span>
                 </div>
@@ -615,9 +615,9 @@ const TopRankingsCards = ({
       {/* 🌟 Hovering Rank Cell for Logged-In User below bottom of list */}
       {userRankItem && (
         <div className="pt-0.5">
-          <div className="group relative flex flex-col sm:grid sm:grid-cols-12 items-center gap-3 p-2.5 sm:px-4 sm:py-2.5 rounded-2xl bg-white border-2 border-indigo-400/90 shadow-lg shadow-indigo-500/10 ring-4 ring-indigo-500/10 transition-all duration-300 hover:-translate-y-0.5 cursor-default">
+          <div className="group relative flex flex-col sm:grid sm:grid-cols-12 items-center gap-3 p-2.5 sm:px-3 sm:py-2 rounded-xl bg-white border-2 border-indigo-400/90 shadow-sm ring-2 ring-indigo-500/10 transition-all duration-300 hover:-translate-y-0.5 cursor-default">
             <div className="sm:col-span-1 flex items-center justify-center">
-              <span className="w-8 h-8 rounded-xl text-xs font-black flex items-center justify-center font-mono bg-indigo-600 text-white shadow-xs">
+              <span className="w-8 h-8 rounded-lg text-xs font-black flex items-center justify-center font-mono bg-indigo-600 text-white shadow-xs">
                 #{userRankItem.rank}
               </span>
             </div>
@@ -650,6 +650,84 @@ const TopRankingsCards = ({
       )}
     </div>
   );
+};
+
+// Utility to calculate leaderboard rankings (Top N)
+const calculateRankings = (leaderboardData, limit = 10) => {
+  let list = [...(leaderboardData || [])];
+  list.sort((a, b) => (b.total_hours || 0) - (a.total_hours || 0));
+  list = list.slice(0, limit);
+
+  const maxHours = list[0] ? Number(list[0].total_hours) || 0 : 0;
+  const totalHours = list.reduce((sum, item) => sum + (Number(item.total_hours) || 0), 0);
+
+  return list.map((item, idx) => {
+    const hrs = Number(item.total_hours) || 0;
+    const sharePct = totalHours > 0 ? Math.round((hrs / totalHours) * 1000) / 10 : 0;
+    const barWidth = maxHours > 0 ? Math.min(100, Math.max(4, Math.round((hrs / maxHours) * 100))) : 0;
+
+    return {
+      ...item,
+      rank: idx + 1,
+      active_hours: hrs,
+      share_percentage: sharePct,
+      bar_width_pct: barWidth,
+    };
+  });
+};
+
+// Utility to calculate the logged-in user's rank item
+const calculateUserRankItem = (
+  leaderboardData,
+  isAdmin,
+  currentUser,
+  currentUserEmail,
+  currentUserName,
+  findUserIndexFn
+) => {
+  if (isAdmin || !leaderboardData || leaderboardData.length === 0) return null;
+
+  let list = [...leaderboardData];
+  list.sort((a, b) => (b.total_hours || 0) - (a.total_hours || 0));
+
+  const maxHours = list[0] ? Number(list[0].total_hours) || 0 : 0;
+  const totalHours = list.reduce((sum, item) => sum + (Number(item.total_hours) || 0), 0);
+
+  const userIndex = findUserIndexFn(list);
+
+  if (userIndex !== -1) {
+    const item = list[userIndex];
+    const hrs = Number(item.total_hours) || 0;
+    const sharePct = totalHours > 0 ? Math.round((hrs / totalHours) * 1000) / 10 : 0;
+    const barWidth = maxHours > 0 ? Math.min(100, Math.max(4, Math.round((hrs / maxHours) * 100))) : 0;
+
+    return {
+      ...item,
+      rank: userIndex + 1,
+      active_hours: hrs,
+      share_percentage: sharePct,
+      bar_width_pct: barWidth,
+    };
+  }
+
+  if (currentUser || currentUserEmail) {
+    const email = currentUserEmail || currentUser?.email || currentUser?.user_email || "user@autonex.ai";
+    const name = currentUserName || currentUser?.name || formatDisplayName(email);
+    return {
+      user_email: email,
+      employee_name: name,
+      avatar_url: currentUser?.avatar_url || "",
+      rank: list.length + 1,
+      active_hours: 0,
+      annotation_hours: 0,
+      review_hours: 0,
+      share_percentage: 0,
+      bar_width_pct: 0,
+      isUnranked: true,
+    };
+  }
+
+  return null;
 };
 
 const LeaderboardPage = () => {
@@ -702,6 +780,38 @@ const LeaderboardPage = () => {
     return (name || "").toLowerCase().trim();
   }, [currentUser]);
 
+  const currentUserEmpId = useMemo(() => {
+    return currentUser?.employee_id || currentUser?.id || meData?.employee_id || meData?.user?.employee_id || meData?.user?.id || null;
+  }, [currentUser, meData]);
+
+  const findCurrentUserIndex = (list) => {
+    if (!list || list.length === 0) return -1;
+    // 1. Exact match by employee_id if available
+    if (currentUserEmpId) {
+      const idx = list.findIndex(
+        (item) => item.employee_id && String(item.employee_id) === String(currentUserEmpId)
+      );
+      if (idx !== -1) return idx;
+    }
+    // 2. Exact match by email (case-insensitive)
+    if (currentUserEmail) {
+      const idx = list.findIndex((item) => {
+        const itemEmail = (item.user_email || "").toLowerCase().trim();
+        return Boolean(itemEmail && itemEmail === currentUserEmail);
+      });
+      if (idx !== -1) return idx;
+    }
+    // 3. Fallback: exact match by full name (never substring)
+    if (currentUserName) {
+      const idx = list.findIndex((item) => {
+        const itemObjName = (item.employee_name || formatDisplayName(item.user_email || "")).toLowerCase().trim();
+        return Boolean(itemObjName && itemObjName === currentUserName);
+      });
+      if (idx !== -1) return idx;
+    }
+    return -1;
+  };
+
   // ── Monthly State & Query ──
   const pastMonths = useMemo(() => generatePastMonths(12), []);
   const currentMonthKey = pastMonths[0]?.key || "";
@@ -738,106 +848,16 @@ const LeaderboardPage = () => {
   const allMonthLeaderboard = monthData?.leaderboard || [];
   const hasMonthData = !isMonthLoading && allMonthLeaderboard.length > 0;
 
-  const filteredMonthLeaderboard = useMemo(() => {
-    let list = [...allMonthLeaderboard];
-    list.sort((a, b) => (b.total_hours || 0) - (a.total_hours || 0));
-    list = list.slice(0, 10);
-
-    const maxHours = list[0] ? Number(list[0].total_hours) || 0 : 0;
-    const totalHours = list.reduce(
-      (sum, item) => sum + (Number(item.total_hours) || 0),
-      0
-    );
-
-    return list.map((item, idx) => {
-      const hrs = Number(item.total_hours) || 0;
-      const sharePct =
-        totalHours > 0
-          ? Math.round((hrs / totalHours) * 1000) / 10
-          : 0;
-      const barWidth =
-        maxHours > 0
-          ? Math.min(100, Math.max(4, Math.round((hrs / maxHours) * 100)))
-          : 0;
-
-      return {
-        ...item,
-        rank: idx + 1,
-        active_hours: hrs,
-        share_percentage: sharePct,
-        bar_width_pct: barWidth,
-      };
-    });
-  }, [allMonthLeaderboard]);
+  const filteredMonthLeaderboard = useMemo(
+    () => calculateRankings(allMonthLeaderboard, 10),
+    [allMonthLeaderboard]
+  );
 
   // Full Month User Rank Calculation
-  const userMonthRankItem = useMemo(() => {
-    if (isAdmin || allMonthLeaderboard.length === 0) return null;
-    let list = [...allMonthLeaderboard];
-    list.sort((a, b) => (b.total_hours || 0) - (a.total_hours || 0));
-
-    const maxHours = list[0] ? Number(list[0].total_hours) || 0 : 0;
-    const totalHours = list.reduce(
-      (sum, item) => sum + (Number(item.total_hours) || 0),
-      0
-    );
-
-    let userIndex = -1;
-    if (currentUserEmail) {
-      userIndex = list.findIndex((item) => {
-        const itemEmail = (item.user_email || "").toLowerCase().trim();
-        return itemEmail && (itemEmail === currentUserEmail || currentUserEmail.includes(itemEmail) || itemEmail.includes(currentUserEmail));
-      });
-    }
-
-    if (userIndex === -1 && currentUserName) {
-      userIndex = list.findIndex((item) => {
-        const itemObjName = (item.employee_name || formatDisplayName(item.user_email || "")).toLowerCase().trim();
-        return itemObjName && (itemObjName === currentUserName || currentUserName.includes(itemObjName) || itemObjName.includes(currentUserName));
-      });
-    }
-
-    if (userIndex !== -1) {
-      const item = list[userIndex];
-      const hrs = Number(item.total_hours) || 0;
-      const sharePct =
-        totalHours > 0
-          ? Math.round((hrs / totalHours) * 1000) / 10
-          : 0;
-      const barWidth =
-        maxHours > 0
-          ? Math.min(100, Math.max(4, Math.round((hrs / maxHours) * 100)))
-          : 0;
-
-      return {
-        ...item,
-        rank: userIndex + 1,
-        active_hours: hrs,
-        share_percentage: sharePct,
-        bar_width_pct: barWidth,
-      };
-    }
-
-    // Always fallback to logged-in user profile if user is logged in
-    if (currentUser || currentUserEmail) {
-      const email = currentUserEmail || currentUser?.email || currentUser?.user_email || "user@autonex.ai";
-      const name = currentUserName || currentUser?.name || formatDisplayName(email);
-      return {
-        user_email: email,
-        employee_name: name,
-        avatar_url: currentUser?.avatar_url || "",
-        rank: list.length + 1,
-        active_hours: 0,
-        annotation_hours: 0,
-        review_hours: 0,
-        share_percentage: 0,
-        bar_width_pct: 0,
-        isUnranked: true,
-      };
-    }
-
-    return null;
-  }, [allMonthLeaderboard, currentUserEmail, currentUserName, currentUser, isAdmin]);
+  const userMonthRankItem = useMemo(
+    () => calculateUserRankItem(allMonthLeaderboard, isAdmin, currentUser, currentUserEmail, currentUserName, findCurrentUserIndex),
+    [allMonthLeaderboard, currentUserEmail, currentUserName, currentUserEmpId, currentUser, isAdmin]
+  );
 
   const top3Month = useMemo(
     () => filteredMonthLeaderboard.slice(0, 3),
@@ -1036,187 +1056,29 @@ const LeaderboardPage = () => {
 
   const allDailyLeaderboard = dailyData?.leaderboard || [];
 
-  const filteredDailyLeaderboard = useMemo(() => {
-    let list = [...allDailyLeaderboard];
-    list.sort((a, b) => (b.total_hours || 0) - (a.total_hours || 0));
-    list = list.slice(0, 10);
+  const filteredDailyLeaderboard = useMemo(
+    () => calculateRankings(allDailyLeaderboard, 10),
+    [allDailyLeaderboard]
+  );
 
-    const maxHours = list[0] ? Number(list[0].total_hours) || 0 : 0;
-    const totalHours = list.reduce(
-      (sum, item) => sum + (Number(item.total_hours) || 0),
-      0
-    );
-
-    return list.map((item, idx) => {
-      const hrs = Number(item.total_hours) || 0;
-      const sharePct =
-        totalHours > 0
-          ? Math.round((hrs / totalHours) * 1000) / 10
-          : 0;
-      const barWidth =
-        maxHours > 0
-          ? Math.min(100, Math.max(4, Math.round((hrs / maxHours) * 100)))
-          : 0;
-
-      return {
-        ...item,
-        rank: idx + 1,
-        active_hours: hrs,
-        share_percentage: sharePct,
-        bar_width_pct: barWidth,
-      };
-    });
-  }, [allDailyLeaderboard]);
-
-  const userDailyRankItem = useMemo(() => {
-    if (isAdmin || allDailyLeaderboard.length === 0) return null;
-    let list = [...allDailyLeaderboard];
-    list.sort((a, b) => (b.total_hours || 0) - (a.total_hours || 0));
-
-    let userIndex = -1;
-    if (currentUserEmail) {
-      userIndex = list.findIndex((item) => {
-        const itemEmail = (item.user_email || "").toLowerCase().trim();
-        return itemEmail && (itemEmail === currentUserEmail || currentUserEmail.includes(itemEmail) || itemEmail.includes(currentUserEmail));
-      });
-    }
-
-    if (userIndex === -1 && currentUserName) {
-      userIndex = list.findIndex((item) => {
-        const itemObjName = (item.employee_name || formatDisplayName(item.user_email || "")).toLowerCase().trim();
-        return itemObjName && (itemObjName === currentUserName || currentUserName.includes(itemObjName) || itemObjName.includes(currentUserName));
-      });
-    }
-
-    if (userIndex !== -1) {
-      const item = list[userIndex];
-      const hrs = Number(item.total_hours) || 0;
-      return {
-        ...item,
-        rank: userIndex + 1,
-        active_hours: hrs,
-      };
-    }
-
-    if (currentUser || currentUserEmail) {
-      const email = currentUserEmail || currentUser?.email || currentUser?.user_email || "user@autonex.ai";
-      const name = currentUserName || currentUser?.name || formatDisplayName(email);
-      return {
-        user_email: email,
-        employee_name: name,
-        avatar_url: currentUser?.avatar_url || "",
-        rank: list.length + 1,
-        active_hours: 0,
-        isUnranked: true,
-      };
-    }
-
-    return null;
-  }, [allDailyLeaderboard, currentUserEmail, currentUserName, currentUser, isAdmin]);
+  const userDailyRankItem = useMemo(
+    () => calculateUserRankItem(allDailyLeaderboard, isAdmin, currentUser, currentUserEmail, currentUserName, findCurrentUserIndex),
+    [allDailyLeaderboard, currentUserEmail, currentUserName, currentUserEmpId, currentUser, isAdmin]
+  );
 
   const allWeekLeaderboard = weekData?.leaderboard || [];
   const hasWeekData = !isWeekLoading && allWeekLeaderboard.length > 0;
 
-  const filteredWeekLeaderboard = useMemo(() => {
-    let list = [...allWeekLeaderboard];
-    list.sort((a, b) => (b.total_hours || 0) - (a.total_hours || 0));
-    list = list.slice(0, 10);
-
-    const maxHours = list[0] ? Number(list[0].total_hours) || 0 : 0;
-    const totalHours = list.reduce(
-      (sum, item) => sum + (Number(item.total_hours) || 0),
-      0
-    );
-
-    return list.map((item, idx) => {
-      const hrs = Number(item.total_hours) || 0;
-      const sharePct =
-        totalHours > 0
-          ? Math.round((hrs / totalHours) * 1000) / 10
-          : 0;
-      const barWidth =
-        maxHours > 0
-          ? Math.min(100, Math.max(4, Math.round((hrs / maxHours) * 100)))
-          : 0;
-
-      return {
-        ...item,
-        rank: idx + 1,
-        active_hours: hrs,
-        share_percentage: sharePct,
-        bar_width_pct: barWidth,
-      };
-    });
-  }, [allWeekLeaderboard]);
+  const filteredWeekLeaderboard = useMemo(
+    () => calculateRankings(allWeekLeaderboard, 10),
+    [allWeekLeaderboard]
+  );
 
   // Full Week User Rank Calculation
-  const userWeekRankItem = useMemo(() => {
-    if (isAdmin || allWeekLeaderboard.length === 0) return null;
-    let list = [...allWeekLeaderboard];
-    list.sort((a, b) => (b.total_hours || 0) - (a.total_hours || 0));
-
-    const maxHours = list[0] ? Number(list[0].total_hours) || 0 : 0;
-    const totalHours = list.reduce(
-      (sum, item) => sum + (Number(item.total_hours) || 0),
-      0
-    );
-
-    let userIndex = -1;
-    if (currentUserEmail) {
-      userIndex = list.findIndex((item) => {
-        const itemEmail = (item.user_email || "").toLowerCase().trim();
-        return itemEmail && (itemEmail === currentUserEmail || currentUserEmail.includes(itemEmail) || itemEmail.includes(currentUserEmail));
-      });
-    }
-
-    if (userIndex === -1 && currentUserName) {
-      userIndex = list.findIndex((item) => {
-        const itemObjName = (item.employee_name || formatDisplayName(item.user_email || "")).toLowerCase().trim();
-        return itemObjName && (itemObjName === currentUserName || currentUserName.includes(itemObjName) || itemObjName.includes(currentUserName));
-      });
-    }
-
-    if (userIndex !== -1) {
-      const item = list[userIndex];
-      const hrs = Number(item.total_hours) || 0;
-      const sharePct =
-        totalHours > 0
-          ? Math.round((hrs / totalHours) * 1000) / 10
-          : 0;
-      const barWidth =
-        maxHours > 0
-          ? Math.min(100, Math.max(4, Math.round((hrs / maxHours) * 100)))
-          : 0;
-
-      return {
-        ...item,
-        rank: userIndex + 1,
-        active_hours: hrs,
-        share_percentage: sharePct,
-        bar_width_pct: barWidth,
-      };
-    }
-
-    // Always fallback to logged-in user profile if user is logged in
-    if (currentUser || currentUserEmail) {
-      const email = currentUserEmail || currentUser?.email || currentUser?.user_email || "user@autonex.ai";
-      const name = currentUserName || currentUser?.name || formatDisplayName(email);
-      return {
-        user_email: email,
-        employee_name: name,
-        avatar_url: currentUser?.avatar_url || "",
-        rank: list.length + 1,
-        active_hours: 0,
-        annotation_hours: 0,
-        review_hours: 0,
-        share_percentage: 0,
-        bar_width_pct: 0,
-        isUnranked: true,
-      };
-    }
-
-    return null;
-  }, [allWeekLeaderboard, currentUserEmail, currentUserName, currentUser, isAdmin]);
+  const userWeekRankItem = useMemo(
+    () => calculateUserRankItem(allWeekLeaderboard, isAdmin, currentUser, currentUserEmail, currentUserName, findCurrentUserIndex),
+    [allWeekLeaderboard, currentUserEmail, currentUserName, currentUserEmpId, currentUser, isAdmin]
+  );
 
   const top3Week = useMemo(
     () => filteredWeekLeaderboard.slice(0, 3),
@@ -1244,16 +1106,16 @@ const LeaderboardPage = () => {
   const canGoNextMonth_ = canGoNextMonth;
 
   return (
-    <div className="space-y-6">
+    <div className="flex flex-col gap-2.5 sm:gap-3">
       {/* 2-Column Leaderboard Showcase (Monthly on Left, Annual + Weekly/Daily on Right) */}
-      <div className="grid grid-cols-1 xl:grid-cols-2 gap-6 items-stretch">
+      <div className="grid grid-cols-1 xl:grid-cols-2 gap-2.5 sm:gap-3 items-stretch">
 
       {/* ════════════════════════════════════════════
           MONTHLY TOPPERS — Podium section
           ════════════════════════════════════════════ */}
       <div className="flex flex-col justify-between h-full">
         {/* ── Podium Card ── */}
-        <div className="bg-gradient-to-b from-indigo-100 via-indigo-50/90 to-purple-100/60 border-2 border-indigo-500/80 ring-2 ring-indigo-400/30 rounded-3xl shadow-md shadow-indigo-500/10 relative p-2.5 sm:p-3 flex-1 flex flex-col justify-between">
+        <div className="bg-gradient-to-b from-indigo-100 via-indigo-50/90 to-purple-100/60 border-2 border-indigo-500/80 ring-2 ring-indigo-400/30 rounded-xl shadow-sm relative p-3 flex-1 flex flex-col justify-between">
           {/* Side Nav Arrows (Fixed at Vertical Center of Podium Card) */}
           <button
             type="button"
@@ -1307,7 +1169,7 @@ const LeaderboardPage = () => {
               <div className="grid grid-cols-3 items-stretch gap-2.5 sm:gap-3 max-w-xl mx-auto">
                 {/* 2nd Place (Silver) */}
                 {top3Month_[1] ? (
-                  <div className="flex flex-col items-center justify-between bg-gradient-to-b from-slate-200/90 via-slate-100/70 to-white/95 border-2 border-slate-400/80 rounded-2xl p-2 shadow-xs relative text-center min-h-[135px]">
+                  <div className="flex flex-col items-center justify-between bg-gradient-to-b from-slate-200/90 via-slate-100/70 to-white/95 border-2 border-slate-400/80 rounded-xl p-2 shadow-xs relative text-center min-h-[135px]">
                     <span className="absolute -top-2 px-2 py-0.5 rounded-full bg-gradient-to-r from-slate-500 via-slate-600 to-slate-800 text-white font-black text-[9px] uppercase tracking-wider shadow-xs border border-white">
                       #2
                     </span>
@@ -1340,12 +1202,12 @@ const LeaderboardPage = () => {
 
                 {/* 1st Place (Champion) */}
                 {top3Month_[0] && (
-                  <div className="flex flex-col items-center justify-between bg-gradient-to-b from-amber-100/95 via-amber-50/90 to-white/95 border-2 border-amber-400 rounded-2xl p-2 shadow-md relative text-center ring-2 ring-amber-400/40 z-10 min-h-[135px]">
+                  <div className="flex flex-col items-center justify-between bg-gradient-to-b from-amber-100/95 via-amber-50/90 to-white/95 border-2 border-amber-400 rounded-xl p-2 shadow-sm relative text-center ring-2 ring-amber-400/40 z-10 min-h-[135px]">
                     <span className="absolute -top-2 px-2 py-0.5 rounded-full bg-gradient-to-r from-amber-500 via-amber-600 to-orange-600 text-white font-black text-[9px] uppercase tracking-wider shadow-md flex items-center gap-0.5 border border-white">
                       <Crown className="w-2.5 h-2.5 text-amber-200 fill-amber-100" /> #1 MVP
                     </span>
                     <div className="mt-3 mb-1 relative">
-                      <div className="rounded-full ring-3 ring-amber-400 shadow-[0_0_12px_rgba(251,191,36,0.5)] p-[2px] bg-gradient-to-b from-amber-300 via-amber-100 to-white">
+                      <div className="rounded-full ring-2 ring-amber-500/90 p-[2px] bg-gradient-to-b from-amber-400 via-amber-200 to-white shadow-xs">
                         <LeaderboardAvatar
                           src={top3Month_[0]?.avatar_url}
                           name={top3Month_[0].employee_name || top3Month_[0].user_email}
@@ -1371,7 +1233,7 @@ const LeaderboardPage = () => {
 
                 {/* 3rd Place (Bronze) */}
                 {top3Month_[2] ? (
-                  <div className="flex flex-col items-center justify-between bg-gradient-to-b from-[#fcf5f0]/95 via-[#f9ebd9]/70 to-white/95 border-2 border-[#d99b73] rounded-2xl p-2 shadow-xs relative text-center min-h-[135px]">
+                  <div className="flex flex-col items-center justify-between bg-gradient-to-b from-[#fcf5f0]/95 via-[#f9ebd9]/70 to-white/95 border-2 border-[#d99b73] rounded-xl p-2 shadow-xs relative text-center min-h-[135px]">
                     <span className="absolute -top-2 px-2 py-0.5 rounded-full bg-gradient-to-r from-[#b35924] via-[#8c4217] to-[#59280b] text-white font-black text-[9px] uppercase tracking-wider shadow-xs border border-white">
                       #3
                     </span>
@@ -1405,7 +1267,7 @@ const LeaderboardPage = () => {
             </div>
           ) : (
             <div className="flex-1 flex flex-col items-center justify-center p-4 text-center my-auto min-h-[140px]">
-              <div className="w-10 h-10 rounded-2xl bg-amber-50 text-amber-500 border border-amber-100 flex items-center justify-center mb-2">
+              <div className="w-10 h-10 rounded-xl bg-amber-50 text-amber-500 border border-amber-100 flex items-center justify-center mb-2">
                 <Trophy className="w-5 h-5" />
               </div>
               <h4 className="text-xs font-bold text-slate-800 mb-0.5">
@@ -1440,11 +1302,11 @@ const LeaderboardPage = () => {
       {/* ════════════════════════════════════════════
           RIGHT COLUMN: OVERALL TOPPERS + WEEKLY TOPPERS
           ════════════════════════════════════════════ */}
-      <div className="space-y-4">
+      <div className="space-y-2.5 sm:space-y-3">
 
         {/* ── Overall Toppers Card (Top 3 Throughout the Year) ── */}
         <div>
-          <div className="bg-gradient-to-b from-amber-100 via-amber-50/90 to-orange-100/60 border-2 border-amber-500/90 ring-4 ring-amber-400/30 rounded-3xl shadow-lg shadow-amber-500/15 relative p-2.5 pb-0 min-h-[145px] flex flex-col justify-between overflow-hidden">
+          <div className="bg-gradient-to-b from-amber-100 via-amber-50/90 to-orange-100/60 border-2 border-amber-500/90 ring-4 ring-amber-400/30 rounded-xl shadow-sm relative p-3 pb-0 min-h-[145px] flex flex-col justify-between overflow-hidden">
             {/* Year Label Header */}
             <div className="flex items-center justify-center mb-1.5">
               <div className="inline-flex items-center justify-center gap-1.5 px-3.5 py-0.5 rounded-full bg-gradient-to-r from-amber-500 via-orange-500 to-amber-600 border border-amber-300 shadow-md ring-3 ring-amber-500/30">
@@ -1459,7 +1321,7 @@ const LeaderboardPage = () => {
               <PodiumSkeleton theme="amber" />
             ) : top3Overall.length === 0 ? (
               <div className="flex-1 flex flex-col items-center justify-center p-3 text-center my-auto min-h-[120px]">
-                <div className="w-8 h-8 rounded-2xl bg-amber-50 text-amber-500 border border-amber-100 flex items-center justify-center mb-1.5">
+                <div className="w-8 h-8 rounded-xl bg-amber-50 text-amber-500 border border-amber-100 flex items-center justify-center mb-1.5">
                   <Trophy className="w-4 h-4" />
                 </div>
                 <h4 className="text-xs font-bold text-slate-800 mb-0.5">
@@ -1472,7 +1334,7 @@ const LeaderboardPage = () => {
                   {/* 2nd Place (Silver Pedestal - Left) */}
                   {top3Overall[1] ? (
                     <div className="flex flex-col items-center">
-                      <div className="flex flex-col items-center justify-between bg-gradient-to-b from-white/95 via-slate-100/90 to-white/95 border-2 border-slate-300 rounded-2xl p-1.5 shadow-xs backdrop-blur-md relative text-center w-full mb-0.5 min-h-[115px]">
+                      <div className="flex flex-col items-center justify-between bg-gradient-to-b from-white/95 via-slate-100/90 to-white/95 border-2 border-slate-300 rounded-xl p-1.5 shadow-xs backdrop-blur-md relative text-center w-full mb-0.5 min-h-[115px]">
                         <span className="absolute -top-2 px-2 py-0.5 rounded-full bg-gradient-to-r from-slate-600 via-slate-700 to-slate-800 text-white font-black text-[8px] uppercase tracking-wider shadow-xs border border-white">
                           #2
                         </span>
@@ -1501,12 +1363,12 @@ const LeaderboardPage = () => {
                   {/* 1st Place (Gold Champion Pedestal - Center) */}
                   {top3Overall[0] && (
                     <div className="flex flex-col items-center z-10">
-                      <div className="flex flex-col items-center justify-between bg-gradient-to-b from-amber-50/95 via-white/90 to-amber-50/95 border-2 border-amber-400 rounded-2xl p-1.5 shadow-md backdrop-blur-md relative text-center ring-2 ring-amber-400/50 w-full mb-0.5 min-h-[115px]">
+                      <div className="flex flex-col items-center justify-between bg-gradient-to-b from-amber-50/95 via-white/90 to-amber-50/95 border-2 border-amber-400 rounded-xl p-1.5 shadow-sm backdrop-blur-md relative text-center ring-2 ring-amber-400/50 w-full mb-0.5 min-h-[115px]">
                         <span className="absolute -top-2 px-2 py-0.5 rounded-full bg-gradient-to-r from-amber-500 via-amber-600 to-orange-600 text-white font-black text-[8px] uppercase tracking-wider shadow-md flex items-center gap-0.5 border border-white">
                           <Crown className="w-2.5 h-2.5 text-amber-200 fill-amber-100" /> #1 Champion
                         </span>
                         <div className="mt-2.5 mb-0.5 relative">
-                          <div className="rounded-full ring-3 ring-amber-400 shadow-[0_0_10px_rgba(251,191,36,0.5)] p-[2px] bg-gradient-to-b from-amber-300 to-white">
+                          <div className="rounded-full ring-2 ring-amber-500/90 p-[2px] bg-gradient-to-b from-amber-400 via-amber-200 to-white shadow-xs">
                             <LeaderboardAvatar
                               src={top3Overall[0]?.avatar_url}
                               name={top3Overall[0].employee_name || top3Overall[0].user_email}
@@ -1528,7 +1390,7 @@ const LeaderboardPage = () => {
                   {/* 3rd Place (Bronze Pedestal - Right) */}
                   {top3Overall[2] ? (
                     <div className="flex flex-col items-center">
-                      <div className="flex flex-col items-center justify-between bg-gradient-to-b from-[#fcf5f0]/95 via-white/90 to-[#fcf5f0]/95 border-2 border-[#d99b73] rounded-2xl p-1.5 shadow-xs backdrop-blur-md relative text-center w-full mb-0.5 min-h-[115px]">
+                      <div className="flex flex-col items-center justify-between bg-gradient-to-b from-[#fcf5f0]/95 via-white/90 to-[#fcf5f0]/95 border-2 border-[#d99b73] rounded-xl p-1.5 shadow-xs backdrop-blur-md relative text-center w-full mb-0.5 min-h-[115px]">
                         <span className="absolute -top-2 px-2 py-0.5 rounded-full bg-gradient-to-r from-[#b35924] via-[#8c4217] to-[#59280b] text-white font-black text-[8px] uppercase tracking-wider shadow-xs border border-white">
                           #3
                         </span>
@@ -1562,9 +1424,9 @@ const LeaderboardPage = () => {
         {/* ── Weekly & Daily Toppers Section ── */}
         <div className="space-y-2">
           {/* Weekly / Daily integrated header + full table card */}
-          <div className="bg-white border border-slate-200/90 rounded-3xl shadow-sm overflow-hidden">
+          <div className="bg-white border border-slate-200/90 rounded-xl shadow-sm overflow-hidden">
             {/* Integrated Header Bar strictly in a SINGLE LINE (Zero Overlap Guaranteed) */}
-            <div className="flex items-center justify-between px-2.5 sm:px-3 py-2 bg-gradient-to-b from-white to-slate-50/60 border-b border-slate-100/60 select-none gap-1 sm:gap-2">
+            <div className="flex items-center justify-between px-3 py-2 bg-gradient-to-b from-white to-slate-50/60 border-b border-slate-100/60 select-none gap-1 sm:gap-2">
               {/* Left Slot: Title */}
               <div className="flex items-center gap-1 shrink-0 min-w-0">
                 <Zap className="w-3.5 h-3.5 sm:w-4 sm:h-4 text-indigo-500 shrink-0" />
@@ -1642,7 +1504,7 @@ const LeaderboardPage = () => {
               <TableSkeleton rows={10} />
             ) : (viewMode === "weekly" ? filteredWeekLeaderboard.length === 0 : filteredDailyLeaderboard.length === 0) ? (
               <div className="p-12 text-center">
-                <div className="w-12 h-12 rounded-2xl bg-amber-50 text-amber-500 border border-amber-100 flex items-center justify-center mx-auto mb-3">
+                <div className="w-12 h-12 rounded-xl bg-amber-50 text-amber-500 border border-amber-100 flex items-center justify-center mx-auto mb-3">
                   <Trophy className="w-6 h-6" />
                 </div>
                 <h4 className="text-sm font-bold text-slate-800 mb-1">
@@ -1659,8 +1521,8 @@ const LeaderboardPage = () => {
                 </p>
               </div>
             ) : (
-              <div className="p-2 sm:p-2.5">
-                <div className="bg-white border border-slate-200/80 rounded-2xl shadow-xs overflow-hidden">
+              <div className="p-2.5">
+                <div className="bg-white border border-slate-200/80 rounded-xl shadow-xs overflow-hidden">
                   <div className="divide-y divide-slate-100/80">
                   {(viewMode === "weekly" ? filteredWeekLeaderboard : filteredDailyLeaderboard).map((row) => {
                     const activeUserItem = viewMode === "weekly" ? userWeekRankItem : userDailyRankItem;
@@ -1695,7 +1557,7 @@ const LeaderboardPage = () => {
                       >
                         {/* Rank Badge */}
                         <div className="sm:col-span-1 flex items-center justify-center">
-                          <span className={`w-7 h-7 rounded-xl text-xs font-black flex items-center justify-center font-mono transition-colors ${rankBadgeBg}`}>
+                          <span className={`w-7 h-7 rounded-lg text-xs font-black flex items-center justify-center font-mono transition-colors ${rankBadgeBg}`}>
                             {row.rank <= 3 ? row.rank : `#${row.rank}`}
                           </span>
                         </div>
@@ -1772,9 +1634,9 @@ const LeaderboardPage = () => {
             ) {
               return (
                 <div className="pt-0.5">
-                  <div className="group relative flex flex-col sm:grid sm:grid-cols-12 items-center gap-3 p-2.5 sm:px-4 sm:py-2.5 rounded-2xl bg-white border-2 border-indigo-400/90 shadow-lg shadow-indigo-500/10 ring-4 ring-indigo-500/10 transition-all duration-300 hover:-translate-y-0.5 cursor-default">
+                  <div className="group relative flex flex-col sm:grid sm:grid-cols-12 items-center gap-3 p-2.5 sm:px-3 sm:py-2 rounded-xl bg-white border-2 border-indigo-400/90 shadow-sm ring-2 ring-indigo-500/10 transition-all duration-300 hover:-translate-y-0.5 cursor-default">
                     <div className="sm:col-span-1 flex items-center justify-center">
-                      <span className="w-8 h-8 rounded-xl text-xs font-black flex items-center justify-center font-mono bg-indigo-600 text-white shadow-xs">
+                      <span className="w-8 h-8 rounded-lg text-xs font-black flex items-center justify-center font-mono bg-indigo-600 text-white shadow-xs">
                         #{activeUserItem.rank}
                       </span>
                     </div>

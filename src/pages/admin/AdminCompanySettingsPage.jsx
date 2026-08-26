@@ -29,12 +29,12 @@ const AdminCompanySettingsPage = () => {
 
   const { data: networks = [], isLoading: networksLoading } = useQuery({
     queryKey: ["wifiNetworks"],
-    queryFn: wifiNetworksApi.getAll,
+    queryFn: () => wifiNetworksApi.getAll(),
   });
 
   const { data: settingsData = [], isLoading: settingsLoading } = useQuery({
     queryKey: ["companySettings"],
-    queryFn: companySettingsApi.getAll,
+    queryFn: () => companySettingsApi.getAll(),
   });
 
   // WiFi Form state
@@ -61,27 +61,55 @@ const AdminCompanySettingsPage = () => {
   const loading = networksLoading || settingsLoading;
 
   // --- General Settings Logic ---
+  const SETTINGS_LABELS = {
+    office_address: "Office address",
+    google_maps_link: "Google Maps link",
+    company_perks: "Company perks",
+  };
+
   const saveGeneralMutation = useMutation({
     mutationFn: async (settings) => {
       const user = JSON.parse(localStorage.getItem("user") || "{}");
-      await Promise.all([
-        companySettingsApi.upsert("office_address", {
-          value: settings.office_address,
-          updated_by: user.id,
-        }),
-        companySettingsApi.upsert("google_maps_link", {
-          value: settings.google_maps_link,
-          updated_by: user.id,
-        }),
-        companySettingsApi.upsert("company_perks", {
-          value: settings.company_perks,
-          updated_by: user.id,
-        }),
-      ]);
+      const keys = ["office_address", "google_maps_link", "company_perks"];
+
+      const results = await Promise.allSettled(
+        keys.map((key) =>
+          companySettingsApi.upsert(key, {
+            value: settings[key],
+            updated_by: user.id,
+          }),
+        ),
+      );
+
+      const succeeded = [];
+      const failed = [];
+      results.forEach((r, i) => {
+        if (r.status === "fulfilled") succeeded.push(keys[i]);
+        else failed.push(keys[i]);
+      });
+
+      return { succeeded, failed };
     },
-    onSuccess: () => {
-      queryClient.invalidateQueries({ queryKey: ["companySettings"] });
-      toast.success("General company settings saved!");
+    onSuccess: ({ succeeded, failed }) => {
+      // Refresh local state if anything actually wrote
+      if (succeeded.length > 0) {
+        queryClient.invalidateQueries({ queryKey: ["companySettings"] });
+      }
+
+      if (failed.length === 0) {
+        toast.success("General company settings saved!");
+        return;
+      }
+
+      if (succeeded.length === 0) {
+        toast.error("Failed to save general settings");
+        return;
+      }
+
+      // Partial save — be explicit so the admin knows what stuck
+      const ok = succeeded.map((k) => SETTINGS_LABELS[k]).join(", ");
+      const bad = failed.map((k) => SETTINGS_LABELS[k]).join(", ");
+      toast.error(`Partially saved (${ok}). Failed: ${bad}. Try again for the failed fields.`);
     },
     onError: () => {
       toast.error("Failed to save general settings");

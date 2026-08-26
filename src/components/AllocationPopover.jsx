@@ -95,6 +95,7 @@ const AllocationPopover = ({
   // fewer people than the ratio it sits beside — the card said 7 while the badge said 6,
   // the difference being a lead recorded on the project but not allocated to it.
   leadIds = [],
+  fetchDetail,
 }) => {
   const [open, setOpen] = useState(false);
   const [position, setPosition] = useState({
@@ -106,6 +107,24 @@ const AllocationPopover = ({
   const triggerRef = useRef(null);
   const popoverRef = useRef(null);
   const closeTimerRef = useRef(null);
+
+  const [detailData, setDetailData] = useState(null);
+  const [isLoadingDetail, setIsLoadingDetail] = useState(false);
+
+  useEffect(() => {
+    if (open && fetchDetail && !detailData) {
+      setIsLoadingDetail(true);
+      fetchDetail()
+        .then((data) => {
+          setDetailData(data);
+          setIsLoadingDetail(false);
+        })
+        .catch((err) => {
+          console.error("Failed to fetch allocation detail:", err);
+          setIsLoadingDetail(false);
+        });
+    }
+  }, [open, fetchDetail, detailData]);
 
   const employeeIndex = useMemo(
     () => buildEmployeeIndex(employees),
@@ -125,6 +144,59 @@ const AllocationPopover = ({
   // way to find the allocation that needs deleting — but marked stale, sorted
   // last, and excluded from the count in the header.
   const list = useMemo(() => {
+    if (fetchDetail) {
+      if (!detailData) return [];
+      const rows = detailData.items.map((item) => ({
+        key: `alloc-${item.allocation_id || item.employee_id}`,
+        alloc: {
+          id: item.allocation_id,
+          employee_id: item.employee_id,
+          role_tags: item.role_tags,
+          total_daily_hours: item.total_daily_hours,
+        },
+        emp: item.stale ? null : {
+          id: item.employee_id,
+          name: item.name,
+          email: item.email,
+          avatar_url: item.avatar_url,
+          designation: item.designation,
+          isOnLeave: item.is_on_leave,
+          location: item.location,
+        },
+        former: item.stale ? { name: item.name } : null,
+        isPm: item.is_pm,
+        isLead: item.is_lead,
+        isStale: item.stale,
+      }));
+
+      // Calculate how many allocations a person holds on this project
+      const rowsPerEmployeeId = {};
+      rows.forEach((r) => {
+        const id = r.alloc?.employee_id;
+        if (id != null) {
+          rowsPerEmployeeId[id] = (rowsPerEmployeeId[id] || 0) + 1;
+        }
+      });
+      rows.forEach((r) => {
+        if (r.alloc?.employee_id != null) {
+          r.rowsForPerson = rowsPerEmployeeId[r.alloc.employee_id];
+        }
+      });
+
+      const activeRows = rows.filter((r) => !r.isStale).sort((a, b) => {
+        if (a.isPm !== b.isPm) return a.isPm ? -1 : 1;
+        if (a.isLead !== b.isLead) return a.isLead ? -1 : 1;
+        const nameA = a.emp?.name || a.former?.name || staleAllocationName(a.alloc);
+        const nameB = b.emp?.name || b.former?.name || staleAllocationName(b.alloc);
+        return nameA.localeCompare(nameB);
+      });
+
+      return [
+        ...activeRows,
+        ...rows.filter((r) => r.isStale),
+      ];
+    }
+
     const filtered = Array.isArray(allocations)
       ? allocations.filter((a) =>
         a.sub_project_id !== undefined
@@ -147,7 +219,7 @@ const AllocationPopover = ({
     });
 
     const allocatedEmpIds = new Set(filtered.map(a => String(a.employee_id)));
-    
+
     // Add PMs who don't have an allocation
     const allPmIds = new Set([...pmIdSet, ...(pmIds || [])]);
     allPmIds.forEach((id) => {
@@ -189,7 +261,7 @@ const AllocationPopover = ({
         rowsPerEmployeeId[id] = (rowsPerEmployeeId[id] || 0) + 1;
       }
     });
-    
+
     rows.forEach((r) => {
       const id = r.alloc?.employee_id;
       r.rowsForPerson = id != null ? rowsPerEmployeeId[id] : 1;
@@ -394,21 +466,22 @@ const AllocationPopover = ({
           </div>
 
           {/* Body */}
-          <div className="max-h-64 overflow-y-auto py-1">
-            {list.length === 0 ? (
-              <div className="px-4 py-8 text-center">
-                <div className="w-10 h-10 rounded-full bg-slate-100 text-slate-400 flex items-center justify-center mx-auto mb-2">
-                  <Users className="w-5 h-5" />
-                </div>
-                <p className="text-sm font-medium text-slate-600">
-                  No employees allocated
+          <div className="max-h-[320px] overflow-y-auto">
+            {isLoadingDetail ? (
+              <div className="px-3 py-6 text-center text-sm text-slate-400">
+                Loading allocations...
+              </div>
+            ) : list.length === 0 ? (
+              <div className="px-3 py-6 text-center">
+                <p className="text-sm font-medium text-slate-500">
+                  No one is allocated to this project
                 </p>
-                <p className="text-xs text-slate-400 mt-0.5">
-                  Add the first one to get started
+                <p className="mt-1 text-xs text-slate-400">
+                  Click Add Employee to get started
                 </p>
               </div>
             ) : (
-              <ul className="divide-y divide-slate-50">
+              <ul className="py-1.5 divide-y divide-slate-50">
                 {list.map((row) => {
                   const { key, alloc, emp, former, isStale, rowsForPerson } =
                     row;
@@ -426,10 +499,8 @@ const AllocationPopover = ({
                   const tags = Array.isArray(alloc?.role_tags)
                     ? alloc.role_tags
                     : [];
-                  const isOnLeave = emp && onLeaveEmployeeIds?.has?.(emp.id);
-                  const location = emp
-                    ? locationByEmployeeId?.get?.(emp.id)
-                    : undefined;
+                  const isOnLeave = emp?.isOnLeave || (emp && onLeaveEmployeeIds?.has?.(emp.id));
+                  const location = emp?.location || (emp ? locationByEmployeeId?.get?.(emp.id) : undefined);
                   return (
                     <li
                       key={key}

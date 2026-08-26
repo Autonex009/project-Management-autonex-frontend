@@ -14,6 +14,7 @@ import { format, parseISO } from "date-fns";
 import { Zap, Award, FolderKanban } from "lucide-react";
 import Modal from "../ui/Modal";
 import Button from "../ui/Button";
+import { ChartWrapper, ChartTooltip, ChartDefs } from "./ChartWrapper";
 
 const shortDate = (s) => {
   try {
@@ -44,12 +45,7 @@ const DailyPlatformHoursChart = ({
 
   if (!data || data.length === 0) {
     return (
-      <div
-        className="w-full flex items-center justify-center text-slate-400 text-xs font-medium"
-        style={{ height }}
-      >
-        No execution trend data logged yet
-      </div>
+      <ChartWrapper data={data} height={height} emptyMessage="No execution trend data logged yet" />
     );
   }
 
@@ -183,13 +179,7 @@ const DailyPlatformHoursChart = ({
             margin={{ top: 10, right: 12, bottom: 4, left: -4 }}
             onClick={(state, event) => handleChartClick(state, event)}
           >
-            <defs>
-              <linearGradient id="executionGradient" x1="0" y1="0" x2="0" y2="1">
-                <stop offset="5%" stopColor="#4f46e5" stopOpacity={0.4} />
-                <stop offset="50%" stopColor="#06b6d4" stopOpacity={0.15} />
-                <stop offset="95%" stopColor="#06b6d4" stopOpacity={0.0} />
-              </linearGradient>
-            </defs>
+            <ChartDefs />
 
             <CartesianGrid strokeDasharray="3 3" stroke="#f1f5f9" vertical={false} />
 
@@ -230,20 +220,9 @@ const DailyPlatformHoursChart = ({
               />
             )}
 
-            <Tooltip
-              isAnimationActive={false}
-              wrapperStyle={{ pointerEvents: "none", outline: "none" }}
+            <ChartTooltip
               labelFormatter={shortDate}
               formatter={(v) => [`${v}h`, "Logged Execution"]}
-              contentStyle={{
-                borderRadius: 14,
-                border: "1px solid #e2e8f0",
-                boxShadow: "0 10px 30px rgba(15,23,42,0.1)",
-                fontSize: 12,
-                backgroundColor: "rgba(255, 255, 255, 0.95)",
-                backdropFilter: "blur(6px)",
-                pointerEvents: "none",
-              }}
             />
 
             {/* Single Smooth Volume Area with Line Stroke */}
@@ -302,20 +281,20 @@ const DailyPlatformHoursChart = ({
               <FolderKanban className="w-5 h-5" />
             </div>
             <div>
-              <h3 className="text-base font-black text-slate-900 leading-snug">
+              <h3 className="text-base font-bold text-stone-900 leading-snug">
                 Project-Wise Execution Breakdown
               </h3>
-              <p className="text-xs font-semibold text-slate-500 font-mono">
+              <p className="text-xs font-semibold text-stone-500 font-mono">
                 {selectedDayData ? formattedModalDate(selectedDayData.date) : ""}
               </p>
             </div>
           </div>
         </Modal.Header>
 
-        <Modal.Body className="space-y-3">
+        <Modal.Body className="space-y-2.5">
           {/* Summary Metric Header */}
-          <div className="flex items-center justify-between p-3 rounded-xl bg-slate-50 border border-slate-100/90 font-mono text-xs">
-            <span className="text-slate-500 font-medium">Total Logged Execution:</span>
+          <div className="flex items-center justify-between p-2.5 rounded-xl bg-stone-50 border border-stone-200 font-mono text-xs">
+            <span className="text-stone-500 font-medium">Total Logged Execution:</span>
             <span className="font-black text-indigo-600 text-sm">
               {selectedDayData ? (selectedDayData.hours ?? selectedDayData.platform_hours ?? 0) : 0}h
             </span>
@@ -326,18 +305,18 @@ const DailyPlatformHoursChart = ({
             {currentBreakdown.map((item, idx) => (
               <div
                 key={item.name + idx}
-                className="p-2.5 rounded-xl border border-slate-100 bg-white shadow-2xs hover:bg-slate-50/60 transition-colors space-y-1.5"
+                className="p-2.5 rounded-xl border border-stone-200 bg-white shadow-xs hover:bg-stone-50/60 transition-colors space-y-1.5"
               >
                 <div className="flex items-center justify-between gap-2 text-xs">
                   <div className="flex items-center gap-2 min-w-0">
                     <span className="w-5 h-5 rounded-md bg-indigo-50 text-indigo-700 font-mono font-bold text-[10px] flex items-center justify-center shrink-0">
                       #{idx + 1}
                     </span>
-                    <span className="font-bold text-slate-800 truncate" title={item.name}>
+                    <span className="font-bold text-stone-800 truncate" title={item.name}>
                       {item.name}
                     </span>
                     {item.client && (
-                      <span className="text-[9px] font-mono px-1.5 py-0.2 rounded-md bg-slate-100 text-slate-500 shrink-0">
+                      <span className="text-[9px] font-mono px-1.5 py-0.2 rounded-md bg-stone-100 text-stone-500 shrink-0">
                         {item.client}
                       </span>
                     )}
@@ -350,7 +329,7 @@ const DailyPlatformHoursChart = ({
                 </div>
 
                 {/* Progress Bar */}
-                <div className="w-full bg-slate-100 rounded-full h-1.5 overflow-hidden flex items-center">
+                <div className="w-full bg-stone-100 rounded-full h-1.5 overflow-hidden flex items-center">
                   <div
                     className="h-full bg-gradient-to-r from-indigo-500 to-purple-500 rounded-full transition-all duration-500"
                     style={{ width: `${item.pct}%` }}

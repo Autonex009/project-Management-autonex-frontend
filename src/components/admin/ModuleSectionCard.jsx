@@ -12,6 +12,7 @@ import {
 import Button from "../ui/Button";
 import { onboardingApi } from "../../services/api";
 import Dropdown from "../ui/Dropdown";
+import { clampPassingScore } from "../../utils/onboarding";
 
 export default function ModuleSectionCard({
   index,
@@ -108,17 +109,28 @@ export default function ModuleSectionCard({
       const rows = XLSX.utils.sheet_to_json(ws);
 
       const newQuestions = rows
-        .map((row) => ({
-          id: Math.random().toString(36).substring(7),
-          question: row.question?.toString() || "",
-          options: [
+        .map((row) => {
+          const options = [
             row.option1?.toString() || "",
             row.option2?.toString() || "",
             row.option3?.toString() || "",
             row.option4?.toString() || "",
-          ],
-          correctIndex: parseInt(row.correctOption?.toString() || "1") - 1,
-        }))
+          ];
+          // Excel uses 1-based correctOption. Guard against NaN / out-of-range.
+          const raw = parseInt(String(row.correctOption ?? "1").trim(), 10);
+          const oneBased = Number.isFinite(raw) ? raw : 1;
+          const correctIndex = Math.max(
+            0,
+            Math.min(options.length - 1, oneBased - 1),
+          );
+
+          return {
+            id: Math.random().toString(36).substring(7),
+            question: row.question?.toString() || "",
+            options,
+            correctIndex,
+          };
+        })
         .filter((q) => q.question.trim());
 
       onChange({
@@ -229,10 +241,7 @@ export default function ModuleSectionCard({
             max={100}
             value={section.quizPassingScore || 0}
             onChange={(e) =>
-              updateField(
-                "quizPassingScore",
-                Math.max(0, Math.min(100, Number(e.target.value) || 0)),
-              )
+              updateField("quizPassingScore", clampPassingScore(e.target.value))
             }
             disabled={!hasQuestions}
             title={
