@@ -75,16 +75,16 @@ import useProjectsStore from "../store/useProjectsStore";
 import { formatDisplayName } from "../utils/displayName";
 import { getWorkingDayCount } from "../utils/leaveTypes";
 
-import { 
-  STATUS_CONFIG, 
-  ARCHIVED_STATUSES, 
-  isArchivedStatus, 
-  getStatusBadgeConfig, 
-  formatCreatedDate, 
-  PROJECT_TYPE_CATEGORIES, 
-  typeLabel, 
-  DEVELOPER_TYPE_KEY, 
-  isDeveloperProject 
+import {
+  STATUS_CONFIG,
+  ARCHIVED_STATUSES,
+  isArchivedStatus,
+  getStatusBadgeConfig,
+  formatCreatedDate,
+  PROJECT_TYPE_CATEGORIES,
+  typeLabel,
+  DEVELOPER_TYPE_KEY,
+  isDeveloperProject
 } from "../utils/projectConstants";
 import ProjectCard from "../components/projects/ProjectCard";
 import { SkillMultiSelect, EmployeeMultiSelect, TeamLeadMultiSelect, PmMultiSelect } from "../components/projects/ProjectDropdowns";
@@ -197,7 +197,7 @@ const ProjectsPage = () => {
       "sub-projects-paginated",
       currentPage,
       12,
-        subProjectSearch,
+      subProjectSearch,
       filterMainProjectId,
       statusParam,
       recommendationParam,
@@ -296,6 +296,22 @@ const ProjectsPage = () => {
     queryFn: () => allocationApi.getSlim(),
     staleTime: 5 * 60 * 1000,
   });
+
+  // Guideline docs, filtered per-card by sub_project_id for the card "Docs" popover.
+  // const { data: guidelinesData = [] } = useQuery({
+  //   queryKey: ["guidelines", "cards"],
+  //   queryFn: () => guidelineApi.getAll(),
+  // });
+
+  const { startStr, endStr } = useMemo(() => {
+    const today = new Date();
+    const y = today.getFullYear();
+    const m = today.getMonth();
+    const start = `${y}-${String(m + 1).padStart(2, "0")}-01`;
+    const end = `${y}-${String(m + 1).padStart(2, "0")}-${String(new Date(y, m + 1, 0).getDate()).padStart(2, "0")}`;
+    return { startStr: start, endStr: end };
+  }, []);
+
   const { data: leaves = [] } = useQuery({
     queryKey: ["leaves"],
     queryFn: () => leaveApi.getTodayIds(),
@@ -1813,35 +1829,35 @@ const ProjectsPage = () => {
                 );
 
                 const pmIds = resolvePmIds(project);
-              const pmNames = pmIds.map(id => employeeIndex.get(String(id))?.name).filter(Boolean);
-              const allocatedManpower = getAllocatedManpower(project);
+                const pmNames = pmIds.map(id => employeeIndex.get(String(id))?.name).filter(Boolean);
+                const allocatedManpower = getAllocatedManpower(project);
 
-              return (
-                <ProjectCard
-                  key={project.id}
-                  id={`sub-project-${project.id}`}
-                  highlighted={highlightId === project.id}
-                  project={project}
-                  parentProject={parentProject}
-                  pmNames={pmNames}
-                  teamLeadNames={getTeamLeadNames(project)}
-                  pmIds={pmIds}
-                  leadIds={getTeamLeadIds(project)}
-                  onLeaveEmployeeIds={leaveEmployeeIds}
-                  locationByEmployeeId={locationByEmployeeId}
-                  allocatedManpower={allocatedManpower}
-                  requiredManpower={project.required_manpower || 0}
-                  pmSlots={getPmSlots(project)}
-                  leadSlots={getTeamLeadIds(project).filter(id => employeeIndex.has(String(id))).length}
-                  allocations={allocations}
-                  employees={employees}
-                  formerEmployees={formerEmployees}
-                  prefix={prefix}
-                  navigate={navigate}
-                  docs={guidelinesData.filter(
-                    (g) => g.sub_project_id === project.id,
-                  )}
-                  isEditing={editingCardId === project.id}
+                return (
+                  <ProjectCard
+                    key={project.id}
+                    id={`sub-project-${project.id}`}
+                    highlighted={highlightId === project.id}
+                    project={project}
+                    parentProject={parentProject}
+                    pmNames={pmNames}
+                    teamLeadNames={getTeamLeadNames(project)}
+                    pmIds={pmIds}
+                    leadIds={getTeamLeadIds(project)}
+                    onLeaveEmployeeIds={leaveEmployeeIds}
+                    locationByEmployeeId={locationByEmployeeId}
+                    allocatedManpower={allocatedManpower}
+                    requiredManpower={project.required_manpower || 0}
+                    pmSlots={getPmSlots(project)}
+                    leadSlots={getTeamLeadIds(project).filter(id => employeeIndex.has(String(id))).length}
+                    allocations={allocations}
+                    employees={employees}
+                    formerEmployees={formerEmployees}
+                    prefix={prefix}
+                    navigate={navigate}
+                    docs={guidelinesData.filter(
+                      (g) => g.sub_project_id === project.id,
+                    )}
+                    isEditing={editingCardId === project.id}
                     draft={cardDraft}
                     onStartEdit={() => startCardEdit(project)}
                     onCancelEdit={cancelCardEdit}
@@ -2611,9 +2627,8 @@ const ProjectsPage = () => {
                       Annotators" is informational and deliberately not in the sum
                       — it counts the vendor's people as well as ours. */}
                   <p className="mt-2 text-[11px] text-slate-400">
-                    {`Required headcount = Autonex Annotators + Autonex Reviewers + Others + Team Leads + Team Managers${
-                      isDevelopmentSelected ? " + Developers" : ""
-                    }. Leads and managers are counted from the fields above, not typed.`}
+                    {`Required headcount = Autonex Annotators + Autonex Reviewers + Others + Team Leads + Team Managers${isDevelopmentSelected ? " + Developers" : ""
+                      }. Leads and managers are counted from the fields above, not typed.`}
                   </p>
                 </div>
               </div>

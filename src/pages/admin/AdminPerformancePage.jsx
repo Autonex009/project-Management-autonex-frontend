@@ -66,10 +66,10 @@ const StatusPill = ({ status }) =>
 const fmtDate = (v) =>
   v
     ? new Date(v).toLocaleDateString("en-US", {
-        month: "short",
-        day: "numeric",
-        year: "numeric",
-      })
+      month: "short",
+      day: "numeric",
+      year: "numeric",
+    })
     : "—";
 
 // Overall-rating cell: compact stars + score, with a hover popover that breaks
@@ -129,8 +129,7 @@ const AdminPerformancePage = () => {
     queryFn: () => parentProjectApi.getAll(),
     staleTime: 5 * 60 * 1000,
   });
-  
-    // ── Persist tab / search / filters / pages / scroll ─────────
+  // ── Persist tab / search / filters / pages / scroll ─────────
   const PAGE_KEY = "admin-performance";
   const setPageState = usePageStateStore((s) => s.setPageState);
   const getPageState = usePageStateStore((s) => s.getPageState);
@@ -207,7 +206,7 @@ const AdminPerformancePage = () => {
     placeholderData: (prev) => prev,
     staleTime: 1000 * 60 * 5, // 5 minutes
   });
-  
+
   const evaluations = evaluationsData?.items || [];
   const evaluationsTotal = evaluationsData?.total || 0;
 

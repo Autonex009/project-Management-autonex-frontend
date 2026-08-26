@@ -219,7 +219,7 @@ const AllocationPopover = ({
     });
 
     const allocatedEmpIds = new Set(filtered.map(a => String(a.employee_id)));
-    
+
     // Add PMs who don't have an allocation
     const allPmIds = new Set([...pmIdSet, ...(pmIds || [])]);
     allPmIds.forEach((id) => {
@@ -261,7 +261,7 @@ const AllocationPopover = ({
         rowsPerEmployeeId[id] = (rowsPerEmployeeId[id] || 0) + 1;
       }
     });
-    
+
     rows.forEach((r) => {
       const id = r.alloc?.employee_id;
       r.rowsForPerson = id != null ? rowsPerEmployeeId[id] : 1;

@@ -82,7 +82,6 @@ const AllocationsPage = () => {
   const role = localStorage.getItem("role") || "admin";
   const isScoped = isProjectScopedRole(role);
   const prefix = isScoped ? "/pm" : "/admin";
-
   const [selectedEmployees, setSelectedEmployees] = useState([]);
   const [filterTab, setFilterTab] = useState("all");
   const [editingAllocation, setEditingAllocation] = useState(null); // { projectId, projectName }
@@ -693,14 +692,12 @@ const AllocationsPage = () => {
                                     ? `${it.name} — archived, not counted towards manpower`
                                     : `${it.name}${it.total_daily_hours ? ` · ${it.total_daily_hours}h/day` : ""}`
                                 }
-                                className={`group inline-flex items-center gap-1.5 pl-1 pr-1 py-0.5 rounded-full shadow-sm transition-opacity ${
-                                  it.stale ? "border border-rose-300 bg-rose-50" : "border border-slate-200 bg-white"
-                                } ${isRemoving ? "opacity-50" : ""}`}
+                                className={`group inline-flex items-center gap-1.5 pl-1 pr-1 py-0.5 rounded-full shadow-sm transition-opacity ${it.stale ? "border border-rose-300 bg-rose-50" : "border border-slate-200 bg-white"
+                                  } ${isRemoving ? "opacity-50" : ""}`}
                               >
                                 <span
-                                  className={`w-5 h-5 rounded-full text-[10px] font-semibold flex items-center justify-center ${
-                                    it.stale ? "bg-rose-200 text-rose-700" : "bg-indigo-500 text-white"
-                                  }`}
+                                  className={`w-5 h-5 rounded-full text-[10px] font-semibold flex items-center justify-center ${it.stale ? "bg-rose-200 text-rose-700" : "bg-indigo-500 text-white"
+                                    }`}
                                 >
                                   {it.stale ? <UserX className="w-3 h-3" /> : initials}
                                 </span>
@@ -733,11 +730,10 @@ const AllocationsPage = () => {
                                       },
                                     });
                                   }}
-                                  className={`ml-0.5 w-4 h-4 rounded-full flex items-center justify-center transition-colors disabled:cursor-not-allowed ${
-                                    it.stale
+                                  className={`ml-0.5 w-4 h-4 rounded-full flex items-center justify-center transition-colors disabled:cursor-not-allowed ${it.stale
                                       ? "text-rose-500 hover:text-white hover:bg-rose-500"
                                       : "text-slate-400 hover:text-white hover:bg-rose-500"
-                                  }`}
+                                    }`}
                                   title={`Remove ${name}`}
                                 >
                                   <X className="w-3 h-3" />
@@ -773,10 +769,10 @@ const AllocationsPage = () => {
                     >
                       <CheckSquare className="w-3.5 h-3.5" />
                       {selectedEmployees.length ===
-                      (filterTab === "unallocated"
-                        ? availableEmployees
-                        : [...availableEmployees, ...allocatedEmployeesOther]
-                      ).length
+                        (filterTab === "unallocated"
+                          ? availableEmployees
+                          : [...availableEmployees, ...allocatedEmployeesOther]
+                        ).length
                         ? "Deselect All"
                         : "Select All"}
                     </button>
@@ -792,11 +788,10 @@ const AllocationsPage = () => {
                           key={t.key}
                           type="button"
                           onClick={() => setFilterTab(t.key)}
-                          className={`px-3 py-1.5 text-[13px] font-semibold rounded-md transition-all whitespace-nowrap ${
-                            filterTab === t.key
+                          className={`px-3 py-1.5 text-[13px] font-semibold rounded-md transition-all whitespace-nowrap ${filterTab === t.key
                               ? "bg-white text-slate-900 shadow-sm ring-1 ring-slate-200/70"
                               : "text-slate-500 hover:text-slate-800"
-                          }`}
+                            }`}
                         >
                           {t.label}
                         </button>
@@ -827,8 +822,8 @@ const AllocationsPage = () => {
                     const q = employeeSearch.trim().toLowerCase();
                     const displayEmployees = q
                       ? allTabEmployees.filter(
-                          (emp) => emp.name.toLowerCase().includes(q) || (emp.email || "").toLowerCase().includes(q),
-                        )
+                        (emp) => emp.name.toLowerCase().includes(q) || (emp.email || "").toLowerCase().includes(q),
+                      )
                       : allTabEmployees;
 
                     if (displayEmployees.length === 0) {
@@ -851,16 +846,15 @@ const AllocationsPage = () => {
                             <div
                               key={employee.id}
                               onClick={() => !employee.alreadyInProject && handleEmployeeToggle(employee)}
-                              className={`px-3 py-2.5 ${
-                                employee.alreadyInProject ? "opacity-50 cursor-not-allowed bg-slate-50" : "cursor-pointer hover:bg-slate-50"
-                              } ${isSelected ? "bg-blue-50/70" : ""}`}
+                              className={`px-3 py-2.5 ${employee.alreadyInProject ? "opacity-50 cursor-not-allowed bg-slate-50" : "cursor-pointer hover:bg-slate-50"
+                                } ${isSelected ? "bg-blue-50/70" : ""}`}
                             >
                               <div className="flex items-center gap-2.5 min-w-0">
                                 <input
                                   type="checkbox"
                                   checked={isSelected}
                                   disabled={employee.alreadyInProject}
-                                  onChange={() => {}}
+                                  onChange={() => { }}
                                   className="rounded border-slate-300 text-blue-600 focus:ring-blue-500 disabled:opacity-40 shrink-0"
                                 />
                                 <span className="text-[13px] font-semibold text-slate-900 shrink-0">
@@ -1030,11 +1024,10 @@ const AllocationsPage = () => {
                           const isValid = totalAssigned === totalDailyHours;
                           return (
                             <div
-                              className={`mt-2 p-2 rounded text-sm ${
-                                isValid
+                              className={`mt-2 p-2 rounded text-sm ${isValid
                                   ? "bg-green-50 text-green-700 border border-green-200"
                                   : "bg-red-50 text-red-700 border border-red-200"
-                              }`}
+                                }`}
                             >
                               {isValid
                                 ? `✓ Hours correctly distributed: ${totalAssigned}/${totalDailyHours}`
@@ -1081,15 +1074,13 @@ const AllocationsPage = () => {
               return (
                 <div
                   key={it.allocation_id}
-                  className={`flex items-center justify-between p-4 border rounded-md ${
-                    it.stale ? "border-rose-200 bg-rose-50" : "border-gray-200 hover:bg-gray-50"
-                  }`}
+                  className={`flex items-center justify-between p-4 border rounded-md ${it.stale ? "border-rose-200 bg-rose-50" : "border-gray-200 hover:bg-gray-50"
+                    }`}
                 >
                   <div className="flex items-center gap-3">
                     <div
-                      className={`w-10 h-10 rounded-full flex items-center justify-center font-medium ${
-                        it.stale ? "bg-rose-200 text-rose-700" : "bg-blue-500 text-white"
-                      }`}
+                      className={`w-10 h-10 rounded-full flex items-center justify-center font-medium ${it.stale ? "bg-rose-200 text-rose-700" : "bg-blue-500 text-white"
+                        }`}
                     >
                       {it.stale ? <UserX className="w-4 h-4" /> : name.charAt(0).toUpperCase()}
                     </div>

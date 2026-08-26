@@ -1,10 +1,10 @@
 import React from "react";
 import { useQuery } from "@tanstack/react-query";
-import { guidelineApi} from "../../services/api";
+import { guidelineApi } from "../../services/api";
 import { FileText, Download } from "lucide-react";
 
 const EmployeeGuidelinesPage = () => {
-  
+
   const { data: myGuidelines = [], isLoading } = useQuery({
     queryKey: ["guidelines-for-me"],
     queryFn: () => guidelineApi.getForMe(),

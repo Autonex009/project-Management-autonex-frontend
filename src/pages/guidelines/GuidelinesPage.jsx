@@ -48,7 +48,7 @@ const GuidelinesPage = () => {
   const canEdit = role === "pm" || role === "admin";
   const pmEmployeeId = getPmEmployeeId(user);
 
-   // ── Persist org filter / search / page / scroll ────────────
+  // ── Persist org filter / search / page / scroll ────────────
   const PAGE_KEY = "guidelines";
   const setPageState = usePageStateStore((s) => s.setPageState);
   const getPageState = usePageStateStore((s) => s.getPageState);
@@ -253,9 +253,9 @@ const GuidelinesPage = () => {
 
   const visibleSubProjects = form.main_project_id
     ? visibleSubProjectsForRole.filter(
-        (project) =>
-          String(project.main_project_id) === String(form.main_project_id),
-      )
+      (project) =>
+        String(project.main_project_id) === String(form.main_project_id),
+    )
     : visibleSubProjectsForRole;
 
   // The guideline currently being edited, if its row is on the visible page —
@@ -316,10 +316,10 @@ const GuidelinesPage = () => {
         <span className="whitespace-nowrap text-slate-500 tabular-nums">
           {g.created_at
             ? new Date(g.created_at).toLocaleDateString("en-US", {
-                month: "short",
-                day: "numeric",
-                year: "numeric",
-              })
+              month: "short",
+              day: "numeric",
+              year: "numeric",
+            })
             : "—"}
         </span>
       ),
@@ -544,11 +544,10 @@ const GuidelinesPage = () => {
                       addGuidelineFile(e.dataTransfer.files?.[0]);
                     }}
                     onClick={() => fileInputRef.current?.click()}
-                    className={`border-2 border-dashed rounded-xl p-6 text-center cursor-pointer transition-colors ${
-                      isDragActive
+                    className={`border-2 border-dashed rounded-xl p-6 text-center cursor-pointer transition-colors ${isDragActive
                         ? "border-indigo-500 bg-indigo-50"
                         : "border-slate-300 bg-slate-50 hover:border-indigo-400 hover:bg-indigo-50/60"
-                    }`}
+                      }`}
                   >
                     <input
                       ref={fileInputRef}
