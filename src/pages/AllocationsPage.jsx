@@ -35,42 +35,13 @@ import AllocationPopover from "../components/AllocationPopover";
 import Dropdown from "../components/ui/Dropdown";
 import SearchBar from "../components/ui/SearchBar";
 import { formatDisplayName } from "../utils/displayName";
-
-// Stable color palette for avatars based on the employee name
-const AVATAR_PALETTE = [
-  "from-indigo-500 to-violet-500",
-  "from-emerald-500 to-teal-500",
-  "from-amber-500 to-orange-500",
-  "from-rose-500 to-pink-500",
-  "from-sky-500 to-blue-500",
-  "from-fuchsia-500 to-purple-500",
-  "from-lime-500 to-green-500",
-  "from-cyan-500 to-sky-500",
-];
-
-const getAvatarGradient = (name) => {
-  let hash = 0;
-  for (let i = 0; i < (name || "").length; i++) {
-    hash = (hash << 5) - hash + name.charCodeAt(i);
-  }
-  return AVATAR_PALETTE[Math.abs(hash) % AVATAR_PALETTE.length];
-};
+import {
+  TEAM_LEAD_TAG,
+  ROLE_TAGS,
+} from "../utils/allocationRoles";
 
 // Marks an allocation as the project's team lead. Stored inside role_tags because that is
 // already per-(employee, project). Kept identical to the backend's TEAM_LEAD_TAG constant.
-export const TEAM_LEAD_TAG = "Team Lead";
-
-// Role tag constants for time division
-const ROLE_TAGS = [
-  "Yutori Verifier",
-  "Yutori Annotation",
-  "Robotics Annotation",
-  "Development",
-  "Robotics Data Collection",
-  "Data Labeling",
-  "Quality Review",
-  "Smart Factory Development",
-];
 
 const PAGE_SIZE = 10;
 

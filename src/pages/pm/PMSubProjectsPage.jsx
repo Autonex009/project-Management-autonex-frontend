@@ -1,14 +1,12 @@
-import React from "react";
+import React, { useEffect } from "react";
 import { useQuery } from "@tanstack/react-query";
 import Pagination from "../../components/ui/Pagination";
-import { useSearchParams, Link, useNavigate } from "react-router-dom";
+import { useSearchParams, Link } from "react-router-dom";
 import {
-  allocationApi,
   parentProjectApi,
   subProjectApi,
 } from "../../services/api";
-import { FolderKanban, Settings, Users, Clock } from "lucide-react";
-import Spinner from "../../components/ui/LoadingSpinner";
+import { Settings, Users, Clock } from "lucide-react";
 import { format } from "date-fns";
 import { getPmEmployeeId, getPmProjects } from "../../utils/pmScope";
 import Table, { ColumnTemplates } from "../../components/ui/Table";
@@ -16,7 +14,7 @@ import Table, { ColumnTemplates } from "../../components/ui/Table";
 const PMSubProjectsPage = () => {
   const user = JSON.parse(localStorage.getItem("user") || "{}");
   const pmEmployeeId = getPmEmployeeId(user);
-  const [searchParams] = useSearchParams();
+  const [searchParams, setSearchParams] = useSearchParams();
   const projectParam = searchParams.get("project");
   const filterMainProjectId = projectParam ? Number(projectParam) : null;
 
@@ -46,9 +44,19 @@ const PMSubProjectsPage = () => {
   const filteredSubProjects = paginatedData?.items || [];
   const totalPages = paginatedData?.pages || 1;
 
-  const currentProject = scopedProjects.find(
-    (project) => project.id === filterMainProjectId,
-  );
+  useEffect(() => {
+    const currentPage = parseInt(searchParams.get("page") || "1", 10);
+    if (currentPage <= 1) return;
+
+    setSearchParams(
+      (prev) => {
+        const params = new URLSearchParams(prev);
+        params.set("page", "1");
+        return params;
+      },
+      { replace: true },
+    );
+  }, [filterMainProjectId]);
 
   return (
     <div className="space-y-6">

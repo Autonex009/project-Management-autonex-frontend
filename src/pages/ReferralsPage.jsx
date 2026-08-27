@@ -23,42 +23,8 @@ import {
 import Dropdown from "../components/ui/Dropdown";
 import Modal from "../components/ui/Modal";
 import StatCard from "../components/dashboard/StatCard";
-
-const STATUS_CONFIG = {
-  pending: {
-    label: "Pending Review",
-    color: "bg-amber-50 text-amber-700 border-amber-200",
-    dot: "bg-amber-400",
-  },
-  reviewing: {
-    label: "Under Review",
-    color: "bg-blue-50 text-blue-700 border-blue-200",
-    dot: "bg-blue-500",
-  },
-  interview_scheduled: {
-    label: "Interview Scheduled",
-    color: "bg-purple-50 text-purple-700 border-purple-200",
-    dot: "bg-purple-500",
-  },
-  hired: {
-    label: "Hired",
-    color: "bg-emerald-50 text-emerald-700 border-emerald-200",
-    dot: "bg-emerald-500",
-  },
-  rejected: {
-    label: "Not Moving Forward",
-    color: "bg-red-50 text-red-700 border-red-200",
-    dot: "bg-red-400",
-  },
-};
-
-const STATUS_OPTIONS = [
-  { value: "pending", label: "Pending Review" },
-  { value: "reviewing", label: "Under Review" },
-  { value: "interview_scheduled", label: "Interview Scheduled" },
-  { value: "hired", label: "Hired" },
-  { value: "rejected", label: "Not Moving Forward" },
-];
+import StatusBadge from "../components/referrals/StatusBadge";
+import { STATUS_OPTIONS } from "../components/referrals/statusConfig";
 
 const TABS = ["All", "Pending", "Reviewing", "Interview", "Hired", "Rejected"];
 const TAB_STATUS = {
@@ -68,24 +34,6 @@ const TAB_STATUS = {
   Interview: "interview_scheduled",
   Hired: "hired",
   Rejected: "rejected",
-};
-
-const StatusBadge = ({ status }) => {
-  const cfg = STATUS_CONFIG[status] || {
-    label: status,
-    color: "bg-slate-100 text-slate-600 border-slate-200",
-    dot: "bg-slate-400",
-  };
-  return (
-    <span
-      className={`inline-flex items-center gap-1.5 px-2 py-0.5 rounded-full text-[11px] font-medium border ${cfg.color}`}
-    >
-      <span
-        className={`h-1.5 w-1.5 rounded-full ${cfg.dot || "bg-slate-400"}`}
-      />
-      {cfg.label}
-    </span>
-  );
 };
 
 const ReferralsPage = () => {
@@ -294,7 +242,7 @@ const ReferralsPage = () => {
                     <div className="flex items-center gap-3 min-w-0 flex-1">
                       <div className="w-10 h-10 rounded-xl bg-gradient-to-br from-indigo-100 to-slate-100 flex items-center justify-center shrink-0">
                         <span className="text-sm font-bold text-indigo-700">
-                          {ref.candidate_name.charAt(0).toUpperCase()}
+                          {(ref.candidate_name || "?").charAt(0).toUpperCase()}
                         </span>
                       </div>
                       <div className="min-w-0">
@@ -302,7 +250,7 @@ const ReferralsPage = () => {
                           <p className="text-[14px] font-semibold text-slate-900">
                             {ref.candidate_name}
                           </p>
-                          <StatusBadge status={ref.status} />
+                          <StatusBadge status={ref.status} showDot />
                         </div>
                         <div className="flex items-center gap-3 mt-0.5 flex-wrap">
                           <span className="flex items-center gap-1 text-xs text-slate-500">

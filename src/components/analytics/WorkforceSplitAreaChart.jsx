@@ -35,8 +35,8 @@ const WorkforceSplitAreaChart = ({
       0
     );
 
-    const annTotal = totalAnnotationHours ?? 9480;
-    const revTotal = totalReviewHours ?? 3767;
+    const annTotal = totalAnnotationHours ?? 0;
+    const revTotal = totalReviewHours ?? 0;
     const denominator =
       totalPlatformH > 0 ? totalPlatformH : annTotal + revTotal || 1;
 

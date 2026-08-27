@@ -2773,7 +2773,7 @@ const EmployeeDashboard = () => {
                   <h3 className="font-display text-sm font-bold text-stone-800 flex items-center gap-2">
                     Attendance & Leave Records
                     <span className="text-xs font-normal text-stone-500">
-                      • {employee?.full_name || "Employee"}
+                      • {employee?.name || "Employee"}
                     </span>
                   </h3>
                   <p className="text-[11px] text-stone-500 mt-0.5">

@@ -14,6 +14,7 @@ import Dropdown from "./ui/Dropdown";
 import Modal from "./ui/Modal";
 import { recommendationsApi } from "../services/api";
 import { formatDisplayName } from "../utils/displayName";
+import { ROLE_TAG_SUGGESTIONS } from "../utils/allocationRoles";
 
 const capacityPill = (status) => {
   if (status === "overburdened")
@@ -67,15 +68,6 @@ const AllocationModalV2 = ({
 
   const [newRole, setNewRole] = useState("");
   const [validationErrors, setValidationErrors] = useState([]);
-
-  // Common role suggestions
-  const roleSuggestions = [
-    "Annotation",
-    "Review",
-    "QA",
-    "Training",
-    "Management",
-  ];
 
   // Project-fit insights (pool flow)
   const [capacity, setCapacity] = useState(null);
@@ -552,7 +544,7 @@ const AllocationModalV2 = ({
                 <div className="mb-4">
                   <p className="text-xs text-gray-500 mb-2">Suggestions:</p>
                   <div className="flex flex-wrap gap-2">
-                    {roleSuggestions.map((role) => (
+                    {ROLE_TAG_SUGGESTIONS.map((role) => (
                       <button
                         key={role}
                         type="button"

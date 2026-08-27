@@ -22,7 +22,7 @@ import { usePayrollStore } from "../store/usePayrollStore";
 import { Table } from "../components/ui/Table";
 import Dropdown from "../components/ui/Dropdown";
 import UserAvatar from "../components/ui/UserAvatar";
-import { formatDisplayName, getNameInitials } from "../utils/displayName";
+import { formatDisplayName } from "../utils/displayName";
 
 const SORT_OPTIONS = [
   { value: "name-asc", label: "Name A → Z" },

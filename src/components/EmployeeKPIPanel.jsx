@@ -6,7 +6,6 @@ import {
   Calendar,
   Home,
   Award,
-  TrendingUp,
   AlertTriangle,
   ShieldAlert,
   FileText,
@@ -19,12 +18,11 @@ import {
   ChevronUp,
   Users,
 } from "lucide-react";
-import { getNameInitials, formatDisplayName } from "../utils/displayName";
+import { formatDisplayName } from "../utils/displayName";
 import UserAvatar from "./ui/UserAvatar";
 import {
   getWorkingDayCount,
   getLeaveTypeLabel,
-  toLocalISODate,
   isIntern,
 } from "../utils/leaveTypes";
 
