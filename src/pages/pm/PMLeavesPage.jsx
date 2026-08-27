@@ -154,6 +154,7 @@ const PMLeavesPage = () => {
   const { data: allLeaves = [], isLoading } = useQuery({
     queryKey: ["leaves"],
     queryFn: () => leaveApi.getAll(),
+    refetchInterval: 60000, // ETag Polling
   });
   const { data: allocations = [], isLoading: allocationsLoading } = useQuery({
     queryKey: ["allocations"],
@@ -237,8 +238,13 @@ const PMLeavesPage = () => {
   // ── Leave mutations ──────────────────────────────────────────────
   const approveMutation = useMutation({
     mutationFn: ({ id, remark }) => leaveApi.approve(id, user.id, remark),
-    onSuccess: () => {
-      queryClient.invalidateQueries({ queryKey: ["leaves"] });
+    onSuccess: (res) => {
+      queryClient.setQueryData(["leaves"], (old) => old?.map(lv => lv.leave_id === res.leave_id ? { ...lv, status: res.status, razorpay_applied: res.razorpay_applied } : lv));
+      // Also apply surgery to paginated cache if we're on LeavesPage
+      queryClient.setQueriesData({ queryKey: ["leaves", "paginated"] }, (old) => {
+        if (!old || !old.items) return old;
+        return { ...old, items: old.items.map(lv => lv.leave_id === res.leave_id ? { ...lv, status: res.status, razorpay_applied: res.razorpay_applied } : lv) };
+      });
       setRemarkModal(null);
       setRemark("");
       toast.success("Leave approved");
@@ -249,8 +255,12 @@ const PMLeavesPage = () => {
 
   const rejectMutation = useMutation({
     mutationFn: (id) => leaveApi.reject(id, user.id),
-    onSuccess: () => {
-      queryClient.invalidateQueries({ queryKey: ["leaves"] });
+    onSuccess: (res) => {
+      queryClient.setQueryData(["leaves"], (old) => old?.map(lv => lv.leave_id === res.leave_id ? { ...lv, status: res.status, razorpay_applied: res.razorpay_applied } : lv));
+      queryClient.setQueriesData({ queryKey: ["leaves", "paginated"] }, (old) => {
+        if (!old || !old.items) return old;
+        return { ...old, items: old.items.map(lv => lv.leave_id === res.leave_id ? { ...lv, status: res.status, razorpay_applied: res.razorpay_applied } : lv) };
+      });
       toast.success("Leave rejected");
     },
     onError: (err) =>
@@ -259,9 +269,12 @@ const PMLeavesPage = () => {
 
   const undoApproveMutation = useMutation({
     mutationFn: (id) => leaveApi.undoApprove(id, user.id),
-    onSuccess: () => {
-      queryClient.invalidateQueries({ queryKey: ["leaves"] });
-      queryClient.invalidateQueries({ queryKey: ["leave-calendar"] });
+    onSuccess: (res) => {
+      queryClient.setQueryData(["leaves"], (old) => old?.map(lv => lv.leave_id === res.leave_id ? { ...lv, status: res.status, razorpay_applied: false } : lv));
+      queryClient.setQueriesData({ queryKey: ["leaves", "paginated"] }, (old) => {
+        if (!old || !old.items) return old;
+        return { ...old, items: old.items.map(lv => lv.leave_id === res.leave_id ? { ...lv, status: res.status, razorpay_applied: false } : lv) };
+      });
       toast.success("Leave approval undone");
     },
     onError: (err) =>
@@ -270,9 +283,12 @@ const PMLeavesPage = () => {
 
   const undoRejectMutation = useMutation({
     mutationFn: (id) => leaveApi.undoReject(id, user.id),
-    onSuccess: () => {
-      queryClient.invalidateQueries({ queryKey: ["leaves"] });
-      queryClient.invalidateQueries({ queryKey: ["leave-calendar"] });
+    onSuccess: (res) => {
+      queryClient.setQueryData(["leaves"], (old) => old?.map(lv => lv.leave_id === res.leave_id ? { ...lv, status: res.status, razorpay_applied: false } : lv));
+      queryClient.setQueriesData({ queryKey: ["leaves", "paginated"] }, (old) => {
+        if (!old || !old.items) return old;
+        return { ...old, items: old.items.map(lv => lv.leave_id === res.leave_id ? { ...lv, status: res.status, razorpay_applied: false } : lv) };
+      });
       toast.success("Leave rejection undone");
     },
     onError: (err) =>
@@ -310,9 +326,12 @@ const PMLeavesPage = () => {
   // ── WFH mutations ────────────────────────────────────────────────
   const wfhApproveMutation = useMutation({
     mutationFn: ({ id, remark }) => wfhApi.approve(id, user.id, remark),
-    onSuccess: () => {
-      queryClient.invalidateQueries({ queryKey: ["wfh"] });
-      queryClient.invalidateQueries({ queryKey: ["leave-calendar"] });
+    onSuccess: (res) => {
+      queryClient.setQueryData(["wfh"], (old) => old?.map(w => w.id === res.wfh_id || w.id === res.id ? { ...w, status: res.status } : w));
+      queryClient.setQueriesData({ queryKey: ["wfh", "paginated"] }, (old) => {
+        if (!old || !old.items) return old;
+        return { ...old, items: old.items.map(w => w.id === res.wfh_id || w.id === res.id ? { ...w, status: res.status } : w) };
+      });
       setWfhRemarkModal(null);
       setWfhRemark("");
       toast.success("WFH approved");
@@ -323,8 +342,12 @@ const PMLeavesPage = () => {
 
   const wfhRejectMutation = useMutation({
     mutationFn: (id) => wfhApi.reject(id, user.id),
-    onSuccess: () => {
-      queryClient.invalidateQueries({ queryKey: ["wfh"] });
+    onSuccess: (res) => {
+      queryClient.setQueryData(["wfh"], (old) => old?.map(w => w.id === res.wfh_id || w.id === res.id ? { ...w, status: res.status } : w));
+      queryClient.setQueriesData({ queryKey: ["wfh", "paginated"] }, (old) => {
+        if (!old || !old.items) return old;
+        return { ...old, items: old.items.map(w => w.id === res.wfh_id || w.id === res.id ? { ...w, status: res.status } : w) };
+      });
       toast.success("WFH rejected");
     },
     onError: (err) =>
@@ -333,9 +356,12 @@ const PMLeavesPage = () => {
 
   const wfhUndoApproveMutation = useMutation({
     mutationFn: (id) => wfhApi.undoApprove(id, user.id),
-    onSuccess: () => {
-      queryClient.invalidateQueries({ queryKey: ["wfh"] });
-      queryClient.invalidateQueries({ queryKey: ["leave-calendar"] });
+    onSuccess: (res) => {
+      queryClient.setQueryData(["wfh"], (old) => old?.map(w => w.id === res.wfh_id || w.id === res.id ? { ...w, status: res.status } : w));
+      queryClient.setQueriesData({ queryKey: ["wfh", "paginated"] }, (old) => {
+        if (!old || !old.items) return old;
+        return { ...old, items: old.items.map(w => w.id === res.wfh_id || w.id === res.id ? { ...w, status: res.status } : w) };
+      });
       toast.success("WFH approval undone");
     },
     onError: (err) =>
@@ -344,8 +370,12 @@ const PMLeavesPage = () => {
 
   const wfhUndoRejectMutation = useMutation({
     mutationFn: (id) => wfhApi.undoReject(id, user.id),
-    onSuccess: () => {
-      queryClient.invalidateQueries({ queryKey: ["wfh"] });
+    onSuccess: (res) => {
+      queryClient.setQueryData(["wfh"], (old) => old?.map(w => w.id === res.wfh_id || w.id === res.id ? { ...w, status: res.status } : w));
+      queryClient.setQueriesData({ queryKey: ["wfh", "paginated"] }, (old) => {
+        if (!old || !old.items) return old;
+        return { ...old, items: old.items.map(w => w.id === res.wfh_id || w.id === res.id ? { ...w, status: res.status } : w) };
+      });
       toast.success("WFH rejection undone");
     },
     onError: (err) =>

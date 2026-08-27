@@ -140,26 +140,57 @@ const AdminPerformancePage = () => {
     setPerfPage(1);
   }, [search, roleFilter, tab, ready]);
 
-  // Admin sees ALL evaluations (submitted + reviewed).
+  // --- SERVER-SIDE RENDERING (SSR) AND PAGINATION ---
+  const currentPeriodQuery = tab === "history" ? historyMonth : activePeriod;
+
+  // KPI Data - SSR for the entire period
+  const { data: kpiData = {} } = useQuery({
+    queryKey: ["perf-evals-kpi", currentPeriodQuery],
+    queryFn: () => perfEvalApi.getAdminKpi({ period: currentPeriodQuery }),
+    staleTime: 1000 * 60 * 5,
+    enabled: ready,
+  });
+
   const { data: evaluationsData = {}, isLoading: evalLoading, isFetching: evalFetching } = useQuery({
-    queryKey: ["perf-evals", "paginated", perfPage, PAGE_SIZE],
-    queryFn: () => perfEvalApi.getAll({ page: perfPage, limit: PAGE_SIZE }),
+    queryKey: ["perf-evals", "paginated", perfPage, PAGE_SIZE, tab, currentPeriodQuery, search, roleFilter],
+    queryFn: () => {
+      const isPmTab = tab === "pm";
+      const params = {
+        page: perfPage,
+        limit: PAGE_SIZE,
+        period: currentPeriodQuery,
+        type: isPmTab ? "pm" : "employee",
+      };
+      if (search.trim()) params.search = search.trim();
+      if (roleFilter !== "all") params.role_filter = roleFilter;
+      return perfEvalApi.getAll(params);
+    },
     placeholderData: (prev) => prev,
-    staleTime: 1000 * 60 * 5, // 5 minutes
+    staleTime: 1000 * 60 * 5,
+    enabled: ready,
   });
 
   const evaluations = evaluationsData?.items || [];
   const evaluationsTotal = evaluationsData?.total || 0;
 
-  // One prior cycle at a time — fetched lazily, only once the History tab is opened.
-  const { data: historyData = {}, isLoading: historyLoading, isError: historyError } = useQuery({
-    queryKey: ["perf-evals", "history", historyMonth],
-    queryFn: () => perfEvalApi.getAll({ period: historyMonth, limit: 500 }),
-    placeholderData: (prev) => prev,
+  // We still need the pending count for the PM tab badge
+  const { data: pmSelfData = {} } = useQuery({
+    queryKey: ["perf-evals", "pm-pending", currentPeriodQuery],
+    queryFn: () => perfEvalApi.getAll({ period: currentPeriodQuery, type: "pm", limit: 500 }),
     staleTime: 1000 * 60 * 5,
-    enabled: tab === "history",
+    enabled: tab !== "pm" && ready,
   });
-  const historyItems = historyData?.items || [];
+  const pmPendingCount = tab === "pm" 
+    ? evaluations.filter(e => e.status === "submitted").length 
+    : (pmSelfData?.items || []).filter(e => e.status === "submitted").length;
+
+  const { data: bonusData = {} } = useQuery({
+    queryKey: ["perf-evals", "bonus", currentPeriodQuery],
+    queryFn: () => perfEvalApi.getAll({ period: currentPeriodQuery, type: "bonus", limit: 100 }),
+    staleTime: 1000 * 60 * 5,
+    enabled: ready,
+  });
+  const bonusEvals = bonusData?.items || [];
 
   const isLoading = empLoading || evalFetching || projectsLoading || mainProjectsLoading;
 
@@ -173,8 +204,6 @@ const AdminPerformancePage = () => {
     return projects.find((p) => p.id === id)?.name || `Project #${id}`;
   };
 
-  // Reporting manager(s) of an evaluation = PM(s) of the main project its sub-project
-  // belongs to. Same join the Employees table uses: sub_project → main_project → PM.
   const subProjectById = useMemo(
     () => new Map(projects.map((sp) => [String(sp.id), sp])),
     [projects],
@@ -188,82 +217,17 @@ const AdminPerformancePage = () => {
     const sp = subProjectById.get(String(projectId));
     const mp = sp ? mainProjectById.get(String(sp.main_project_id)) : null;
     if (!mp) return [];
-    if (
-      Array.isArray(mp.program_manager_names) &&
-      mp.program_manager_names.length > 0
-    )
+    if (Array.isArray(mp.program_manager_names) && mp.program_manager_names.length > 0)
       return mp.program_manager_names;
     if (mp.program_manager_name) return [mp.program_manager_name];
-    const ids = mp.program_manager_ids?.length
-      ? mp.program_manager_ids
-      : mp.program_manager_id
-        ? [mp.program_manager_id]
-        : [];
+    const ids = mp.program_manager_ids?.length ? mp.program_manager_ids : mp.program_manager_id ? [mp.program_manager_id] : [];
     return ids.map((id) => empById.get(Number(id))?.name).filter(Boolean);
   };
 
-  // Employee summary excludes PM self-reports (project_id 0 — shown on the PM Approvals tab).
-  const employeeEvals = useMemo(
-    () => evaluations.filter((e) => e.project_id !== 0),
-    [evaluations],
-  );
-  const historyEvals = useMemo(
-    () => historyItems.filter((e) => e.project_id !== 0),
-    [historyItems],
-  );
+  const filtered = tab === "employees" ? evaluations : [];
+  const pmSelfEvals = tab === "pm" ? evaluations : [];
+  const filteredHistory = tab === "history" ? evaluations : [];
 
-  // PM self-reports (project_id 0) — admin reviews/approves these.
-  const pmSelfEvals = useMemo(
-    () =>
-      evaluations
-        .filter((e) => e.project_id === 0)
-        .sort((a, b) => {
-          if (a.status !== b.status) return a.status === "submitted" ? -1 : 1;
-          return (b.period || "").localeCompare(a.period || "");
-        }),
-    [evaluations],
-  );
-  const pmPendingCount = pmSelfEvals.filter(
-    (e) => e.status === "submitted",
-  ).length;
-
-  const filtered = useMemo(() => {
-    const term = search.trim().toLowerCase();
-    return employeeEvals
-      .filter((e) => matchesRole(empById.get(e.employee_id), roleFilter))
-      .filter(
-        (e) => !term || empName(e.employee_id).toLowerCase().includes(term),
-      )
-      .sort((a, b) => (b.period || "").localeCompare(a.period || ""));
-  }, [employeeEvals, search, roleFilter, empById]);
-
-  const filteredHistory = useMemo(() => {
-    const term = search.trim().toLowerCase();
-    return historyEvals
-      .filter((e) => matchesRole(empById.get(e.employee_id), roleFilter))
-      .filter(
-        (e) => !term || empName(e.employee_id).toLowerCase().includes(term),
-      )
-      .sort((a, b) => empName(a.employee_id).localeCompare(empName(b.employee_id)));
-  }, [historyEvals, search, roleFilter, empById]);
-
-  const bonusEvals = useMemo(
-    () =>
-      evaluations
-        .filter((e) => e.bonus_suggested)
-        .sort((a, b) => (b.period || "").localeCompare(a.period || "")),
-    [evaluations],
-  );
-
-  const avgAll = useMemo(() => {
-    const vals = employeeEvals
-      .map((e) => Number(e.overall_rating))
-      .filter((n) => n >= 1);
-    if (vals.length === 0) return null;
-    return (
-      Math.round((vals.reduce((a, b) => a + b, 0) / vals.length) * 100) / 100
-    );
-  }, [employeeEvals]);
 
   // Shared row shape for the active-cycle table — the only difference call-to-call is
   // which rows/page they're handed (for the reporting-manager popover's positioning).
@@ -544,22 +508,22 @@ const AdminPerformancePage = () => {
       <div className="grid grid-cols-1 sm:grid-cols-3 gap-3">
         <StatCard
           title="Reviews"
-          value={employeeEvals.length}
+          value={kpiData.total ?? 0}
           icon={ClipboardList}
           tone="indigo"
           hint="submitted reviews"
         />
         <StatCard
           title="Avg Rating"
-          value={avgAll != null ? avgAll.toFixed(2) : "—"}
-          unit={avgAll != null ? "/ 5" : undefined}
+          value={kpiData.avgRating != null ? kpiData.avgRating.toFixed(2) : "--"}
+          unit={kpiData.avgRating != null ? "/ 5" : undefined}
           icon={Star}
           tone="amber"
           hint="across all reviews"
         />
         <StatCard
           title="Bonus Suggested"
-          value={bonusEvals.length}
+          value={kpiData.bonusCount ?? 0}
           icon={Gift}
           tone="violet"
           hint="flagged by PMs"
@@ -598,7 +562,7 @@ const AdminPerformancePage = () => {
           </button>
         </div>
 
-        {((tab === "employees" && !isLoading) || (tab === "history" && !historyLoading)) && (
+        {((tab === "employees" && !isLoading) || (tab === "history" && !evalLoading)) && (
           <div className="flex flex-col gap-2 pb-2.5 sm:flex-row sm:items-center">
             <div className="relative w-full sm:w-60">
               <Search className="pointer-events-none absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-slate-400" />
@@ -664,7 +628,7 @@ const AdminPerformancePage = () => {
             onChange={setHistoryMonth}
             max={maxHistoryMonth}
           />
-          {historyLoading ? (
+          {evalLoading ? (
             <Table
               variant="untitled"
               columns={historyColumns}
@@ -672,7 +636,7 @@ const AdminPerformancePage = () => {
               loading
               skeletonRows={6}
             />
-          ) : historyError ? (
+          ) : false ? (
             <div className="rounded-3xl border border-dashed border-red-200 bg-red-50/40 p-12 text-center shadow-sm">
               <h2 className="text-lg font-semibold text-red-700">
                 Couldn't load reviews for {formatPeriod(historyMonth)}
@@ -681,7 +645,7 @@ const AdminPerformancePage = () => {
                 Something went wrong fetching this month. Try again or pick a different month.
               </p>
             </div>
-          ) : historyEvals.length === 0 ? (
+          ) : evaluationsTotal === 0 && !search.trim() && roleFilter === "all" ? (
             <div className="rounded-3xl border border-dashed border-slate-200 bg-white p-12 text-center shadow-sm">
               <HistoryIcon className="mx-auto h-10 w-10 text-slate-300" />
               <h2 className="mt-4 text-lg font-semibold text-slate-800">
@@ -704,7 +668,10 @@ const AdminPerformancePage = () => {
               allowOverflow
               columns={historyColumns}
               data={filteredHistory}
-              pageSize={filteredHistory.length}
+              totalItems={evaluationsTotal}
+              pageSize={PAGE_SIZE}
+              currentPage={perfPage}
+                onPageChange={setPerfPage}
               onRowClick={(row) =>
                 setExpandedEval((cur) => (cur === row.id ? null : row.id))
               }
@@ -767,7 +734,7 @@ const AdminPerformancePage = () => {
               loading
               skeletonRows={10}
             />
-          ) : employeeEvals.length === 0 ? (
+          ) : evaluationsTotal === 0 && !search.trim() && roleFilter === "all" ? (
             <div className="rounded-3xl border border-dashed border-slate-200 bg-white p-12 text-center shadow-sm">
               <ClipboardList className="mx-auto h-10 w-10 text-slate-300" />
               <h2 className="mt-4 text-lg font-semibold text-slate-800">
