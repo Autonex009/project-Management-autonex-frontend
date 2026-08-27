@@ -352,9 +352,12 @@ const LeavesPage = () => {
   // ── Mutations (unchanged) ────────────────────────────────────────────────
   const approveMutation = useMutation({
     mutationFn: ({ id, remark }) => leaveApi.approve(id, user.id, remark),
-    onSuccess: () => {
-      queryClient.invalidateQueries({ queryKey: ["leaves-page"] });
-      queryClient.invalidateQueries({ queryKey: ["leaves"] });
+    onSuccess: (res) => {
+      queryClient.setQueryData(["leaves"], (old) => old?.map(lv => lv.leave_id === res.leave_id ? { ...lv, status: res.status, razorpay_applied: res.razorpay_applied } : lv));
+      queryClient.setQueriesData({ queryKey: ["leaves-page"] }, (old) => {
+        if (!old || !old.items) return old;
+        return { ...old, items: old.items.map(lv => lv.leave_id === res.leave_id ? { ...lv, status: res.status, razorpay_applied: res.razorpay_applied } : lv) };
+      });
       setRemarkModal(null);
       setRemark("");
       toast.success("Leave approved");
@@ -365,9 +368,12 @@ const LeavesPage = () => {
 
   const rejectMutation = useMutation({
     mutationFn: (id) => leaveApi.reject(id, user.id),
-    onSuccess: () => {
-      queryClient.invalidateQueries({ queryKey: ["leaves-page"] });
-      queryClient.invalidateQueries({ queryKey: ["leaves"] });
+    onSuccess: (res) => {
+      queryClient.setQueryData(["leaves"], (old) => old?.map(lv => lv.leave_id === res.leave_id ? { ...lv, status: res.status, razorpay_applied: res.razorpay_applied } : lv));
+      queryClient.setQueriesData({ queryKey: ["leaves-page"] }, (old) => {
+        if (!old || !old.items) return old;
+        return { ...old, items: old.items.map(lv => lv.leave_id === res.leave_id ? { ...lv, status: res.status, razorpay_applied: res.razorpay_applied } : lv) };
+      });
       toast.success("Leave rejected");
     },
     onError: (err) =>
@@ -376,10 +382,12 @@ const LeavesPage = () => {
 
   const undoApproveMutation = useMutation({
     mutationFn: (id) => leaveApi.undoApprove(id, user.id),
-    onSuccess: () => {
-      queryClient.invalidateQueries({ queryKey: ["leaves-page"] });
-      queryClient.invalidateQueries({ queryKey: ["leaves"] });
-      queryClient.invalidateQueries({ queryKey: ["leave-calendar"] });
+    onSuccess: (res) => {
+      queryClient.setQueryData(["leaves"], (old) => old?.map(lv => lv.leave_id === res.leave_id ? { ...lv, status: res.status, razorpay_applied: false } : lv));
+      queryClient.setQueriesData({ queryKey: ["leaves-page"] }, (old) => {
+        if (!old || !old.items) return old;
+        return { ...old, items: old.items.map(lv => lv.leave_id === res.leave_id ? { ...lv, status: res.status, razorpay_applied: false } : lv) };
+      });
       toast.success("Leave approval undone");
     },
     onError: (err) =>
@@ -388,10 +396,12 @@ const LeavesPage = () => {
 
   const undoRejectMutation = useMutation({
     mutationFn: (id) => leaveApi.undoReject(id, user.id),
-    onSuccess: () => {
-      queryClient.invalidateQueries({ queryKey: ["leaves-page"] });
-      queryClient.invalidateQueries({ queryKey: ["leaves"] });
-      queryClient.invalidateQueries({ queryKey: ["leave-calendar"] });
+    onSuccess: (res) => {
+      queryClient.setQueryData(["leaves"], (old) => old?.map(lv => lv.leave_id === res.leave_id ? { ...lv, status: res.status, razorpay_applied: false } : lv));
+      queryClient.setQueriesData({ queryKey: ["leaves-page"] }, (old) => {
+        if (!old || !old.items) return old;
+        return { ...old, items: old.items.map(lv => lv.leave_id === res.leave_id ? { ...lv, status: res.status, razorpay_applied: false } : lv) };
+      });
       toast.success("Leave rejection undone");
     },
     onError: (err) =>

@@ -153,6 +153,8 @@ export const recommendationsApi = {
 
 // === Encord Analytics API ===
 export const analyticsApi = {
+  getPmTeamSummary: (pmId) =>
+    api.get(`/analytics/pm/${pmId}/team-summary`).then((res) => res.data),
   getDashboardKpis: () =>
     api.get("/analytics/dashboard-kpis").then((res) => res.data),
   getProjectAnalytics: (mainProjectId, params) =>
@@ -285,6 +287,7 @@ export const allocationApi = {
 };
 
 export const leaveApi = {
+  getTeamSummary: (pmId) => api.get("/leaves/team-summary", { params: { pm_id: pmId } }).then((res) => res.data),
   getAll: (params) => api.get("/leaves", { params }).then((res) => res.data),
   getTodayIds: () => api.get("/leaves/today-ids").then((res) => res.data),
   create: (data) => api.post("/leaves", data).then((res) => res.data),
@@ -651,6 +654,7 @@ export const performanceReviewApi = {
 export const perfEvalApi = {
   getAll: (params) =>
     api.get("/perf-evals", { params }).then((res) => res.data),
+  getAdminKpi: (params) => api.get("/perf-evals/admin-kpi", { params }).then((res) => res.data),
   submit: (data) => api.post("/perf-evals", data).then((res) => res.data),
   // PM review: approvals + PM ratings + per-param feedback + bonus.
   review: (id, data) =>

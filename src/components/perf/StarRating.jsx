@@ -63,7 +63,7 @@ export const currentPeriod = () => {
   let month = Number(parts.month); // 1-12
   const day = Number(parts.day);
 
-  if (day >= 25) {
+  if (day >= 28) {
     month += 1;
     if (month > 12) {
       month = 1;
