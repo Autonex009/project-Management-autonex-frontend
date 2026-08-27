@@ -10,11 +10,8 @@ import {
   FolderKanban,
   Users,
   Calendar,
-  CheckCircle2,
-  Clock,
   AlertTriangle,
   Siren,
-  TrendingUp,
 } from "lucide-react";
 import { format, parseISO } from "date-fns";
 import { parentProjectApi } from "../../services/api";

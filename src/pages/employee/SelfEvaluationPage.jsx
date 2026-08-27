@@ -7,34 +7,20 @@ import {
   ChevronUp,
   CheckCircle2,
   Lock,
+  History as HistoryIcon,
 } from "lucide-react";
 import toast from "react-hot-toast";
 import StarRating, {
   currentPeriod,
   formatPeriod,
+  shiftPeriod,
 } from "../../components/perf/StarRating";
 import { PERF_PARAMETERS, averageOf } from "../../components/perf/perfParams";
+import { StatusPill, fmtDate, RatingCell, MonthStepper } from "../../components/perf/perfTableCells";
 import EvaluationDetail from "../../components/perf/EvaluationDetail";
 import ConfirmDialog from "../../components/ui/ConfirmDialog";
+import Table from "../../components/ui/Table";
 import { formatDisplayName } from "../../utils/displayName";
-
-const StatusBadge = ({ status }) => {
-  if (status === "reviewed") {
-    return (
-      <span className="inline-flex items-center gap-1 rounded-full bg-emerald-50 px-2.5 py-1 text-xs font-medium text-emerald-700">
-        <CheckCircle2 className="h-3 w-3" /> Reviewed
-      </span>
-    );
-  }
-  if (status === "submitted") {
-    return (
-      <span className="inline-flex items-center gap-1 rounded-full bg-amber-50 px-2.5 py-1 text-xs font-medium text-amber-700">
-        <Lock className="h-3 w-3" /> Submitted
-      </span>
-    );
-  }
-  return null;
-};
 
 const ProjectEvalPanel = ({
   project,
@@ -236,6 +222,24 @@ const ProjectEvalPanel = ({
   );
 };
 
+const StatusBadge = ({ status }) => {
+  if (status === "reviewed") {
+    return (
+      <span className="inline-flex items-center gap-1 rounded-full bg-emerald-50 px-2.5 py-1 text-xs font-medium text-emerald-700">
+        <CheckCircle2 className="h-3 w-3" /> Reviewed
+      </span>
+    );
+  }
+  if (status === "submitted") {
+    return (
+      <span className="inline-flex items-center gap-1 rounded-full bg-amber-50 px-2.5 py-1 text-xs font-medium text-amber-700">
+        <Lock className="h-3 w-3" /> Submitted
+      </span>
+    );
+  }
+  return null;
+};
+
 // PM self-report: a single monthly form, not tied to any project (project_id 0),
 // reviewed by the Admin.
 const PM_SELF_PROJECT = {
@@ -252,6 +256,11 @@ const SelfEvaluationPage = () => {
   const isPm = role === "pm" || role === "hr";
   const employeeId = user.employee_id;
 
+  const maxHistoryMonth = shiftPeriod(currentPeriod(), -1);
+  const [tab, setTab] = useState("reviews"); // 'reviews' | 'history'
+  const [historyMonth, setHistoryMonth] = useState(maxHistoryMonth);
+  const [expandedHistory, setExpandedHistory] = useState(null);
+
   const { data: allocations = [], isLoading: allocLoading } = useQuery({
     queryKey: ["my-allocations", employeeId],
     queryFn: () => allocationApi.getByEmployee(employeeId),
@@ -262,9 +271,11 @@ const SelfEvaluationPage = () => {
     queryFn: () => subProjectApi.getAll(),
     enabled: !isPm,
   });
-  const { data: myEvalsData, isLoading: evalsLoading } = useQuery({
+  const { data: myEvalsData, isLoading: evalsLoading, isError: evalsError } = useQuery({
     queryKey: ["my-perf-evals", employeeId],
-    queryFn: () => perfEvalApi.getAll({ employee_id: employeeId }),
+    // Explicit limit: the History tab wants this person's *entire* record, and the
+    // endpoint's default page size (25) could otherwise quietly cut off older months.
+    queryFn: () => perfEvalApi.getAll({ employee_id: employeeId, limit: 500 }),
     enabled: !!employeeId,
   });
   const myEvals = myEvalsData?.items || [];
@@ -280,6 +291,154 @@ const SelfEvaluationPage = () => {
     myEvals.filter((e) => e.project_id === projectId);
   const isLoading = evalsLoading || (!isPm && allocLoading);
 
+  const projName = (id) =>
+    projects.find((p) => p.id === id)?.name || `Project #${id}`;
+
+  // Browsed one month at a time (see the MonthStepper below), so "Period" would just
+  // repeat the same value on every row — dropped from both column sets below.
+  const historyRows = useMemo(
+    () => myEvals.filter((e) => e.period === historyMonth),
+    [myEvals, historyMonth],
+  );
+
+  // PM's history is always the same single self-report project, so there's nothing to
+  // show in a "Project" column; the employee history spans multiple projects.
+  const historyColumns = isPm
+    ? [
+        {
+          key: "submitted",
+          label: "Submitted",
+          width: "w-[34%]",
+          render: (_, ev) => (
+            <span className="whitespace-nowrap text-slate-500 tabular-nums">
+              {fmtDate(ev.submitted_at || ev.created_at)}
+            </span>
+          ),
+        },
+        {
+          key: "status",
+          label: "Status",
+          width: "w-[33%]",
+          render: (_, ev) => <StatusPill status={ev.status} />,
+        },
+        {
+          key: "rating",
+          label: "Rating",
+          align: "right",
+          width: "w-[33%]",
+          render: (_, ev) => <RatingCell evaluation={ev} />,
+        },
+      ]
+    : [
+        {
+          key: "project",
+          label: "Project",
+          width: "w-[34%]",
+          render: (_, ev) => (
+            <span className="block truncate text-slate-600">{projName(ev.project_id)}</span>
+          ),
+        },
+        {
+          key: "submitted",
+          label: "Submitted",
+          width: "w-[22%]",
+          render: (_, ev) => (
+            <span className="whitespace-nowrap text-slate-500 tabular-nums">
+              {fmtDate(ev.submitted_at || ev.created_at)}
+            </span>
+          ),
+        },
+        {
+          key: "status",
+          label: "Status",
+          width: "w-[22%]",
+          render: (_, ev) => <StatusPill status={ev.status} />,
+        },
+        {
+          key: "rating",
+          label: "Rating",
+          align: "right",
+          width: "w-[22%]",
+          render: (_, ev) => <RatingCell evaluation={ev} />,
+        },
+      ];
+
+  const tabs = (
+    <div className="flex items-center gap-4 border-b border-slate-200">
+      <button
+        type="button"
+        onClick={() => setTab("reviews")}
+        className={`-mb-px border-b-2 pb-2.5 text-[13px] font-semibold transition-colors ${tab === "reviews" ? "border-emerald-600 text-slate-900" : "border-transparent text-slate-500 hover:text-slate-800"}`}
+      >
+        Reviews
+      </button>
+      <button
+        type="button"
+        onClick={() => setTab("history")}
+        className={`-mb-px flex items-center gap-1.5 border-b-2 pb-2.5 text-[13px] font-semibold transition-colors ${tab === "history" ? "border-emerald-600 text-slate-900" : "border-transparent text-slate-500 hover:text-slate-800"}`}
+      >
+        <HistoryIcon className="h-3.5 w-3.5" />
+        History
+      </button>
+    </div>
+  );
+
+  const historyContent = (
+    <div className="space-y-3">
+      <MonthStepper
+        period={historyMonth}
+        onChange={setHistoryMonth}
+        max={maxHistoryMonth}
+      />
+      {isLoading ? (
+        <div className="rounded-2xl border border-slate-200 bg-white p-10 text-center text-sm text-slate-400 shadow-sm">
+          Loading…
+        </div>
+      ) : evalsError ? (
+        <div className="rounded-3xl border border-dashed border-red-200 bg-red-50/40 p-12 text-center shadow-sm">
+          <h2 className="text-lg font-semibold text-red-700">
+            Couldn't load your history
+          </h2>
+          <p className="mt-2 text-sm text-red-500">
+            Something went wrong fetching your past reviews. Try refreshing.
+          </p>
+        </div>
+      ) : historyRows.length === 0 ? (
+        <div className="rounded-3xl border border-dashed border-slate-200 bg-white p-12 text-center shadow-sm">
+          <HistoryIcon className="mx-auto h-10 w-10 text-slate-300" />
+          <h2 className="mt-4 text-lg font-semibold text-slate-800">
+            No reviews for {formatPeriod(historyMonth)}
+          </h2>
+          <p className="mt-2 text-sm text-slate-500">
+            Step to a different month to see your past submissions.
+          </p>
+        </div>
+      ) : (
+        <Table
+          variant="untitled"
+          allowOverflow
+          columns={historyColumns}
+          data={historyRows}
+          pageSize={historyRows.length}
+          onRowClick={(row) =>
+            setExpandedHistory((cur) => (cur === row.id ? null : row.id))
+          }
+          expandedRowId={expandedHistory}
+          getRowId={(row) => row.id}
+          renderExpandedRow={(row) => (
+            <div className="border-t border-slate-100 bg-slate-50/40 p-4">
+              <EvaluationDetail evaluation={row} />
+            </div>
+          )}
+          emptyState={{
+            title: "No reviews",
+            description: "Nothing to show here.",
+          }}
+        />
+      )}
+    </div>
+  );
+
   // ── PM view: one self-report, reviewed by Admin ──
   if (isPm) {
     return (
@@ -294,7 +453,11 @@ const SelfEvaluationPage = () => {
           </p>
         </div>
 
-        {isLoading ? (
+        {tabs}
+
+        {tab === "history" ? (
+          historyContent
+        ) : isLoading ? (
           <div className="rounded-2xl border border-slate-200 bg-white p-10 text-center text-sm text-slate-400 shadow-sm">
             Loading…
           </div>
@@ -324,7 +487,11 @@ const SelfEvaluationPage = () => {
         </p>
       </div>
 
-      {isLoading ? (
+      {tabs}
+
+      {tab === "history" ? (
+        historyContent
+      ) : isLoading ? (
         <div className="rounded-2xl border border-slate-200 bg-white p-10 text-center text-sm text-slate-400 shadow-sm">
           Loading…
         </div>

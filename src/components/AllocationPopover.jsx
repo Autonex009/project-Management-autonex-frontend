@@ -3,8 +3,6 @@ import React, {
   useRef,
   useEffect,
   useMemo,
-  useLayoutEffect,
-  useCallback,
 } from "react";
 import { createPortal } from "react-dom";
 import UserAvatar from "./ui/UserAvatar";
@@ -24,9 +22,9 @@ import {
   isStaleAllocation,
   staleAllocationName,
 } from "../utils/workforce";
+import { usePopoverPosition } from "./usePopoverPosition";
 
 const POPOVER_WIDTH = 320;
-const POPOVER_MARGIN = 12;
 
 // Stable color palette for avatars based on the employee name
 const AVATAR_PALETTE = [
@@ -97,33 +95,42 @@ const AllocationPopover = ({
   leadIds = [],
   fetchDetail,
 }) => {
-  const [open, setOpen] = useState(false);
-  const [position, setPosition] = useState({
-    top: 0,
-    left: 0,
-    placement: "bottom",
-    arrowLeft: 0,
-  });
-  const triggerRef = useRef(null);
-  const popoverRef = useRef(null);
-  const closeTimerRef = useRef(null);
-
   const [detailData, setDetailData] = useState(null);
   const [isLoadingDetail, setIsLoadingDetail] = useState(false);
 
+  const {
+    open,
+    setOpen,
+    position,
+    triggerRef,
+    popoverRef,
+    scheduleClose,
+    cancelClose,
+  } = usePopoverPosition({ deps: [/* recomputed below once list exists */] });
+
+  // Fetch allocation detail on open. Guarded so a fast close/unmount while the
+  // request is in flight can't set state on a component that's gone —
+  // previously nothing here prevented that.
   useEffect(() => {
-    if (open && fetchDetail && !detailData) {
-      setIsLoadingDetail(true);
-      fetchDetail()
-        .then((data) => {
-          setDetailData(data);
-          setIsLoadingDetail(false);
-        })
-        .catch((err) => {
-          console.error("Failed to fetch allocation detail:", err);
-          setIsLoadingDetail(false);
-        });
-    }
+    if (!open || !fetchDetail || detailData) return;
+    let cancelled = false;
+
+    setIsLoadingDetail(true);
+    fetchDetail()
+      .then((data) => {
+        if (cancelled) return;
+        setDetailData(data);
+        setIsLoadingDetail(false);
+      })
+      .catch((err) => {
+        if (cancelled) return;
+        console.error("Failed to fetch allocation detail:", err);
+        setIsLoadingDetail(false);
+      });
+
+    return () => {
+      cancelled = true;
+    };
   }, [open, fetchDetail, detailData]);
 
   const employeeIndex = useMemo(
@@ -294,110 +301,6 @@ const AllocationPopover = ({
       .map((r) => String(r.alloc?.employee_id ?? r.emp?.id)),
   ).size;
 
-  // Position the popover relative to the trigger, flipping above when bottom space is tight
-  const updatePosition = useCallback(() => {
-    const trigger = triggerRef.current;
-    if (!trigger) return;
-
-    const rect = trigger.getBoundingClientRect();
-    const popoverEl = popoverRef.current;
-    const popoverHeight = popoverEl?.offsetHeight || 360;
-
-    const vw = window.innerWidth;
-    const vh = window.innerHeight;
-
-    // Horizontal: center on the trigger, clamp into viewport
-    const triggerCenter = rect.left + rect.width / 2;
-    let left = triggerCenter - POPOVER_WIDTH / 2;
-    left = Math.max(
-      POPOVER_MARGIN,
-      Math.min(left, vw - POPOVER_WIDTH - POPOVER_MARGIN),
-    );
-
-    // Vertical: prefer bottom; flip to top if there's more room above
-    const spaceBelow = vh - rect.bottom - POPOVER_MARGIN;
-    const spaceAbove = rect.top - POPOVER_MARGIN;
-    const placeBelow = spaceBelow >= popoverHeight || spaceBelow >= spaceAbove;
-    const top = placeBelow ? rect.bottom + 8 : rect.top - popoverHeight - 8;
-
-    const arrowLeft = Math.max(
-      16,
-      Math.min(POPOVER_WIDTH - 16, triggerCenter - left),
-    );
-
-    setPosition({
-      top,
-      left,
-      placement: placeBelow ? "bottom" : "top",
-      arrowLeft,
-    });
-  }, []);
-
-  useLayoutEffect(() => {
-    if (!open) return;
-    updatePosition();
-    // Re-measure once after content lays out (in case size changed)
-    const id = requestAnimationFrame(updatePosition);
-    return () => cancelAnimationFrame(id);
-  }, [open, list.length, updatePosition]);
-
-  useEffect(() => {
-    if (!open) return;
-    const onScroll = () => updatePosition();
-    const onResize = () => updatePosition();
-    window.addEventListener("scroll", onScroll, true);
-    window.addEventListener("resize", onResize);
-    return () => {
-      window.removeEventListener("scroll", onScroll, true);
-      window.removeEventListener("resize", onResize);
-    };
-  }, [open, updatePosition]);
-
-  // Close on outside click
-  useEffect(() => {
-    if (!open) return;
-    const handler = (e) => {
-      if (
-        (triggerRef.current && triggerRef.current.contains(e.target)) ||
-        (popoverRef.current && popoverRef.current.contains(e.target))
-      ) {
-        return;
-      }
-      setOpen(false);
-    };
-    document.addEventListener("mousedown", handler);
-    return () => document.removeEventListener("mousedown", handler);
-  }, [open]);
-
-  // Close on Escape
-  useEffect(() => {
-    if (!open) return;
-    const handler = (e) => {
-      if (e.key === "Escape") setOpen(false);
-    };
-    document.addEventListener("keydown", handler);
-    return () => document.removeEventListener("keydown", handler);
-  }, [open]);
-
-  useEffect(
-    () => () => {
-      if (closeTimerRef.current) clearTimeout(closeTimerRef.current);
-    },
-    [],
-  );
-
-  const scheduleClose = () => {
-    if (closeTimerRef.current) clearTimeout(closeTimerRef.current);
-    closeTimerRef.current = setTimeout(() => setOpen(false), 140);
-  };
-
-  const cancelClose = () => {
-    if (closeTimerRef.current) {
-      clearTimeout(closeTimerRef.current);
-      closeTimerRef.current = null;
-    }
-  };
-
   const handleAdd = (e) => {
     e.stopPropagation();
     setOpen(false);
@@ -517,9 +420,6 @@ const AllocationPopover = ({
                       <div className="flex-1 min-w-0">
                         <div className="flex items-center gap-1.5 min-w-0">
                           <span
-                            // Shortened for the row, full on hover — the popover
-                            // is narrow and a middle name is often what tells two
-                            // colleagues apart.
                             title={rawName}
                             className={`text-sm truncate ${isStale
                               ? "font-medium text-rose-700"

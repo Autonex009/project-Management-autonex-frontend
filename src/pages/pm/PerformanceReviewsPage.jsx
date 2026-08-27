@@ -1,15 +1,21 @@
-import React, { useState } from "react";
+import React, { useMemo, useState } from "react";
 import { useQuery } from "@tanstack/react-query";
-import { perfEvalApi } from "../../services/api";
+import { perfEvalApi, employeeApi, subProjectApi } from "../../services/api";
 import {
   ChevronDown,
   ChevronUp,
   ClipboardList,
   FolderKanban,
   Clock,
+  History as HistoryIcon,
 } from "lucide-react";
 import EvalReviewCard from "../../components/perf/EvalReviewCard";
+import EvaluationDetail from "../../components/perf/EvaluationDetail";
+import { formatPeriod, currentPeriod, shiftPeriod } from "../../components/perf/StarRating";
+import { StatusPill, RatingCell, MonthStepper } from "../../components/perf/perfTableCells";
 import StatCard from "../../components/dashboard/StatCard";
+import Table from "../../components/ui/Table";
+import UserAvatar from "../../components/ui/UserAvatar";
 import { formatDisplayName } from "../../utils/displayName";
 
 const ProjectPanel = ({ project, reviewerId }) => {
@@ -98,6 +104,87 @@ const PerformanceReviewsPage = () => {
     pending_count: 0,
   };
 
+  const maxHistoryMonth = shiftPeriod(currentPeriod(), -1);
+  const [tab, setTab] = useState("active"); // 'active' | 'history'
+  const [historyMonth, setHistoryMonth] = useState(maxHistoryMonth);
+  const [expandedEval, setExpandedEval] = useState(null);
+
+  // Name lookups for the History tab — the dashboard endpoint above pre-joins
+  // employee/project names server-side, but the flat history fetch below doesn't.
+  const { data: employees = [] } = useQuery({
+    queryKey: ["employees"],
+    queryFn: () => employeeApi.getAll(),
+    enabled: tab === "history",
+  });
+  const { data: projectsList = [] } = useQuery({
+    queryKey: ["sub-projects"],
+    queryFn: () => subProjectApi.getAll(),
+    enabled: tab === "history",
+  });
+
+  // One prior cycle at a time — scoped to this PM server-side by the same
+  // list_evals logic the old Active tab used (including the reviewed_by
+  // carve-out, so a past decision doesn't vanish if the employee has since
+  // moved to a project this PM no longer runs).
+  const { data: historyData, isLoading: historyLoading, isError: historyError } = useQuery({
+    queryKey: ["perf-evals", "history", historyMonth],
+    queryFn: () => perfEvalApi.getAll({ period: historyMonth, limit: 500 }),
+    placeholderData: (prev) => prev,
+    enabled: tab === "history",
+  });
+  const historyRows = useMemo(
+    () => (historyData?.items || []).filter((e) => e.project_id !== 0),
+    [historyData],
+  );
+
+  const empName = (id) =>
+    formatDisplayName(employees.find((e) => e.id === id)?.name) || `Employee #${id}`;
+  const projName = (id) =>
+    projectsList.find((p) => p.id === id)?.name || `Project #${id}`;
+
+  const historyColumns = [
+    {
+      key: "employee",
+      label: "Employee",
+      width: "w-[22%]",
+      render: (_, ev) => (
+        <div className="flex min-w-0 items-center gap-2.5">
+          <UserAvatar
+            src={employees.find((e) => e.id === ev.employee_id)?.avatar_url}
+            name={empName(ev.employee_id)}
+            size="w-8 h-8 text-[13px]"
+          />
+          <span className="truncate font-medium text-slate-800">
+            {empName(ev.employee_id)}
+          </span>
+        </div>
+      ),
+    },
+    {
+      key: "project",
+      label: "Project",
+      width: "w-[34%]",
+      render: (_, ev) => (
+        <span className="block truncate text-slate-600">
+          {projName(ev.project_id)}
+        </span>
+      ),
+    },
+    {
+      key: "status",
+      label: "Status",
+      width: "w-[22%]",
+      render: (_, ev) => <StatusPill status={ev.status} />,
+    },
+    {
+      key: "rating",
+      label: "Rating",
+      align: "right",
+      width: "w-[16%]",
+      render: (_, ev) => <RatingCell evaluation={ev} />,
+    },
+  ];
+
   return (
     <div className="space-y-4">
       {/* KPIs */}
@@ -125,7 +212,84 @@ const PerformanceReviewsPage = () => {
         />
       </div>
 
-      {isLoading ? (
+      {/* Tabs */}
+      <div className="flex items-center gap-4 border-b border-slate-200">
+        <button
+          type="button"
+          onClick={() => setTab("active")}
+          className={`-mb-px border-b-2 pb-2.5 text-[13px] font-semibold transition-colors ${tab === "active" ? "border-indigo-600 text-slate-900" : "border-transparent text-slate-500 hover:text-slate-800"}`}
+        >
+          Active Cycle
+        </button>
+        <button
+          type="button"
+          onClick={() => setTab("history")}
+          className={`-mb-px flex items-center gap-1.5 border-b-2 pb-2.5 text-[13px] font-semibold transition-colors ${tab === "history" ? "border-indigo-600 text-slate-900" : "border-transparent text-slate-500 hover:text-slate-800"}`}
+        >
+          <HistoryIcon className="h-3.5 w-3.5" />
+          History
+        </button>
+      </div>
+
+      {tab === "history" ? (
+        <div className="space-y-3">
+          <MonthStepper
+            period={historyMonth}
+            onChange={setHistoryMonth}
+            max={maxHistoryMonth}
+          />
+          {historyLoading ? (
+            <Table
+              variant="untitled"
+              columns={historyColumns}
+              data={[]}
+              loading
+              skeletonRows={6}
+            />
+          ) : historyError ? (
+            <div className="rounded-3xl border border-dashed border-red-200 bg-red-50/40 p-12 text-center shadow-sm">
+              <h2 className="text-lg font-semibold text-red-700">
+                Couldn't load reviews for {formatPeriod(historyMonth)}
+              </h2>
+              <p className="mt-2 text-sm text-red-500">
+                Something went wrong fetching this month. Try again or pick a different month.
+              </p>
+            </div>
+          ) : historyRows.length === 0 ? (
+            <div className="rounded-3xl border border-dashed border-slate-200 bg-white p-12 text-center shadow-sm">
+              <HistoryIcon className="mx-auto h-10 w-10 text-slate-300" />
+              <h2 className="mt-4 text-lg font-semibold text-slate-800">
+                No reviews for {formatPeriod(historyMonth)}
+              </h2>
+              <p className="mt-2 text-sm text-slate-500">
+                Step to a different month to see your team's past evaluations.
+              </p>
+            </div>
+          ) : (
+            <Table
+              variant="untitled"
+              allowOverflow
+              columns={historyColumns}
+              data={historyRows}
+              pageSize={historyRows.length}
+              onRowClick={(row) =>
+                setExpandedEval((cur) => (cur === row.id ? null : row.id))
+              }
+              expandedRowId={expandedEval}
+              getRowId={(row) => row.id}
+              renderExpandedRow={(row) => (
+                <div className="border-t border-slate-100 bg-slate-50/40 p-4">
+                  <EvaluationDetail evaluation={row} />
+                </div>
+              )}
+              emptyState={{
+                title: "No reviews",
+                description: "Nothing to show here.",
+              }}
+            />
+          )}
+        </div>
+      ) : isLoading ? (
         <div className="rounded-2xl border border-slate-200 bg-white p-10 text-center text-sm text-slate-400 shadow-sm">
           Loading…
         </div>

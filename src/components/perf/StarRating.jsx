@@ -41,9 +41,36 @@ const StarRating = ({
 
 export const RATING_LABELS = LABELS;
 
+/**
+ * The active review period, as "YYYY-MM". Evaluated in IST regardless of the
+ * browser's timezone (same reasoning as halfDayTiming.js's getISTDateTime).
+ *
+ * The review cycle rolls over on the 25th rather than the 1st: from the 25th
+ * onward, "current period" becomes next month's, so employees/PMs start
+ * filing next month's review a few days early instead of waiting for the 1st.
+ */
 export const currentPeriod = () => {
-  const d = new Date();
-  return `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, "0")}`;
+  const formatter = new Intl.DateTimeFormat("en-US", {
+    timeZone: "Asia/Kolkata",
+    year: "numeric",
+    month: "2-digit",
+    day: "2-digit",
+  });
+  const parts = Object.fromEntries(
+    formatter.formatToParts(new Date()).map((p) => [p.type, p.value]),
+  );
+  let year = Number(parts.year);
+  let month = Number(parts.month); // 1-12
+  const day = Number(parts.day);
+
+  if (day >= 25) {
+    month += 1;
+    if (month > 12) {
+      month = 1;
+      year += 1;
+    }
+  }
+  return `${year}-${String(month).padStart(2, "0")}`;
 };
 
 export const formatPeriod = (period) => {
@@ -54,6 +81,15 @@ export const formatPeriod = (period) => {
     month: "long",
     year: "numeric",
   });
+};
+
+// Add `delta` months to a "YYYY-MM" period, rolling the year over as needed.
+export const shiftPeriod = (period, delta) => {
+  const [y, m] = period.split("-").map(Number);
+  const total = y * 12 + (m - 1) + delta;
+  const year = Math.floor(total / 12);
+  const month = (((total % 12) + 12) % 12) + 1;
+  return `${year}-${String(month).padStart(2, "0")}`;
 };
 
 export default StarRating;

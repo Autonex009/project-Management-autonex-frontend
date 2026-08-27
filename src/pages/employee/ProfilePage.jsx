@@ -60,12 +60,20 @@ const EmailCard = ({ value, onRequestOTP, onVerifyOTP, isRequesting, isVerifying
   const [timeLeft, setTimeLeft] = useState(600); // 10 minutes
 
   useEffect(() => {
-    let timer;
-    if (step === 2 && timeLeft > 0) {
-      timer = setInterval(() => setTimeLeft((prev) => prev - 1), 1000);
-    }
+    if (step !== 2) return;
+
+    const timer = setInterval(() => {
+      setTimeLeft((prev) => {
+        if (prev <= 1) {
+          clearInterval(timer);
+          return 0;
+        }
+        return prev - 1;
+      });
+    }, 1000);
+
     return () => clearInterval(timer);
-  }, [step, timeLeft]);
+  }, [step]);
 
   const start = () => {
     setDraft(value || "");

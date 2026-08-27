@@ -13,13 +13,10 @@ import UserAvatar from "../components/ui/UserAvatar";
 import { formatDisplayName } from "../utils/displayName";
 import GlassKpiCard from "../components/analytics/GlassKpiCard";
 import DailyPlatformHoursChart from "../components/analytics/DailyPlatformHoursChart";
-import StageDistributionChart from "../components/analytics/StageDistributionChart";
-import PlannedVsActualChart from "../components/analytics/PlannedVsActualChart";
 import ProjectVelocityBarChart from "../components/analytics/ProjectVelocityBarChart";
 import WorkforceRoleInsightCard from "../components/analytics/WorkforceRoleInsightCard";
 import ProjectDeliveryPacingCard from "../components/analytics/ProjectDeliveryPacingCard";
 import WorkforceSplitAreaChart from "../components/analytics/WorkforceSplitAreaChart";
-import ProjectTeamRosterTable from "../components/analytics/ProjectTeamRosterTable";
 import AnnotatorComparisonChart from "../components/analytics/AnnotatorComparisonChart";
 import {
   FolderKanban,
@@ -326,24 +323,6 @@ const AnalyticsDashboard = () => {
     return projectAnalytics?.daily || [];
   }, [isGlobal, autonex, projectAnalytics]);
 
-  const activeStageData = useMemo(() => {
-    if (!activeKpis) return [];
-    return [
-      { stage: "Annotation", hours: activeKpis.annotation_hours || 0 },
-      { stage: "Review", hours: activeKpis.review_hours || 0 },
-      { stage: "Other", hours: activeKpis.other_hours || 0 },
-    ].filter((s) => s.hours > 0);
-  }, [activeKpis]);
-
-  const activeVelocityData = useMemo(() => {
-    if (isGlobal) return rows;
-    const annotators = projectAnalytics?.annotators || [];
-    return annotators.map((a) => ({
-      name: a.employee_name || a.user_email || "Annotator",
-      hours: a.total_hours || 0,
-    }));
-  }, [isGlobal, rows, projectAnalytics]);
-
   const projectOptions = useMemo(
     () => [
       { value: "all", label: "All Projects (Global Scope)" },
@@ -356,26 +335,6 @@ const AnalyticsDashboard = () => {
   );
 
   const liveProjects = useMemo(() => rows.filter((r) => r.status === "active").length, [rows]);
-
-  const plannedVsActualData = useMemo(() => {
-    const plannedByProject = {};
-    allocations.forEach((a) => {
-      plannedByProject[a.sub_project_id] = (plannedByProject[a.sub_project_id] || 0) + (a.hours_per_day || 0) * 20;
-    });
-
-    return rows.map((r) => {
-      const explicitAlloc = plannedByProject[r.project_id];
-      const actual = r.autonex_platform_hours || 0;
-      // Use explicit allocation if configured; otherwise use realistic target benchmark relative to project scope
-      const planned = explicitAlloc && explicitAlloc > 0 ? explicitAlloc : Math.max(1200, Math.round(actual * 1.08));
-      return {
-        project_id: r.project_id,
-        label: r.name,
-        plannedHours: Math.round(planned),
-        actualHours: Math.round(actual),
-      };
-    });
-  }, [rows, allocations]);
 
   const workforceUtilization = useMemo(() => {
     const activeMembers =

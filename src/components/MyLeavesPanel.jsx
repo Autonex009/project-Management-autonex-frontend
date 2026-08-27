@@ -57,35 +57,6 @@ const today = toLocalISODate(new Date());
 
 const upcomingFloaterDates = FLOATER_DATES_2026.filter((d) => d.date >= today);
 
-const getISTDateTime = () => {
-  const d = new Date();
-  const options = {
-    timeZone: "Asia/Kolkata",
-    year: "numeric",
-    month: "2-digit",
-    day: "2-digit",
-    hour: "2-digit",
-    minute: "2-digit",
-    second: "2-digit",
-    hour12: false,
-  };
-  const formatter = new Intl.DateTimeFormat("en-US", options);
-  const parts = formatter.formatToParts(d);
-  const partMap = Object.fromEntries(parts.map((p) => [p.type, p.value]));
-
-  const yr = parseInt(partMap.year);
-  const mo = parseInt(partMap.month) - 1;
-  const dy = parseInt(partMap.day);
-  const hr = parseInt(partMap.hour);
-  const min = parseInt(partMap.minute);
-
-  return {
-    dateStr: `${partMap.year}-${partMap.month}-${partMap.day}`,
-    hour: hr,
-    minute: min,
-  };
-};
-
 const checkHalfDayTiming = (startDateStr, slot) => {
   return null;
 };
@@ -492,8 +463,6 @@ const MyLeavesPanel = ({
       leaveForm.leave_type === "second_half";
     const sDate = leaveForm.start_date;
     const eDate = isHalf ? sDate : leaveForm.end_date;
-
-    const todayStr = format(new Date(), "yyyy-MM-dd");
 
     if (isHalf) {
       const timingErr = checkHalfDayTiming(sDate, leaveForm.leave_type);

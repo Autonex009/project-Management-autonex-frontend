@@ -1,21 +1,13 @@
 import React, { useState, useEffect, useRef } from "react";
 import { ChevronDown, UserCheck, Check } from "lucide-react";
 import { formatDisplayName } from "../../utils/displayName";
+import { useClickOutside } from "../../hooks/useClickOutside";
 
 const SkillMultiSelect = ({ options, value, onChange }) => {
   const [isOpen, setIsOpen] = useState(false);
   const dropdownRef = useRef(null);
 
-  useEffect(() => {
-    const handleClickOutside = (event) => {
-      if (dropdownRef.current && !dropdownRef.current.contains(event.target)) {
-        setIsOpen(false);
-      }
-    };
-
-    document.addEventListener("mousedown", handleClickOutside);
-    return () => document.removeEventListener("mousedown", handleClickOutside);
-  }, []);
+  useClickOutside(dropdownRef, () => setIsOpen(false), isOpen);
 
   const toggleSkill = (skill) => {
     if (skill === "Any Skill") {
@@ -108,16 +100,7 @@ const EmployeeMultiSelect = ({
   const [selectedEmployeeIds, setSelectedEmployeeIds] = useState(defaultValue);
   const dropdownRef = useRef(null);
 
-  useEffect(() => {
-    const handleClickOutside = (event) => {
-      if (dropdownRef.current && !dropdownRef.current.contains(event.target)) {
-        setIsOpen(false);
-      }
-    };
-
-    document.addEventListener("mousedown", handleClickOutside);
-    return () => document.removeEventListener("mousedown", handleClickOutside);
-  }, []);
+  useClickOutside(dropdownRef, () => setIsOpen(false), isOpen);
 
   // Filter employees by matching skills
   const matchingEmployees = employees.filter((emp) => {
@@ -298,13 +281,7 @@ const TeamLeadMultiSelect = ({
   const [search, setSearch] = useState("");
   const ref = useRef(null);
 
-  useEffect(() => {
-    const handler = (e) => {
-      if (ref.current && !ref.current.contains(e.target)) setOpen(false);
-    };
-    document.addEventListener("mousedown", handler);
-    return () => document.removeEventListener("mousedown", handler);
-  }, []);
+  useClickOutside(ref, () => setOpen(false), open);
 
   const q = search.trim().toLowerCase();
   const excluded = new Set(excludeIds.map(Number));
@@ -379,13 +356,7 @@ const PmMultiSelect = ({ employees, value, onChange, isPm, pmEmployeeId }) => {
   const [search, setSearch] = useState("");
   const ref = useRef(null);
 
-  useEffect(() => {
-    const handler = (e) => {
-      if (ref.current && !ref.current.contains(e.target)) setOpen(false);
-    };
-    document.addEventListener("mousedown", handler);
-    return () => document.removeEventListener("mousedown", handler);
-  }, []);
+  useClickOutside(ref, () => setOpen(false), open);
 
   const q = search.trim().toLowerCase();
   const list = employees
