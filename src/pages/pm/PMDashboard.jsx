@@ -1,10 +1,9 @@
-import React, { useMemo, useState } from "react";
+import React, { useState } from "react";
 import { useQuery } from "@tanstack/react-query";
 import {
-  allocationApi,
   subProjectApi,
   leaveApi,
-  employeeApi,
+  analyticsApi,
 } from "../../services/api";
 import {
   FolderKanban,
@@ -14,16 +13,7 @@ import {
   Siren,
 } from "lucide-react";
 import { format, parseISO } from "date-fns";
-import { parentProjectApi } from "../../services/api";
-import { getPmEmployeeId, getPmSubProjects } from "../../utils/pmScope";
-import {
-  demotedToLeadIds,
-  resolveProjectPmIds,
-} from "../../utils/roleAccess";
-import {
-  buildEmployeeIndex,
-  manpowerEmployeeIds,
-} from "../../utils/workforce";
+import { getPmEmployeeId } from "../../utils/pmScope";
 import Table from "../../components/ui/Table";
 import StatCard from "../../components/dashboard/StatCard";
 import { formatDisplayName } from "../../utils/displayName";
@@ -34,114 +24,44 @@ const PMDashboard = () => {
   const user = JSON.parse(localStorage.getItem("user") || "{}");
   const pmEmployeeId = getPmEmployeeId(user);
 
-  // Fetch all data
-  const { data: projects = [], isLoading: projLoading } = useQuery({
-    queryKey: ["sub-projects"],
-    queryFn: () => subProjectApi.getAll(),
+  // Fetch slim pre-calculated data
+  const { data: projectsData, isLoading: projLoading } = useQuery({
+    queryKey: ["sub-projects", "pm-dashboard", pmEmployeeId],
+    queryFn: () => subProjectApi.getPaginated({ is_dashboard: true, pm_id: pmEmployeeId, limit: 100 }),
     staleTime: 5 * 60 * 1000,
   });
-  const { data: parentProjects = [] } = useQuery({
-    queryKey: ["parent-projects"],
-    queryFn: () => parentProjectApi.getAll(),
+  const projects = projectsData?.items || [];
+
+  const { data: teamSummary = { totalMembers: 0, teamIds: [], teamMembers: [] } } = useQuery({
+    queryKey: ["pm-team-summary", pmEmployeeId],
+    queryFn: () => analyticsApi.getPmTeamSummary(pmEmployeeId),
     staleTime: 5 * 60 * 1000,
   });
-  const { data: employees = [] } = useQuery({
-    queryKey: ["employees"],
-    queryFn: () => employeeApi.getAll(),
-    staleTime: 5 * 60 * 1000,
-  });
-  const { data: allocations = [] } = useQuery({
-    queryKey: ["allocations"],
-    queryFn: () => allocationApi.getAll(),
-    staleTime: 5 * 60 * 1000,
-  });
-
-  const employeeIndex = useMemo(
-    () => buildEmployeeIndex(employees),
-    [employees],
-  );
-
-  const getTeamLeadIds = (project) => {
-    const demoted = demotedToLeadIds(project, parentProjects, employeeIndex);
-    const existing = project.team_lead_ids || [];
-    return [...new Set([...existing, ...demoted])];
-  };
-
-  const resolvePmIds = (project) =>
-    resolveProjectPmIds(project, parentProjects, employeeIndex);
-
-  const getAllocatedManpower = (project) => {
-    return manpowerEmployeeIds({
-      allocations: allocations.filter((a) => a.sub_project_id === project.id),
-      pmIds: resolvePmIds(project),
-      leadIds: getTeamLeadIds(project),
-      employeeIndex,
-    }).size;
-  };
-
-  const { startStr } = useMemo(() => {
-    const today = new Date();
-    const y = today.getFullYear();
-    const m = today.getMonth();
-    const start = `${y}-${String(m + 1).padStart(2, "0")}-01`;
-    return { startStr: start };
-  }, []);
 
   const { data: allLeaves = [] } = useQuery({
-    queryKey: ["leaves", startStr],
-    queryFn: () => leaveApi.getAll({ start_date: startStr }),
+    queryKey: ["pm-leaves", pmEmployeeId],
+    queryFn: () => leaveApi.getTeamSummary(pmEmployeeId),
+    staleTime: 5 * 60 * 1000,
   });
 
   const todayStr = format(new Date(), "yyyy-MM-dd");
 
-  // Projects managed by this PM (by assigned_employee_ids or all if PM)
-  const scopedProjects = getPmSubProjects(
-    projects,
-    parentProjects,
-    pmEmployeeId,
-    allocations,
+  const activeProjects = projects.filter(
+    (p) => ["active", "in-progress", "in progress", "poc"].includes(p.project_status)
   );
-  const activeProjects = scopedProjects.filter(
-    (p) => p.project_status === "active",
-  );
-  const completedProjects = scopedProjects.filter(
-    (p) => p.project_status === "completed",
+  const completedProjects = projects.filter(
+    (p) => p.project_status === "completed"
   );
 
-  // Team members = employees who are allocated to any project
-  const allocatedEmployeeIdSet = new Set(
-    allocations
-      .filter((a) =>
-        scopedProjects.some((project) => project.id === a.sub_project_id),
-      )
-      .map((a) => Number(a.employee_id)),
+  const pendingLeaves = allLeaves.filter(
+    (l) => l.start_date > todayStr
   );
-  const teamMembers = employees.filter((e) =>
-    allocatedEmployeeIdSet.has(Number(e.id)),
+  const currentLeaves = allLeaves.filter(
+    (l) => l.start_date <= todayStr && l.end_date >= todayStr
   );
 
-  // Leaves
-  const pendingLeaves = allLeaves.filter((l) => {
-    if (!l.start_date || l.status === "rejected") return false;
-    return (
-      l.start_date > todayStr &&
-      allocatedEmployeeIdSet.has(Number(l.employee_id))
-    );
-  });
-  const currentLeaves = allLeaves.filter((l) => {
-    if (!l.start_date || !l.end_date || l.status === "rejected") return false;
-    return (
-      l.start_date <= todayStr &&
-      l.end_date >= todayStr &&
-      allocatedEmployeeIdSet.has(Number(l.employee_id))
-    );
-  });
-
-  // At-risk projects (under-staffed)
-  const atRiskProjects = activeProjects.filter((p) => {
-    const allocated = getAllocatedManpower(p);
-    return p.required_manpower && allocated < p.required_manpower;
-  });
+  const atRiskProjects = activeProjects.filter((p) => p.is_at_risk);
+  const teamMembers = teamSummary.teamMembers || [];
 
   return (
     <div className="space-y-4">
@@ -247,10 +167,8 @@ const PMDashboard = () => {
                 label: "Staff",
                 align: "center",
                 render: (id, project) => {
-                  const allocated = getAllocatedManpower(project);
-                  const isUnder =
-                    project.required_manpower &&
-                    allocated < project.required_manpower;
+                  const allocated = project.allocated_employees || 0;
+                  const isUnder = project.is_at_risk;
                   return (
                     <span
                       className={`text-sm font-semibold ${isUnder ? "text-red-600" : "text-slate-700"}`}
@@ -265,12 +183,7 @@ const PMDashboard = () => {
                 label: "Status",
                 align: "center",
                 render: (_, project) => {
-                  const projAllocs = allocations.filter(
-                    (a) => a.sub_project_id === project.id,
-                  );
-                  const isUnder =
-                    project.required_manpower &&
-                    projAllocs.length < project.required_manpower;
+                  const isUnder = project.is_at_risk;
                   return (
                     <span
                       className={`inline-flex items-center gap-1 px-2 py-0.5 rounded-full text-xs font-medium border ${isUnder ? "bg-red-50 text-red-700 border-red-200" : "bg-emerald-50 text-emerald-700 border-emerald-200"}`}
@@ -316,7 +229,7 @@ const PMDashboard = () => {
             ) : (
               <div className="space-y-2">
                 {currentLeaves.map((l) => {
-                  const emp = employees.find((e) => e.id === l.employee_id);
+                  const emp = teamMembers.find((e) => e.id === l.employee_id);
                   return (
                     <div
                       key={l.id}
@@ -357,7 +270,7 @@ const PMDashboard = () => {
             ) : (
               <div className="space-y-2">
                 {pendingLeaves.slice(0, 5).map((l) => {
-                  const emp = employees.find((e) => e.id === l.employee_id);
+                  const emp = teamMembers.find((e) => e.id === l.employee_id);
                   return (
                     <div
                       key={l.id}
