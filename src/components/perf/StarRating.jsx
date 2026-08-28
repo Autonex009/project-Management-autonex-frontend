@@ -45,32 +45,20 @@ export const RATING_LABELS = LABELS;
  * The active review period, as "YYYY-MM". Evaluated in IST regardless of the
  * browser's timezone (same reasoning as halfDayTiming.js's getISTDateTime).
  *
- * The review cycle rolls over on the 25th rather than the 1st: from the 25th
- * onward, "current period" becomes next month's, so employees/PMs start
- * filing next month's review a few days early instead of waiting for the 1st.
+ * The review cycle remains open until the last day of the current month,
+ * rolling over on the 1st of the next month.
  */
 export const currentPeriod = () => {
   const formatter = new Intl.DateTimeFormat("en-US", {
     timeZone: "Asia/Kolkata",
     year: "numeric",
     month: "2-digit",
-    day: "2-digit",
   });
   const parts = Object.fromEntries(
     formatter.formatToParts(new Date()).map((p) => [p.type, p.value]),
   );
-  let year = Number(parts.year);
-  let month = Number(parts.month); // 1-12
-  const day = Number(parts.day);
-
-  if (day >= 28) {
-    month += 1;
-    if (month > 12) {
-      month = 1;
-      year += 1;
-    }
-  }
-  return `${year}-${String(month).padStart(2, "0")}`;
+  
+  return `${parts.year}-${parts.month}`;
 };
 
 export const formatPeriod = (period) => {
