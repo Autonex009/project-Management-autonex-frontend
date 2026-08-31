@@ -248,6 +248,13 @@ export const employeeApi = {
     api.post(`/employees/${id}/avatar/from-slack`).then((res) => res.data),
   deleteAvatar: (id) =>
     api.delete(`/employees/${id}/avatar`).then((res) => res.data),
+  // Encord Sync APIs
+  triggerEncordSync: (id, payload) =>
+    api.post(`/employees/${id}/encord-sync`, payload).then((res) => res.data),
+  checkEncordSyncStatus: (id, jobId) =>
+    api.get(`/employees/${id}/encord-sync/status/${jobId}`).then((res) => res.data),
+  getEncordSyncLogs: (id) =>
+    api.get(`/employees/${id}/encord-sync-logs`).then((res) => res.data),
   getActive: () => api.get("/employees/status/active").then((res) => res.data),
   getInactive: () =>
     api.get("/employees/status/inactive").then((res) => res.data),

@@ -12,6 +12,12 @@ export function useClickOutside(ref, onOutside, enabled = true) {
     };
 
     document.addEventListener("mousedown", handler);
-    return () => document.removeEventListener("mousedown", handler);
+    document.addEventListener("touchstart", handler);
+    document.addEventListener("pointerdown", handler);
+    return () => {
+      document.removeEventListener("mousedown", handler);
+      document.removeEventListener("touchstart", handler);
+      document.removeEventListener("pointerdown", handler);
+    };
   }, [ref, onOutside, enabled]);
 }

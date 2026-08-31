@@ -31,7 +31,13 @@ const Dropdown = ({
       if (ref.current && !ref.current.contains(e.target)) setOpen(false);
     };
     document.addEventListener("mousedown", handler);
-    return () => document.removeEventListener("mousedown", handler);
+    document.addEventListener("touchstart", handler);
+    document.addEventListener("pointerdown", handler);
+    return () => {
+      document.removeEventListener("mousedown", handler);
+      document.removeEventListener("touchstart", handler);
+      document.removeEventListener("pointerdown", handler);
+    };
   }, []);
 
   // When mounted already-open (e.g. auto-opened on a tab switch), scroll it
@@ -94,7 +100,19 @@ const Dropdown = ({
 
     return (
       <div ref={ref} className={`relative block ${className}`}>
-        <div className="w-full flex items-center gap-1.5 px-3 py-1.5 rounded-lg border border-slate-200 bg-white text-sm transition-colors hover:border-slate-300">
+        <div 
+          onClick={(e) => {
+            // If they clicked the input itself, let the input's own events handle it
+            if (e.target === inputRef.current) return;
+            if (open) {
+              setOpen(false);
+            } else {
+              setOpen(true);
+              inputRef.current?.focus();
+            }
+          }}
+          className="w-full flex items-center gap-1.5 px-3 py-1.5 rounded-lg border border-slate-200 bg-white text-sm transition-colors hover:border-slate-300 cursor-text"
+        >
           <input
             ref={inputRef}
             type="text"
@@ -107,8 +125,9 @@ const Dropdown = ({
               }
               setOpen(true);
             }}
-            onMouseDown={() => {
-              if (open) setOpen(false);
+            onClick={(e) => {
+               // Allow input click to just open if closed, or let user place cursor if open
+               if (!open) setOpen(true);
             }}
             onFocus={() => setOpen(true)}
             disabled={disabled}
@@ -127,9 +146,19 @@ const Dropdown = ({
               <X className="w-3.5 h-3.5" />
             </button>
           )}
-          <ChevronDown
-            className={`w-3.5 h-3.5 text-slate-400 transition-transform flex-shrink-0 ${open ? "rotate-180" : ""}`}
-          />
+          <button
+            type="button"
+            tabIndex={-1}
+            onClick={(e) => {
+              e.stopPropagation();
+              setOpen(!open);
+            }}
+            className="p-0.5 flex-shrink-0 focus:outline-none"
+          >
+            <ChevronDown
+              className={`w-3.5 h-3.5 text-slate-400 transition-transform ${open ? "rotate-180" : ""}`}
+            />
+          </button>
         </div>
         {open && !disabled && (
           <div
@@ -151,7 +180,7 @@ const Dropdown = ({
                       setSearchText("");
                       setOpen(false);
                     }}
-                    className={`w-full text-left px-3 py-1.5 text-sm transition-colors ${
+                    className={`block w-full text-left px-3 py-1.5 text-sm whitespace-normal transition-colors ${
                       optValue === value
                         ? "bg-indigo-50 text-indigo-700 font-medium"
                         : "text-slate-700 hover:bg-slate-50"
@@ -206,7 +235,7 @@ const Dropdown = ({
       >
         <span className="truncate whitespace-nowrap">{displayValue}</span>
         <ChevronDown
-          className={`w-3.5 h-3.5 text-slate-400 transition-transform shrink-0 ${open ? "rotate-180" : ""}`}
+          className={`w-3.5 h-3.5 text-slate-400 transition-transform shrink-0 pointer-events-none ${open ? "rotate-180" : ""}`}
         />
       </button>
       {open && !disabled && (
@@ -268,7 +297,7 @@ const Dropdown = ({
                       setSearchText("");
                       setOpen(false);
                     }}
-                    className={`w-full text-left px-3 py-1.5 text-sm transition-colors ${
+                    className={`block w-full text-left px-3 py-1.5 text-sm whitespace-normal transition-colors ${
                       optValue === value
                         ? "bg-indigo-50 text-indigo-700 font-medium"
                         : "text-slate-700 hover:bg-slate-50"
