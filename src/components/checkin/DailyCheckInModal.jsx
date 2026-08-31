@@ -4,7 +4,8 @@ import { CalendarCheck, Home, Building2, Smile, Meh, Frown, Zap } from "lucide-r
 import toast from "react-hot-toast";
 import Modal from "../ui/Modal";
 import Button from "../ui/Button";
-import { checkinApi } from "../../services/api";
+import { checkinApi, subProjectApi } from "../../services/api";
+import { MultiSelect } from "../ui/MultiSelect";
 
 const MOODS = [
   { value: "great", label: "Great", icon: Zap, tone: "text-emerald-600 bg-emerald-50 border-emerald-200" },
@@ -77,6 +78,18 @@ export default function DailyCheckInModal() {
   });
 
   const projectOptions = useMemo(() => status?.project_options || [], [status]);
+  
+  const { data: allProjects } = useQuery({
+    queryKey: ["all-sub-projects"],
+    queryFn: () => subProjectApi.getAll(),
+    enabled: isOpen && projectOptions.length === 0,
+    staleTime: 60000,
+  });
+
+  const fallbackOptions = useMemo(() => {
+    return (allProjects || []).map((p) => ({ label: p.name, value: p.id }));
+  }, [allProjects]);
+
   const canSubmit = selectedProjects.length > 0 && !isPending;
 
   if (!isOpen) return null;
@@ -125,9 +138,17 @@ export default function DailyCheckInModal() {
             Which project(s) are you on today?
           </h3>
           {projectOptions.length === 0 ? (
-            <p className="rounded-xl bg-slate-50 p-3 text-sm text-slate-500">
-              No active project allocations found. Let your PM know if this looks wrong.
-            </p>
+            <div className="space-y-2">
+              <p className="rounded-xl bg-slate-50 p-3 text-sm text-slate-500 mb-2">
+                No active project allocations found. Select a project from the list below:
+              </p>
+              <MultiSelect
+                options={fallbackOptions}
+                value={selectedProjects}
+                onChange={setSelectedProjects}
+                placeholder="Search projects..."
+              />
+            </div>
           ) : (
             <div className="space-y-2">
               {projectOptions.map((p) => (

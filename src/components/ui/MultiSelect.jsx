@@ -34,7 +34,7 @@ export const MultiSelect = ({
     .map((o) => o.label);
 
   return (
-    <div ref={ref} className={\elative \\}>
+    <div ref={ref} className="relative">
       <button
         type="button"
         onClick={() => setIsOpen(!isOpen)}
@@ -57,7 +57,7 @@ export const MultiSelect = ({
         <div className="flex items-center gap-2 pl-2">
           <span className="text-xs text-slate-500">{value.length} selected</span>
           <ChevronDown
-            className={\w-4 h-4 text-slate-400 transition-transform \\}
+            className={`w-4 h-4 text-slate-400 transition-transform ${isOpen ? "rotate-180" : ""}`}
           />
         </div>
       </button>

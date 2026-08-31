@@ -88,7 +88,7 @@ const AdminReportsPage = lazy(() => import("./pages/admin/AdminReportsPage"));
 const AdminCompanySettingsPage = lazy(
   () => import("./pages/admin/AdminCompanySettingsPage"),
 );
-// const AdminAnalyticsPage = lazy(() => import('./pages/admin/AdminAnalyticsPage'));
+const AdminCheckInsPage = lazy(() => import("./pages/admin/AdminCheckInsPage"));
 
 // HR Routes
 const HRDashboard = lazy(() => import("./pages/hr/HRDashboard"));
@@ -170,6 +170,7 @@ function App() {
                 <Route path="sub-projects" element={<SubProjectsPage />} />
                 <Route path="allocations" element={<AllocationsPage />} />
                 <Route path="leaves" element={<LeavesPage />} />
+                <Route path="checkins" element={<AdminCheckInsPage />} />
                 <Route path="performance" element={<AdminPerformancePage />} />
                 <Route path="signup-requests" element={<SignupRequestsPage />} />
                 <Route path="payroll" element={<PayrollTabs />} />

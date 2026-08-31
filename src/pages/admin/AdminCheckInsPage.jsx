@@ -1,8 +1,6 @@
 import React, { useState } from "react";
-import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
-import toast from "react-hot-toast";
+import { useQuery } from "@tanstack/react-query";
 import {
-  ListChecks,
   Building2,
   Home,
   CheckCircle2,
@@ -13,8 +11,6 @@ import {
 import { checkinApi } from "../../services/api";
 import Table from "../../components/ui/Table";
 import UserAvatar from "../../components/ui/UserAvatar";
-import Button from "../../components/ui/Button";
-import StatCard from "../../components/dashboard/StatCard";
 import SearchBar from "../../components/ui/SearchBar";
 import { formatDisplayName } from "../../utils/displayName";
 
@@ -35,34 +31,19 @@ const WorkModePill = ({ mode }) =>
     <span className="text-xs text-slate-400">—</span>
   );
 
-const TeamCheckInsPage = () => {
-  const queryClient = useQueryClient();
+const AdminCheckInsPage = () => {
   const [page, setPage] = useState(1);
   const [search, setSearch] = useState("");
   const limit = 20;
 
   const { data, isLoading, isError } = useQuery({
-    queryKey: ["checkins-team-today", page, search],
-    queryFn: () => checkinApi.getTeamToday({ page, limit, search }),
+    queryKey: ["checkins-admin-today", page, search],
+    queryFn: () => checkinApi.getAdminPaginated({ page, limit, search }),
     staleTime: 60 * 1000,
   });
 
-  const { mutate: confirmAll, isPending: confirming } = useMutation({
-    mutationFn: () => checkinApi.confirmTeam(),
-    onSuccess: (result) => {
-      toast.success(
-        result.confirmed > 0
-          ? `Confirmed ${result.confirmed} check-in${result.confirmed === 1 ? "" : "s"}.`
-          : "Nothing new to confirm.",
-      );
-      queryClient.invalidateQueries({ queryKey: ["checkins-team-today"] });
-    },
-    onError: () => toast.error("Couldn't confirm the roster. Please try again."),
-  });
-
   const items = data?.items || [];
-  const totalCount = data?.total || 0; // for pagination
-  const pendingOnPage = items.filter((r) => r.checked_in && !r.pm_confirmed_at).length;
+  const totalCount = data?.total || 0;
 
   const columns = [
     {
@@ -131,7 +112,7 @@ const TeamCheckInsPage = () => {
     },
     {
       key: "confirmed",
-      label: "Confirmed",
+      label: "Confirmed by PM",
       align: "right",
       width: "w-[12%]",
       render: (_, row) =>
@@ -146,57 +127,42 @@ const TeamCheckInsPage = () => {
   ];
 
   return (
-    <div className="space-y-4">
-      <div className="grid grid-cols-1 sm:grid-cols-3 gap-3 mb-4">
-        <StatCard
-          title="On your projects"
-          value={data?.kpi_total ?? 0}
-          icon={ListChecks}
-          tone="indigo"
-          hint="today"
-        />
-        <StatCard
-          title="Checked in"
-          value={data?.kpi_checked_in ?? 0}
-          icon={CheckCircle2}
-          tone="emerald"
-          hint="so far today"
-        />
-        <StatCard
-          title="Confirmed"
-          value={data?.kpi_confirmed ?? 0}
-          icon={ShieldCheck}
-          tone="sky"
-          hint="reviewed by you"
-        />
-      </div>
-
-      <div className="flex flex-col sm:flex-row items-start sm:items-center justify-between gap-4">
+    <div className="space-y-4 max-w-[1200px] mx-auto py-6">
+      <div className="flex flex-col sm:flex-row items-start sm:items-center justify-between gap-4 mb-2">
         <div>
-          <h2 className="text-base font-semibold text-slate-900">Today's Roster</h2>
-          <p className="text-xs text-slate-500">
-            Everyone allocated to a project you run, plus anyone who checked in manually.
+          <h1 className="text-2xl font-bold text-slate-900 tracking-tight">Company Check-ins</h1>
+          <p className="text-sm text-slate-500 mt-1">
+            Monitor daily attendance and work locations across the entire company.
           </p>
         </div>
         <div className="flex items-center gap-3">
           <SearchBar 
             value={search} 
             onChange={(v) => { setSearch(v); setPage(1); }} 
-            placeholder="Search roster..." 
-            className="w-64"
+            placeholder="Search employees..." 
+            className="w-72"
           />
-          <Button
-            onClick={() => confirmAll()}
-            disabled={confirming}
-          >
-            {confirming ? "Confirming…" : "Confirm New Check-ins"}
-          </Button>
+        </div>
+      </div>
+
+      <div className="grid grid-cols-1 sm:grid-cols-3 gap-3 mb-6">
+        <div className="bg-white p-4 rounded-xl border border-slate-200 shadow-sm flex flex-col justify-center">
+          <p className="text-sm font-medium text-slate-500 mb-1">Total Active Employees</p>
+          <p className="text-2xl font-bold text-slate-900">{data?.kpi_total ?? 0}</p>
+        </div>
+        <div className="bg-emerald-50 p-4 rounded-xl border border-emerald-100 shadow-sm flex flex-col justify-center">
+          <p className="text-sm font-medium text-emerald-700 mb-1">Checked In Today</p>
+          <p className="text-2xl font-bold text-emerald-900">{data?.kpi_checked_in ?? 0}</p>
+        </div>
+        <div className="bg-sky-50 p-4 rounded-xl border border-sky-100 shadow-sm flex flex-col justify-center">
+          <p className="text-sm font-medium text-sky-700 mb-1">Confirmed by PM</p>
+          <p className="text-2xl font-bold text-sky-900">{data?.kpi_confirmed ?? 0}</p>
         </div>
       </div>
 
       {isError ? (
         <div className="rounded-3xl border border-dashed border-red-200 bg-red-50/40 p-12 text-center shadow-sm">
-          <h2 className="text-lg font-semibold text-red-700">Couldn't load today's roster</h2>
+          <h2 className="text-lg font-semibold text-red-700">Couldn't load company check-ins</h2>
           <p className="mt-2 text-sm text-red-500">Something went wrong. Try refreshing the page.</p>
         </div>
       ) : (
@@ -205,14 +171,14 @@ const TeamCheckInsPage = () => {
           columns={columns}
           data={items}
           loading={isLoading}
-          skeletonRows={6}
+          skeletonRows={10}
           pageSize={limit}
           currentPage={page}
           totalItems={totalCount}
           onPageChange={setPage}
           emptyState={{
-            title: "No one found",
-            description: "No employees match your search or allocation criteria.",
+            title: "No employees found",
+            description: "No one matches your search criteria.",
           }}
         />
       )}
@@ -220,4 +186,4 @@ const TeamCheckInsPage = () => {
   );
 };
 
-export default TeamCheckInsPage;
+export default AdminCheckInsPage;

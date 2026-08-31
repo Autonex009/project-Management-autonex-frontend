@@ -14,6 +14,7 @@ import {
   BarChart3,
   History,
   Trophy,
+  ClipboardCheck,
 } from "lucide-react";
 
 // `roles`, when present, limits the item to those user roles. Omit it for items
@@ -23,6 +24,7 @@ export const navigation = [
   { name: "Projects", href: "/admin/sub-projects", icon: FolderKanban },
   { name: "Analytics", href: "/admin/analytics", icon: BarChart3 },
   { name: "Employees", href: "/admin/employees", icon: Users },
+  { name: "Check-ins", href: "/admin/checkins", icon: ClipboardCheck },
   { name: "Signup Requests", href: "/admin/signup-requests", icon: UserPlus },
   { name: "Allocations", href: "/admin/allocations", icon: UserCog },
   { name: "Leaves", href: "/admin/leaves", icon: Calendar },
