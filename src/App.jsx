@@ -9,6 +9,7 @@ import ForcePasswordChangeModal from "./components/ForcePasswordChangeModal";
 
 // Layouts
 import AdminLayout from "./layouts/AdminLayout";
+import HRLayout from "./layouts/HRLayout";
 import EmployeeLayout from "./layouts/EmployeeLayout";
 import AdminLogin from "./pages/auth/AdminLogin";
 import EmployeeLogin from "./pages/auth/EmployeeLogin";
@@ -85,6 +86,12 @@ const AdminReportsPage = lazy(() => import("./pages/admin/AdminReportsPage"));
 const AdminCompanySettingsPage = lazy(
   () => import("./pages/admin/AdminCompanySettingsPage"),
 );
+// const AdminAnalyticsPage = lazy(() => import('./pages/admin/AdminAnalyticsPage'));
+
+// HR Routes
+const HRDashboard = lazy(() => import("./pages/hr/HRDashboard"));
+const OnboardingPipelinePage = lazy(() => import("./pages/hr/OnboardingPipelinePage"));
+const CandidateConfirmationPage = lazy(() => import("./pages/hr/CandidateConfirmationPage"));
 // const AdminAnalyticsPage = lazy(() => import('./pages/admin/AdminAnalyticsPage'));
 
 function App() {
@@ -177,6 +184,25 @@ function App() {
                 {/* <Route path="onboarding-analytics" element={<AdminAnalyticsPage />} /> */}
               </Route>
 
+              {/* Protected HR Routes */}
+              <Route
+                path="/hr"
+                element={
+                  <ProtectedRoute allowedRoles={["admin", "hr"]}>
+                    <HRLayout />
+                  </ProtectedRoute>
+                }
+              >
+                <Route index element={<Navigate to="/hr/dashboard" replace />} />
+                <Route path="dashboard" element={<HRDashboard />} />
+                <Route path="onboarding-pipeline" element={<OnboardingPipelinePage />} />
+                <Route path="signup-requests" element={<SignupRequestsPage />} />
+                <Route path="employees" element={<EmployeesPage />} />
+                <Route path="leaves" element={<LeavesPage />} />
+                <Route path="performance" element={<AdminPerformancePage />} />
+                <Route path="activity-log" element={<ChangeLogPage />} />
+              </Route>
+
               {/* Root Redirect */}
               <Route
                 path="/"
@@ -192,6 +218,7 @@ function App() {
                   </ProtectedRoute>
                 }
               >
+                <Route path="confirmation-mockup" element={<CandidateConfirmationPage />} />
                 <Route
                   index
                   element={<Navigate to="/employee/dashboard" replace />}
