@@ -6,6 +6,7 @@ import { Toaster } from "react-hot-toast";
 import ProtectedRoute from "./routes/ProtectedRoute";
 import ErrorBoundary from "./components/ErrorBoundary";
 import ForcePasswordChangeModal from "./components/ForcePasswordChangeModal";
+import DailyCheckInModal from "./components/checkin/DailyCheckInModal";
 
 // Layouts
 import AdminLayout from "./layouts/AdminLayout";
@@ -34,6 +35,7 @@ const EmployeeDashboard = lazy(
 const PMDashboard = lazy(() => import("./pages/pm/PMDashboard"));
 const GuidelinesPage = lazy(() => import("./pages/guidelines/GuidelinesPage"));
 const MyTeamPage = lazy(() => import("./pages/pm/MyTeamPage"));
+const TeamCheckInsPage = lazy(() => import("./pages/pm/TeamCheckInsPage"));
 const PerformanceReviewsPage = lazy(
   () => import("./pages/pm/PerformanceReviewsPage"),
 );
@@ -86,7 +88,7 @@ const AdminReportsPage = lazy(() => import("./pages/admin/AdminReportsPage"));
 const AdminCompanySettingsPage = lazy(
   () => import("./pages/admin/AdminCompanySettingsPage"),
 );
-// const AdminAnalyticsPage = lazy(() => import('./pages/admin/AdminAnalyticsPage'));
+const AdminCheckInsPage = lazy(() => import("./pages/admin/AdminCheckInsPage"));
 
 // HR Routes
 const HRDashboard = lazy(() => import("./pages/hr/HRDashboard"));
@@ -125,6 +127,7 @@ function App() {
             }}
           />
           <ForcePasswordChangeModal />
+          <DailyCheckInModal />
           <Suspense fallback={null}>
             <Routes>
               {/* Public Auth Routes */}
@@ -167,6 +170,7 @@ function App() {
                 <Route path="sub-projects" element={<SubProjectsPage />} />
                 <Route path="allocations" element={<AllocationsPage />} />
                 <Route path="leaves" element={<LeavesPage />} />
+                <Route path="checkins" element={<AdminCheckInsPage />} />
                 <Route path="performance" element={<AdminPerformancePage />} />
                 <Route path="signup-requests" element={<SignupRequestsPage />} />
                 <Route path="payroll" element={<PayrollTabs />} />
@@ -261,6 +265,7 @@ function App() {
                 <Route path="allocations" element={<AllocationsPage />} />
                 <Route path="my-team" element={<MyTeamPage />} />
                 <Route path="my-team/:id" element={<EmployeeDashboard />} />
+                <Route path="team-checkins" element={<TeamCheckInsPage />} />
                 <Route path="performance" element={<PerformanceReviewsPage />} />
                 <Route path="self-evaluation" element={<SelfEvaluationPage />} />
                 <Route path="leaves" element={<LeavesPage />} />
