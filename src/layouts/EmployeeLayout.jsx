@@ -6,6 +6,7 @@ import { useBreadcrumbTrail } from "../hooks/useBreadcrumbTrail";
 import { usePageDetailTitle } from "../utils/pageDetailTitle";
 import EmployeeSidebar from "./EmployeeSidebar";
 import AppShellLayout from "../layouts/AppShellLayout";
+import CandidateConfirmationPage from "../pages/hr/CandidateConfirmationPage";
 
 const EmployeeLayout = () => {
   const location = useLocation();
@@ -136,24 +137,27 @@ const EmployeeLayout = () => {
   }
 
   return (
-    <AppShellLayout
-      storageKeyPrefix="employee"
-      SidebarComponent={EmployeeSidebar}
-      sidebarProps={{
-        user,
-        account,
-        role,
-        isPm,
-        onLogout: handleLogout,
-      }}
-      breadcrumbTrail={breadcrumbTrail}
-      homeHref={`${prefix}/dashboard`}
-      filterDashboardCrumb={false}
-      normalizeLightMode={false}
-      // chatRole omitted → <ChatWidget /> with no role (same as today)
-      outerBgClass="bg-[#f4f5f7]"
-      contentWrapperClass="w-full h-full"
-    />
+    <>
+      <CandidateConfirmationPage />
+      <AppShellLayout
+        storageKeyPrefix="employee"
+        SidebarComponent={EmployeeSidebar}
+        sidebarProps={{
+          user,
+          account,
+          role,
+          isPm,
+          onLogout: handleLogout,
+        }}
+        breadcrumbTrail={breadcrumbTrail}
+        homeHref={`${prefix}/dashboard`}
+        filterDashboardCrumb={false}
+        normalizeLightMode={false}
+        // chatRole omitted → <ChatWidget /> with no role (same as today)
+        outerBgClass="bg-[#f4f5f7]"
+        contentWrapperClass="w-full h-full"
+      />
+    </>
   );
 };
 
