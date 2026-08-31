@@ -23,6 +23,8 @@ import EvaluationDetail from "../../components/perf/EvaluationDetail";
 import EvalReviewCard from "../../components/perf/EvalReviewCard";
 import StatCard from "../../components/dashboard/StatCard";
 import Table from "../../components/ui/Table";
+import MetricDots from "../../components/ui/MetricDots";
+import Dropdown from "../../components/ui/Dropdown";
 import UserAvatar from "../../components/ui/UserAvatar";
 import { formatDisplayName } from "../../utils/displayName";
 
@@ -51,6 +53,62 @@ const matchesRole = (emp, key) => {
   return true;
 };
 
+const ReviewsStatCard = ({ totalReviews, totalEmployees }) => {
+  const pct = totalEmployees > 0 ? Math.round((totalReviews / totalEmployees) * 100) : 0;
+  const radius = 20;
+  const circumference = 2 * Math.PI * radius;
+  const strokeDashoffset = circumference - (pct / 100) * circumference;
+
+  return (
+    <div className="group relative rounded-xl border bg-white p-3 shadow-[0_1px_2px_rgba(0,0,0,0.03)] transition-colors focus:outline-none border-slate-200 hover:border-slate-300">
+      <div className="flex items-start justify-between">
+        <div className="flex items-center gap-2.5">
+          <span className="flex shrink-0 items-center justify-center bg-gradient-to-br from-indigo-500 to-indigo-600 text-white shadow-sm h-9 w-9 rounded-xl">
+            <ClipboardList className="h-[18px] w-[18px]" />
+          </span>
+          <span className="truncate font-medium text-slate-600 text-[13px]">
+            Reviews
+          </span>
+        </div>
+        
+        <div className="relative flex h-[48px] w-[48px] shrink-0 items-center justify-center -mr-1 -mt-1">
+          <svg className="absolute inset-0 h-full w-full -rotate-90">
+            <circle
+              cx="24" cy="24" r={radius}
+              stroke="currentColor" strokeWidth="4.5" fill="none"
+              className="text-slate-100"
+            />
+            <circle
+              cx="24" cy="24" r={radius}
+              stroke="currentColor" strokeWidth="4.5" fill="none"
+              strokeDasharray={circumference}
+              strokeDashoffset={strokeDashoffset}
+              strokeLinecap="round"
+              className="text-indigo-500 transition-all duration-1000 ease-out"
+            />
+          </svg>
+          <span className="absolute inset-0 flex items-center justify-center pt-0.5 text-[11px] font-bold tracking-tight text-indigo-600 tabular-nums">
+            {pct}%
+          </span>
+        </div>
+      </div>
+
+      <div className="mt-2">
+        <div className="flex items-baseline gap-1 min-w-0 pb-0.5">
+          <span className="font-bold leading-normal tracking-tight text-slate-900 tabular-nums truncate text-[24px]">
+            {totalReviews}
+          </span>
+          <span className="text-sm font-medium text-slate-400">/ {totalEmployees}</span>
+        </div>
+      </div>
+      
+      <div className="flex items-center gap-1.5 text-xs mt-2">
+        <span className="text-slate-400">submitted reviews</span>
+      </div>
+    </div>
+  );
+};
+
 const AdminPerformancePage = () => {
   const user = JSON.parse(localStorage.getItem("user") || "{}");
   const { data: employees = [], isLoading: empLoading } = useQuery({
@@ -74,6 +132,7 @@ const AdminPerformancePage = () => {
   const [tab, setTab] = useState("employees"); // 'employees' | 'history' | 'pm'
   const [search, setSearch] = useState("");
   const [roleFilter, setRoleFilter] = useState("all");
+  const [projectFilter, setProjectFilter] = useState("all");
   const [perfPage, setPerfPage] = useState(1);
   const [bonusPage, setBonusPage] = useState(1);
   const [bonusOpen, setBonusOpen] = useState(false);
@@ -92,6 +151,7 @@ const AdminPerformancePage = () => {
       if (s.tab === "employees" || s.tab === "pm" || s.tab === "history") setTab(s.tab);
       if (s.search != null) setSearch(s.search);
       if (s.roleFilter != null) setRoleFilter(s.roleFilter);
+      if (s.projectFilter != null) setProjectFilter(s.projectFilter);
       if (s.perfPage != null) setPerfPage(s.perfPage);
       if (s.bonusPage != null) setBonusPage(s.bonusPage);
       if (s.bonusOpen != null) setBonusOpen(!!s.bonusOpen);
@@ -112,6 +172,7 @@ const AdminPerformancePage = () => {
       tab,
       search,
       roleFilter,
+      projectFilter,
       perfPage,
       bonusPage,
       bonusOpen,
@@ -121,6 +182,7 @@ const AdminPerformancePage = () => {
     tab,
     search,
     roleFilter,
+    projectFilter,
     perfPage,
     bonusPage,
     bonusOpen,
@@ -138,21 +200,27 @@ const AdminPerformancePage = () => {
       return;
     }
     setPerfPage(1);
-  }, [search, roleFilter, tab, ready]);
+  }, [search, roleFilter, projectFilter, tab, ready]);
 
   // --- SERVER-SIDE RENDERING (SSR) AND PAGINATION ---
   const currentPeriodQuery = tab === "history" ? historyMonth : activePeriod;
 
   // KPI Data - SSR for the entire period
   const { data: kpiData = {} } = useQuery({
-    queryKey: ["perf-evals-kpi", currentPeriodQuery],
-    queryFn: () => perfEvalApi.getAdminKpi({ period: currentPeriodQuery }),
+    queryKey: ["perf-evals-kpi", currentPeriodQuery, projectFilter, roleFilter, search],
+    queryFn: () => {
+      const params = { period: currentPeriodQuery };
+      if (search.trim()) params.search = search.trim();
+      if (roleFilter !== "all") params.role_filter = roleFilter;
+      if (projectFilter !== "all") params.project_id = projectFilter;
+      return perfEvalApi.getAdminKpi(params);
+    },
     staleTime: 1000 * 60 * 5,
     enabled: ready,
   });
 
   const { data: evaluationsData = {}, isLoading: evalLoading, isFetching: evalFetching } = useQuery({
-    queryKey: ["perf-evals", "paginated", perfPage, PAGE_SIZE, tab, currentPeriodQuery, search, roleFilter],
+    queryKey: ["perf-evals", "paginated", perfPage, PAGE_SIZE, tab, currentPeriodQuery, search, roleFilter, projectFilter],
     queryFn: () => {
       const isPmTab = tab === "pm";
       const params = {
@@ -163,6 +231,7 @@ const AdminPerformancePage = () => {
       };
       if (search.trim()) params.search = search.trim();
       if (roleFilter !== "all") params.role_filter = roleFilter;
+      if (projectFilter !== "all") params.project_id = projectFilter;
       return perfEvalApi.getAll(params);
     },
     placeholderData: (prev) => prev,
@@ -185,8 +254,14 @@ const AdminPerformancePage = () => {
     : (pmSelfData?.items || []).filter(e => e.status === "submitted").length;
 
   const { data: bonusData = {} } = useQuery({
-    queryKey: ["perf-evals", "bonus", currentPeriodQuery],
-    queryFn: () => perfEvalApi.getAll({ period: currentPeriodQuery, type: "bonus", limit: 100 }),
+    queryKey: ["perf-evals", "bonus", currentPeriodQuery, projectFilter, roleFilter, search],
+    queryFn: () => {
+      const params = { period: currentPeriodQuery, type: "bonus", limit: 100 };
+      if (search.trim()) params.search = search.trim();
+      if (roleFilter !== "all") params.role_filter = roleFilter;
+      if (projectFilter !== "all") params.project_id = projectFilter;
+      return perfEvalApi.getAll(params);
+    },
     staleTime: 1000 * 60 * 5,
     enabled: ready,
   });
@@ -212,6 +287,16 @@ const AdminPerformancePage = () => {
     () => new Map(mainProjects.map((mp) => [String(mp.id), mp])),
     [mainProjects],
   );
+
+  const filteredEmployeesCount = useMemo(() => {
+    return employees.filter(emp => {
+      if (search.trim() && !emp.name.toLowerCase().includes(search.trim().toLowerCase())) return false;
+      if (!matchesRole(emp, roleFilter)) return false;
+      // projectFilter isn't perfectly computable on the raw employee list locally,
+      // so the denominator reflects the total employees matching the role/search.
+      return true;
+    }).length;
+  }, [employees, search, roleFilter]);
 
   const managersOfProject = (projectId) => {
     const sp = subProjectById.get(String(projectId));
@@ -506,12 +591,9 @@ const AdminPerformancePage = () => {
 
       {/* KPIs */}
       <div className="grid grid-cols-1 sm:grid-cols-3 gap-3">
-        <StatCard
-          title="Reviews"
-          value={kpiData.total ?? 0}
-          icon={ClipboardList}
-          tone="indigo"
-          hint="submitted reviews"
+        <ReviewsStatCard 
+          totalReviews={kpiData.total ?? 0} 
+          totalEmployees={filteredEmployeesCount} 
         />
         <StatCard
           title="Avg Rating"
@@ -574,6 +656,17 @@ const AdminPerformancePage = () => {
                 className="h-8 w-full rounded-lg border border-slate-200 bg-white pl-9 pr-3 text-[13px] text-slate-700 outline-none transition focus:border-indigo-300 focus:ring-2 focus:ring-indigo-100"
               />
             </div>
+            
+            <Dropdown
+              className="w-full sm:w-48"
+              value={String(projectFilter)}
+              onChange={(val) => setProjectFilter(val)}
+              options={[
+                { value: "all", label: "All Projects" },
+                ...projects.map((p) => ({ value: String(p.id), label: p.name })),
+              ]}
+            />
+
             <div className="inline-flex items-center gap-0.5 overflow-x-auto rounded-lg border border-slate-200 bg-slate-50 p-0.5">
               {ROLE_FILTERS.map((r) => {
                 const active = roleFilter === r.key;

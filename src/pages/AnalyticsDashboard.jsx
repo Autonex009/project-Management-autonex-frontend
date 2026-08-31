@@ -579,22 +579,24 @@ const AnalyticsDashboard = () => {
             })}
           </div>
 
-          <Button
-            variant="primary"
-            size="sm"
-            onClick={handleSyncClick}
-            disabled={syncBusy}
-            className="rounded-lg font-bold px-2.5 py-1 text-xs"
-          >
-            <RefreshCw className={`w-3.5 h-3.5 ${syncBusy ? "animate-spin" : ""}`} />
-            <span>
-              {syncBusy
-                ? "Syncing…"
-                : activeJobId
-                ? "Check status"
-                : "Sync Data"}
-            </span>
-          </Button>
+          {/* Sync temporarily disabled pending prod Redis setup
+            <Button
+              variant="primary"
+              size="sm"
+              onClick={handleSyncClick}
+              disabled={syncBusy}
+              className="rounded-lg font-bold px-2.5 py-1 text-xs"
+            >
+              <RefreshCw className={`w-3.5 h-3.5 ${syncBusy ? "animate-spin" : ""}`} />
+              <span>
+                {syncBusy
+                  ? "Syncing…"
+                  : activeJobId
+                  ? "Check status"
+                  : "Sync Data"}
+              </span>
+            </Button>
+            */}
         </div>
       </div>
 

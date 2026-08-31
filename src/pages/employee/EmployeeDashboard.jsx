@@ -1603,7 +1603,7 @@ const EmployeeDashboard = () => {
               </p>
             </div>
             <div className="flex items-center gap-3">
-              <EncordSyncWidget employeeId={employeeId} />
+              {/* <EncordSyncWidget employeeId={employeeId} /> */}
               <div className="flex items-center gap-1.5 shrink-0 bg-indigo-50/50 px-3 py-1 rounded border border-indigo-100">
                 <span className="font-data text-lg font-extrabold text-indigo-700 leading-none">
                   {totalDailyHours}h
