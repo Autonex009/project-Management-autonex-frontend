@@ -811,4 +811,12 @@ export const badgesApi = {
     api.get('/employee-badge-logs', { params: { employee_id: employeeId } }),
 };
 
+export const checkinApi = {
+  getToday: () => api.get("/checkins/today").then((res) => res.data),
+  submit: (data) => api.post("/checkins", data).then((res) => res.data),
+  checkOut: (data) => api.post("/checkins/checkout", data).then((res) => res.data),
+  getTeamToday: () => api.get("/checkins/team-today").then((res) => res.data),
+  confirmTeam: () => api.post("/checkins/team/confirm").then((res) => res.data),
+};
+
 export default api;
