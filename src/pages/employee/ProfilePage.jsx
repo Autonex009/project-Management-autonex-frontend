@@ -43,7 +43,7 @@ const CompactField = ({ icon: Icon, label, value, color = "emerald" }) => {
         <p className="text-[10px] font-bold uppercase tracking-wider text-slate-400">
           {label}
         </p>
-        <p className="truncate text-xs font-semibold text-slate-800">
+        <p className="break-all text-xs font-semibold text-slate-800">
           {value || "—"}
         </p>
       </div>
@@ -52,12 +52,22 @@ const CompactField = ({ icon: Icon, label, value, color = "emerald" }) => {
 };
 
 /* ── Editable Email Inline Card ─────────────────────────────────── */
-const EmailCard = ({ value, onRequestOTP, onVerifyOTP, isRequesting, isVerifying, error, onDismissError }) => {
-  const [editing, setEditing] = useState(false);
+const EmailCard = ({ value, isEditing, onRequestOTP, onVerifyOTP, isRequesting, isVerifying, error, onDismissError }) => {
   const [step, setStep] = useState(1); // 1 = Request, 2 = Verify
   const [draft, setDraft] = useState("");
   const [otp, setOtp] = useState("");
   const [timeLeft, setTimeLeft] = useState(600); // 10 minutes
+  const [successMsg, setSuccessMsg] = useState("");
+
+  useEffect(() => {
+    if (isEditing) {
+      setDraft(value || "");
+      setStep(1);
+      setOtp("");
+      setSuccessMsg("");
+      onDismissError();
+    }
+  }, [isEditing]);
 
   useEffect(() => {
     if (step !== 2) return;
@@ -74,19 +84,6 @@ const EmailCard = ({ value, onRequestOTP, onVerifyOTP, isRequesting, isVerifying
 
     return () => clearInterval(timer);
   }, [step]);
-
-  const start = () => {
-    setDraft(value || "");
-    setStep(1);
-    setOtp("");
-    onDismissError();
-    setEditing(true);
-  };
-
-  const cancel = () => {
-    setEditing(false);
-    onDismissError();
-  };
 
   const trimmed = draft.trim().toLowerCase();
   const isValidEmail = /^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(trimmed);
@@ -109,7 +106,10 @@ const EmailCard = ({ value, onRequestOTP, onVerifyOTP, isRequesting, isVerifying
     e.preventDefault();
     if (canVerify) {
       onVerifyOTP(otp, () => {
-        setEditing(false);
+        setStep(1);
+        setOtp("");
+        setSuccessMsg("Email successfully updated!");
+        setTimeout(() => setSuccessMsg(""), 3000);
       });
     }
   };
@@ -120,71 +120,39 @@ const EmailCard = ({ value, onRequestOTP, onVerifyOTP, isRequesting, isVerifying
     return `${m}:${s.toString().padStart(2, "0")}`;
   };
 
-  if (!editing) {
-    return (
-      <div className="flex items-center justify-between gap-3 rounded-xl border border-slate-200/80 bg-slate-50/50 p-3 transition-all hover:bg-white hover:border-slate-300 hover:shadow-xs">
-        <div className="flex items-center gap-3 min-w-0">
-          <div className="rounded-lg border border-emerald-100 bg-emerald-50 p-2 text-emerald-600 shrink-0">
-            <Mail className="h-4 w-4" />
-          </div>
-          <div className="min-w-0">
-            <p className="text-[10px] font-bold uppercase tracking-wider text-slate-400">
-              Login Email
-            </p>
-            <p className="truncate text-xs font-semibold text-slate-800">
-              {value || "—"}
-            </p>
-          </div>
-        </div>
-        <button
-          type="button"
-          onClick={start}
-          title="Change login email"
-          className="shrink-0 rounded-lg border border-slate-200 bg-white p-1.5 text-slate-500 hover:border-emerald-300 hover:bg-emerald-50 hover:text-emerald-600 transition-colors"
-        >
-          <Pencil className="h-3 w-3" />
-        </button>
-      </div>
-    );
+  if (!isEditing) {
+    return <CompactField icon={Mail} label="Login Email" value={value} />;
   }
 
   return (
-    <div className="col-span-full rounded-xl border-2 border-emerald-400 bg-emerald-50/40 p-3 shadow-xs">
-      <div className="flex items-center justify-between">
+    <div className="rounded-xl border-2 border-emerald-400 bg-emerald-50/30 p-2.5 flex flex-col justify-center">
+      <div className="flex items-center justify-between mb-1">
         <p className="text-[10px] font-bold uppercase tracking-wider text-emerald-700">
-          {step === 1 ? "Update Login Email" : "Verify Email with OTP"}
+          {step === 1 ? "Login Email" : "Verify OTP"}
         </p>
-        <button type="button" onClick={cancel} className="text-slate-400 hover:text-slate-600">
-          <X className="h-3.5 w-3.5" />
-        </button>
+        {step === 2 && (
+          <button type="button" onClick={() => { setStep(1); onDismissError(); }} className="text-slate-400 hover:text-slate-600">
+            <X className="h-3.5 w-3.5" />
+          </button>
+        )}
       </div>
       
       {step === 1 ? (
-        <form onSubmit={handleRequest} className="mt-2 flex items-center gap-2">
+        <form onSubmit={handleRequest} className="flex items-center gap-1.5">
           <input
             type="email"
-            autoFocus
             value={draft}
             onChange={(e) => setDraft(e.target.value)}
             placeholder="new@example.com"
-            className="w-full rounded-lg border border-slate-200 bg-white px-3 py-1.5 text-xs font-medium text-slate-800 outline-none focus:border-emerald-500 focus:ring-1 focus:ring-emerald-500"
+            className="w-full rounded-lg border border-slate-200 bg-white px-2 py-1 text-xs outline-none focus:border-emerald-500"
           />
-          <Button
-            variant="success"
-            size="sm"
-            type="submit"
-            disabled={!canRequest}
-            isLoading={isRequesting}
-          >
+          <Button variant="success" size="sm" type="submit" disabled={!canRequest} isLoading={isRequesting} className="px-2.5 py-1 text-[10px] h-auto whitespace-nowrap">
             Send OTP
           </Button>
         </form>
       ) : (
-        <form onSubmit={handleVerify} className="mt-2 flex flex-col gap-2">
-          <p className="text-xs text-slate-600">
-            We sent a 6-digit code to <span className="font-bold">{draft}</span>
-          </p>
-          <div className="flex items-center gap-2">
+        <form onSubmit={handleVerify} className="flex flex-col gap-1.5">
+          <div className="flex items-center gap-1.5">
             <input
               type="text"
               autoFocus
@@ -192,37 +160,27 @@ const EmailCard = ({ value, onRequestOTP, onVerifyOTP, isRequesting, isVerifying
               value={otp}
               onChange={(e) => setOtp(e.target.value.replace(/[^0-9]/g, ""))}
               placeholder="000000"
-              className="w-full rounded-lg border border-slate-200 bg-white px-3 py-1.5 text-xs font-medium text-slate-800 outline-none focus:border-emerald-500 focus:ring-1 focus:ring-emerald-500 tracking-widest text-center"
+              className="w-full rounded-lg border border-slate-200 bg-white px-2 py-1 text-xs tracking-widest text-center outline-none focus:border-emerald-500"
               disabled={timeLeft === 0}
             />
-            <Button
-              variant="success"
-              size="sm"
-              type="submit"
-              disabled={!canVerify || timeLeft === 0}
-              isLoading={isVerifying}
-            >
+            <Button variant="success" size="sm" type="submit" disabled={!canVerify || timeLeft === 0} isLoading={isVerifying} className="px-2.5 py-1 text-[10px] h-auto whitespace-nowrap">
               Verify
             </Button>
           </div>
-          <div className="flex items-center justify-between mt-1">
-            <p className="text-[11px] font-medium text-slate-500">
-              {timeLeft > 0 ? `Code expires in ${formatTime(timeLeft)}` : "Code expired."}
+          <div className="flex items-center justify-between">
+            <p className="text-[9px] font-medium text-slate-500">
+              {timeLeft > 0 ? `Expires in ${formatTime(timeLeft)}` : "Expired."}
             </p>
             {timeLeft === 0 && (
-              <button
-                type="button"
-                onClick={() => setStep(1)}
-                className="text-[11px] font-bold text-emerald-600 hover:text-emerald-700 underline"
-              >
-                Request New Code
+              <button type="button" onClick={() => setStep(1)} className="text-[9px] font-bold text-emerald-600 hover:text-emerald-700 underline">
+                Resend
               </button>
             )}
           </div>
         </form>
       )}
-
-      {error && <p className="mt-1 text-[11px] font-medium text-rose-600">{error}</p>}
+      {error && <p className="mt-1 text-[9px] font-medium text-rose-600 leading-tight">{error}</p>}
+      {successMsg && <p className="mt-1 text-[9px] font-medium text-emerald-600 leading-tight">{successMsg}</p>}
     </div>
   );
 };
@@ -698,6 +656,7 @@ const formatPhoneNumber = (phone) => {
                 <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
                   <EmailCard
                     value={mergedProfile.email}
+                    isEditing={isEditing}
                     onRequestOTP={handleRequestOTP}
                     onVerifyOTP={handleVerifyOTP}
                     isRequesting={requestEmailChangeMutation.isPending}

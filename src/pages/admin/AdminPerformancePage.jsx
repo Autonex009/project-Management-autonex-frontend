@@ -73,6 +73,12 @@ const AdminPerformancePage = () => {
 
   const [tab, setTab] = useState("employees"); // 'employees' | 'history' | 'pm'
   const [search, setSearch] = useState("");
+  const [debouncedSearch, setDebouncedSearch] = useState("");
+
+  useEffect(() => {
+    const timer = setTimeout(() => setDebouncedSearch(search), 300);
+    return () => clearTimeout(timer);
+  }, [search]);
   const [roleFilter, setRoleFilter] = useState("all");
   const [perfPage, setPerfPage] = useState(1);
   const [bonusPage, setBonusPage] = useState(1);
@@ -90,7 +96,10 @@ const AdminPerformancePage = () => {
     const restore = () => {
       const s = getPageState(PAGE_KEY);
       if (s.tab === "employees" || s.tab === "pm" || s.tab === "history") setTab(s.tab);
-      if (s.search != null) setSearch(s.search);
+      if (s.search != null) {
+        setSearch(s.search);
+        setDebouncedSearch(s.search);
+      }
       if (s.roleFilter != null) setRoleFilter(s.roleFilter);
       if (s.perfPage != null) setPerfPage(s.perfPage);
       if (s.bonusPage != null) setBonusPage(s.bonusPage);
@@ -138,7 +147,7 @@ const AdminPerformancePage = () => {
       return;
     }
     setPerfPage(1);
-  }, [search, roleFilter, tab, ready]);
+  }, [debouncedSearch, roleFilter, tab, ready]);
 
   // --- SERVER-SIDE RENDERING (SSR) AND PAGINATION ---
   const currentPeriodQuery = tab === "history" ? historyMonth : activePeriod;
@@ -152,7 +161,7 @@ const AdminPerformancePage = () => {
   });
 
   const { data: evaluationsData = {}, isLoading: evalLoading, isFetching: evalFetching } = useQuery({
-    queryKey: ["perf-evals", "paginated", perfPage, PAGE_SIZE, tab, currentPeriodQuery, search, roleFilter],
+    queryKey: ["perf-evals", "paginated", perfPage, PAGE_SIZE, tab, currentPeriodQuery, debouncedSearch, roleFilter],
     queryFn: () => {
       const isPmTab = tab === "pm";
       const params = {
@@ -161,7 +170,7 @@ const AdminPerformancePage = () => {
         period: currentPeriodQuery,
         type: isPmTab ? "pm" : "employee",
       };
-      if (search.trim()) params.search = search.trim();
+      if (debouncedSearch.trim()) params.search = debouncedSearch.trim();
       if (roleFilter !== "all") params.role_filter = roleFilter;
       return perfEvalApi.getAll(params);
     },
@@ -562,7 +571,7 @@ const AdminPerformancePage = () => {
           </button>
         </div>
 
-        {((tab === "employees" && !isLoading) || (tab === "history" && !evalLoading)) && (
+        {(tab === "employees" || tab === "history") && (
           <div className="flex flex-col gap-2 pb-2.5 sm:flex-row sm:items-center">
             <div className="relative w-full sm:w-60">
               <Search className="pointer-events-none absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-slate-400" />
