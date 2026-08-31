@@ -1,4 +1,5 @@
 import React, { useEffect, useMemo, useState } from "react";
+import { useLocation } from "react-router-dom";
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
 import { CalendarCheck, Home, Building2, Smile, Meh, Frown, Zap } from "lucide-react";
 import toast from "react-hot-toast";
@@ -16,6 +17,7 @@ const MOODS = [
 
 export default function DailyCheckInModal() {
   const queryClient = useQueryClient();
+  const location = useLocation();
   const [user, setUser] = useState(null);
   const [workMode, setWorkMode] = useState("WFO");
   const [selectedProjects, setSelectedProjects] = useState([]);
@@ -28,7 +30,7 @@ export default function DailyCheckInModal() {
     } catch {
       setUser(null);
     }
-  }, []);
+  }, [location.pathname]);
 
   // Skip entirely while a forced password change is pending — that modal takes
   // priority and stacking both would be confusing.
