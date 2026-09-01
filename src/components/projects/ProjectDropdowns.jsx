@@ -300,7 +300,17 @@ const TeamLeadMultiSelect = ({
 
   return (
     <div ref={ref} className="relative">
-      <div className="flex w-full items-center gap-1.5 rounded-lg border border-slate-200 bg-white px-3 py-1.5 text-sm transition-colors hover:border-slate-300">
+        <div 
+          onClick={(e) => {
+            if (e.target.tagName.toLowerCase() === 'input') return;
+            setOpen(!open);
+            if (!open) {
+              const input = e.currentTarget.querySelector('input');
+              if (input) input.focus();
+            }
+          }}
+          className="flex w-full items-center gap-1.5 rounded-lg border border-slate-200 bg-white px-3 py-1.5 text-sm transition-colors hover:border-slate-300 cursor-text"
+        >
         <input
           type="text"
           value={search}
@@ -309,12 +319,19 @@ const TeamLeadMultiSelect = ({
             setSearch(e.target.value);
             setOpen(true);
           }}
+          onClick={() => { if (!open) setOpen(true); }}
           onFocus={() => setOpen(true)}
           className="min-w-0 flex-1 bg-transparent text-slate-700 outline-none placeholder:text-slate-400"
         />
-        <ChevronDown
-          className={`h-3.5 w-3.5 shrink-0 text-slate-400 transition-transform ${open ? "rotate-180" : ""}`}
-        />
+        <button
+          type="button"
+          tabIndex={-1}
+          className="p-0.5 flex-shrink-0 focus:outline-none"
+        >
+          <ChevronDown
+            className={`h-3.5 w-3.5 shrink-0 text-slate-400 transition-transform pointer-events-none ${open ? "rotate-180" : ""}`}
+          />
+        </button>
       </div>
       {open && (
         <div className="absolute left-0 top-full z-[9999] mt-1 max-h-64 w-full overflow-y-auto rounded-xl border border-slate-200 bg-white py-1 shadow-lg">
@@ -374,7 +391,17 @@ const PmMultiSelect = ({ employees, value, onChange, isPm, pmEmployeeId }) => {
 
   return (
     <div ref={ref} className="relative">
-      <div className="flex w-full items-center gap-1.5 rounded-lg border border-slate-200 bg-white px-3 py-1.5 text-sm transition-colors hover:border-slate-300">
+        <div 
+          onClick={(e) => {
+            if (e.target.tagName.toLowerCase() === 'input') return;
+            setOpen(!open);
+            if (!open) {
+              const input = e.currentTarget.querySelector('input');
+              if (input) input.focus();
+            }
+          }}
+          className="flex w-full items-center gap-1.5 rounded-lg border border-slate-200 bg-white px-3 py-1.5 text-sm transition-colors hover:border-slate-300 cursor-text"
+        >
         <input
           type="text"
           value={search}
@@ -383,12 +410,19 @@ const PmMultiSelect = ({ employees, value, onChange, isPm, pmEmployeeId }) => {
             setSearch(e.target.value);
             setOpen(true);
           }}
+          onClick={() => { if (!open) setOpen(true); }}
           onFocus={() => setOpen(true)}
           className="min-w-0 flex-1 bg-transparent text-slate-700 outline-none placeholder:text-slate-400"
         />
-        <ChevronDown
-          className={`h-3.5 w-3.5 shrink-0 text-slate-400 transition-transform ${open ? "rotate-180" : ""}`}
-        />
+        <button
+          type="button"
+          tabIndex={-1}
+          className="p-0.5 flex-shrink-0 focus:outline-none"
+        >
+          <ChevronDown
+            className={`h-3.5 w-3.5 shrink-0 text-slate-400 transition-transform pointer-events-none ${open ? "rotate-180" : ""}`}
+          />
+        </button>
       </div>
       {open && (
         <div className="absolute left-0 top-full z-[9999] mt-1 max-h-64 w-full overflow-y-auto rounded-xl border border-slate-200 bg-white py-1 shadow-lg">
