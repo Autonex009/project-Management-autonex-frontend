@@ -6,9 +6,11 @@ import { Toaster } from "react-hot-toast";
 import ProtectedRoute from "./routes/ProtectedRoute";
 import ErrorBoundary from "./components/ErrorBoundary";
 import ForcePasswordChangeModal from "./components/ForcePasswordChangeModal";
+import DailyCheckInModal from "./components/checkin/DailyCheckInModal";
 
 // Layouts
 import AdminLayout from "./layouts/AdminLayout";
+import HRLayout from "./layouts/HRLayout";
 import EmployeeLayout from "./layouts/EmployeeLayout";
 import AdminLogin from "./pages/auth/AdminLogin";
 import EmployeeLogin from "./pages/auth/EmployeeLogin";
@@ -33,6 +35,7 @@ const EmployeeDashboard = lazy(
 const PMDashboard = lazy(() => import("./pages/pm/PMDashboard"));
 const GuidelinesPage = lazy(() => import("./pages/guidelines/GuidelinesPage"));
 const MyTeamPage = lazy(() => import("./pages/pm/MyTeamPage"));
+const TeamCheckInsPage = lazy(() => import("./pages/pm/TeamCheckInsPage"));
 const PerformanceReviewsPage = lazy(
   () => import("./pages/pm/PerformanceReviewsPage"),
 );
@@ -85,6 +88,12 @@ const AdminReportsPage = lazy(() => import("./pages/admin/AdminReportsPage"));
 const AdminCompanySettingsPage = lazy(
   () => import("./pages/admin/AdminCompanySettingsPage"),
 );
+const AdminCheckInsPage = lazy(() => import("./pages/admin/AdminCheckInsPage"));
+
+// HR Routes
+const HRDashboard = lazy(() => import("./pages/hr/HRDashboard"));
+const OnboardingPipelinePage = lazy(() => import("./pages/hr/OnboardingPipelinePage"));
+const CandidateConfirmationPage = lazy(() => import("./pages/hr/CandidateConfirmationPage"));
 // const AdminAnalyticsPage = lazy(() => import('./pages/admin/AdminAnalyticsPage'));
 
 function App() {
@@ -118,6 +127,7 @@ function App() {
             }}
           />
           <ForcePasswordChangeModal />
+          <DailyCheckInModal />
           <Suspense fallback={null}>
             <Routes>
               {/* Public Auth Routes */}
@@ -160,6 +170,7 @@ function App() {
                 <Route path="sub-projects" element={<SubProjectsPage />} />
                 <Route path="allocations" element={<AllocationsPage />} />
                 <Route path="leaves" element={<LeavesPage />} />
+                <Route path="checkins" element={<AdminCheckInsPage />} />
                 <Route path="performance" element={<AdminPerformancePage />} />
                 <Route path="signup-requests" element={<SignupRequestsPage />} />
                 <Route path="payroll" element={<PayrollTabs />} />
@@ -177,6 +188,25 @@ function App() {
                 {/* <Route path="onboarding-analytics" element={<AdminAnalyticsPage />} /> */}
               </Route>
 
+              {/* Protected HR Routes */}
+              <Route
+                path="/hr"
+                element={
+                  <ProtectedRoute allowedRoles={["admin", "hr"]}>
+                    <HRLayout />
+                  </ProtectedRoute>
+                }
+              >
+                <Route index element={<Navigate to="/hr/dashboard" replace />} />
+                <Route path="dashboard" element={<HRDashboard />} />
+                <Route path="onboarding-pipeline" element={<OnboardingPipelinePage />} />
+                <Route path="signup-requests" element={<SignupRequestsPage />} />
+                <Route path="employees" element={<EmployeesPage />} />
+                <Route path="leaves" element={<LeavesPage />} />
+                <Route path="performance" element={<AdminPerformancePage />} />
+                <Route path="activity-log" element={<ChangeLogPage />} />
+              </Route>
+
               {/* Root Redirect */}
               <Route
                 path="/"
@@ -192,6 +222,7 @@ function App() {
                   </ProtectedRoute>
                 }
               >
+                <Route path="confirmation-mockup" element={<CandidateConfirmationPage />} />
                 <Route
                   index
                   element={<Navigate to="/employee/dashboard" replace />}
@@ -234,6 +265,7 @@ function App() {
                 <Route path="allocations" element={<AllocationsPage />} />
                 <Route path="my-team" element={<MyTeamPage />} />
                 <Route path="my-team/:id" element={<EmployeeDashboard />} />
+                <Route path="team-checkins" element={<TeamCheckInsPage />} />
                 <Route path="performance" element={<PerformanceReviewsPage />} />
                 <Route path="self-evaluation" element={<SelfEvaluationPage />} />
                 <Route path="leaves" element={<LeavesPage />} />
