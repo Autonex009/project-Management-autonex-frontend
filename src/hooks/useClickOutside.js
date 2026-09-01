@@ -22,10 +22,12 @@ export function useClickOutside(ref, onOutside, enabled = true) {
     // can call stopPropagation(), which is a common cause of click-outside bugs app-wide.
     document.addEventListener("mousedown", handler, true);
     document.addEventListener("touchstart", handler, true);
-
+    document.addEventListener("pointerdown", handler, true);
+    
     return () => {
       document.removeEventListener("mousedown", handler, true);
       document.removeEventListener("touchstart", handler, true);
+      document.removeEventListener("pointerdown", handler, true);
     };
   }, [ref, onOutside, enabled]);
 }

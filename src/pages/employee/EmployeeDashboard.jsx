@@ -15,6 +15,7 @@ import {
   employeeNotesApi,
   badgesApi,
 } from "../../services/api";
+import EncordSyncWidget from "../../components/dashboard/EncordSyncWidget";
 
 import {
   AlertCircle,
@@ -1329,7 +1330,7 @@ const EmployeeDashboard = () => {
 
             <div className="flex flex-col gap-1.5 mt-auto">
               <div className="flex items-center justify-end">
-                <h3 className="font-display text-[15px] font-extrabold text-stone-900">
+                <h3 className="font-display text-[15px] font-extrabold text-stone-800">
                   Leaves
                 </h3>
               </div>
@@ -1398,7 +1399,7 @@ const EmployeeDashboard = () => {
         <div className="lg:col-span-7 bg-white border border-stone-200 rounded-xl p-3 flex flex-col gap-2 shadow-[0_1px_4px_rgba(28,25,23,0.06)]">
           <div className="flex items-center justify-between pb-1">
             <div className="flex items-center gap-2">
-              <h2 className="font-display text-[15px] font-extrabold text-stone-900">
+              <h2 className="font-display text-[15px] font-extrabold text-stone-800">
                 Badges
               </h2>
               <button
@@ -1457,7 +1458,7 @@ const EmployeeDashboard = () => {
           </div>
 
           <div className="flex flex-col gap-1.5 flex-1">
-            <h3 className="font-display text-[15px] font-extrabold text-stone-900">
+            <h3 className="font-display text-[15px] font-extrabold text-stone-800">
               Stats
             </h3>
             <div className="grid grid-cols-4 gap-2 flex-1">
@@ -1595,19 +1596,22 @@ const EmployeeDashboard = () => {
           <div className="flex items-start justify-between gap-2">
             <div>
               <h3 className="font-display text-sm font-bold text-stone-800">
-                Productivity Trend &amp; Project Highlights
+                Daily Working Hours
               </h3>
               <p className="text-[10px] text-stone-400 mt-0.5">
                 {currentMonthLabel}
               </p>
             </div>
-            <div className="text-right shrink-0">
-              <span className="font-data text-lg font-extrabold text-indigo-700 leading-none">
-                {totalDailyHours}h
-              </span>
-              <span className="text-[9px] font-medium text-stone-400 block mt-0.5">
-                Total Hours
-              </span>
+            <div className="flex items-center gap-3">
+              {/* <EncordSyncWidget employeeId={employeeId} /> */}
+              <div className="flex items-center gap-1.5 shrink-0 bg-indigo-50/50 px-3 py-1 rounded border border-indigo-100">
+                <span className="font-data text-lg font-extrabold text-indigo-700 leading-none">
+                  {totalDailyHours}h
+                </span>
+                <span className="text-[10px] font-medium text-stone-500">
+                  Total Hours
+                </span>
+              </div>
             </div>
           </div>
 
