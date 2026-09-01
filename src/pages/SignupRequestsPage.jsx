@@ -241,25 +241,6 @@ const SignupRequestsPage = () => {
             <div className="pt-4 grid grid-cols-1 md:grid-cols-2 gap-4 text-sm">
               <div>
                 <p className="text-[11px] font-semibold text-slate-400 uppercase tracking-wide mb-1">
-                  Employment Type
-                </p>
-                <Dropdown
-                  options={EMPLOYEE_TYPES}
-                  value={localEmployeeTypes[req.id] ?? req.employee_type ?? ""}
-                  onChange={(newType) => {
-                    setLocalEmployeeTypes((prev) => ({
-                      ...prev,
-                      [req.id]: newType,
-                    }));
-                    updateMutation.mutate({
-                      id: req.id,
-                      data: { employee_type: newType },
-                    });
-                  }}
-                />
-              </div>
-              <div>
-                <p className="text-[11px] font-semibold text-slate-400 uppercase tracking-wide mb-1">
                   Skills
                 </p>
                 <div className="flex flex-wrap gap-1.5">
@@ -314,7 +295,7 @@ const SignupRequestsPage = () => {
           {
             key: "name",
             label: "Applicant",
-            width: "w-[26%]",
+            width: "w-[22%]",
             render: (value, req) => (
               <div className="flex items-center gap-3">
                 <div className="w-9 h-9 rounded-full bg-indigo-50 text-indigo-600 flex items-center justify-center text-[13px] font-semibold ring-1 ring-slate-200 shrink-0">
@@ -344,19 +325,44 @@ const SignupRequestsPage = () => {
           {
             key: "designation",
             label: "Designation",
-            width: "w-[15%]",
+            width: "w-[13%]",
             render: (v) => (
-              <span className="text-[13px] font-medium text-slate-600">
+              <span className="text-[13px] font-medium text-slate-600 truncate block">
                 {v || "—"}
               </span>
             ),
           },
           {
+            key: "employment_type",
+            label: "Type",
+            width: "w-[14%]",
+            render: (v, req) => (
+              <div onClick={(e) => e.stopPropagation()}>
+                <Dropdown
+                  options={EMPLOYEE_TYPES}
+                  value={localEmployeeTypes[req.id] ?? req.employee_type ?? ""}
+                  onChange={(newType) => {
+                    setLocalEmployeeTypes((prev) => ({
+                      ...prev,
+                      [req.id]: newType,
+                    }));
+                    updateMutation.mutate({
+                      id: req.id,
+                      data: { employee_type: newType },
+                    });
+                  }}
+                  className="w-full text-xs"
+                  optionsClassName="min-w-[130px]"
+                />
+              </div>
+            ),
+          },
+          {
             key: "phone",
             label: "Phone",
-            width: "w-[13%]",
+            width: "w-[11%]",
             render: (v) => (
-              <span className="text-[13px] text-slate-600 tabular-nums">
+              <span className="text-[13px] text-slate-600 tabular-nums truncate block">
                 {v || "—"}
               </span>
             ),
@@ -364,9 +370,9 @@ const SignupRequestsPage = () => {
           {
             key: "created_at",
             label: "Requested",
-            width: "w-[12%]",
+            width: "w-[10%]",
             render: (v) => (
-              <span className="text-[13px] text-slate-500">
+              <span className="text-[13px] text-slate-500 truncate block">
                 {v ? format(parseISO(v), "MMM d, yyyy") : "—"}
               </span>
             ),
@@ -374,14 +380,14 @@ const SignupRequestsPage = () => {
           {
             key: "status",
             label: "Status",
-            width: "w-[11%]",
+            width: "w-[10%]",
             render: (v) => STATUS_BADGE[v] || STATUS_BADGE.pending,
           },
           {
             key: "actions",
             label: "Actions",
             align: "right",
-            width: "w-[23%]",
+            width: "w-[20%]",
             render: (_, req) => {
               const isExpanded = expandedId === req.id;
               return (
