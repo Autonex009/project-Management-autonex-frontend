@@ -38,6 +38,9 @@ import {
   Copy,
   ExternalLink,
   KeyRound,
+  Lock,
+  Archive,
+  FileText,
 } from "lucide-react";
 import toast from "react-hot-toast";
 import UserAvatar from "../components/ui/UserAvatar";
@@ -397,20 +400,20 @@ function EmployeeArchiveModal({ employee, onClose, onConfirm, isPending }) {
                 </p>
                 <div className="bg-amber-50 border border-amber-100 rounded-xl p-4 space-y-2.5">
                   <div className="flex gap-2.5 text-xs text-amber-850 leading-relaxed">
-                    <span className="flex-shrink-0">ðŸ”’</span>
+                    <span className="flex-shrink-0"><Lock className="w-4 h-4 text-amber-500" /></span>
                     <span>
                       System access to the portal will be immediately revoked.
                     </span>
                   </div>
                   <div className="flex gap-2.5 text-xs text-amber-850 leading-relaxed">
-                    <span className="flex-shrink-0">ðŸ“</span>
+                    <span className="flex-shrink-0"><Archive className="w-4 h-4 text-amber-500" /></span>
                     <span>
                       All historical data (leaves, project allocations history)
                       will be preserved for records.
                     </span>
                   </div>
                   <div className="flex gap-2.5 text-xs text-amber-850 leading-relaxed">
-                    <span className="flex-shrink-0">ðŸ”„</span>
+                    <span className="flex-shrink-0"><RotateCcw className="w-4 h-4 text-amber-500" /></span>
                     <span>
                       You can restore this employee at any time from the
                       "Archived / Former" tab.
@@ -474,14 +477,14 @@ function EmployeeRestoreModal({ employee, onClose, onConfirm, isPending }) {
         </p>
         <div className="bg-emerald-50 border border-emerald-100 rounded-xl p-4 space-y-2.5">
           <div className="flex gap-2.5 text-xs text-emerald-850 leading-relaxed">
-            <span className="flex-shrink-0">ðŸ”‘</span>
+            <span className="flex-shrink-0"><KeyRound className="w-4 h-4 text-emerald-500" /></span>
             <span>
               Their portal account will be reactivated, allowing them to log in
               again.
             </span>
           </div>
           <div className="flex gap-2.5 text-xs text-emerald-850 leading-relaxed">
-            <span className="flex-shrink-0">ðŸ‘¥</span>
+            <span className="flex-shrink-0"><Users className="w-4 h-4 text-emerald-500" /></span>
             <span>They will show up in the active employee list.</span>
           </div>
         </div>
@@ -532,14 +535,14 @@ function EmployeeConvertToFulltimeModal({
         </p>
         <div className="bg-indigo-50 border border-indigo-100 rounded-xl p-4 space-y-2.5">
           <div className="flex gap-2.5 text-xs text-indigo-850 leading-relaxed">
-            <span className="flex-shrink-0">📝</span>
+            <span className="flex-shrink-0"><FileText className="w-4 h-4 text-indigo-500" /></span>
             <span>
               This updates the existing record in place — all leave, payroll,
               performance and other history is preserved.
             </span>
           </div>
           <div className="flex gap-2.5 text-xs text-indigo-850 leading-relaxed">
-            <span className="flex-shrink-0">💼</span>
+            <span className="flex-shrink-0"><Briefcase className="w-4 h-4 text-indigo-500" /></span>
             <span>Full-time leave entitlements will apply going forward.</span>
           </div>
         </div>
@@ -1612,20 +1615,6 @@ const EmployeesPage = () => {
   const updateMutation = useMutation({
     mutationFn: async ({ id, data, previousStatus }) => {
       const res = await employeeApi.update(id, data);
-      const newStatus = (data.status || "").toLowerCase();
-      const oldStatus = (previousStatus || "").toLowerCase();
-
-      // If status changed to 'inactive', automatically remove all assigned project allocations
-      if (newStatus === "inactive" && oldStatus !== "inactive") {
-        const empAllocations = allocations.filter(
-          (a) => String(a.employee_id) === String(id),
-        );
-        if (empAllocations.length > 0) {
-          await Promise.allSettled(
-            empAllocations.map((a) => allocationApi.delete(a.id)),
-          );
-        }
-      }
       return res;
     },
     onSuccess: (res, variables) => {
@@ -1655,14 +1644,6 @@ const EmployeesPage = () => {
   const archiveMutation = useMutation({
     mutationFn: async (id) => {
       const res = await employeeApi.delete(id);
-      const empAllocations = allocations.filter(
-        (a) => String(a.employee_id) === String(id),
-      );
-      if (empAllocations.length > 0) {
-        await Promise.allSettled(
-          empAllocations.map((a) => allocationApi.delete(a.id)),
-        );
-      }
       return res;
     },
     onSuccess: (_, id) => {
