@@ -33,3 +33,4 @@ coverage/
 *.tgz
 node_modules
 .vercel
+.agents/

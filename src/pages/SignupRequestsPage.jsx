@@ -284,7 +284,7 @@ const SignupRequestsPage = () => {
                     Reviewed At
                   </p>
                   <p className="text-[13px] text-slate-700">
-                    {format(parseISO(req.reviewed_at), "MMM d, yyyy HH:mm")}
+                    {format(parseISO(req.reviewed_at), "MMM d, yyyy hh:mm a")}
                   </p>
                 </div>
               )}

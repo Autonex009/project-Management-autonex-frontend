@@ -239,11 +239,11 @@ const PMLeavesPage = () => {
   const approveMutation = useMutation({
     mutationFn: ({ id, remark }) => leaveApi.approve(id, user.id, remark),
     onSuccess: (res) => {
-      queryClient.setQueryData(["leaves"], (old) => old?.map(lv => lv.leave_id === res.leave_id ? { ...lv, status: res.status, razorpay_applied: res.razorpay_applied } : lv));
+      queryClient.setQueryData(["leaves"], (old) => old?.map(lv => lv.leave_id === res.leave_id ? { ...lv, status: res.status, razorpay_applied: res.razorpay_applied, approved_by_name: user.name } : lv));
       // Also apply surgery to paginated cache if we're on LeavesPage
       queryClient.setQueriesData({ queryKey: ["leaves", "paginated"] }, (old) => {
         if (!old || !old.items) return old;
-        return { ...old, items: old.items.map(lv => lv.leave_id === res.leave_id ? { ...lv, status: res.status, razorpay_applied: res.razorpay_applied } : lv) };
+        return { ...old, items: old.items.map(lv => lv.leave_id === res.leave_id ? { ...lv, status: res.status, razorpay_applied: res.razorpay_applied, approved_by_name: user.name } : lv) };
       });
       setRemarkModal(null);
       setRemark("");
@@ -256,10 +256,10 @@ const PMLeavesPage = () => {
   const rejectMutation = useMutation({
     mutationFn: (id) => leaveApi.reject(id, user.id),
     onSuccess: (res) => {
-      queryClient.setQueryData(["leaves"], (old) => old?.map(lv => lv.leave_id === res.leave_id ? { ...lv, status: res.status, razorpay_applied: res.razorpay_applied } : lv));
+      queryClient.setQueryData(["leaves"], (old) => old?.map(lv => lv.leave_id === res.leave_id ? { ...lv, status: res.status, razorpay_applied: res.razorpay_applied, approved_by_name: user.name } : lv));
       queryClient.setQueriesData({ queryKey: ["leaves", "paginated"] }, (old) => {
         if (!old || !old.items) return old;
-        return { ...old, items: old.items.map(lv => lv.leave_id === res.leave_id ? { ...lv, status: res.status, razorpay_applied: res.razorpay_applied } : lv) };
+        return { ...old, items: old.items.map(lv => lv.leave_id === res.leave_id ? { ...lv, status: res.status, razorpay_applied: res.razorpay_applied, approved_by_name: user.name } : lv) };
       });
       toast.success("Leave rejected");
     },
@@ -270,10 +270,10 @@ const PMLeavesPage = () => {
   const undoApproveMutation = useMutation({
     mutationFn: (id) => leaveApi.undoApprove(id, user.id),
     onSuccess: (res) => {
-      queryClient.setQueryData(["leaves"], (old) => old?.map(lv => lv.leave_id === res.leave_id ? { ...lv, status: res.status, razorpay_applied: false } : lv));
+      queryClient.setQueryData(["leaves"], (old) => old?.map(lv => lv.leave_id === res.leave_id ? { ...lv, status: res.status, razorpay_applied: false, approved_by_name: null } : lv));
       queryClient.setQueriesData({ queryKey: ["leaves", "paginated"] }, (old) => {
         if (!old || !old.items) return old;
-        return { ...old, items: old.items.map(lv => lv.leave_id === res.leave_id ? { ...lv, status: res.status, razorpay_applied: false } : lv) };
+        return { ...old, items: old.items.map(lv => lv.leave_id === res.leave_id ? { ...lv, status: res.status, razorpay_applied: false, approved_by_name: null } : lv) };
       });
       toast.success("Leave approval undone");
     },
@@ -284,10 +284,10 @@ const PMLeavesPage = () => {
   const undoRejectMutation = useMutation({
     mutationFn: (id) => leaveApi.undoReject(id, user.id),
     onSuccess: (res) => {
-      queryClient.setQueryData(["leaves"], (old) => old?.map(lv => lv.leave_id === res.leave_id ? { ...lv, status: res.status, razorpay_applied: false } : lv));
+      queryClient.setQueryData(["leaves"], (old) => old?.map(lv => lv.leave_id === res.leave_id ? { ...lv, status: res.status, razorpay_applied: false, approved_by_name: null } : lv));
       queryClient.setQueriesData({ queryKey: ["leaves", "paginated"] }, (old) => {
         if (!old || !old.items) return old;
-        return { ...old, items: old.items.map(lv => lv.leave_id === res.leave_id ? { ...lv, status: res.status, razorpay_applied: false } : lv) };
+        return { ...old, items: old.items.map(lv => lv.leave_id === res.leave_id ? { ...lv, status: res.status, razorpay_applied: false, approved_by_name: null } : lv) };
       });
       toast.success("Leave rejection undone");
     },
@@ -327,10 +327,10 @@ const PMLeavesPage = () => {
   const wfhApproveMutation = useMutation({
     mutationFn: ({ id, remark }) => wfhApi.approve(id, user.id, remark),
     onSuccess: (res) => {
-      queryClient.setQueryData(["wfh"], (old) => old?.map(w => w.id === res.wfh_id || w.id === res.id ? { ...w, status: res.status } : w));
+      queryClient.setQueryData(["wfh"], (old) => old?.map(w => w.id === res.wfh_id || w.id === res.id ? { ...w, status: res.status, approved_by_name: user.name } : w));
       queryClient.setQueriesData({ queryKey: ["wfh", "paginated"] }, (old) => {
         if (!old || !old.items) return old;
-        return { ...old, items: old.items.map(w => w.id === res.wfh_id || w.id === res.id ? { ...w, status: res.status } : w) };
+        return { ...old, items: old.items.map(w => w.id === res.wfh_id || w.id === res.id ? { ...w, status: res.status, approved_by_name: user.name } : w) };
       });
       setWfhRemarkModal(null);
       setWfhRemark("");
@@ -343,10 +343,10 @@ const PMLeavesPage = () => {
   const wfhRejectMutation = useMutation({
     mutationFn: (id) => wfhApi.reject(id, user.id),
     onSuccess: (res) => {
-      queryClient.setQueryData(["wfh"], (old) => old?.map(w => w.id === res.wfh_id || w.id === res.id ? { ...w, status: res.status } : w));
+      queryClient.setQueryData(["wfh"], (old) => old?.map(w => w.id === res.wfh_id || w.id === res.id ? { ...w, status: res.status, approved_by_name: user.name } : w));
       queryClient.setQueriesData({ queryKey: ["wfh", "paginated"] }, (old) => {
         if (!old || !old.items) return old;
-        return { ...old, items: old.items.map(w => w.id === res.wfh_id || w.id === res.id ? { ...w, status: res.status } : w) };
+        return { ...old, items: old.items.map(w => w.id === res.wfh_id || w.id === res.id ? { ...w, status: res.status, approved_by_name: user.name } : w) };
       });
       toast.success("WFH rejected");
     },
@@ -357,10 +357,10 @@ const PMLeavesPage = () => {
   const wfhUndoApproveMutation = useMutation({
     mutationFn: (id) => wfhApi.undoApprove(id, user.id),
     onSuccess: (res) => {
-      queryClient.setQueryData(["wfh"], (old) => old?.map(w => w.id === res.wfh_id || w.id === res.id ? { ...w, status: res.status } : w));
+      queryClient.setQueryData(["wfh"], (old) => old?.map(w => w.id === res.wfh_id || w.id === res.id ? { ...w, status: res.status, approved_by_name: null } : w));
       queryClient.setQueriesData({ queryKey: ["wfh", "paginated"] }, (old) => {
         if (!old || !old.items) return old;
-        return { ...old, items: old.items.map(w => w.id === res.wfh_id || w.id === res.id ? { ...w, status: res.status } : w) };
+        return { ...old, items: old.items.map(w => w.id === res.wfh_id || w.id === res.id ? { ...w, status: res.status, approved_by_name: null } : w) };
       });
       toast.success("WFH approval undone");
     },
@@ -371,10 +371,10 @@ const PMLeavesPage = () => {
   const wfhUndoRejectMutation = useMutation({
     mutationFn: (id) => wfhApi.undoReject(id, user.id),
     onSuccess: (res) => {
-      queryClient.setQueryData(["wfh"], (old) => old?.map(w => w.id === res.wfh_id || w.id === res.id ? { ...w, status: res.status } : w));
+      queryClient.setQueryData(["wfh"], (old) => old?.map(w => w.id === res.wfh_id || w.id === res.id ? { ...w, status: res.status, approved_by_name: null } : w));
       queryClient.setQueriesData({ queryKey: ["wfh", "paginated"] }, (old) => {
         if (!old || !old.items) return old;
-        return { ...old, items: old.items.map(w => w.id === res.wfh_id || w.id === res.id ? { ...w, status: res.status } : w) };
+        return { ...old, items: old.items.map(w => w.id === res.wfh_id || w.id === res.id ? { ...w, status: res.status, approved_by_name: null } : w) };
       });
       toast.success("WFH rejection undone");
     },
