@@ -353,10 +353,10 @@ const LeavesPage = () => {
   const approveMutation = useMutation({
     mutationFn: ({ id, remark }) => leaveApi.approve(id, user.id, remark),
     onSuccess: (res) => {
-      queryClient.setQueryData(["leaves"], (old) => old?.map(lv => lv.leave_id === res.leave_id ? { ...lv, status: res.status, razorpay_applied: res.razorpay_applied } : lv));
+      queryClient.setQueryData(["leaves"], (old) => old?.map(lv => lv.leave_id === res.leave_id ? { ...lv, status: res.status, razorpay_applied: res.razorpay_applied, approved_by_name: user.name } : lv));
       queryClient.setQueriesData({ queryKey: ["leaves-page"] }, (old) => {
         if (!old || !old.items) return old;
-        return { ...old, items: old.items.map(lv => lv.leave_id === res.leave_id ? { ...lv, status: res.status, razorpay_applied: res.razorpay_applied } : lv) };
+        return { ...old, items: old.items.map(lv => lv.leave_id === res.leave_id ? { ...lv, status: res.status, razorpay_applied: res.razorpay_applied, approved_by_name: user.name } : lv) };
       });
       setRemarkModal(null);
       setRemark("");
@@ -369,10 +369,10 @@ const LeavesPage = () => {
   const rejectMutation = useMutation({
     mutationFn: (id) => leaveApi.reject(id, user.id),
     onSuccess: (res) => {
-      queryClient.setQueryData(["leaves"], (old) => old?.map(lv => lv.leave_id === res.leave_id ? { ...lv, status: res.status, razorpay_applied: res.razorpay_applied } : lv));
+      queryClient.setQueryData(["leaves"], (old) => old?.map(lv => lv.leave_id === res.leave_id ? { ...lv, status: res.status, razorpay_applied: res.razorpay_applied, approved_by_name: user.name } : lv));
       queryClient.setQueriesData({ queryKey: ["leaves-page"] }, (old) => {
         if (!old || !old.items) return old;
-        return { ...old, items: old.items.map(lv => lv.leave_id === res.leave_id ? { ...lv, status: res.status, razorpay_applied: res.razorpay_applied } : lv) };
+        return { ...old, items: old.items.map(lv => lv.leave_id === res.leave_id ? { ...lv, status: res.status, razorpay_applied: res.razorpay_applied, approved_by_name: user.name } : lv) };
       });
       toast.success("Leave rejected");
     },
@@ -383,10 +383,10 @@ const LeavesPage = () => {
   const undoApproveMutation = useMutation({
     mutationFn: (id) => leaveApi.undoApprove(id, user.id),
     onSuccess: (res) => {
-      queryClient.setQueryData(["leaves"], (old) => old?.map(lv => lv.leave_id === res.leave_id ? { ...lv, status: res.status, razorpay_applied: false } : lv));
+      queryClient.setQueryData(["leaves"], (old) => old?.map(lv => lv.leave_id === res.leave_id ? { ...lv, status: res.status, razorpay_applied: false, approved_by_name: null } : lv));
       queryClient.setQueriesData({ queryKey: ["leaves-page"] }, (old) => {
         if (!old || !old.items) return old;
-        return { ...old, items: old.items.map(lv => lv.leave_id === res.leave_id ? { ...lv, status: res.status, razorpay_applied: false } : lv) };
+        return { ...old, items: old.items.map(lv => lv.leave_id === res.leave_id ? { ...lv, status: res.status, razorpay_applied: false, approved_by_name: null } : lv) };
       });
       toast.success("Leave approval undone");
     },
@@ -397,10 +397,10 @@ const LeavesPage = () => {
   const undoRejectMutation = useMutation({
     mutationFn: (id) => leaveApi.undoReject(id, user.id),
     onSuccess: (res) => {
-      queryClient.setQueryData(["leaves"], (old) => old?.map(lv => lv.leave_id === res.leave_id ? { ...lv, status: res.status, razorpay_applied: false } : lv));
+      queryClient.setQueryData(["leaves"], (old) => old?.map(lv => lv.leave_id === res.leave_id ? { ...lv, status: res.status, razorpay_applied: false, approved_by_name: null } : lv));
       queryClient.setQueriesData({ queryKey: ["leaves-page"] }, (old) => {
         if (!old || !old.items) return old;
-        return { ...old, items: old.items.map(lv => lv.leave_id === res.leave_id ? { ...lv, status: res.status, razorpay_applied: false } : lv) };
+        return { ...old, items: old.items.map(lv => lv.leave_id === res.leave_id ? { ...lv, status: res.status, razorpay_applied: false, approved_by_name: null } : lv) };
       });
       toast.success("Leave rejection undone");
     },
@@ -808,8 +808,8 @@ const LeavesPage = () => {
                 const emp = employees.find((e) => e.id === leave.employee_id);
                 const empName = getEmployeeName(leave.employee_id);
                 const approvedBy =
-                  leave.status === "approved" && leave.approved_by_name
-                    ? `Approved by ${leave.approved_by_name}`
+                  (leave.status === "approved" || leave.status === "rejected") && leave.approved_by_name
+                    ? `${leave.status === "approved" ? "Approved" : "Rejected"} by ${leave.approved_by_name}`
                     : null;
 
                 const remark = (leave.approval_remark || "").trim();
@@ -1072,8 +1072,8 @@ const LeavesPage = () => {
                   ? formatDisplayName(value)
                   : getEmployeeName(w.employee_id);
                 const approvedBy =
-                  w.status === "approved" && w.approved_by_name
-                    ? `Approved by ${w.approved_by_name}`
+                  (w.status === "approved" || w.status === "rejected") && w.approved_by_name
+                    ? `${w.status === "approved" ? "Approved" : "Rejected"} by ${w.approved_by_name}`
                     : null;
 
                 const remark = (w.remark || "").trim();
