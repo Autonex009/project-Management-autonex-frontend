@@ -1201,18 +1201,6 @@ const EmployeeDashboard = () => {
       className="w-full h-full text-stone-800 font-sans flex flex-col gap-2 sm:gap-3"
       style={{ fontFamily: "'Inter', system-ui, sans-serif" }}
     >
-      <style>{`
-        @import url('https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800&family=JetBrains+Mono:wght@500;600;700&display=swap');
-        .font-display { font-family: 'Inter', sans-serif; letter-spacing: -0.01em; }
-        .font-data { font-family: 'JetBrains Mono', monospace; font-variant-numeric: tabular-nums; }
-        .log-scroll::-webkit-scrollbar { width: 4px; }
-        .log-scroll::-webkit-scrollbar-thumb { background: #D6D3D1; border-radius: 999px; }
-        .badge-glow {
-          filter: drop-shadow(0 0 4px rgba(13, 148, 136, 0.35))
-                  drop-shadow(0 0 1.5px rgba(13, 148, 136, 0.25));
-        }
-      `}</style>
-
       {/* ════════════════ TOP SECTION ════════════════ */}
       <div className="grid grid-cols-1 lg:grid-cols-12 gap-2 sm:gap-3 items-stretch">
         {/* ──────────── PROFILE CARD ──────────── */}
