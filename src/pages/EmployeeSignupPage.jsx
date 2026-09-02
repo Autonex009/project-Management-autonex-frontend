@@ -69,7 +69,7 @@ const EmployeeSignupPage = () => {
     name: "",
     phone: "",
     designation: "",
-    employee_type: "Full-time",
+    employee_type: "Intern",
     skills: [],
     reason: "",
   });

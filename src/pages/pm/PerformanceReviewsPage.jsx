@@ -279,7 +279,15 @@ const PerformanceReviewsPage = () => {
               getRowId={(row) => row.id}
               renderExpandedRow={(row) => (
                 <div className="border-t border-slate-100 bg-slate-50/40 p-4">
-                  <EvaluationDetail evaluation={row} />
+                  {row.status === "submitted" ? (
+                    <EvalReviewCard
+                      evaluation={row}
+                      personName={empName(row.employee_id)}
+                      reviewerId={user.id}
+                    />
+                  ) : (
+                    <EvaluationDetail evaluation={row} />
+                  )}
                 </div>
               )}
               emptyState={{

@@ -21,6 +21,7 @@ import EvaluationDetail from "../../components/perf/EvaluationDetail";
 import ConfirmDialog from "../../components/ui/ConfirmDialog";
 import Table from "../../components/ui/Table";
 import { formatDisplayName } from "../../utils/displayName";
+import { endOfMonth, differenceInDays } from "date-fns";
 
 const ProjectEvalPanel = ({
   project,
@@ -40,6 +41,12 @@ const ProjectEvalPanel = ({
   // existing evaluation for the selected period (locked once submitted)
   const currentEval = existing.find((e) => e.period === period) || null;
   const liveAverage = averageOf(PERF_PARAMETERS.map((p) => ratings[p.name]));
+
+  const isSubmissionAllowed = useMemo(() => {
+    const today = new Date();
+    const end = endOfMonth(today);
+    return differenceInDays(end, today) <= 6;
+  }, []);
 
   const submitMutation = useMutation({
     mutationFn: (data) => perfEvalApi.submit(data),
@@ -117,19 +124,8 @@ const ProjectEvalPanel = ({
         <div className="border-t border-slate-100 p-5">
           {/* Month + status header */}
           <div className="mb-5 flex flex-wrap items-end justify-between gap-4">
-            <div>
-              <label className="mb-1.5 block text-xs font-semibold uppercase tracking-wide text-slate-500">
-                Review Month
-              </label>
-              <input
-                type="month"
-                value={period}
-                max={currentPeriod()}
-                onChange={(e) => setPeriod(e.target.value || currentPeriod())}
-                className="rounded-xl border border-slate-200 bg-white px-3 py-2 text-sm text-slate-800 focus:border-emerald-400 focus:outline-none focus:ring-2 focus:ring-emerald-100"
-              />
-            </div>
-            {!currentEval && (
+
+            {!currentEval && isSubmissionAllowed && (
               <div className="text-right">
                 <p className="text-xs font-semibold uppercase tracking-wide text-slate-400">
                   Average
@@ -153,6 +149,16 @@ const ProjectEvalPanel = ({
                   : `You've already submitted this month's evaluation. It's locked and pending your ${reviewerLabel}'s review.`}
               </p>
               <EvaluationDetail evaluation={currentEval} />
+            </div>
+          ) : !isSubmissionAllowed ? (
+            <div className="rounded-xl bg-slate-50 px-4 py-8 text-center border border-slate-100 mt-2">
+              <Lock className="mx-auto h-8 w-8 text-slate-300 mb-2" />
+              <p className="text-sm font-medium text-slate-600">
+                Submissions Closed
+              </p>
+              <p className="text-xs text-slate-400 mt-1">
+                The performance evaluation form is only open during the last week of the month.
+              </p>
             </div>
           ) : (
             <form onSubmit={handleSubmit} className="space-y-3">
