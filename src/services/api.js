@@ -17,7 +17,12 @@ const api = axios.create({
 // Request interceptor
 api.interceptors.request.use(
   (config) => {
-    // The access_token cookie is automatically sent because withCredentials is true.
+    if (typeof window !== "undefined") {
+      const token = localStorage.getItem("token");
+      if (token) {
+        config.headers.Authorization = `Bearer ${token}`;
+      }
+    }
     return config;
   },
   (error) => {
@@ -68,23 +73,33 @@ api.interceptors.response.use(
       isRefreshing = true;
 
       try {
-        const { data } = await axios.post(`${apiBaseUrl}/auth/refresh`, {}, { withCredentials: true });
+        const token = typeof window !== "undefined" ? localStorage.getItem("token") : null;
+        const refreshHeaders = token ? { Authorization: `Bearer ${token}` } : {};
+        const { data } = await axios.post(
+          `${apiBaseUrl}/auth/refresh`,
+          {},
+          { withCredentials: true, headers: refreshHeaders }
+        );
         
-        // Optionally update token in localStorage if still using it for backward compatibility
-        if (localStorage.getItem("token")) {
-           localStorage.setItem("token", data.token);
+        if (data?.token && typeof window !== "undefined") {
+          localStorage.setItem("token", data.token);
         }
         
         processQueue(null, data.token);
+        if (data?.token) {
+          originalRequest.headers.Authorization = `Bearer ${data.token}`;
+        }
         return api(originalRequest);
       } catch (err) {
         processQueue(err, null);
-        localStorage.removeItem("token");
-        localStorage.removeItem("role");
-        localStorage.removeItem("user");
-        
-        // Force logout by dispatching an event that the root component can listen to
-        window.dispatchEvent(new Event("auth:unauthorized"));
+        if (typeof window !== "undefined") {
+          localStorage.removeItem("token");
+          localStorage.removeItem("role");
+          localStorage.removeItem("user");
+          
+          // Force logout by dispatching an event that the root component can listen to
+          window.dispatchEvent(new Event("auth:unauthorized"));
+        }
         
         return Promise.reject(err);
       } finally {

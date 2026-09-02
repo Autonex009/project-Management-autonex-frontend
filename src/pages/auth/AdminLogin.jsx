@@ -33,7 +33,9 @@ const AdminLogin = () => {
     mutationFn: (credentials) =>
       authApi.login({ ...credentials, portal: "admin" }),
     onSuccess: (data) => {
-      // localStorage.setItem("token", data.token); // REMOVED: Using HttpOnly cookie instead
+      if (data.token) {
+        localStorage.setItem("token", data.token);
+      }
       localStorage.setItem("user", JSON.stringify(data.user));
       localStorage.setItem("role", data.user.role);
       window.dispatchEvent(new Event("auth-change"));

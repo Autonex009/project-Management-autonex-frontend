@@ -8,6 +8,17 @@ if (!apiBaseUrl.includes("localhost") && apiBaseUrl.startsWith("http://")) {
   apiBaseUrl = apiBaseUrl.replace("http://", "https://");
 }
 
+const getAuthHeaders = (extraHeaders = {}) => {
+  const headers = { ...extraHeaders };
+  if (typeof window !== "undefined") {
+    const token = localStorage.getItem("token");
+    if (token) {
+      headers["Authorization"] = `Bearer ${token}`;
+    }
+  }
+  return headers;
+};
+
 /**
  * Send a chat message and receive streaming SSE events.
  * @param {string} message - The user's message
@@ -19,9 +30,9 @@ export async function streamChat(message, conversationId, onEvent) {
   const response = await fetch(`${apiBaseUrl}/chat/stream`, {
     method: "POST",
     credentials: "include",
-    headers: {
+    headers: getAuthHeaders({
       "Content-Type": "application/json",
-    },
+    }),
     body: JSON.stringify({
       message,
       conversation_id: conversationId,
@@ -70,9 +81,9 @@ export async function confirmLeave(details) {
   const response = await fetch(`${apiBaseUrl}/chat/confirm-leave`, {
     method: "POST",
     credentials: "include",
-    headers: {
+    headers: getAuthHeaders({
       "Content-Type": "application/json",
-    },
+    }),
     body: JSON.stringify(details),
   });
   return response.json();
@@ -85,9 +96,9 @@ export async function confirmWFH(details) {
   const response = await fetch(`${apiBaseUrl}/chat/confirm-wfh`, {
     method: "POST",
     credentials: "include",
-    headers: {
+    headers: getAuthHeaders({
       "Content-Type": "application/json",
-    },
+    }),
     body: JSON.stringify(details),
   });
   return response.json();
@@ -100,9 +111,9 @@ export async function cancelLeave(leaveId) {
   const response = await fetch(`${apiBaseUrl}/chat/cancel-leave`, {
     method: "POST",
     credentials: "include",
-    headers: {
+    headers: getAuthHeaders({
       "Content-Type": "application/json",
-    },
+    }),
     body: JSON.stringify({ leave_id: leaveId }),
   });
   return response.json();
@@ -114,6 +125,7 @@ export async function cancelLeave(leaveId) {
 export async function getChatHistory(conversationId) {
   const response = await fetch(`${apiBaseUrl}/chat/history/${conversationId}`, {
     credentials: "include",
+    headers: getAuthHeaders(),
   });
   return response.json();
 }
@@ -124,6 +136,7 @@ export async function getChatHistory(conversationId) {
 export async function getConversations() {
   const response = await fetch(`${apiBaseUrl}/chat/conversations`, {
     credentials: "include",
+    headers: getAuthHeaders(),
   });
   return response.json();
 }
