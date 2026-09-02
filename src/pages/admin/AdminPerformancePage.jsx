@@ -16,12 +16,15 @@ import {
   Star,
   ChevronDown,
   History as HistoryIcon,
+  CheckCircle2,
+  Clock,
 } from "lucide-react";
 import StarRating, { formatPeriod, currentPeriod, shiftPeriod } from "../../components/perf/StarRating";
 import { StatusPill, fmtDate, RatingCell, MonthStepper } from "../../components/perf/perfTableCells";
 import EvaluationDetail from "../../components/perf/EvaluationDetail";
 import EvalReviewCard from "../../components/perf/EvalReviewCard";
 import StatCard from "../../components/dashboard/StatCard";
+import CustomKPICards from "./CustomKPICards";
 import Table from "../../components/ui/Table";
 import MetricDots from "../../components/ui/MetricDots";
 import Dropdown from "../../components/ui/Dropdown";
@@ -32,6 +35,13 @@ const isPm = (emp) =>
   (emp?.designation || "").toLowerCase().includes("program manager") ||
   (emp?.designation || "").toLowerCase().includes("project manager");
 
+const isHr = (emp) =>
+  (emp?.designation || "").toLowerCase().includes("hr") ||
+  (emp?.designation || "").toLowerCase().includes("human resource");
+
+const isTeamLead = (emp) =>
+  (emp?.designation || "").toLowerCase().includes("lead");
+
 const PAGE_SIZE = 10;
 
 // Role filter buttons -> predicate over an employee record.
@@ -40,12 +50,16 @@ const ROLE_FILTERS = [
   { key: "Full-time", label: "Full-time" },
   { key: "Intern", label: "Interns" },
   { key: "pm", label: "PMs" },
+  { key: "hr", label: "HRs" },
+  { key: "team_lead", label: "TL" },
   { key: "Contract", label: "Contract" },
 ];
 
 const matchesRole = (emp, key) => {
   if (key === "all") return true;
   if (key === "pm") return isPm(emp);
+  if (key === "hr") return isHr(emp);
+  if (key === "team_lead") return isTeamLead(emp);
   const t = (emp?.employee_type || "").toLowerCase();
   if (key === "Full-time") return t === "full-time";
   if (key === "Intern") return t === "intern";
@@ -53,14 +67,14 @@ const matchesRole = (emp, key) => {
   return true;
 };
 
-const ReviewsStatCard = ({ totalReviews, totalEmployees }) => {
+const ReviewsStatCard = ({ totalReviews, totalEmployees, reviewed = 0, pending = 0, multiCount = 0, multiNames = [] }) => {
   const pct = totalEmployees > 0 ? Math.round((totalReviews / totalEmployees) * 100) : 0;
   const radius = 20;
   const circumference = 2 * Math.PI * radius;
   const strokeDashoffset = circumference - (pct / 100) * circumference;
 
   return (
-    <div className="group relative rounded-xl border bg-white p-3 shadow-[0_1px_2px_rgba(0,0,0,0.03)] transition-colors focus:outline-none border-slate-200 hover:border-slate-300">
+    <div className="group relative rounded-xl border bg-white p-3 flex flex-col h-full shadow-[0_1px_2px_rgba(0,0,0,0.03)] transition-colors focus:outline-none border-slate-200 hover:border-slate-300">
       <div className="flex items-start justify-between">
         <div className="flex items-center gap-2.5">
           <span className="flex shrink-0 items-center justify-center bg-gradient-to-br from-indigo-500 to-indigo-600 text-white shadow-sm h-9 w-9 rounded-xl">
@@ -94,16 +108,38 @@ const ReviewsStatCard = ({ totalReviews, totalEmployees }) => {
       </div>
 
       <div className="mt-2">
-        <div className="flex items-baseline gap-1 min-w-0 pb-0.5">
+        <div className="flex items-baseline gap-1 min-w-0 pb-0.5 flex-wrap">
           <span className="font-bold leading-normal tracking-tight text-slate-900 tabular-nums truncate text-[24px]">
             {totalReviews}
           </span>
+          {multiCount > 0 && (
+            <div className="group/multi relative cursor-pointer inline-flex items-center">
+              <span className="text-[10px] font-semibold text-slate-500 bg-slate-100 px-1.5 py-0.5 rounded-md border border-slate-200 ml-1">
+                ({multiCount} emp in &gt;1 proj)
+              </span>
+              <div className="absolute left-0 top-full pt-2 z-50 hidden group-hover/multi:block">
+                <div className="min-w-[200px] whitespace-normal rounded-xl border border-slate-200 bg-white p-3 text-xs leading-relaxed text-slate-700 shadow-xl">
+                  <div className="font-semibold text-slate-900 mb-1 border-b border-slate-100 pb-1">Employees in multiple projects:</div>
+                  <ul className="list-disc pl-4 space-y-1 text-slate-600 max-h-48 overflow-y-auto pr-2 custom-scrollbar">
+                    {multiNames.map(name => <li key={name}>{name}</li>)}
+                  </ul>
+                </div>
+              </div>
+            </div>
+          )}
           <span className="text-sm font-medium text-slate-400">/ {totalEmployees}</span>
         </div>
       </div>
       
-      <div className="flex items-center gap-1.5 text-xs mt-2">
-        <span className="text-slate-400">submitted reviews</span>
+      <div className="flex items-center gap-4 text-xs mt-auto border-t border-slate-100 pt-2">
+        <div className="flex items-center gap-1.5">
+          <CheckCircle2 className="w-3.5 h-3.5 text-emerald-500" />
+          <span className="font-semibold text-slate-700">{reviewed} <span className="text-slate-400 font-normal">Reviewed</span></span>
+        </div>
+        <div className="flex items-center gap-1.5">
+          <Clock className="w-3.5 h-3.5 text-amber-500" />
+          <span className="font-semibold text-slate-700">{pending} <span className="text-slate-400 font-normal">Pending Review</span></span>
+        </div>
       </div>
     </div>
   );
@@ -129,7 +165,8 @@ const AdminPerformancePage = () => {
   const setPageState = usePageStateStore((s) => s.setPageState);
   const getPageState = usePageStateStore((s) => s.getPageState);
 
-  const [tab, setTab] = useState("employees"); // 'employees' | 'history' | 'pm'
+  const [topTab, setTopTab] = useState("active");
+  const [tab, setTab] = useState("employees"); // 'employees' | 'pm' | 'hr'
   const [search, setSearch] = useState("");
   const [roleFilter, setRoleFilter] = useState("all");
   const [projectFilter, setProjectFilter] = useState("all");
@@ -203,13 +240,15 @@ const AdminPerformancePage = () => {
   }, [search, roleFilter, projectFilter, tab, ready]);
 
   // --- SERVER-SIDE RENDERING (SSR) AND PAGINATION ---
-  const currentPeriodQuery = tab === "history" ? historyMonth : activePeriod;
+  const currentPeriodQuery = topTab === "history" ? historyMonth : activePeriod;
 
   // KPI Data - SSR for the entire period
   const { data: kpiData = {} } = useQuery({
-    queryKey: ["perf-evals-kpi", currentPeriodQuery, projectFilter, roleFilter, search],
+    queryKey: ["perf-evals-kpi", currentPeriodQuery, projectFilter, roleFilter, search, tab],
     queryFn: () => {
-      const params = { period: currentPeriodQuery };
+      const params = { 
+        period: currentPeriodQuery
+      };
       if (search.trim()) params.search = search.trim();
       if (roleFilter !== "all") params.role_filter = roleFilter;
       if (projectFilter !== "all") params.project_id = projectFilter;
@@ -223,14 +262,27 @@ const AdminPerformancePage = () => {
     queryKey: ["perf-evals", "paginated", perfPage, PAGE_SIZE, tab, currentPeriodQuery, search, roleFilter, projectFilter],
     queryFn: () => {
       const isPmTab = tab === "pm";
+      const isHrTab = tab === "hr";
+      const isHistory = tab === "history";
+      
       const params = {
         page: perfPage,
         limit: PAGE_SIZE,
         period: currentPeriodQuery,
-        type: isPmTab ? "pm" : "employee",
       };
+      
+      params.type = (isPmTab || isHrTab) ? "pm" : "employee";
+      
       if (search.trim()) params.search = search.trim();
-      if (roleFilter !== "all") params.role_filter = roleFilter;
+      
+      if (isPmTab) {
+        params.role_filter = "pm";
+      } else if (isHrTab) {
+        params.role_filter = "hr";
+      } else if (roleFilter !== "all") {
+        params.role_filter = roleFilter;
+      }
+      
       if (projectFilter !== "all") params.project_id = projectFilter;
       return perfEvalApi.getAll(params);
     },
@@ -243,9 +295,16 @@ const AdminPerformancePage = () => {
   const evaluationsTotal = evaluationsData?.total || 0;
 
   // We still need the pending count for the PM tab badge
-  const { data: pmSelfData = {} } = useQuery({
-    queryKey: ["perf-evals", "pm-pending", currentPeriodQuery],
-    queryFn: () => perfEvalApi.getAll({ period: currentPeriodQuery, type: "pm", limit: 500 }),
+  const { data: pmSelfData } = useQuery({
+    queryKey: ["perf-evals", "pm-pending", currentPeriodQuery, search, roleFilter, projectFilter],
+    queryFn: () => perfEvalApi.getAll({ 
+      period: currentPeriodQuery, 
+      type: "pm", 
+      limit: 500,
+      search: search.trim() || undefined,
+      project_id: projectFilter === "all" ? undefined : projectFilter,
+      role: roleFilter === "all" ? undefined : roleFilter,
+    }),
     staleTime: 1000 * 60 * 5,
     enabled: tab !== "pm" && ready,
   });
@@ -310,7 +369,7 @@ const AdminPerformancePage = () => {
   };
 
   const filtered = tab === "employees" ? evaluations : [];
-  const pmSelfEvals = tab === "pm" ? evaluations : [];
+  const pmSelfEvals = (tab === "pm" || tab === "hr") ? evaluations : [];
   const filteredHistory = tab === "history" ? evaluations : [];
 
 
@@ -456,7 +515,7 @@ const AdminPerformancePage = () => {
     {
       key: "employee",
       label: "Employee",
-      width: "w-[24%]",
+      width: "w-[20%]",
       render: (_, ev) => (
         <div className="flex min-w-0 items-center gap-2.5">
           <UserAvatar
@@ -473,7 +532,7 @@ const AdminPerformancePage = () => {
     {
       key: "project",
       label: "Project",
-      width: "w-[28%]",
+      width: "w-[22%]",
       render: (_, ev) => (
         <span className="block truncate text-slate-600">
           {projName(ev.project_id)}
@@ -481,9 +540,66 @@ const AdminPerformancePage = () => {
       ),
     },
     {
+      key: "pm",
+      label: "Program Manager",
+      width: "w-[18%]",
+      render: (_, ev) => {
+        const managers = managersOfProject(ev.project_id);
+        if (managers.length === 0)
+          return <span className="text-slate-400">—</span>;
+
+        const visibleRows = filteredHistory.slice(
+          (perfPage - 1) * PAGE_SIZE,
+          perfPage * PAGE_SIZE,
+        );
+        const pageIndex = visibleRows.indexOf(ev);
+        const isNearTop =
+          visibleRows.length <= 2 ? pageIndex === 0 : pageIndex <= 1;
+        const positionClass = isNearTop
+          ? "top-full mt-1.5"
+          : "bottom-full mb-1.5";
+        const extra = managers.length - 1;
+
+        return (
+          <div className="group/pm relative flex cursor-default items-center gap-1 whitespace-nowrap">
+            <span
+              className="truncate text-slate-600"
+              title={managers.join(", ")}
+            >
+              {managers[0]}
+            </span>
+            {extra > 0 && (
+              <span className="inline-flex h-4 min-w-4 shrink-0 items-center justify-center rounded-full bg-slate-100 px-1 text-[10px] font-semibold text-slate-500">
+                +{extra}
+              </span>
+            )}
+            {managers.length > 1 && (
+              <div
+                className={`pointer-events-none absolute left-0 ${positionClass} z-40 hidden min-w-[180px] max-w-[260px] flex-col gap-1.5 rounded-xl border border-slate-200 bg-white p-2.5 shadow-xl group-hover/pm:flex`}
+              >
+                <div className="text-xs font-semibold uppercase tracking-wider text-slate-400">
+                  Reporting Managers ({managers.length})
+                </div>
+                <div className="flex flex-wrap gap-1">
+                  {managers.map((name, idx) => (
+                    <span
+                      key={idx}
+                      className="inline-flex items-center rounded-md border border-indigo-200 bg-indigo-50 px-2 py-0.5 text-xs font-medium text-indigo-700"
+                    >
+                      {name}
+                    </span>
+                  ))}
+                </div>
+              </div>
+            )}
+          </div>
+        );
+      },
+    },
+    {
       key: "submitted",
       label: "Submitted",
-      width: "w-[18%]",
+      width: "w-[14%]",
       render: (_, ev) => (
         <span className="whitespace-nowrap text-slate-500 tabular-nums">
           {fmtDate(ev.submitted_at || ev.created_at)}
@@ -493,7 +609,7 @@ const AdminPerformancePage = () => {
     {
       key: "status",
       label: "Status",
-      width: "w-[16%]",
+      width: "w-[14%]",
       render: (_, ev) => (
         <span className="inline-flex items-center gap-1.5">
           <StatusPill status={ev.status} />
@@ -510,7 +626,7 @@ const AdminPerformancePage = () => {
       key: "rating",
       label: "Rating",
       align: "right",
-      width: "w-[14%]",
+      width: "w-[12%]",
       render: (_, ev) => <RatingCell evaluation={ev} />,
     },
   ];
@@ -586,14 +702,45 @@ const AdminPerformancePage = () => {
   ];
 
   return (
-    <div className="space-y-4">
-
+    <div className="space-y-6">
+      {/* NEW TOP-LEVEL NAVIGATION */}
+      <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3 border-b border-slate-200 pb-1.5">
+        <div className="flex items-center gap-0.5 bg-slate-100/70 p-1 rounded-xl w-max">
+          <button
+            onClick={() => { setTopTab("active"); setTab("employees"); }}
+            className={`px-4 py-1.5 rounded-lg text-[13px] font-semibold transition-all ${topTab === "active" ? "bg-white text-indigo-700 shadow-sm ring-1 ring-slate-200" : "text-slate-500 hover:text-slate-700"}`}
+          >
+            Current Cycle
+          </button>
+          <button
+            onClick={() => { setTopTab("history"); setTab("employees"); }}
+            className={`px-4 py-1.5 rounded-lg text-[13px] font-semibold transition-all flex items-center gap-1.5 ${topTab === "history" ? "bg-white text-indigo-700 shadow-sm ring-1 ring-slate-200" : "text-slate-500 hover:text-slate-700"}`}
+          >
+            <HistoryIcon className="w-3.5 h-3.5" />
+            Past Cycles
+          </button>
+        </div>
+        
+        {topTab === "history" && (
+          <div className="shrink-0 mt-2 sm:mt-0">
+            <MonthStepper
+              period={historyMonth}
+              onChange={setHistoryMonth}
+              max={maxHistoryMonth}
+            />
+          </div>
+        )}
+      </div>
 
       {/* KPIs */}
       <div className="grid grid-cols-1 sm:grid-cols-3 gap-3">
         <ReviewsStatCard 
           totalReviews={kpiData.total ?? 0} 
-          totalEmployees={filteredEmployeesCount} 
+          totalEmployees={filteredEmployeesCount}
+          reviewed={kpiData.reviewed ?? 0}
+          pending={kpiData.pending ?? 0}
+          multiCount={kpiData.multiEvalCount ?? 0}
+          multiNames={kpiData.multiEvalNames ?? []}
         />
         <StatCard
           title="Avg Rating"
@@ -608,7 +755,26 @@ const AdminPerformancePage = () => {
           value={kpiData.bonusCount ?? 0}
           icon={Gift}
           tone="violet"
-          hint="flagged by PMs"
+          hint={
+            (kpiData.multiBonusCount ?? 0) > 0 ? (
+              <span className="group/bmulti relative cursor-pointer flex items-center">
+                <span>flagged by PMs</span>
+                <span className="text-[10px] font-semibold text-violet-500 bg-violet-50 px-1.5 py-0.5 rounded-md border border-violet-200/60 ml-1.5">
+                  ({kpiData.multiBonusCount} emp in &gt;1 proj)
+                </span>
+                <div className="absolute left-0 top-full pt-2 z-50 hidden group-hover/bmulti:block">
+                  <div className="min-w-[200px] whitespace-normal rounded-xl border border-slate-200 bg-white p-3 text-xs leading-relaxed text-slate-700 shadow-xl">
+                    <div className="font-semibold text-slate-900 mb-1 border-b border-slate-100 pb-1">Bonus in multiple projects:</div>
+                    <ul className="list-disc pl-4 space-y-1 text-slate-600 max-h-48 overflow-y-auto pr-2 custom-scrollbar">
+                      {(kpiData.multiBonusNames || []).map(name => <li key={name}>{name}</li>)}
+                    </ul>
+                  </div>
+                </div>
+              </span>
+            ) : (
+              "flagged by PMs"
+            )
+          }
         />
       </div>
 
@@ -624,14 +790,6 @@ const AdminPerformancePage = () => {
           </button>
           <button
             type="button"
-            onClick={() => setTab("history")}
-            className={`-mb-px flex items-center gap-1.5 border-b-2 pb-2.5 text-[13px] font-semibold transition-colors ${tab === "history" ? "border-indigo-600 text-slate-900" : "border-transparent text-slate-500 hover:text-slate-800"}`}
-          >
-            <HistoryIcon className="h-3.5 w-3.5" />
-            History
-          </button>
-          <button
-            type="button"
             onClick={() => setTab("pm")}
             className={`-mb-px flex items-center gap-1.5 border-b-2 pb-2.5 text-[13px] font-semibold transition-colors ${tab === "pm" ? "border-indigo-600 text-slate-900" : "border-transparent text-slate-500 hover:text-slate-800"}`}
           >
@@ -642,10 +800,17 @@ const AdminPerformancePage = () => {
               </span>
             )}
           </button>
+          <button
+            type="button"
+            onClick={() => setTab("hr")}
+            className={`-mb-px flex items-center gap-1.5 border-b-2 pb-2.5 text-[13px] font-semibold transition-colors ${tab === "hr" ? "border-indigo-600 text-slate-900" : "border-transparent text-slate-500 hover:text-slate-800"}`}
+          >
+            HR Approvals
+          </button>
         </div>
 
         {((tab === "employees" && !isLoading) || (tab === "history" && !evalLoading)) && (
-          <div className="flex flex-col gap-2 pb-2.5 sm:flex-row sm:items-center">
+          <div className="flex flex-col gap-2 pb-1.5 sm:flex-row sm:items-center">
             <div className="relative w-full sm:w-60">
               <Search className="pointer-events-none absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-slate-400" />
               <input
@@ -686,7 +851,7 @@ const AdminPerformancePage = () => {
         )}
       </div>
 
-      {tab === "pm" ? (
+      {tab === "pm" || tab === "hr" ? (
         isLoading ? (
           <div className="rounded-2xl border border-slate-200 bg-white p-10 text-center text-sm text-slate-400 shadow-sm">
             Loading…
@@ -695,10 +860,10 @@ const AdminPerformancePage = () => {
           <div className="rounded-3xl border border-dashed border-slate-200 bg-white p-12 text-center shadow-sm">
             <UserCog className="mx-auto h-10 w-10 text-slate-300" />
             <h2 className="mt-4 text-lg font-semibold text-slate-800">
-              No PM self-evaluations yet
+              No {tab === "pm" ? "PM" : "HR"} self-evaluations yet
             </h2>
             <p className="mt-2 text-sm text-slate-500">
-              When a PM submits their monthly self-evaluation, it appears here
+              When a {tab === "pm" ? "PM" : "HR"} submits their monthly self-evaluation, it appears here
               for approval.
             </p>
           </div>
@@ -714,74 +879,6 @@ const AdminPerformancePage = () => {
             ))}
           </div>
         )
-      ) : tab === "history" ? (
-        <div className="space-y-3">
-          <MonthStepper
-            period={historyMonth}
-            onChange={setHistoryMonth}
-            max={maxHistoryMonth}
-          />
-          {evalLoading ? (
-            <Table
-              variant="untitled"
-              columns={historyColumns}
-              data={[]}
-              loading
-              skeletonRows={6}
-            />
-          ) : false ? (
-            <div className="rounded-3xl border border-dashed border-red-200 bg-red-50/40 p-12 text-center shadow-sm">
-              <h2 className="text-lg font-semibold text-red-700">
-                Couldn't load reviews for {formatPeriod(historyMonth)}
-              </h2>
-              <p className="mt-2 text-sm text-red-500">
-                Something went wrong fetching this month. Try again or pick a different month.
-              </p>
-            </div>
-          ) : evaluationsTotal === 0 && !search.trim() && roleFilter === "all" ? (
-            <div className="rounded-3xl border border-dashed border-slate-200 bg-white p-12 text-center shadow-sm">
-              <HistoryIcon className="mx-auto h-10 w-10 text-slate-300" />
-              <h2 className="mt-4 text-lg font-semibold text-slate-800">
-                No reviews for {formatPeriod(historyMonth)}
-              </h2>
-              <p className="mt-2 text-sm text-slate-500">
-                Step to a different month, or check back once this cycle closes.
-              </p>
-            </div>
-          ) : filteredHistory.length === 0 ? (
-            <div className="rounded-3xl border border-dashed border-slate-200 bg-white p-12 text-center shadow-sm">
-              <Search className="mx-auto h-10 w-10 text-slate-300" />
-              <h2 className="mt-4 text-lg font-semibold text-slate-800">
-                No results match your filters
-              </h2>
-            </div>
-          ) : (
-            <Table
-              variant="untitled"
-              allowOverflow
-              columns={historyColumns}
-              data={filteredHistory}
-              totalItems={evaluationsTotal}
-              pageSize={PAGE_SIZE}
-              currentPage={perfPage}
-                onPageChange={setPerfPage}
-              onRowClick={(row) =>
-                setExpandedEval((cur) => (cur === row.id ? null : row.id))
-              }
-              expandedRowId={expandedEval}
-              getRowId={(row) => row.id}
-              renderExpandedRow={(row) => (
-                <div className="border-t border-slate-100 bg-slate-50/40 p-4">
-                  <EvaluationDetail evaluation={row} />
-                </div>
-              )}
-              emptyState={{
-                title: "No reviews",
-                description: "Nothing to show here.",
-              }}
-            />
-          )}
-        </div>
       ) : (
         <>
           {/* Suggested for Bonus — collapsible; click header to reveal the table */}
@@ -861,7 +958,15 @@ const AdminPerformancePage = () => {
               getRowId={(row) => row.id}
               renderExpandedRow={(row) => (
                 <div className="border-t border-slate-100 bg-slate-50/40 p-4">
-                  <EvaluationDetail evaluation={row} />
+                  {row.status === "submitted" ? (
+                    <EvalReviewCard
+                      evaluation={row}
+                      personName={empById.get(row.employee_id)?.name || `Employee #${row.employee_id}`}
+                      reviewerId={user.id}
+                    />
+                  ) : (
+                    <EvaluationDetail evaluation={row} />
+                  )}
                 </div>
               )}
               emptyState={{

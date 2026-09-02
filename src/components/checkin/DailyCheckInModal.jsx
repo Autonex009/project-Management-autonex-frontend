@@ -84,13 +84,18 @@ export default function DailyCheckInModal() {
   const { data: allProjects } = useQuery({
     queryKey: ["all-sub-projects"],
     queryFn: () => subProjectApi.getAll(),
-    enabled: isOpen && projectOptions.length === 0,
+    enabled: isOpen,
     staleTime: 60000,
   });
 
   const fallbackOptions = useMemo(() => {
-    return (allProjects || []).map((p) => ({ label: p.name, value: p.id }));
-  }, [allProjects]);
+    const assignedIds = new Set(projectOptions.map(p => p.project_id));
+    const opts = (allProjects || [])
+      .filter(p => !assignedIds.has(p.id))
+      .map((p) => ({ label: p.name, value: p.id }));
+    opts.push({ label: "Other", value: "other" });
+    return opts;
+  }, [allProjects, projectOptions]);
 
   const canSubmit = selectedProjects.length > 0 && !isPending;
 
@@ -139,36 +144,42 @@ export default function DailyCheckInModal() {
           <h3 className="mb-2 text-xs font-semibold uppercase tracking-wider text-slate-500">
             Which project(s) are you on today?
           </h3>
-          {projectOptions.length === 0 ? (
-            <div className="space-y-2">
-              <p className="rounded-xl bg-slate-50 p-3 text-sm text-slate-500 mb-2">
+          <div className="space-y-3">
+            {projectOptions.length === 0 && (
+              <p className="rounded-xl bg-slate-50 p-3 text-sm text-slate-500">
                 No active project allocations found. Select a project from the list below:
               </p>
-              <MultiSelect
-                options={fallbackOptions}
-                value={selectedProjects}
-                onChange={setSelectedProjects}
-                placeholder="Search projects..."
-              />
-            </div>
-          ) : (
-            <div className="space-y-2">
-              {projectOptions.map((p) => (
-                <label
-                  key={p.project_id}
-                  className={`flex cursor-pointer items-center gap-3 rounded-xl border p-3 text-sm transition-colors ${selectedProjects.includes(p.project_id) ? "border-indigo-400 bg-indigo-50/60" : "border-slate-200 hover:border-slate-300"}`}
-                >
-                  <input
-                    type="checkbox"
-                    checked={selectedProjects.includes(p.project_id)}
-                    onChange={() => toggleProject(p.project_id)}
-                    className="h-4 w-4 rounded border-slate-300 text-indigo-600 focus:ring-indigo-500"
-                  />
-                  <span className="font-medium text-slate-800">{p.project_name}</span>
-                </label>
-              ))}
-            </div>
-          )}
+            )}
+            
+            {projectOptions.length > 0 && (
+              <div className="space-y-2">
+                {projectOptions.map((p) => (
+                  <label
+                    key={p.project_id}
+                    className={`flex cursor-pointer items-center gap-3 rounded-xl border p-3 text-sm transition-colors ${selectedProjects.includes(p.project_id) ? "border-indigo-400 bg-indigo-50/60" : "border-slate-200 hover:border-slate-300"}`}
+                  >
+                    <input
+                      type="checkbox"
+                      checked={selectedProjects.includes(p.project_id)}
+                      onChange={() => toggleProject(p.project_id)}
+                      className="h-4 w-4 rounded border-slate-300 text-indigo-600 focus:ring-indigo-500"
+                    />
+                    <span className="font-medium text-slate-800">{p.project_name}</span>
+                  </label>
+                ))}
+              </div>
+            )}
+            
+            <MultiSelect
+              options={fallbackOptions}
+              value={selectedProjects.filter(id => !projectOptions.some(p => p.project_id === id))}
+              onChange={(newDropdownValues) => {
+                const assignedValues = selectedProjects.filter(id => projectOptions.some(p => p.project_id === id));
+                setSelectedProjects([...assignedValues, ...newDropdownValues]);
+              }}
+              placeholder={projectOptions.length > 0 ? "Search other projects..." : "Search projects..."}
+            />
+          </div>
         </section>
 
         <section>

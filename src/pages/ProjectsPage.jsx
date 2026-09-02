@@ -232,6 +232,23 @@ const ProjectsPage = () => {
     development: 0,
   };
 
+  const [hasAutoSwitched, setHasAutoSwitched] = useState(false);
+
+  useEffect(() => {
+    if (projectKpis?.tab_counts && !hasAutoSwitched) {
+      setHasAutoSwitched(true);
+      const counts = projectKpis.tab_counts;
+      if (counts[projectView] === 0) {
+        const bestTab = Object.keys(counts).reduce((a, b) =>
+          counts[a] > counts[b] ? a : b
+        );
+        if (counts[bestTab] > 0 && bestTab !== projectView) {
+          setProjectView(bestTab);
+        }
+      }
+    }
+  }, [projectKpis, hasAutoSwitched, projectView, setProjectView]);
+
   const { data: parentProjects = [] } = useQuery({
     queryKey: ["parent-projects"],
     queryFn: () => parentProjectApi.getAll(),
@@ -1161,9 +1178,8 @@ const ProjectsPage = () => {
     <div className="space-y-4">
 
 
-      {/* Active / Archived / Development tabs — admin only. Archived = Completed /
+      {/* Active / Archived / Development tabs. Archived = Completed /
  On Hold / Cancelled; Development = projects with the Developer type. */}
-      {isAdmin && (
         <div className="flex items-center justify-between border-b border-slate-200 pb-2">
           <div className="flex items-center">
             {[
@@ -1209,7 +1225,6 @@ const ProjectsPage = () => {
             })}
           </div>
         </div>
-      )}
 
       <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-3">
         <StatCard

@@ -203,7 +203,7 @@ const StatCard = ({
       role={interactive ? "button" : undefined}
       tabIndex={interactive ? 0 : undefined}
       aria-expanded={hasBreakdown ? open : undefined}
-      className={`group relative rounded-xl border bg-white ${inline ? "px-3.5 py-3" : compact ? "px-3 py-2.5" : "p-3"} shadow-[0_1px_2px_rgba(0,0,0,0.03)] transition-colors focus:outline-none focus-visible:ring-2 focus-visible:ring-indigo-500/40 ${pinned ? "border-slate-300" : "border-slate-200 hover:border-slate-300"
+      className={`group relative rounded-xl border bg-white flex flex-col h-full ${inline ? "px-3.5 py-3" : compact ? "px-3 py-2.5" : "p-3"} shadow-[0_1px_2px_rgba(0,0,0,0.03)] transition-colors focus:outline-none focus-visible:ring-2 focus-visible:ring-indigo-500/40 ${pinned ? "border-slate-300" : "border-slate-200 hover:border-slate-300"
         } ${interactive ? "cursor-pointer" : ""}`}
     >
       {inline ? (
@@ -251,7 +251,7 @@ const StatCard = ({
 
       {(delta || hint) && (
         <div
-          className={`flex items-center gap-1.5 text-xs ${compact ? "mt-1.5" : "mt-2"}`}
+          className={`flex items-center gap-1.5 text-xs ${compact ? "mt-1.5" : "mt-2"} mt-auto pt-2 border-t border-slate-100`}
         >
           {delta && (
             <span
