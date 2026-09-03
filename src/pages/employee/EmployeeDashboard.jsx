@@ -198,6 +198,80 @@ const DISPLAY_SLOTS = [
   "yearly_milestone",
 ];
 
+/* ── Previous period helpers (mirror backend) ── */
+function getPreviousWeekRange(ref = new Date()) {
+  const d = new Date(ref);
+  const day = d.getDay(); // 0 = Sun … 6 = Sat
+  const diffToMonday = day === 0 ? -6 : 1 - day;
+  const thisMonday = new Date(d);
+  thisMonday.setDate(d.getDate() + diffToMonday);
+  thisMonday.setHours(0, 0, 0, 0);
+
+  const prevMonday = new Date(thisMonday);
+  prevMonday.setDate(thisMonday.getDate() - 7);
+
+  const prevSunday = new Date(prevMonday);
+  prevSunday.setDate(prevMonday.getDate() + 6);
+
+  return { start: prevMonday, end: prevSunday };
+}
+
+function getPreviousMonthRange(ref = new Date()) {
+  const d = new Date(ref);
+  const firstOfThisMonth = new Date(d.getFullYear(), d.getMonth(), 1);
+  const lastOfPrevMonth = new Date(firstOfThisMonth);
+  lastOfPrevMonth.setDate(0); // last day of previous month
+  const firstOfPrevMonth = new Date(
+    lastOfPrevMonth.getFullYear(),
+    lastOfPrevMonth.getMonth(),
+    1
+  );
+  return { start: firstOfPrevMonth, end: lastOfPrevMonth };
+}
+
+/** Returns true only for badges that should appear as “active / earned”. */
+function isCurrentPeriodBadge(badge) {
+  const code = badge.badge_code || "";
+  const pStart = badge.period_start
+    ? new Date(badge.period_start + "T00:00:00")
+    : null;
+  const pEnd = badge.period_end
+    ? new Date(badge.period_end + "T00:00:00")
+    : null;
+
+  // Tenure & yearly never expire → always show as earned
+  if (
+    code === "tenure_3_months" ||
+    code === "tenure_6_months" ||
+    code === "yearly_milestone"
+  ) {
+    return true;
+  }
+
+  // Weekly badges → only previous week
+  if (code === "hrs_50_week" || code.startsWith("weekly_top_")) {
+    if (!pStart || !pEnd) return false;
+    const { start, end } = getPreviousWeekRange();
+    return (
+      pStart.getTime() === start.getTime() &&
+      pEnd.getTime() === end.getTime()
+    );
+  }
+
+  // Monthly badges → only previous month
+  if (code === "hrs_200_month" || code.startsWith("monthly_top_")) {
+    if (!pStart || !pEnd) return false;
+    const { start, end } = getPreviousMonthRange();
+    return (
+      pStart.getTime() === start.getTime() &&
+      pEnd.getTime() === end.getTime()
+    );
+  }
+
+  // Unknown codes stay locked
+  return false;
+}
+
 /* ── Skills Multi-Select ─────────────────────────────── */
 const SkillsMultiSelect = ({ selected, onChange, options, isLoading }) => {
   const [open, setOpen] = useState(false);
@@ -267,14 +341,14 @@ const SkillsMultiSelect = ({ selected, onChange, options, isLoading }) => {
                   type="button"
                   onClick={() => toggle(skill.name)}
                   className={`flex w-full items-center gap-2 px-3 py-1.5 text-left text-xs transition-colors ${isSelected
-                      ? "bg-indigo-50 font-semibold text-teal-800"
-                      : "hover:bg-stone-50 text-stone-700"
+                    ? "bg-indigo-50 font-semibold text-teal-800"
+                    : "hover:bg-stone-50 text-stone-700"
                     }`}
                 >
                   <div
                     className={`flex h-3.5 w-3.5 items-center justify-center rounded border ${isSelected
-                        ? "border-teal-600 bg-teal-600 text-white"
-                        : "border-stone-300"
+                      ? "border-teal-600 bg-teal-600 text-white"
+                      : "border-stone-300"
                       }`}
                   >
                     {isSelected && <Check className="h-2.5 w-2.5" />}
@@ -675,21 +749,21 @@ const EmployeeDashboard = () => {
   const handleSave = async () => {
     setSaveError("");
     setEmailError("");
-    
+
     const trimmedEmail = editEmail.trim().toLowerCase();
     const originalEmail = (profile.email || "").trim().toLowerCase();
     const emailChanged = !!trimmedEmail && trimmedEmail !== originalEmail;
-    
+
     if (emailChanged) {
       if (!trimmedEmail.endsWith(`@${COMPANY_DOMAIN}`) || trimmedEmail.split("@")[0].length === 0) {
         setEmailError(`Email must be a valid @${COMPANY_DOMAIN} address.`);
-        return; 
+        return;
       }
     }
-      
+
     try {
       const promises = [];
-      
+
       promises.push(
         saveMutation.mutateAsync({
           phone: editPhone || null,
@@ -1002,7 +1076,163 @@ const EmployeeDashboard = () => {
     };
   }, [allLeaves, myWfh, internOrContractor, currentYear, currentMonth, todayStr]);
 
+  // const achievementBadges = useMemo(() => {
+  //   const list = Array.isArray(employeeBadges)
+  //     ? employeeBadges
+  //     : Array.isArray(employeeBadges?.data)
+  //       ? employeeBadges.data
+  //       : Array.isArray(employeeBadges?.items)
+  //         ? employeeBadges.items
+  //         : [];
+
+  //   const getBadgeInfo = (codes) => {
+  //     const codeArr = Array.isArray(codes) ? codes : [codes];
+  //     const foundIdx = list.findIndex((b) => codeArr.includes(b.badge_code));
+  //     if (foundIdx === -1) return { earned: false, awardedAt: null, listIndex: 999 };
+  //     const item = list[foundIdx];
+  //     return {
+  //       earned: true,
+  //       awardedAt: item.awarded_at || item.created_at || item.issued_at || null,
+  //       listIndex: foundIdx,
+  //     };
+  //   };
+
+  //   const has = (code) => list.some((b) => b.badge_code === code);
+
+  //   // Best weekly rank
+  //   let weeklyRank = null;
+  //   if (has("weekly_top_1")) weeklyRank = 1;
+  //   else if (has("weekly_top_2")) weeklyRank = 2;
+  //   else if (has("weekly_top_3")) weeklyRank = 3;
+
+  //   // Best monthly rank
+  //   let monthlyRankBadge = null;
+  //   if (has("monthly_top_1")) monthlyRankBadge = 1;
+  //   else if (has("monthly_top_2")) monthlyRankBadge = 2;
+  //   else if (has("monthly_top_3")) monthlyRankBadge = 3;
+
+  //   // Tenure: prefer 6 months
+  //   const has6 = has("tenure_6_months");
+  //   const has3 = has("tenure_3_months");
+  //   const tenureEarned = has6 || has3;
+  //   const tenureLabel = has6 ? "6 Months" : has3 ? "3 Months" : "Tenure";
+  //   const tenureImage = has6 ? sixMonthsBadge : threeMonthsBadge;
+
+  //   // Yearly: one badge + count
+  //   const yearlyCount = list.filter((b) => b.badge_code === "yearly_milestone").length;
+
+  //   const rawBadges = DISPLAY_SLOTS.map((slot) => {
+  //     const base = BADGE_CONFIG[slot];
+
+  //     if (slot === "hrs_50_week") {
+  //       const info = getBadgeInfo("hrs_50_week");
+  //       return {
+  //         id: slot,
+  //         label: base.label,
+  //         meta: base.meta,
+  //         image: base.image,
+  //         earned: info.earned,
+  //         awardedAt: info.awardedAt,
+  //         listIndex: info.listIndex,
+  //         badgeText: null,
+  //       };
+  //     }
+
+  //     if (slot === "hrs_200_month") {
+  //       const info = getBadgeInfo("hrs_200_month");
+  //       return {
+  //         id: slot,
+  //         label: base.label,
+  //         meta: base.meta,
+  //         image: base.image,
+  //         earned: info.earned,
+  //         awardedAt: info.awardedAt,
+  //         listIndex: info.listIndex,
+  //         badgeText: null,
+  //       };
+  //     }
+
+  //     if (slot === "weekly_top") {
+  //       const info = getBadgeInfo(["weekly_top_1", "weekly_top_2", "weekly_top_3"]);
+  //       const dynamicImage = weeklyRank ? BADGE_CONFIG[`weekly_top_${weeklyRank}`]?.image : base.image;
+  //       return {
+  //         id: slot,
+  //         label: base.label,
+  //         meta: weeklyRank ? `#${weeklyRank}` : base.meta,
+  //         image: dynamicImage,
+  //         earned: weeklyRank != null,
+  //         awardedAt: info.awardedAt,
+  //         listIndex: info.listIndex,
+  //         badgeText: weeklyRank ? `#${weeklyRank}` : null,
+  //       };
+  //     }
+
+  //     if (slot === "monthly_top") {
+  //       const info = getBadgeInfo(["monthly_top_1", "monthly_top_2", "monthly_top_3"]);
+  //       const dynamicImage = monthlyRankBadge ? BADGE_CONFIG[`monthly_top_${monthlyRankBadge}`]?.image : base.image;
+  //       return {
+  //         id: slot,
+  //         label: base.label,
+  //         meta: monthlyRankBadge ? `#${monthlyRankBadge}` : base.meta,
+  //         image: dynamicImage,
+  //         earned: monthlyRankBadge != null,
+  //         awardedAt: info.awardedAt,
+  //         listIndex: info.listIndex,
+  //         badgeText: monthlyRankBadge ? `#${monthlyRankBadge}` : null,
+  //       };
+  //     }
+
+  //     if (slot === "tenure") {
+  //       const info = getBadgeInfo(["tenure_6_months", "tenure_3_months"]);
+  //       return {
+  //         id: slot,
+  //         label: tenureLabel,
+  //         meta: tenureEarned ? "Completed" : base.meta,
+  //         image: tenureImage,
+  //         earned: tenureEarned,
+  //         awardedAt: info.awardedAt,
+  //         listIndex: info.listIndex,
+  //         badgeText: null,
+  //       };
+  //     }
+
+  //     if (slot === "yearly_milestone") {
+  //       const info = getBadgeInfo("yearly_milestone");
+  //       return {
+  //         id: slot,
+  //         label: base.label,
+  //         meta: yearlyCount > 0 ? `${yearlyCount} yr${yearlyCount > 1 ? "s" : ""}` : base.meta,
+  //         image: base.image,
+  //         earned: yearlyCount > 0,
+  //         awardedAt: info.awardedAt,
+  //         listIndex: info.listIndex,
+  //         badgeText: yearlyCount > 1 ? `×${yearlyCount}` : yearlyCount === 1 ? "1" : null,
+  //       };
+  //     }
+
+  //     return null;
+  //   }).filter(Boolean);
+
+  //   // Sort: active/earned badges move to the front of the line (leftmost)
+  //   // Within active badges, order by newest awarded timestamp / list index first
+  //   return rawBadges.sort((a, b) => {
+  //     if (a.earned !== b.earned) {
+  //       return a.earned ? -1 : 1;
+  //     }
+  //     if (a.earned && b.earned) {
+  //       if (a.awardedAt && b.awardedAt) {
+  //         const tA = new Date(a.awardedAt).getTime();
+  //         const tB = new Date(b.awardedAt).getTime();
+  //         if (tA !== tB) return tB - tA;
+  //       }
+  //       return a.listIndex - b.listIndex;
+  //     }
+  //     return 0;
+  //   });
+  // }, [employeeBadges]);
+
   const achievementBadges = useMemo(() => {
+    // 1. Normalise the list coming from the API
     const list = Array.isArray(employeeBadges)
       ? employeeBadges
       : Array.isArray(employeeBadges?.data)
@@ -1011,41 +1241,52 @@ const EmployeeDashboard = () => {
           ? employeeBadges.items
           : [];
 
+    // 2. Keep ONLY badges that belong to the previous week / previous month
+    //    (plus tenure & yearly which never expire)
+    const currentPeriodList = list.filter(isCurrentPeriodBadge);
+
     const getBadgeInfo = (codes) => {
       const codeArr = Array.isArray(codes) ? codes : [codes];
-      const foundIdx = list.findIndex((b) => codeArr.includes(b.badge_code));
-      if (foundIdx === -1) return { earned: false, awardedAt: null, listIndex: 999 };
-      const item = list[foundIdx];
+      const foundIdx = currentPeriodList.findIndex((b) =>
+        codeArr.includes(b.badge_code)
+      );
+      if (foundIdx === -1)
+        return { earned: false, awardedAt: null, listIndex: 999 };
+      const item = currentPeriodList[foundIdx];
       return {
         earned: true,
-        awardedAt: item.awarded_at || item.created_at || item.issued_at || null,
+        awardedAt:
+          item.awarded_at || item.created_at || item.issued_at || null,
         listIndex: foundIdx,
       };
     };
 
-    const has = (code) => list.some((b) => b.badge_code === code);
+    const has = (code) =>
+      currentPeriodList.some((b) => b.badge_code === code);
 
-    // Best weekly rank
+    // Best weekly rank among the *current* period only
     let weeklyRank = null;
     if (has("weekly_top_1")) weeklyRank = 1;
     else if (has("weekly_top_2")) weeklyRank = 2;
     else if (has("weekly_top_3")) weeklyRank = 3;
 
-    // Best monthly rank
+    // Best monthly rank among the *current* period only
     let monthlyRankBadge = null;
     if (has("monthly_top_1")) monthlyRankBadge = 1;
     else if (has("monthly_top_2")) monthlyRankBadge = 2;
     else if (has("monthly_top_3")) monthlyRankBadge = 3;
 
-    // Tenure: prefer 6 months
+    // Tenure: prefer 6 months over 3 months
     const has6 = has("tenure_6_months");
     const has3 = has("tenure_3_months");
     const tenureEarned = has6 || has3;
     const tenureLabel = has6 ? "6 Months" : has3 ? "3 Months" : "Tenure";
     const tenureImage = has6 ? sixMonthsBadge : threeMonthsBadge;
 
-    // Yearly: one badge + count
-    const yearlyCount = list.filter((b) => b.badge_code === "yearly_milestone").length;
+    // Yearly: count how many yearly_milestone badges exist
+    const yearlyCount = currentPeriodList.filter(
+      (b) => b.badge_code === "yearly_milestone"
+    ).length;
 
     const rawBadges = DISPLAY_SLOTS.map((slot) => {
       const base = BADGE_CONFIG[slot];
@@ -1079,8 +1320,14 @@ const EmployeeDashboard = () => {
       }
 
       if (slot === "weekly_top") {
-        const info = getBadgeInfo(["weekly_top_1", "weekly_top_2", "weekly_top_3"]);
-        const dynamicImage = weeklyRank ? BADGE_CONFIG[`weekly_top_${weeklyRank}`]?.image : base.image;
+        const info = getBadgeInfo([
+          "weekly_top_1",
+          "weekly_top_2",
+          "weekly_top_3",
+        ]);
+        const dynamicImage = weeklyRank
+          ? BADGE_CONFIG[`weekly_top_${weeklyRank}`]?.image
+          : base.image;
         return {
           id: slot,
           label: base.label,
@@ -1094,8 +1341,14 @@ const EmployeeDashboard = () => {
       }
 
       if (slot === "monthly_top") {
-        const info = getBadgeInfo(["monthly_top_1", "monthly_top_2", "monthly_top_3"]);
-        const dynamicImage = monthlyRankBadge ? BADGE_CONFIG[`monthly_top_${monthlyRankBadge}`]?.image : base.image;
+        const info = getBadgeInfo([
+          "monthly_top_1",
+          "monthly_top_2",
+          "monthly_top_3",
+        ]);
+        const dynamicImage = monthlyRankBadge
+          ? BADGE_CONFIG[`monthly_top_${monthlyRankBadge}`]?.image
+          : base.image;
         return {
           id: slot,
           label: base.label,
@@ -1127,24 +1380,29 @@ const EmployeeDashboard = () => {
         return {
           id: slot,
           label: base.label,
-          meta: yearlyCount > 0 ? `${yearlyCount} yr${yearlyCount > 1 ? "s" : ""}` : base.meta,
+          meta:
+            yearlyCount > 0
+              ? `${yearlyCount} yr${yearlyCount > 1 ? "s" : ""}`
+              : base.meta,
           image: base.image,
           earned: yearlyCount > 0,
           awardedAt: info.awardedAt,
           listIndex: info.listIndex,
-          badgeText: yearlyCount > 1 ? `×${yearlyCount}` : yearlyCount === 1 ? "1" : null,
+          badgeText:
+            yearlyCount > 1
+              ? `×${yearlyCount}`
+              : yearlyCount === 1
+                ? "1"
+                : null,
         };
       }
 
       return null;
     }).filter(Boolean);
 
-    // Sort: active/earned badges move to the front of the line (leftmost)
-    // Within active badges, order by newest awarded timestamp / list index first
+    // Sort: earned badges first, then by newest award date
     return rawBadges.sort((a, b) => {
-      if (a.earned !== b.earned) {
-        return a.earned ? -1 : 1;
-      }
+      if (a.earned !== b.earned) return a.earned ? -1 : 1;
       if (a.earned && b.earned) {
         if (a.awardedAt && b.awardedAt) {
           const tA = new Date(a.awardedAt).getTime();
@@ -1201,18 +1459,6 @@ const EmployeeDashboard = () => {
       className="w-full h-full text-stone-800 font-sans flex flex-col gap-2 sm:gap-3"
       style={{ fontFamily: "'Inter', system-ui, sans-serif" }}
     >
-      <style>{`
-        @import url('https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800&family=JetBrains+Mono:wght@500;600;700&display=swap');
-        .font-display { font-family: 'Inter', sans-serif; letter-spacing: -0.01em; }
-        .font-data { font-family: 'JetBrains Mono', monospace; font-variant-numeric: tabular-nums; }
-        .log-scroll::-webkit-scrollbar { width: 4px; }
-        .log-scroll::-webkit-scrollbar-thumb { background: #D6D3D1; border-radius: 999px; }
-        .badge-glow {
-          filter: drop-shadow(0 0 4px rgba(13, 148, 136, 0.35))
-                  drop-shadow(0 0 1.5px rgba(13, 148, 136, 0.25));
-        }
-      `}</style>
-
       {/* ════════════════ TOP SECTION ════════════════ */}
       <div className="grid grid-cols-1 lg:grid-cols-12 gap-2 sm:gap-3 items-stretch">
         {/* ──────────── PROFILE CARD ──────────── */}
@@ -1567,8 +1813,8 @@ const EmployeeDashboard = () => {
                       <Star
                         key={s}
                         className={`w-2.5 h-2.5 ${latestRating && s <= Math.floor(latestRating)
-                            ? "fill-amber-400 text-amber-400"
-                            : "fill-stone-200 text-stone-200"
+                          ? "fill-amber-400 text-amber-400"
+                          : "fill-stone-200 text-stone-200"
                           }`}
                       />
                     ))}
@@ -1859,8 +2105,8 @@ const EmployeeDashboard = () => {
                   type="button"
                   onClick={() => setBottomTab("notes")}
                   className={`flex items-center gap-1.5 pb-2 -mb-[3px] border-b-[2px] font-semibold text-[13px] transition-colors ${bottomTab === "notes"
-                      ? "border-indigo-500 text-indigo-600"
-                      : "border-transparent text-stone-400 hover:text-stone-600"
+                    ? "border-indigo-500 text-indigo-600"
+                    : "border-transparent text-stone-400 hover:text-stone-600"
                     }`}
                 >
                   <FileText className="w-4 h-4" /> Notes
@@ -1870,8 +2116,8 @@ const EmployeeDashboard = () => {
                 type="button"
                 onClick={() => setBottomTab("performance")}
                 className={`flex items-center gap-1.5 pb-2 -mb-[3px] border-b-[2px] font-semibold text-[13px] transition-colors ${bottomTab === "performance" || !canViewNotes
-                    ? "border-indigo-500 text-indigo-600"
-                    : "border-transparent text-stone-400 hover:text-stone-600"
+                  ? "border-indigo-500 text-indigo-600"
+                  : "border-transparent text-stone-400 hover:text-stone-600"
                   }`}
               >
                 <TrendingUp className="w-4 h-4" /> Performance History
@@ -2286,8 +2532,8 @@ const EmployeeDashboard = () => {
               <div
                 key={title}
                 className={`flex items-center gap-3 p-2.5 rounded-xl border transition-colors ${earned
-                    ? "bg-stone-50 border-stone-200 hover:bg-stone-100/60"
-                    : "bg-stone-50/40 border-stone-200/50 opacity-50"
+                  ? "bg-stone-50 border-stone-200 hover:bg-stone-100/60"
+                  : "bg-stone-50/40 border-stone-200/50 opacity-50"
                   }`}
               >
                 <span
@@ -2327,10 +2573,10 @@ const EmployeeDashboard = () => {
               <div className="flex items-center gap-2.5">
                 <div
                   className={`w-8 h-8 rounded-xl flex items-center justify-center ${addNoteModal.type === "complaint"
-                      ? "bg-rose-50 text-rose-600"
-                      : addNoteModal.type === "warning"
-                        ? "bg-amber-50 text-amber-600"
-                        : "bg-indigo-50 text-indigo-600"
+                    ? "bg-rose-50 text-rose-600"
+                    : addNoteModal.type === "warning"
+                      ? "bg-amber-50 text-amber-600"
+                      : "bg-indigo-50 text-indigo-600"
                     }`}
                 >
                   {addNoteModal.type === "complaint" ? (
@@ -2409,12 +2655,12 @@ const EmployeeDashboard = () => {
                             setNoteForm((f) => ({ ...f, severity: s }))
                           }
                           className={`flex-1 py-1.5 rounded-lg text-[11px] font-semibold border transition-colors ${noteForm.severity === s
-                              ? s === "high"
-                                ? "bg-rose-50 border-rose-300 text-rose-700"
-                                : s === "medium"
-                                  ? "bg-amber-50 border-amber-300 text-amber-700"
-                                  : "bg-indigo-50 border-emerald-300 text-emerald-700"
-                              : "bg-white border-stone-200 text-stone-500 hover:bg-stone-50"
+                            ? s === "high"
+                              ? "bg-rose-50 border-rose-300 text-rose-700"
+                              : s === "medium"
+                                ? "bg-amber-50 border-amber-300 text-amber-700"
+                                : "bg-indigo-50 border-emerald-300 text-emerald-700"
+                            : "bg-white border-stone-200 text-stone-500 hover:bg-stone-50"
                             }`}
                         >
                           {s.charAt(0).toUpperCase() + s.slice(1)}
@@ -2484,10 +2730,10 @@ const EmployeeDashboard = () => {
               <div className="flex items-center gap-2.5">
                 <div
                   className={`w-8 h-8 rounded-xl flex items-center justify-center ${notesModal.type === "complaints"
-                      ? "bg-rose-50 text-rose-600"
-                      : notesModal.type === "warnings"
-                        ? "bg-amber-50 text-amber-600"
-                        : "bg-indigo-50 text-indigo-600"
+                    ? "bg-rose-50 text-rose-600"
+                    : notesModal.type === "warnings"
+                      ? "bg-amber-50 text-amber-600"
+                      : "bg-indigo-50 text-indigo-600"
                     }`}
                 >
                   {notesModal.type === "complaints" ? (
@@ -2525,10 +2771,10 @@ const EmployeeDashboard = () => {
                   <div
                     key={item.id ?? idx}
                     className={`p-3 rounded-xl border ${notesModal.type === "complaints"
-                        ? "bg-rose-50/30 border-rose-100"
-                        : notesModal.type === "warnings"
-                          ? "bg-amber-50/30 border-amber-100"
-                          : "bg-indigo-50/30 border-indigo-100"
+                      ? "bg-rose-50/30 border-rose-100"
+                      : notesModal.type === "warnings"
+                        ? "bg-amber-50/30 border-amber-100"
+                        : "bg-indigo-50/30 border-indigo-100"
                       }`}
                   >
                     <div className="flex items-start justify-between gap-2 mb-1">
@@ -2626,16 +2872,16 @@ const EmployeeDashboard = () => {
                     <div
                       key={item.id}
                       className={`p-3 rounded-xl border ${isActive
-                          ? "bg-indigo-50/40 border-indigo-100"
-                          : "bg-stone-50 border-stone-100"
+                        ? "bg-indigo-50/40 border-indigo-100"
+                        : "bg-stone-50 border-stone-100"
                         }`}
                     >
                       <div className="flex items-center justify-between gap-2 mb-1">
                         <div className="flex items-center gap-2 min-w-0">
                           <span
                             className={`px-2 py-0.5 text-[8.5px] font-bold uppercase rounded-md shrink-0 ${isActive
-                                ? "bg-indigo-600 text-white"
-                                : "bg-stone-200 text-stone-600"
+                              ? "bg-indigo-600 text-white"
+                              : "bg-stone-200 text-stone-600"
                               }`}
                           >
                             {isActive ? "Active" : "Completed"}
@@ -2866,16 +3112,16 @@ const EmployeeDashboard = () => {
                   key={tab.key}
                   onClick={() => setAttendanceModalTab(tab.key)}
                   className={`flex items-center gap-2 px-3 py-2 text-xs font-semibold rounded-t-xl border-b-2 transition-all cursor-pointer ${attendanceModalTab === tab.key
-                      ? "border-indigo-600 text-indigo-700 bg-white shadow-xs"
-                      : "border-transparent text-stone-500 hover:text-stone-700 hover:bg-stone-100/50"
+                    ? "border-indigo-600 text-indigo-700 bg-white shadow-xs"
+                    : "border-transparent text-stone-500 hover:text-stone-700 hover:bg-stone-100/50"
                     }`}
                 >
                   {tab.icon}
                   {tab.label}
                   <span
                     className={`px-1.5 py-0.5 text-[10px] font-bold rounded-full ${attendanceModalTab === tab.key
-                        ? "bg-indigo-100 text-indigo-700"
-                        : "bg-stone-100 text-stone-600"
+                      ? "bg-indigo-100 text-indigo-700"
+                      : "bg-stone-100 text-stone-600"
                       }`}
                   >
                     {tab.count}
@@ -2912,12 +3158,12 @@ const EmployeeDashboard = () => {
                               </span>
                               <span
                                 className={`text-[10px] font-bold uppercase px-2 py-0.5 rounded-full ${(wfh.status || "pending").toLowerCase() ===
-                                    "approved"
-                                    ? "bg-indigo-100 text-indigo-700"
-                                    : (wfh.status || "pending").toLowerCase() ===
-                                      "rejected"
-                                      ? "bg-rose-100 text-rose-700"
-                                      : "bg-amber-100 text-amber-700"
+                                  "approved"
+                                  ? "bg-indigo-100 text-indigo-700"
+                                  : (wfh.status || "pending").toLowerCase() ===
+                                    "rejected"
+                                    ? "bg-rose-100 text-rose-700"
+                                    : "bg-amber-100 text-amber-700"
                                   }`}
                               >
                                 {wfh.status || "Pending"}
@@ -2976,12 +3222,12 @@ const EmployeeDashboard = () => {
                                   )}
                                   <span
                                     className={`text-[10px] font-bold uppercase px-2 py-0.5 rounded-full ${(leave.status || "pending").toLowerCase() ===
-                                        "approved"
-                                        ? "bg-indigo-100 text-indigo-700"
-                                        : (leave.status || "pending").toLowerCase() ===
-                                          "rejected"
-                                          ? "bg-rose-100 text-rose-700"
-                                          : "bg-amber-100 text-amber-700"
+                                      "approved"
+                                      ? "bg-indigo-100 text-indigo-700"
+                                      : (leave.status || "pending").toLowerCase() ===
+                                        "rejected"
+                                        ? "bg-rose-100 text-rose-700"
+                                        : "bg-amber-100 text-amber-700"
                                       }`}
                                   >
                                     {leave.status || "Pending"}

@@ -69,10 +69,10 @@ async function main() {
         );
         templateHtml = await vite.transformIndexHtml(url, templateHtml);
         const mod = await vite.ssrLoadModule('/src/entry-server.jsx');
-        const { html: appHtml } = mod.render(url, req.headers.cookie || '');
+        const { html: appHtml } = await mod.render(url, req.headers.cookie || '');
         html = templateHtml.replace('<!--ssr-outlet-->', appHtml);
       } else {
-        const { html: appHtml } = render(url, req.headers.cookie || '');
+        const { html: appHtml } = await render(url, req.headers.cookie || '');
         html = template.replace('<!--ssr-outlet-->', appHtml);
       }
       res.status(200).set({ 'Content-Type': 'text/html' }).end(html);
