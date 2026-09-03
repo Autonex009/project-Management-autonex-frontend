@@ -34,9 +34,13 @@ const getISTDateTime = () => {
  * First half must be applied at least a day ahead; second half must be in
  * before 2:00 PM IST on the day itself.
  */
-export const checkHalfDayTiming = (startDateStr, slot) => {
+export function checkHalfDayTiming(startDate, leaveType, { skip = false } = {}) {
+  if (skip) return null;
+
   const ist = getISTDateTime();
   const todayStr = ist.dateStr;
+  const startDateStr = String(startDate).slice(0, 10); // ensure "YYYY-MM-DD"
+  const slot = leaveType; // "first_half" | "second_half"
 
   if (slot === "first_half") {
     if (todayStr >= startDateStr) {
@@ -51,4 +55,4 @@ export const checkHalfDayTiming = (startDateStr, slot) => {
     }
   }
   return null;
-};
+}
