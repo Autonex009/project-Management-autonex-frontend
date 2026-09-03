@@ -248,6 +248,13 @@ const LeavesPage = () => {
   const [wfhDeleteConfirm, setWfhDeleteConfirm] = useState(null);
   const [formEmployeeId, setFormEmployeeId] = useState("");
   const user = JSON.parse(localStorage.getItem("user") || "{}");
+  const role = localStorage.getItem("role") || user.role || "";
+  const isPrivileged = ["admin", "hr", "pm", "team_lead"].includes(role);
+  const [isWfhModalOpen, setIsWfhModalOpen] = useState(false);
+  const [wfhFormEmployeeId, setWfhFormEmployeeId] = useState("");
+  const [wfhFormDate, setWfhFormDate] = useState("");
+  const [wfhFormReason, setWfhFormReason] = useState("");
+
 
   const approverLabel =
     { admin: "Admin", pm: "PM", hr: "HR", team_lead: "Team Lead" }[user.role] ||
@@ -348,6 +355,44 @@ const LeavesPage = () => {
     queryFn: () => wfhApi.getAll(),
     enabled: activeTab === "Employee KPI",
   });
+
+  const createWfhMutation = useMutation({
+    mutationFn: wfhApi.create,
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ["wfh-page"] });
+      queryClient.invalidateQueries({ queryKey: ["wfh"] });
+      setIsWfhModalOpen(false);
+      setWfhFormEmployeeId("");
+      setWfhFormDate("");
+      setWfhFormReason("");
+      toast.success("WFH request created successfully");
+    },
+    onError: (err) =>
+      toast.error(err.response?.data?.detail || "Failed to create WFH"),
+  });
+
+  const handleWfhSubmit = (e) => {
+    e.preventDefault();
+    if (!wfhFormEmployeeId) {
+      toast.error("Please select an employee");
+      return;
+    }
+    if (!wfhFormDate) {
+      toast.error("Please select a date");
+      return;
+    }
+    if (!wfhFormReason.trim()) {
+      toast.error("Please enter a reason");
+      return;
+    }
+
+    createWfhMutation.mutate({
+      employee_id: parseInt(wfhFormEmployeeId),
+      wfh_date: wfhFormDate,
+      end_date: wfhFormDate,
+      reason: wfhFormReason.trim(),
+    });
+  };
 
   // ── Mutations (unchanged) ────────────────────────────────────────────────
   const approveMutation = useMutation({
@@ -529,8 +574,22 @@ const LeavesPage = () => {
       return;
     }
 
+    // if (isHalf) {
+    //   const timingErr = checkHalfDayTiming(startDate, leaveType);
+    //   if (timingErr) {
+    //     toast.error(timingErr);
+    //     return;
+    //   }
+    // } else {
+    //   if (isEndDateBeforeStartDate(startDate, endDate)) {
+    //     toast.error(getEndDateValidationMessage());
+    //     return;
+    //   }
+    // }
+
+    
     if (isHalf) {
-      const timingErr = checkHalfDayTiming(startDate, leaveType);
+      const timingErr = checkHalfDayTiming(startDate, leaveType, { skip: isPrivileged });
       if (timingErr) {
         toast.error(timingErr);
         return;
@@ -782,15 +841,21 @@ const LeavesPage = () => {
               }
             />
           )}
-          {activeTab === "Leave List" && (
-            <button
-              type="button"
-              onClick={() => setIsModalOpen(true)}
-              className="inline-flex items-center gap-1.5 h-9 px-3.5 rounded-lg bg-indigo-600 text-white text-[13px] font-semibold hover:bg-indigo-700 shadow-sm transition-colors shrink-0"
-            >
-              <Plus className="w-4 h-4" /> Add Leave
-            </button>
-          )}
+          <div className="flex items-center gap-2">
+            {activeTab === "Leave List" && (
+              <Button onClick={() => setIsModalOpen(true)}>
+                <Plus className="w-4 h-4" /> Add Leave
+              </Button>
+            )}
+
+            {activeTab === "WFH Requests" && (
+              <Button
+                onClick={() => setIsWfhModalOpen(true)}
+              >
+                <Home className="w-4 h-4" /> Add WFH
+              </Button>
+            )}
+          </div>
         </div>
       </div>
 
@@ -1466,6 +1531,7 @@ const LeavesPage = () => {
                       setFormStartDate(e.target.value);
                       setFormEndDate(e.target.value);
                     }}
+                    minDate={isPrivileged ? undefined : format(new Date(), "yyyy-MM-dd")}
                     required
                   />
                 </div>
@@ -1486,6 +1552,7 @@ const LeavesPage = () => {
                       setFormStartDate(startDate);
                       setFormEndDate(endDate);
                     }}
+                    minDate={isPrivileged ? undefined : format(new Date(), "yyyy-MM-dd")}
                     placeholder="Click to select start and end dates from calendar"
                     required
                   />
@@ -1558,6 +1625,108 @@ const LeavesPage = () => {
               isLoading={createMutation.isPending}
             >
               {!createMutation.isPending && "Create Leave"}
+            </Button>
+          </Modal.Footer>
+        </form>
+      </Modal>
+
+      {/* ── Add WFH Modal ── */}
+      <Modal
+        isOpen={isWfhModalOpen}
+        onClose={() => {
+          setIsWfhModalOpen(false);
+          setWfhFormEmployeeId("");
+          setWfhFormDate("");
+          setWfhFormReason("");
+        }}
+        size="md"
+      >
+        <Modal.Header
+          onClose={() => {
+            setIsWfhModalOpen(false);
+            setWfhFormEmployeeId("");
+            setWfhFormDate("");
+            setWfhFormReason("");
+          }}
+        >
+          <h2 className="text-xl font-semibold text-gray-900">Add WFH</h2>
+        </Modal.Header>
+
+        <form onSubmit={handleWfhSubmit} className="flex-1 flex flex-col min-h-0">
+          <Modal.Body className="space-y-4">
+            {/* Employee */}
+            <div>
+              <label className="block text-sm font-medium text-gray-700 mb-1">
+                Employee <span className="text-red-500">*</span>
+              </label>
+              <Dropdown
+                options={[
+                  { value: "", label: "Select employee" },
+                  ...activeEmployees.map((e) => ({
+                    value: String(e.id),
+                    label: `${e.name} - ${e.employee_type}`,
+                  })),
+                ]}
+                value={wfhFormEmployeeId}
+                onChange={setWfhFormEmployeeId}
+                placeholder="Select employee"
+                disabled={activeEmployees.length === 0}
+                searchable
+                searchPlaceholder="Search employee..."
+              />
+            </div>
+
+            {/* Date */}
+            <div>
+              <label className="block text-sm font-medium text-gray-700 mb-1">
+                Date <span className="text-red-500">*</span>
+              </label>
+              <DatePicker
+                type="date"
+                accentColor="purple"
+                value={wfhFormDate}
+                onChange={(e) => setWfhFormDate(e.target.value)}
+                minDate={isPrivileged ? undefined : format(new Date(), "yyyy-MM-dd")}
+                required
+              />
+            </div>
+
+            {/* Reason */}
+            <div>
+              <label className="block text-sm font-medium text-gray-700 mb-1">
+                Reason <span className="text-red-500">*</span>
+              </label>
+              <textarea
+                rows={3}
+                value={wfhFormReason}
+                onChange={(e) => setWfhFormReason(e.target.value)}
+                required
+                placeholder="Reason for WFH"
+                className="w-full rounded-xl border border-slate-200 p-3 text-sm resize-none focus:outline-none focus:ring-2 focus:ring-purple-500 focus:border-transparent"
+              />
+            </div>
+          </Modal.Body>
+
+          <Modal.Footer>
+            <Button
+              type="button"
+              variant="cancel"
+              onClick={() => {
+                setIsWfhModalOpen(false);
+                setWfhFormEmployeeId("");
+                setWfhFormDate("");
+                setWfhFormReason("");
+              }}
+            >
+              Cancel
+            </Button>
+            <Button
+              type="submit"
+              className="bg-purple-600 hover:bg-purple-700 text-white"
+              disabled={createWfhMutation.isPending || activeEmployees.length === 0}
+              isLoading={createWfhMutation.isPending}
+            >
+              {!createWfhMutation.isPending && "Create WFH"}
             </Button>
           </Modal.Footer>
         </form>
