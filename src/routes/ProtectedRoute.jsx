@@ -1,3 +1,4 @@
+import React, { useEffect, useState } from "react";
 import { Navigate, useLocation } from "react-router-dom";
 
 /**
@@ -59,8 +60,21 @@ const useAuth = () => {
 };
 
 const ProtectedRoute = ({ children, allowedRoles }) => {
+  const [hasMounted, setHasMounted] = useState(false);
+  useEffect(() => {
+    setHasMounted(true);
+  }, []);
+
   const { isAuthenticated, role } = useAuth();
   const location = useLocation();
+
+  if (!hasMounted) {
+    return (
+      <div className="flex h-screen w-full items-center justify-center bg-gray-50">
+        <div className="h-8 w-8 animate-spin rounded-full border-4 border-indigo-600 border-t-transparent" />
+      </div>
+    );
+  }
 
   if (!isAuthenticated) {
     const isEmployeeRoute = location.pathname.startsWith("/employee");

@@ -1,32 +1,61 @@
-// IMPORTANT: ssr-globals must be the first import so its browser-global stubs
-// are installed before App's module graph is evaluated (ES imports run in order).
 import "./ssr-globals";
 
 import React from "react";
-import { renderToString } from "react-dom/server";
+import { renderToPipeableStream } from "react-dom/server";
 import { StaticRouter } from "react-router-dom/server";
+import { PassThrough } from "node:stream";
 import App from "./App";
 
 // Called once per request by the server (server.js in dev, api/ssr.js on Vercel).
 // StaticRouter is the SSR counterpart to BrowserRouter — it takes the requested
 // URL as a prop instead of reading window.location (which does not exist here).
-// cookieHeader is accepted now but only becomes load-bearing in Phase 2
-// (cookie-based auth); Phase 1 renders public pages fully and protected pages
-// as empty (ProtectedRoute's <Navigate> renders null during renderToString).
 export function render(url, cookieHeader) {
-  // Store the cookie header globally so that useAuth can access it on the server
-  globalThis.__cookieHeader = cookieHeader;
-  try {
-    const html = renderToString(
+  return new Promise((resolve, reject) => {
+    globalThis.__cookieHeader = cookieHeader;
+    let didError = false;
+
+    const stream = new PassThrough();
+    let body = "";
+
+    stream.on("data", (chunk) => {
+      body += chunk.toString();
+    });
+
+    stream.on("end", () => {
+      globalThis.__cookieHeader = undefined;
+      resolve({ html: body, didError });
+    });
+
+    stream.on("error", (err) => {
+      globalThis.__cookieHeader = undefined;
+      reject(err);
+    });
+
+    const { pipe, abort } = renderToPipeableStream(
       <React.StrictMode>
         <StaticRouter location={url}>
           <App />
         </StaticRouter>
       </React.StrictMode>,
+      {
+        onAllReady() {
+          pipe(stream);
+        },
+        onShellError(error) {
+          globalThis.__cookieHeader = undefined;
+          reject(error);
+        },
+        onError(error) {
+          didError = true;
+          console.error("SSR rendering error:", error);
+        },
+      }
     );
-    return { html };
-  } finally {
-    // Clean up to prevent memory leaks or cross-request pollution
-    globalThis.__cookieHeader = undefined;
-  }
+
+    // Timeout safety: if something suspends indefinitely, abort after 5s
+    setTimeout(() => {
+      abort();
+    }, 5000);
+  });
 }
+

@@ -545,14 +545,6 @@ const AllocationPopover = ({
             </Button>
           </div>
         </div>
-
-        {/* Local keyframes */}
-        <style>{`
- @keyframes allocPopoverIn {
- 0% { opacity: 0; transform: translateY(-4px) scale(0.98); }
- 100% { opacity: 1; transform: translateY(0) scale(1); }
- }
- `}</style>
       </div>,
       document.body,
     )
