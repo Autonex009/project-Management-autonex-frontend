@@ -8,10 +8,14 @@ import {
   ShieldCheck,
   AlertTriangle,
 } from "lucide-react";
-import { checkinApi } from "../../services/api";
+import { checkinApi, parentProjectApi } from "../../services/api";
 import Table from "../../components/ui/Table";
+import Button from "../../components/ui/Button";
 import UserAvatar from "../../components/ui/UserAvatar";
+import Dropdown from "../../components/ui/Dropdown";
+import StatCard from "../../components/dashboard/StatCard";
 import SearchBar from "../../components/ui/SearchBar";
+import HistoryMatrix from "../../components/checkin/HistoryMatrix";
 import { formatDisplayName } from "../../utils/displayName";
 
 const fmtTime = (v) =>
@@ -34,13 +38,29 @@ const WorkModePill = ({ mode }) =>
 const AdminCheckInsPage = () => {
   const [page, setPage] = useState(1);
   const [search, setSearch] = useState("");
+  const [projectId, setProjectId] = useState("");
+  const [statusFilter, setStatusFilter] = useState("");
+  const [timeFilter, setTimeFilter] = useState("");
+  const [activeTab, setActiveTab] = useState("today");
   const limit = 20;
 
   const { data, isLoading, isError } = useQuery({
-    queryKey: ["checkins-admin-today", page, search],
-    queryFn: () => checkinApi.getAdminPaginated({ page, limit, search }),
+    queryKey: ["checkins-admin-today", page, search, projectId, statusFilter, timeFilter],
+    queryFn: () => checkinApi.getAdminPaginated({ 
+      page, limit, search, 
+      project_id: projectId || undefined, 
+      status: statusFilter, 
+      time_filter: timeFilter 
+    }),
     staleTime: 60 * 1000,
   });
+
+  const { data: projectsData } = useQuery({
+    queryKey: ["all-projects"],
+    queryFn: () => parentProjectApi.getAll(),
+    staleTime: 5 * 60 * 1000,
+  });
+  const projectsList = projectsData?.items || [];
 
   const items = data?.items || [];
   const totalCount = data?.total || 0;
@@ -127,37 +147,97 @@ const AdminCheckInsPage = () => {
   ];
 
   return (
-    <div className="space-y-4 max-w-[1200px] mx-auto py-6">
-      <div className="flex flex-col sm:flex-row items-start sm:items-center justify-between gap-4 mb-2">
-        <div>
-          <h1 className="text-2xl font-bold text-slate-900 tracking-tight">Company Check-ins</h1>
-          <p className="text-sm text-slate-500 mt-1">
-            Monitor daily attendance and work locations across the entire company.
-          </p>
+    <div className="space-y-4">
+      {/* Tabs */}
+      <div className="flex border-b border-slate-200">
+        <button
+          className={`px-4 py-2 font-medium text-sm border-b-2 ${activeTab === 'today' ? 'border-indigo-500 text-indigo-600' : 'border-transparent text-slate-500 hover:text-slate-700'}`}
+          onClick={() => setActiveTab('today')}
+        >
+          Today's Roster
+        </button>
+        <button
+          className={`px-4 py-2 font-medium text-sm border-b-2 ${activeTab === 'history' ? 'border-indigo-500 text-indigo-600' : 'border-transparent text-slate-500 hover:text-slate-700'}`}
+          onClick={() => setActiveTab('history')}
+        >
+          Historical Matrix
+        </button>
+      </div>
+
+      {activeTab === 'today' ? (
+        <>
+          <div className="flex flex-col md:flex-row items-start md:items-center justify-between gap-4 mb-2">
+        <div className="flex flex-wrap items-center gap-3">
+          <div className="w-40">
+            <Dropdown
+              value={projectId}
+              onChange={(v) => { setProjectId(v); setPage(1); }}
+              placeholder="All Projects"
+              options={[
+                { value: "", label: "All Projects" },
+                ...projectsList.map((p) => ({ value: p.id, label: p.name }))
+              ]}
+            />
+          </div>
+
+          <div className="w-36">
+            <Dropdown
+              value={statusFilter}
+              onChange={(v) => { setStatusFilter(v); setPage(1); }}
+              placeholder="All Statuses"
+              options={[
+                { value: "", label: "All Statuses" },
+                { value: "checked_in", label: "Checked In" },
+                { value: "pending", label: "Not Yet" }
+              ]}
+            />
+          </div>
+
+          <div className="w-36">
+            <Dropdown
+              value={timeFilter}
+              onChange={(v) => { setTimeFilter(v); setPage(1); }}
+              placeholder="All Times"
+              options={[
+                { value: "", label: "All Times" },
+                { value: "late", label: "After 10:00 AM" }
+              ]}
+            />
+          </div>
         </div>
-        <div className="flex items-center gap-3">
+
+        <div className="flex items-center gap-3 w-full md:w-auto">
           <SearchBar 
             value={search} 
             onChange={(v) => { setSearch(v); setPage(1); }} 
             placeholder="Search employees..." 
-            className="w-72"
+            className="w-full md:w-72"
           />
         </div>
       </div>
 
       <div className="grid grid-cols-1 sm:grid-cols-3 gap-3 mb-6">
-        <div className="bg-white p-4 rounded-xl border border-slate-200 shadow-sm flex flex-col justify-center">
-          <p className="text-sm font-medium text-slate-500 mb-1">Total Active Employees</p>
-          <p className="text-2xl font-bold text-slate-900">{data?.kpi_total ?? 0}</p>
-        </div>
-        <div className="bg-emerald-50 p-4 rounded-xl border border-emerald-100 shadow-sm flex flex-col justify-center">
-          <p className="text-sm font-medium text-emerald-700 mb-1">Checked In Today</p>
-          <p className="text-2xl font-bold text-emerald-900">{data?.kpi_checked_in ?? 0}</p>
-        </div>
-        <div className="bg-sky-50 p-4 rounded-xl border border-sky-100 shadow-sm flex flex-col justify-center">
-          <p className="text-sm font-medium text-sky-700 mb-1">Confirmed by PM</p>
-          <p className="text-2xl font-bold text-sky-900">{data?.kpi_confirmed ?? 0}</p>
-        </div>
+        <StatCard
+          title="Total Active Employees"
+          value={data?.kpi_total ?? 0}
+          icon={Building2}
+          tone="indigo"
+          hint="on payroll"
+        />
+        <StatCard
+          title="Checked In Today"
+          value={data?.kpi_checked_in ?? 0}
+          icon={CheckCircle2}
+          tone="emerald"
+          hint="so far today"
+        />
+        <StatCard
+          title="Confirmed by PM"
+          value={data?.kpi_confirmed ?? 0}
+          icon={ShieldCheck}
+          tone="sky"
+          hint="reviewed by managers"
+        />
       </div>
 
       {isError ? (
@@ -181,6 +261,10 @@ const AdminCheckInsPage = () => {
             description: "No one matches your search criteria.",
           }}
         />
+      )}
+      </>
+      ) : (
+        <HistoryMatrix role="admin" />
       )}
     </div>
   );
