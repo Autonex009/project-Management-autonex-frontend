@@ -98,6 +98,7 @@ const PMLeavesPage = () => {
   const queryClient = useQueryClient();
   const user = JSON.parse(localStorage.getItem("user") || "{}");
   const role = localStorage.getItem("role") || user.role || "pm";
+  const isPrivileged = ["admin", "hr", "pm", "team_lead"].includes(role);
   const canAct = canRoleActOnRequests(role);
   const employeeId = getPmEmployeeId(user);
 
@@ -426,14 +427,16 @@ const PMLeavesPage = () => {
     }
 
     if (isHalf) {
-      const timingErr = checkHalfDayTiming(startDate, leaveType);
+      const timingErr = checkHalfDayTiming(startDate, leaveType, { skip: isPrivileged });
       if (timingErr) {
         toast.error(timingErr);
         return;
       }
-    } else if (isEndDateBeforeStartDate(startDate, endDate)) {
-      toast.error(getEndDateValidationMessage());
-      return;
+    } else {
+      if (isEndDateBeforeStartDate(startDate, endDate)) {
+        toast.error(getEndDateValidationMessage());
+        return;
+      }
     }
 
     const empIdInt = parseInt(empId);
@@ -1350,11 +1353,13 @@ const PMLeavesPage = () => {
                   <input type="hidden" name="end_date" value={formStartDate} />
                   <DatePicker
                     type="date"
+                    accentColor="indigo"
                     value={formStartDate}
                     onChange={(e) => {
                       setFormStartDate(e.target.value);
                       setFormEndDate(e.target.value);
                     }}
+                    minDate={isPrivileged ? undefined : undefined /* or omit the prop */}
                     required
                   />
                 </div>
@@ -1368,12 +1373,14 @@ const PMLeavesPage = () => {
                   <input type="hidden" name="end_date" value={formEndDate} />
                   <DatePicker
                     type="range"
+                    accentColor="indigo"
                     startDate={formStartDate}
                     endDate={formEndDate}
                     onRangeChange={({ startDate, endDate }) => {
                       setFormStartDate(startDate);
                       setFormEndDate(endDate);
                     }}
+                    minDate={isPrivileged ? undefined : undefined}
                     placeholder="Click to select start and end dates from calendar"
                     required
                   />
