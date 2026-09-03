@@ -839,6 +839,8 @@ export const checkinApi = {
   checkOut: (data) => api.post("/checkins/checkout", data).then((res) => res.data),
   getTeamToday: (params) => api.get("/checkins/team-today", { params }).then((res) => res.data),
   getAdminPaginated: (params) => api.get("/checkins/admin/paginated", { params }).then((res) => res.data),
+  getAdminMatrix: (month_year) => api.get("/checkins/admin/matrix", { params: { month_year } }).then((res) => res.data),
+  getTeamMatrix: (month_year) => api.get("/checkins/team/matrix", { params: { month_year } }).then((res) => res.data),
   confirmTeam: () => api.post("/checkins/team/confirm").then((res) => res.data),
 };
 
