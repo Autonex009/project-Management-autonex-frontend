@@ -21,6 +21,16 @@ import {
   isBefore,
 } from "date-fns";
 
+function getISOWeekString(date) {
+  if (!date) return "";
+  const d = new Date(Date.UTC(date.getFullYear(), date.getMonth(), date.getDate()));
+  const dayNum = d.getUTCDay() || 7;
+  d.setUTCDate(d.getUTCDate() + 4 - dayNum);
+  const yearStart = new Date(Date.UTC(d.getUTCFullYear(),0,1));
+  const weekNo = Math.ceil((((d - yearStart) / 86400000) + 1)/7);
+  return `${d.getUTCFullYear()}-W${String(weekNo).padStart(2, '0')}`;
+}
+
 function parseDateInput(val, type = "date") {
   if (!val) return null;
   if (val instanceof Date) return isValid(val) ? val : null;
@@ -28,6 +38,19 @@ function parseDateInput(val, type = "date") {
     if (type === "month") {
       const d = parse(val, "yyyy-MM", new Date());
       return isValid(d) ? d : null;
+    }
+    if (type === "week" && val.includes("-W")) {
+      const [year, week] = val.split("-W");
+      const y = parseInt(year, 10);
+      const w = parseInt(week, 10);
+      const simple = new Date(y, 0, 1 + (w - 1) * 7);
+      const dow = simple.getDay();
+      const ISOweekStart = simple;
+      if (dow <= 4)
+        ISOweekStart.setDate(simple.getDate() - simple.getDay() + 1);
+      else
+        ISOweekStart.setDate(simple.getDate() + 8 - simple.getDay());
+      return ISOweekStart;
     }
     const d = parseISO(val);
     return isValid(d) ? d : null;
@@ -254,6 +277,14 @@ export default function DatePicker({
       return;
     }
 
+    if (type === "week") {
+      const formatted = getISOWeekString(date);
+      if (value === undefined) setInternalValue(formatted);
+      if (onChange) onChange({ target: { name, value: formatted } });
+      setIsOpen(false);
+      return;
+    }
+
     const formatted = format(date, "yyyy-MM-dd");
     if (value === undefined) setInternalValue(formatted);
     if (onChange) onChange({ target: { name, value: formatted } });
@@ -269,6 +300,11 @@ export default function DatePicker({
   };
 
   const isInRange = (day) => {
+    if (type === "week") {
+      const targetWeek = parsedDate ? getISOWeekString(parsedDate) : (isOpen && hoverDate ? getISOWeekString(hoverDate) : null);
+      if (!targetWeek) return false;
+      return getISOWeekString(day) === targetWeek;
+    }
     if (type !== "range" || !rangeStart) return false;
     const end = rangeEnd || (isOpen && hoverDate && !isBefore(hoverDate, rangeStart) ? hoverDate : null);
     if (!end) return false;
@@ -278,12 +314,21 @@ export default function DatePicker({
     return target >= sTime && target <= eTime;
   };
 
-  const isRangeStart = (day) => type === "range" && rangeStart && isSameDay(day, rangeStart);
-  const isRangeEnd = (day) =>
-    type === "range" &&
-    (rangeEnd
-      ? isSameDay(day, rangeEnd)
-      : hoverDate && !isBefore(hoverDate, rangeStart) && isSameDay(day, hoverDate));
+  const isRangeStart = (day) => {
+    if (type === "week") {
+      const targetWeek = parsedDate ? getISOWeekString(parsedDate) : (isOpen && hoverDate ? getISOWeekString(hoverDate) : null);
+      return targetWeek && getISOWeekString(day) === targetWeek && day.getDay() === 1;
+    }
+    return type === "range" && rangeStart && isSameDay(day, rangeStart);
+  };
+
+  const isRangeEnd = (day) => {
+    if (type === "week") {
+      const targetWeek = parsedDate ? getISOWeekString(parsedDate) : (isOpen && hoverDate ? getISOWeekString(hoverDate) : null);
+      return targetWeek && getISOWeekString(day) === targetWeek && day.getDay() === 0;
+    }
+    return type === "range" && (rangeEnd ? isSameDay(day, rangeEnd) : hoverDate && !isBefore(hoverDate, rangeStart) && isSameDay(day, hoverDate));
+  };
 
   const renderDays = () => {
     const monthStart = startOfMonth(currentView);
@@ -292,9 +337,10 @@ export default function DatePicker({
     const endDate = endOfWeek(monthEnd);
 
     const weekDays = ["Su", "Mo", "Tu", "We", "Th", "Fr", "Sa"];
+    const isWeekType = type === "week";
 
     return (
-      <div className="w-[260px]">
+      <div className={isWeekType ? "w-[296px]" : "w-[260px]"}>
         {/* Header */}
         <div className="flex items-center justify-between mb-3">
           <button
@@ -328,7 +374,12 @@ export default function DatePicker({
         )}
 
         {/* Weekdays */}
-        <div className="grid grid-cols-7 mb-2">
+        <div className={`grid ${isWeekType ? "grid-cols-8" : "grid-cols-7"} mb-2`}>
+          {isWeekType && (
+            <div className="text-center text-[10px] font-semibold text-slate-400 uppercase tracking-wider border-r border-slate-100 pr-1 mr-1">
+              Wk
+            </div>
+          )}
           {weekDays.map((wd) => (
             <div
               key={wd}
@@ -340,26 +391,78 @@ export default function DatePicker({
         </div>
 
         {/* Days */}
-        <div className="grid grid-cols-7 gap-y-1">
+        <div 
+          className={`grid ${isWeekType ? "grid-cols-8" : "grid-cols-7"} gap-y-1`}
+          onMouseLeave={() => setHoverDate(null)}
+        >
           {(() => {
             let currentDay = startDate;
             const dayEls = [];
             while (currentDay <= endDate) {
               const cloneDay = currentDay;
+              
+              if (isWeekType && cloneDay.getDay() === 0) {
+                  // Assume Thursday determines the ISO week number, so cloneDay + 4 days is safely in that ISO week
+                  const isoWeekStr = getISOWeekString(addDays(cloneDay, 4));
+                  const [, wNum] = isoWeekStr.split("-W");
+                  const isWeekSelected = parsedDate && isoWeekStr === getISOWeekString(parsedDate);
+                  const isWeekHovered = hoverDate && isoWeekStr === getISOWeekString(hoverDate);
+                  dayEls.push(
+                     <div key={`wk-${isoWeekStr}`} className="flex justify-center items-center py-0.5 border-r border-slate-100 pr-1 mr-1">
+                         <button 
+                            type="button"
+                            onClick={() => handleSelectDate(addDays(cloneDay, 4))}
+                            onMouseEnter={() => setHoverDate(addDays(cloneDay, 4))}
+                            className={`w-7 h-7 flex justify-center items-center rounded-md ${isWeekSelected ? accent.selected : (isWeekHovered ? "bg-slate-100 text-slate-900" : "text-slate-400")} text-[11px] font-semibold transition-colors focus:outline-none`}
+                         >
+                            {wNum}
+                         </button>
+                     </div>
+                  );
+              }
+
+              const isoDayStr = getISOWeekString(cloneDay);
+              
+              let rStart = false;
+              let rEnd = false;
+              let inRange = false;
+              let isSelected = false;
+              let isHoveredRow = false;
+              
+              if (isWeekType) {
+                const selectedIso = parsedDate ? getISOWeekString(parsedDate) : null;
+                const hoveredIso = hoverDate ? getISOWeekString(hoverDate) : null;
+                
+                const isThisWeekSelected = selectedIso && isoDayStr === selectedIso;
+                const isThisWeekHovered = hoveredIso && isoDayStr === hoveredIso;
+                
+                rStart = cloneDay.getDay() === 1;
+                rEnd = cloneDay.getDay() === 0;
+                
+                if (isThisWeekSelected) {
+                  inRange = true;
+                  isSelected = true; // Makes all circles solid
+                } else if (isThisWeekHovered) {
+                  isHoveredRow = true;
+                }
+              } else {
+                rStart = isRangeStart(cloneDay);
+                rEnd = isRangeEnd(cloneDay);
+                inRange = isInRange(cloneDay);
+                isSelected = parsedDate && isSameDay(cloneDay, parsedDate);
+              }
+
               const disabled = isDayDisabled(cloneDay);
-              const isSelected = parsedDate && isSameDay(cloneDay, parsedDate);
-              const rStart = isRangeStart(cloneDay);
-              const rEnd = isRangeEnd(cloneDay);
-              const inRange = isInRange(cloneDay);
               const isCurrentMonth = isSameMonth(cloneDay, monthStart);
               const isToday = isSameDay(cloneDay, new Date());
 
               dayEls.push(
                 <div
                   key={cloneDay.toISOString()}
-                  className={`flex justify-center py-0.5 ${inRange && !disabled ? accent.inRangeBg : ""
-                    } ${rStart ? "rounded-l-full" : ""} ${rEnd ? "rounded-r-full" : ""}`}
-                  onMouseEnter={() => type === "range" && setHoverDate(cloneDay)}
+                  className={`flex justify-center py-0.5 ${
+                      inRange && !disabled ? accent.inRangeBg : (isHoveredRow && !disabled ? "bg-slate-100" : "")
+                    } ${rStart && (inRange || isHoveredRow) ? "rounded-l-full" : ""} ${rEnd && (inRange || isHoveredRow) ? "rounded-r-full" : ""}`}
+                  onMouseEnter={() => (type === "range" || type === "week") && setHoverDate(cloneDay)}
                 >
                   <button
                     type="button"
@@ -367,15 +470,15 @@ export default function DatePicker({
                     onClick={() => handleSelectDate(cloneDay)}
                     className={`w-8 h-8 flex items-center justify-center rounded-full text-[13px] transition-all focus:outline-none ${disabled
                         ? "text-slate-300 cursor-not-allowed bg-transparent hover:bg-transparent"
-                        : rStart || rEnd || isSelected
+                        : (type !== "week" && (rStart || rEnd)) || isSelected
                           ? accent.selected
-                          : inRange
+                          : inRange || isHoveredRow
                             ? accent.inRangeText
                             : isToday
                               ? accent.today
                               : isCurrentMonth
-                                ? "text-slate-700 hover:bg-slate-100 hover:text-slate-900"
-                                : "text-slate-300 hover:bg-slate-50"
+                                ? "text-slate-700 hover:bg-slate-200 hover:text-slate-900"
+                                : "text-slate-300 hover:bg-slate-100"
                       }`}
                   >
                     {format(cloneDay, "d")}
@@ -454,6 +557,9 @@ export default function DatePicker({
     } else if (rangeStart) {
       displayValue = `${format(rangeStart, "dd MMM yyyy")} – Select end date`;
     }
+  } else if (type === "week" && actualValue) {
+    const [y, w] = actualValue.split("-W");
+    displayValue = `Week ${w}, ${y}`;
   } else if (parsedDate) {
     displayValue =
       type === "month"
@@ -508,6 +614,8 @@ export default function DatePicker({
               placeholder ||
               (type === "range"
                 ? "Select leave dates"
+                : type === "week"
+                  ? "Select week"
                 : type === "month"
                   ? "Select month"
                   : "Select date")}
