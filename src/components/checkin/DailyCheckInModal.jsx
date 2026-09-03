@@ -7,6 +7,7 @@ import Modal from "../ui/Modal";
 import Button from "../ui/Button";
 import { checkinApi, subProjectApi } from "../../services/api";
 import { MultiSelect } from "../ui/MultiSelect";
+import useCheckinStore from "../../store/useCheckinStore";
 
 const MOODS = [
   { value: "great", label: "Great", icon: Zap, tone: "text-emerald-600 bg-emerald-50 border-emerald-200" },
@@ -22,6 +23,8 @@ export default function DailyCheckInModal() {
   const [workMode, setWorkMode] = useState("WFO");
   const [selectedProjects, setSelectedProjects] = useState([]);
   const [mood, setMood] = useState(null);
+
+  const { isDismissed, isOpenManually, dismiss } = useCheckinStore();
 
   useEffect(() => {
     try {
@@ -51,7 +54,8 @@ export default function DailyCheckInModal() {
     }
   }, [status]);
 
-  const isOpen = hasEmployeeRecord && !isLoading && status && !status.already_checked_in;
+  const shouldPrompt = hasEmployeeRecord && !isLoading && status && !status.already_checked_in;
+  const isOpen = Boolean(shouldPrompt && (!isDismissed || isOpenManually));
 
   const toggleProject = (id) => {
     setSelectedProjects((prev) =>
@@ -102,8 +106,8 @@ export default function DailyCheckInModal() {
   if (!isOpen) return null;
 
   return (
-    <Modal isOpen={isOpen} onClose={() => {}} size="md" disableBackdropClose>
-      <Modal.Header>
+    <Modal isOpen={isOpen} onClose={dismiss} size="md" disableBackdropClose={!isOpenManually}>
+      <Modal.Header onClose={dismiss}>
         <div className="flex items-center gap-3">
           <div className="flex h-10 w-10 items-center justify-center rounded-xl bg-indigo-50 text-indigo-600">
             <CalendarCheck className="h-5 w-5" />
