@@ -18,7 +18,10 @@ import {
   History as HistoryIcon,
   CheckCircle2,
   Clock,
+  Filter,
+  Lock,
 } from "lucide-react";
+import { endOfMonth, differenceInDays } from "date-fns";
 import StarRating, { formatPeriod, currentPeriod, shiftPeriod } from "../../components/perf/StarRating";
 import { StatusPill, fmtDate, RatingCell, MonthStepper } from "../../components/perf/perfTableCells";
 import EvaluationDetail from "../../components/perf/EvaluationDetail";
@@ -176,6 +179,9 @@ const AdminPerformancePage = () => {
   }, [search]);
   const [roleFilter, setRoleFilter] = useState("all");
   const [projectFilter, setProjectFilter] = useState("all");
+  const [statusFilter, setStatusFilter] = useState("all");
+  const [pmFilter, setPmFilter] = useState("all");
+  const [showFilters, setShowFilters] = useState(false);
   const [perfPage, setPerfPage] = useState(1);
   const [bonusPage, setBonusPage] = useState(1);
   const [bonusOpen, setBonusOpen] = useState(false);
@@ -198,6 +204,8 @@ const AdminPerformancePage = () => {
       }
       if (s.roleFilter != null) setRoleFilter(s.roleFilter);
       if (s.projectFilter != null) setProjectFilter(s.projectFilter);
+      if (s.statusFilter != null) setStatusFilter(s.statusFilter);
+      if (s.pmFilter != null) setPmFilter(s.pmFilter);
       if (s.perfPage != null) setPerfPage(s.perfPage);
       if (s.bonusPage != null) setBonusPage(s.bonusPage);
       if (s.bonusOpen != null) setBonusOpen(!!s.bonusOpen);
@@ -219,6 +227,8 @@ const AdminPerformancePage = () => {
       search,
       roleFilter,
       projectFilter,
+      statusFilter,
+      pmFilter,
       perfPage,
       bonusPage,
       bonusOpen,
@@ -229,6 +239,8 @@ const AdminPerformancePage = () => {
     search,
     roleFilter,
     projectFilter,
+    statusFilter,
+    pmFilter,
     perfPage,
     bonusPage,
     bonusOpen,
@@ -246,12 +258,12 @@ const AdminPerformancePage = () => {
       return;
     }
     setPerfPage(1);
-  }, [debouncedSearch, roleFilter, projectFilter, tab, ready]);
+  }, [debouncedSearch, roleFilter, projectFilter, statusFilter, pmFilter, tab, ready]);
 
   // --- SERVER-SIDE RENDERING (SSR) AND PAGINATION ---
   const currentPeriodQuery = topTab === "history" ? historyMonth : activePeriod;
 
-  // KPI Data - SSR for the entire period
+  // KPIs
   const { data: kpiData = {} } = useQuery({
     queryKey: ["perf-evals-kpi", currentPeriodQuery, projectFilter, roleFilter, search, tab],
     queryFn: () => {
@@ -268,11 +280,10 @@ const AdminPerformancePage = () => {
   });
 
   const { data: evaluationsData = {}, isLoading: evalLoading, isFetching: evalFetching } = useQuery({
-    queryKey: ["perf-evals", "paginated", perfPage, PAGE_SIZE, tab, currentPeriodQuery, debouncedSearch, roleFilter, projectFilter],
+    queryKey: ["perf-evals", "paginated", perfPage, PAGE_SIZE, tab, currentPeriodQuery, debouncedSearch, roleFilter, projectFilter, statusFilter, pmFilter],
     queryFn: () => {
       const isPmTab = tab === "pm";
       const isHrTab = tab === "hr";
-      const isHistory = tab === "history";
       
       const params = {
         page: perfPage,
@@ -291,6 +302,9 @@ const AdminPerformancePage = () => {
         params.role_filter = roleFilter;
       }
       if (projectFilter !== "all") params.project_id = projectFilter;
+      if (statusFilter !== "all") params.status = statusFilter;
+      if (pmFilter !== "all") params.pm_id = pmFilter;
+      
       return perfEvalApi.getAll(params);
     },
     placeholderData: (prev) => prev,
@@ -374,6 +388,17 @@ const AdminPerformancePage = () => {
     const ids = mp.program_manager_ids?.length ? mp.program_manager_ids : mp.program_manager_id ? [mp.program_manager_id] : [];
     return ids.map((id) => empById.get(Number(id))?.name).filter(Boolean);
   };
+
+  const isSubmissionAllowed = useMemo(() => {
+    const today = new Date();
+    const end = endOfMonth(today);
+    return differenceInDays(end, today) <= 6;
+  }, []);
+
+  const pmOptions = useMemo(() => {
+    const pms = employees.filter((e) => isPm(e));
+    return pms.map((p) => ({ value: String(p.id), label: p.name }));
+  }, [employees]);
 
   const filtered = tab === "employees" ? evaluations : [];
   const pmSelfEvals = (tab === "pm" || tab === "hr") ? evaluations : [];
@@ -829,15 +854,85 @@ const AdminPerformancePage = () => {
               />
             </div>
             
-            <Dropdown
-              className="w-full sm:w-48"
-              value={String(projectFilter)}
-              onChange={(val) => setProjectFilter(val)}
-              options={[
-                { value: "all", label: "All Projects" },
-                ...projects.map((p) => ({ value: String(p.id), label: p.name })),
-              ]}
-            />
+            <div className="relative z-10">
+              <button
+                type="button"
+                onClick={() => setShowFilters((prev) => !prev)}
+                className={`flex h-8 items-center gap-2 rounded-lg border px-3 text-[13px] font-medium transition-colors ${showFilters || projectFilter !== "all" || statusFilter !== "all" || pmFilter !== "all" ? "border-indigo-300 bg-indigo-50 text-indigo-700" : "border-slate-200 bg-white text-slate-700 hover:border-slate-300"}`}
+              >
+                <Filter className="h-4 w-4" />
+                Filters
+                {(projectFilter !== "all" || statusFilter !== "all" || pmFilter !== "all") && (
+                  <span className="flex h-4 w-4 items-center justify-center rounded-full bg-indigo-600 text-[10px] font-bold text-white">
+                    {[projectFilter, statusFilter, pmFilter].filter(f => f !== "all").length}
+                  </span>
+                )}
+              </button>
+              
+              {showFilters && (
+                <>
+                  <div className="fixed inset-0 z-40" onClick={() => setShowFilters(false)} />
+                  <div className="absolute left-0 top-full mt-2 z-50 w-72 rounded-xl border border-slate-200 bg-white p-4 shadow-xl">
+                    <div className="mb-4 flex items-center justify-between border-b border-slate-100 pb-2">
+                      <h3 className="font-semibold text-slate-800">Filters</h3>
+                      <button
+                        type="button"
+                        onClick={() => {
+                          setProjectFilter("all");
+                          setStatusFilter("all");
+                          setPmFilter("all");
+                        }}
+                        className="text-xs font-medium text-indigo-600 hover:text-indigo-700"
+                      >
+                        Reset
+                      </button>
+                    </div>
+                    
+                    <div className="space-y-4">
+                      <div className="space-y-1.5">
+                        <label className="text-xs font-medium text-slate-500">Project</label>
+                        <Dropdown
+                          className="w-full"
+                          value={String(projectFilter)}
+                          onChange={(val) => setProjectFilter(val)}
+                          options={[
+                            { value: "all", label: "All Projects" },
+                            ...projects.map((p) => ({ value: String(p.id), label: p.name })),
+                          ]}
+                        />
+                      </div>
+                      
+                      <div className="space-y-1.5">
+                        <label className="text-xs font-medium text-slate-500">Status</label>
+                        <Dropdown
+                          className="w-full"
+                          value={String(statusFilter)}
+                          onChange={(val) => setStatusFilter(val)}
+                          options={[
+                            { value: "all", label: "All Statuses" },
+                            { value: "submitted", label: "Pending Review" },
+                            { value: "reviewed", label: "Reviewed" },
+                          ]}
+                        />
+                      </div>
+
+                      <div className="space-y-1.5">
+                        <label className="text-xs font-medium text-slate-500">Program Manager</label>
+                        <Dropdown
+                          className="w-full"
+                          value={String(pmFilter)}
+                          onChange={(val) => setPmFilter(val)}
+                          options={[
+                            { value: "all", label: "All PMs" },
+                            ...pmOptions,
+                          ]}
+                        />
+                      </div>
+                    </div>
+                  </div>
+                </>
+              )}
+            </div>
 
             <div className="inline-flex items-center gap-0.5 overflow-x-auto rounded-lg border border-slate-200 bg-slate-50 p-0.5">
               {ROLE_FILTERS.map((r) => {
@@ -931,7 +1026,17 @@ const AdminPerformancePage = () => {
               loading
               skeletonRows={10}
             />
-          ) : evaluationsTotal === 0 && !search.trim() && roleFilter === "all" ? (
+          ) : !isSubmissionAllowed && topTab === "active" ? (
+            <div className="rounded-3xl border border-dashed border-slate-200 bg-white p-12 text-center shadow-sm">
+              <Lock className="mx-auto h-10 w-10 text-slate-300" />
+              <h2 className="mt-4 text-lg font-semibold text-slate-800">
+                Submissions Locked
+              </h2>
+              <p className="mt-2 text-sm text-slate-500 max-w-md mx-auto">
+                The current cycle is locked. Data will be available when the window opens in the last week of the month.
+              </p>
+            </div>
+          ) : evaluationsTotal === 0 && !search.trim() && roleFilter === "all" && projectFilter === "all" && statusFilter === "all" && pmFilter === "all" ? (
             <div className="rounded-3xl border border-dashed border-slate-200 bg-white p-12 text-center shadow-sm">
               <ClipboardList className="mx-auto h-10 w-10 text-slate-300" />
               <h2 className="mt-4 text-lg font-semibold text-slate-800">

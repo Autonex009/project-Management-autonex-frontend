@@ -10,7 +10,9 @@ const OnboardingPipelinePage = () => {
   const [activeTab, setActiveTab] = useState("pool");
   const [isAssignModalOpen, setIsAssignModalOpen] = useState(false);
   const [isEvalModalOpen, setIsEvalModalOpen] = useState(false);
+  const [isTimelineModalOpen, setIsTimelineModalOpen] = useState(false);
   const [selectedCandidate, setSelectedCandidate] = useState(null);
+  const [selectedTimelineCandidate, setSelectedTimelineCandidate] = useState(null);
   const [selectedCandidateIds, setSelectedCandidateIds] = useState([]);
   const [searchQuery, setSearchQuery] = useState("");
 
@@ -110,6 +112,8 @@ const OnboardingPipelinePage = () => {
       id: `pool-${c.userId}`,
       isPool: true,
       candidateName: c.name,
+      appliedAt: c.appliedAt,
+      approvedAt: c.approvedAt,
       project: "-",
       buddy: "-",
       status: "unassigned",
@@ -120,10 +124,13 @@ const OnboardingPipelinePage = () => {
       id: `pipe-${p.id}`,
       isPool: false,
       candidateName: p.candidate_name,
-      project: p.project_name,
+      project: p.sub_project_name || p.project_name,
       buddy: p.buddy_name,
       status: p.status,
       daysElapsed: p.days_elapsed || 0,
+      startedAt: p.started_at,
+      appliedAt: p.applied_at,
+      approvedAt: p.approved_at,
       rawPipeline: p
     }));
   }
@@ -140,7 +147,7 @@ const OnboardingPipelinePage = () => {
   const handleAssign = () => {
     const payload = {
       candidate_ids: selectedCandidateIds,
-      project_id: parseInt(selectedProject),
+      sub_project_id: parseInt(selectedProject),
       buddy_id: parseInt(selectedBuddy),
       escalation_days: 5
     };
@@ -270,8 +277,17 @@ const OnboardingPipelinePage = () => {
                     )}
                   </th>
                   <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase">Candidate</th>
-                  <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase">Project</th>
-                  <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase">Buddy</th>
+                  {activeTab === "pool" ? (
+                    <>
+                      <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase">Applied Date</th>
+                      <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase">Approved Date</th>
+                    </>
+                  ) : (
+                    <>
+                      <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase">Project</th>
+                      <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase">Buddy</th>
+                    </>
+                  )}
                   <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase">Status</th>
                   <th className="px-6 py-3 text-right text-xs font-medium text-gray-500 uppercase">Actions</th>
                 </tr>
@@ -292,9 +308,34 @@ const OnboardingPipelinePage = () => {
                         />
                       )}
                     </td>
-                    <td className="px-6 py-4 whitespace-nowrap text-sm font-medium text-gray-900">{item.candidateName}</td>
-                    <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-500">{item.project}</td>
-                    <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-500">{item.buddy}</td>
+                    <td className="px-6 py-4 whitespace-nowrap text-sm font-medium text-gray-900">
+                      {item.candidateName}
+                      {!item.isPool && (
+                        <button 
+                          onClick={() => {
+                            setSelectedTimelineCandidate(item);
+                            setIsTimelineModalOpen(true);
+                          }}
+                          className="ml-2 text-indigo-500 hover:text-indigo-700"
+                          title="View Timeline"
+                        >
+                          <svg xmlns="http://www.w3.org/2000/svg" className="h-4 w-4 inline" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 8v4l3 3m6-3a9 9 0 11-18 0 9 9 0 0118 0z" />
+                          </svg>
+                        </button>
+                      )}
+                    </td>
+                    {activeTab === "pool" ? (
+                      <>
+                        <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-500">{item.appliedAt ? new Date(item.appliedAt).toLocaleDateString() : "-"}</td>
+                        <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-500">{item.approvedAt ? new Date(item.approvedAt).toLocaleDateString() : "-"}</td>
+                      </>
+                    ) : (
+                      <>
+                        <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-500">{item.project}</td>
+                        <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-500">{item.buddy}</td>
+                      </>
+                    )}
                     <td className="px-6 py-4 whitespace-nowrap">
                       {item.isPool ? (
                         <span className="px-2 inline-flex text-xs leading-5 font-semibold rounded-full bg-gray-100 text-gray-800">
@@ -347,7 +388,7 @@ const OnboardingPipelinePage = () => {
                 {filteredHistory.map((h) => (
                   <tr key={h.id}>
                     <td className="px-6 py-4 whitespace-nowrap text-sm font-medium text-gray-900">{h.candidate_name}</td>
-                    <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-500">{h.project_name}</td>
+                    <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-500">{h.sub_project_name || h.project_name}</td>
                     <td className="px-6 py-4 whitespace-nowrap">
                       <span className={`px-2 inline-flex text-xs leading-5 font-semibold rounded-full ${h.status === "passed" ? "bg-green-100 text-green-800" : "bg-red-100 text-red-800"}`}>
                         {h.status === "passed" ? "Passed (Allocated)" : "Failed (Notified)"}
@@ -395,6 +436,88 @@ const OnboardingPipelinePage = () => {
               <button onClick={handleAssign} disabled={assignMutation.isLoading} className="px-4 py-2 border border-transparent shadow-sm text-sm font-medium rounded-md text-white bg-indigo-600 hover:bg-indigo-700 focus:outline-none">
                 {assignMutation.isLoading ? "Assigning..." : "Assign & Require Confirmation"}
               </button>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {isTimelineModalOpen && selectedTimelineCandidate && (
+        <div className="fixed inset-0 bg-gray-900 bg-opacity-50 flex items-center justify-center p-4 z-[999]">
+          <div className="bg-white rounded-lg p-8 max-w-4xl w-full shadow-xl">
+            <div className="flex justify-between items-center mb-10">
+              <h3 className="text-xl font-bold text-gray-900">Candidate Timeline</h3>
+              <button onClick={() => setIsTimelineModalOpen(false)} className="text-gray-400 hover:text-gray-600 transition-colors">
+                <XCircle className="w-7 h-7" />
+              </button>
+            </div>
+            
+            <div className="relative flex justify-between items-start w-full px-4 md:px-10">
+              {/* Horizontal Connecting Line */}
+              <div className="absolute top-6 left-[10%] right-[10%] h-0.5 bg-gray-200 z-0" />
+              
+              {/* Step 1: Applied */}
+              <div className="flex flex-col items-center flex-1 text-center relative">
+                <div className="flex items-center justify-center w-12 h-12 rounded-full border-4 border-white bg-green-100 text-green-600 shadow-md mb-4 z-10">
+                  <CheckCircle className="w-6 h-6" />
+                </div>
+                <div className="text-sm font-bold text-gray-900">Applied</div>
+                <time className="text-xs font-semibold text-indigo-500 my-1">
+                  {selectedTimelineCandidate.appliedAt ? new Date(selectedTimelineCandidate.appliedAt).toLocaleDateString() : "Unknown"}
+                </time>
+                <div className="text-xs text-gray-500 max-w-[120px] leading-tight">Raised signup request</div>
+              </div>
+
+              {/* Step 2: Approved */}
+              <div className="flex flex-col items-center flex-1 text-center relative">
+                <div className="flex items-center justify-center w-12 h-12 rounded-full border-4 border-white bg-green-100 text-green-600 shadow-md mb-4 z-10">
+                  <CheckCircle className="w-6 h-6" />
+                </div>
+                <div className="text-sm font-bold text-gray-900">Approved</div>
+                <time className="text-xs font-semibold text-indigo-500 my-1">
+                  {selectedTimelineCandidate.approvedAt ? new Date(selectedTimelineCandidate.approvedAt).toLocaleDateString() : "Unknown"}
+                </time>
+                <div className="text-xs text-gray-500 max-w-[120px] leading-tight">Signup was approved</div>
+              </div>
+
+              {/* Step 3: Pipeline Started */}
+              <div className={`flex flex-col items-center flex-1 text-center relative ${!selectedTimelineCandidate.startedAt ? 'opacity-60' : ''}`}>
+                <div className={`flex items-center justify-center w-12 h-12 rounded-full border-4 border-white shadow-md mb-4 z-10 ${selectedTimelineCandidate.startedAt ? 'bg-blue-100 text-blue-600' : 'bg-gray-100 text-gray-500'}`}>
+                  {selectedTimelineCandidate.startedAt ? (
+                    <svg className="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24" xmlns="http://www.w3.org/2000/svg"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M13 10V3L4 14h7v7l9-11h-7z" /></svg>
+                  ) : (
+                    <svg className="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24" xmlns="http://www.w3.org/2000/svg"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 8v4l3 3m6-3a9 9 0 11-18 0 9 9 0 0118 0z" /></svg>
+                  )}
+                </div>
+                <div className="text-sm font-bold text-gray-900">
+                  {selectedTimelineCandidate.startedAt ? "Pipeline Started" : "Pending Start"}
+                </div>
+                <time className={`text-xs font-semibold my-1 ${selectedTimelineCandidate.startedAt ? 'text-indigo-500' : 'text-gray-500'}`}>
+                  {selectedTimelineCandidate.startedAt ? new Date(selectedTimelineCandidate.startedAt).toLocaleDateString() : "Not Started"}
+                </time>
+                <div className="text-xs text-gray-500 max-w-[120px] leading-tight">
+                  {selectedTimelineCandidate.startedAt ? "Candidate accepted 5-day evaluation" : "Pending candidate acceptance"}
+                </div>
+              </div>
+
+              {/* Step 4: Expected Eval */}
+              <div className="flex flex-col items-center flex-1 text-center relative opacity-70">
+                <div className="flex items-center justify-center w-12 h-12 rounded-full border-4 border-white bg-gray-100 text-gray-500 shadow-md mb-4 z-10">
+                  <svg className="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24" xmlns="http://www.w3.org/2000/svg"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 8v4l3 3m6-3a9 9 0 11-18 0 9 9 0 0118 0z" /></svg>
+                </div>
+                <div className="text-sm font-bold text-gray-900">Expected Eval</div>
+                <time className="text-xs font-semibold text-gray-500 my-1">
+                  {selectedTimelineCandidate.startedAt 
+                    ? new Date(new Date(selectedTimelineCandidate.startedAt).getTime() + (5 * 24 * 60 * 60 * 1000)).toLocaleDateString() 
+                    : "Unknown"}
+                </time>
+                <div className="text-xs text-gray-500 max-w-[120px] leading-tight">Day 5 evaluation by Team Lead</div>
+              </div>
+            </div>
+
+            <div className="mt-12 text-center">
+               <button onClick={() => setIsTimelineModalOpen(false)} className="px-8 py-2.5 bg-slate-800 text-white font-semibold rounded-full hover:bg-slate-700 transition-colors shadow focus:outline-none">
+                 Close Timeline
+               </button>
             </div>
           </div>
         </div>

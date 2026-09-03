@@ -5,6 +5,10 @@ import NotificationBell from "../components/NotificationBell";
 import PortalSwitcher from "../components/PortalSwitcher";
 import Breadcrumbs from "../components/ui/Breadcrumbs";
 import ChatWidget from "../components/chat/ChatWidget";
+import { useQuery } from "@tanstack/react-query";
+import { checkinApi } from "../services/api";
+import useCheckinStore from "../store/useCheckinStore";
+import { CalendarCheck } from "lucide-react";
 
 const MIN_WIDTH = 200;
 const MAX_WIDTH = 400;
@@ -32,6 +36,23 @@ export default function AppShellLayout({
   const [peek, setPeek] = useState(false);
   const [width, setWidth] = useState(DEFAULT_WIDTH);
   const widthRef = useRef(DEFAULT_WIDTH);
+
+  const openCheckin = useCheckinStore(state => state.open);
+
+  const { data: checkinStatus } = useQuery({
+    queryKey: ["checkin-today"],
+    queryFn: () => checkinApi.getToday(),
+    // only check if user is an employee
+    enabled: (() => {
+      try {
+        const u = JSON.parse(localStorage.getItem("user") || "{}");
+        return Boolean(u?.employee_id) && !u?.must_change_password;
+      } catch {
+        return false;
+      }
+    })(),
+    staleTime: 60000, // 1 minute
+  });
 
   useEffect(() => {
     const savedCollapsed = localStorage.getItem(`${storageKeyPrefix}-sidebar-collapsed`);
@@ -194,6 +215,16 @@ export default function AppShellLayout({
           </div>
 
           <div className="flex items-center gap-2">
+            {checkinStatus && !checkinStatus.already_checked_in && (
+              <button
+                onClick={openCheckin}
+                className="flex items-center gap-1.5 text-xs font-medium text-amber-700 bg-amber-50 px-2.5 py-1.5 rounded-lg border border-amber-200 hover:bg-amber-100 transition-colors shadow-sm animate-pulse"
+                title="You haven't checked in for today yet"
+              >
+                <CalendarCheck className="w-3.5 h-3.5" />
+                <span className="hidden sm:inline">Pending Check-in</span>
+              </button>
+            )}
             <PortalSwitcher />
             <NotificationBell />
           </div>
