@@ -87,7 +87,7 @@ const ReviewsStatCard = ({ totalReviews, totalEmployees, reviewed = 0, pending =
             Reviews
           </span>
         </div>
-        
+
         <div className="relative flex h-[48px] w-[48px] shrink-0 items-center justify-center -mr-1 -mt-1">
           <svg className="absolute inset-0 h-full w-full -rotate-90">
             <circle
@@ -133,7 +133,7 @@ const ReviewsStatCard = ({ totalReviews, totalEmployees, reviewed = 0, pending =
           <span className="text-sm font-medium text-slate-400">/ {totalEmployees}</span>
         </div>
       </div>
-      
+
       <div className="flex items-center gap-4 text-xs mt-auto border-t border-slate-100 pt-2">
         <div className="flex items-center gap-1.5">
           <CheckCircle2 className="w-3.5 h-3.5 text-emerald-500" />
@@ -267,7 +267,7 @@ const AdminPerformancePage = () => {
   const { data: kpiData = {} } = useQuery({
     queryKey: ["perf-evals-kpi", currentPeriodQuery, projectFilter, roleFilter, search, tab],
     queryFn: () => {
-      const params = { 
+      const params = {
         period: currentPeriodQuery
       };
       if (search.trim()) params.search = search.trim();
@@ -284,16 +284,16 @@ const AdminPerformancePage = () => {
     queryFn: () => {
       const isPmTab = tab === "pm";
       const isHrTab = tab === "hr";
-      
+
       const params = {
         page: perfPage,
         limit: PAGE_SIZE,
         period: currentPeriodQuery,
       };
       params.type = (isPmTab || isHrTab) ? "pm" : "employee";
-      
+
       if (debouncedSearch.trim()) params.search = debouncedSearch.trim();
-      
+
       if (isPmTab) {
         params.role_filter = "pm";
       } else if (isHrTab) {
@@ -304,7 +304,7 @@ const AdminPerformancePage = () => {
       if (projectFilter !== "all") params.project_id = projectFilter;
       if (statusFilter !== "all") params.status = statusFilter;
       if (pmFilter !== "all") params.pm_id = pmFilter;
-      
+
       return perfEvalApi.getAll(params);
     },
     placeholderData: (prev) => prev,
@@ -318,9 +318,9 @@ const AdminPerformancePage = () => {
   // We still need the pending count for the PM tab badge
   const { data: pmSelfData } = useQuery({
     queryKey: ["perf-evals", "pm-pending", currentPeriodQuery, search, roleFilter, projectFilter],
-    queryFn: () => perfEvalApi.getAll({ 
-      period: currentPeriodQuery, 
-      type: "pm", 
+    queryFn: () => perfEvalApi.getAll({
+      period: currentPeriodQuery,
+      type: "pm",
       limit: 500,
       search: search.trim() || undefined,
       project_id: projectFilter === "all" ? undefined : projectFilter,
@@ -329,8 +329,8 @@ const AdminPerformancePage = () => {
     staleTime: 1000 * 60 * 5,
     enabled: tab !== "pm" && ready,
   });
-  const pmPendingCount = tab === "pm" 
-    ? evaluations.filter(e => e.status === "submitted").length 
+  const pmPendingCount = tab === "pm"
+    ? evaluations.filter(e => e.status === "submitted").length
     : (pmSelfData?.items || []).filter(e => e.status === "submitted").length;
 
   const { data: bonusData = {} } = useQuery({
@@ -358,6 +358,39 @@ const AdminPerformancePage = () => {
     if (id === 0) return "Overall (PM)";
     return projects.find((p) => p.id === id)?.name || `Project #${id}`;
   };
+
+  // Group bonus evaluations by employee so one row shows all projects
+  const groupedBonusEvals = useMemo(() => {
+    const byEmployee = new Map();
+
+    for (const ev of bonusEvals) {
+      const key = ev.employee_id;
+      if (!byEmployee.has(key)) {
+        byEmployee.set(key, {
+          employee_id: ev.employee_id,
+          // parallel arrays so Project / Note / Rating stay aligned
+          projects: [
+            {
+              project_id: ev.project_id,
+              project_name: projName(ev.project_id),
+              note: ev.bonus_note || null,
+              rating: ev.overall_rating,
+            },
+          ],
+        });
+      } else {
+        const group = byEmployee.get(key);
+        group.projects.push({
+          project_id: ev.project_id,
+          project_name: projName(ev.project_id),
+          note: ev.bonus_note || null,
+          rating: ev.overall_rating,
+        });
+      }
+    }
+
+    return Array.from(byEmployee.values());
+  }, [bonusEvals, projects]);
 
   const subProjectById = useMemo(
     () => new Map(projects.map((sp) => [String(sp.id), sp])),
@@ -667,69 +700,71 @@ const AdminPerformancePage = () => {
     {
       key: "employee",
       label: "Employee",
-      width: "w-[20%]",
-      render: (_, ev) => (
+      width: "w-[22%]",
+      render: (_, row) => (
         <div className="flex min-w-0 items-center gap-2.5">
           <UserAvatar
-            src={empById.get(ev.employee_id)?.avatar_url}
-            name={empName(ev.employee_id)}
+            src={empById.get(row.employee_id)?.avatar_url}
+            name={empName(row.employee_id)}
             size="w-8 h-8 text-[13px]"
           />
           <span className="truncate font-medium text-slate-800">
-            {empName(ev.employee_id)}
+            {empName(row.employee_id)}
           </span>
         </div>
       ),
     },
     {
-      key: "project",
-      label: "Project",
-      width: "w-[16%]",
-      render: (_, ev) => (
-        <span className="block truncate text-slate-600">
-          {projName(ev.project_id)}
-        </span>
-      ),
-    },
-    {
-      key: "note",
-      label: "Note",
-      width: "w-[48%]",
-      render: (_, ev) => {
-        const note = ev.bonus_note || "—";
+      key: "details",
+      label: "Projects & Feedback",
+      width: "w-[78%]",
+      render: (_, row) => {
+        const projects = row.projects || [];
+        if (projects.length === 0) return <span className="text-slate-400">—</span>;
+
         return (
-          <div className="group/note relative cursor-default">
-            <span className="block truncate text-slate-500">{note}</span>
-            {ev.bonus_note && (
-              <div className="pointer-events-none absolute left-0 bottom-full mb-1.5 z-[60] hidden max-w-[380px] whitespace-normal rounded-xl border border-slate-200 bg-white p-3 text-[13px] leading-relaxed text-slate-700 shadow-xl group-hover/note:block">
-                {note}
+          <div className="flex flex-col gap-3 py-1">
+            {projects.map((p, idx) => (
+              <div
+                key={p.project_id ?? idx}
+                className={`flex flex-col sm:flex-row sm:items-start gap-2 sm:gap-4 ${idx > 0 ? "pt-3 border-t border-slate-100" : ""
+                  }`}
+              >
+                {/* Project name */}
+                <div className="sm:w-[28%] min-w-0 shrink-0">
+                  <span className="inline-flex items-center rounded-md bg-slate-100 px-2 py-0.5 text-[12px] font-medium text-slate-700 truncate max-w-full">
+                    {p.project_name}
+                  </span>
+                </div>
+
+                {/* Note */}
+                <div className="sm:flex-1 min-w-0">
+                  {p.note ? (
+                    <p className="text-[13px] leading-snug text-slate-600 whitespace-normal">
+                      {p.note}
+                    </p>
+                  ) : (
+                    <span className="text-[13px] text-slate-400">—</span>
+                  )}
+                </div>
+
+                {/* Rating */}
+                <div className="sm:w-[120px] shrink-0 flex items-center justify-start sm:justify-end gap-1.5">
+                  <StarRating
+                    value={Math.round(p.rating || 0)}
+                    readOnly
+                    showLabel={false}
+                    size="text-sm"
+                  />
+                  <span className="rounded-full bg-amber-100 px-2 py-0.5 text-[11px] font-semibold text-amber-800 tabular-nums">
+                    {p.rating != null ? Number(p.rating).toFixed(1) : "—"} / 5
+                  </span>
+                </div>
               </div>
-            )}
+            ))}
           </div>
         );
       },
-    },
-    {
-      key: "rating",
-      label: "Rating",
-      align: "right",
-      width: "w-[16%]",
-      render: (_, ev) => (
-        <div className="flex items-center justify-end gap-2">
-          <StarRating
-            value={Math.round(ev.overall_rating || 0)}
-            readOnly
-            showLabel={false}
-            size="text-sm"
-          />
-          <span className="rounded-full bg-amber-100 px-2.5 py-1 text-xs font-semibold text-amber-800">
-            {ev.overall_rating != null
-              ? Number(ev.overall_rating).toFixed(1)
-              : "—"}{" "}
-            / 5
-          </span>
-        </div>
-      ),
     },
   ];
 
@@ -752,7 +787,7 @@ const AdminPerformancePage = () => {
             Past Cycles
           </button>
         </div>
-        
+
         {topTab === "history" && (
           <div className="shrink-0 mt-2 sm:mt-0">
             <MonthStepper
@@ -766,8 +801,8 @@ const AdminPerformancePage = () => {
 
       {/* KPIs */}
       <div className="grid grid-cols-1 sm:grid-cols-3 gap-3">
-        <ReviewsStatCard 
-          totalReviews={kpiData.total ?? 0} 
+        <ReviewsStatCard
+          totalReviews={kpiData.total ?? 0}
           totalEmployees={filteredEmployeesCount}
           reviewed={kpiData.reviewed ?? 0}
           pending={kpiData.pending ?? 0}
@@ -853,7 +888,7 @@ const AdminPerformancePage = () => {
                 className="h-8 w-full rounded-lg border border-slate-200 bg-white pl-9 pr-3 text-[13px] text-slate-700 outline-none transition focus:border-indigo-300 focus:ring-2 focus:ring-indigo-100"
               />
             </div>
-            
+
             <div className="relative z-10">
               <button
                 type="button"
@@ -868,7 +903,7 @@ const AdminPerformancePage = () => {
                   </span>
                 )}
               </button>
-              
+
               {showFilters && (
                 <>
                   <div className="fixed inset-0 z-40" onClick={() => setShowFilters(false)} />
@@ -887,7 +922,7 @@ const AdminPerformancePage = () => {
                         Reset
                       </button>
                     </div>
-                    
+
                     <div className="space-y-4">
                       <div className="space-y-1.5">
                         <label className="text-xs font-medium text-slate-500">Project</label>
@@ -901,7 +936,7 @@ const AdminPerformancePage = () => {
                           ]}
                         />
                       </div>
-                      
+
                       <div className="space-y-1.5">
                         <label className="text-xs font-medium text-slate-500">Status</label>
                         <Dropdown
@@ -996,7 +1031,7 @@ const AdminPerformancePage = () => {
                   Suggested for Bonus
                 </h2>
                 <span className="rounded-full bg-amber-100 px-2 py-0.5 text-xs font-medium text-amber-800">
-                  {bonusEvals.length}
+                  {groupedBonusEvals.length}
                 </span>
                 <ChevronDown
                   className={`ml-auto h-4 w-4 text-amber-600 transition-transform ${bonusOpen ? "rotate-180" : ""}`}
@@ -1008,8 +1043,8 @@ const AdminPerformancePage = () => {
                     variant="untitled"
                     allowOverflow
                     columns={bonusColumns}
-                    data={bonusEvals}
-                    getRowId={(row) => row.id}
+                    data={groupedBonusEvals}
+                    getRowId={(row) => row.employee_id}
                     currentPage={bonusPage}
                     onPageChange={setBonusPage}
                   />
