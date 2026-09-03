@@ -15,9 +15,9 @@ const template = readFileSync(
   'utf-8'
 );
 
-export default function handler(req, res) {
+export default async function handler(req, res) {
   try {
-    const { html: appHtml } = render(req.url, req.headers.cookie || '');
+    const { html: appHtml } = await render(req.url, req.headers.cookie || '');
     const html = template.replace('<!--ssr-outlet-->', appHtml);
     res.setHeader('Content-Type', 'text/html');
     res.status(200).end(html);

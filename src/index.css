@@ -113,5 +113,37 @@
   animation: dotPulseAmber 2s cubic-bezier(0.4, 0, 0.6, 1) infinite;
 }
 
+/* Dashboard & Popover Utility Classes */
+.font-display {
+  font-family: 'Inter', sans-serif;
+  letter-spacing: -0.01em;
+}
 
+.font-data {
+  font-family: 'JetBrains Mono', monospace;
+  font-variant-numeric: tabular-nums;
+}
 
+.log-scroll::-webkit-scrollbar {
+  width: 4px;
+}
+
+.log-scroll::-webkit-scrollbar-thumb {
+  background: #D6D3D1;
+  border-radius: 999px;
+}
+
+.badge-glow {
+  filter: drop-shadow(0 0 4px rgba(13, 148, 136, 0.35))
+          drop-shadow(0 0 1.5px rgba(13, 148, 136, 0.25));
+}
+
+@keyframes allocPopoverIn {
+  0% { opacity: 0; transform: translateY(-4px) scale(0.98); }
+  100% { opacity: 1; transform: translateY(0) scale(1); }
+}
+
+@keyframes candAllocIn {
+  0% { opacity: 0; transform: translateY(-4px) scale(0.98); }
+  100% { opacity: 1; transform: translateY(0) scale(1); }
+}
