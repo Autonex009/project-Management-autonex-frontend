@@ -54,7 +54,13 @@ export default function DailyCheckInModal() {
     }
   }, [status]);
 
-  const shouldPrompt = hasEmployeeRecord && !isLoading && status && !status.already_checked_in;
+  const isAuthRoute = 
+    location.pathname.startsWith('/login') ||
+    location.pathname.startsWith('/forgot-password') ||
+    location.pathname.startsWith('/reset-password') ||
+    location.pathname.startsWith('/employee-signup');
+
+  const shouldPrompt = hasEmployeeRecord && !isLoading && status && !status.already_checked_in && !isAuthRoute;
   const isOpen = Boolean(shouldPrompt && (!isDismissed || isOpenManually));
 
   const toggleProject = (id) => {
