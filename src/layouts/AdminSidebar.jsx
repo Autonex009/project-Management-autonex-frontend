@@ -10,6 +10,7 @@ import {
 } from "lucide-react";
 import { navigation } from "../config/navigation";
 import { useState } from "react";
+import UserAvatar from "../components/ui/UserAvatar";
 
 const onboardingNavigation = [
   { name: "Training Modules", href: "/admin/modules", icon: GraduationCap },
@@ -152,16 +153,34 @@ const AdminSidebar = ({
       <div className="shrink-0 p-2.5 border-t border-slate-200 flex items-center justify-between gap-2">
         {/* Profile (hover shows email) */}
         <div className="group relative">
-          <button
-            type="button"
-            className="h-9 w-9 flex items-center justify-center overflow-hidden rounded-lg border border-slate-200 bg-white "
-          >
-            <img
-              src="/favicon.png"
-              alt="Autonex"
-              className="h-full w-full object-contain p-1"
-            />
-          </button>
+          {user?.employee_id ? (
+            <Link
+              to={`/admin/employees/${user.employee_id}`}
+              onClick={handleNavigate}
+              className="h-9 w-9 flex items-center justify-center overflow-hidden rounded-lg border border-slate-200 bg-white hover:border-blue-500 hover:ring-2 hover:ring-blue-500/20 transition-all shadow-sm"
+            >
+              <UserAvatar
+                src={user?.avatar_url}
+                name={user?.name || user?.email}
+                size="sm"
+                className="h-full w-full rounded-lg"
+                fallbackClassName="rounded-lg border-0 bg-transparent text-slate-500 font-bold text-sm"
+              />
+            </Link>
+          ) : (
+            <button
+              type="button"
+              className="h-9 w-9 flex items-center justify-center overflow-hidden rounded-lg border border-slate-200 bg-white hover:border-slate-300 transition-colors shadow-sm"
+            >
+              <UserAvatar
+                src={user?.avatar_url}
+                name={user?.name || user?.email || "Admin"}
+                size="sm"
+                className="h-full w-full rounded-lg"
+                fallbackClassName="rounded-lg border-0 bg-transparent text-slate-500 font-bold text-sm"
+              />
+            </button>
+          )}
           <div className="absolute bottom-full left-0 mb-2 bg-slate-900 text-white text-xs px-2.5 py-1.5 rounded-lg border border-slate-700 opacity-0 group-hover:opacity-100 transition-opacity duration-200 whitespace-nowrap pointer-events-none z-50 shadow-xl">
             {user.email || "Admin"} · Super Admin
           </div>
