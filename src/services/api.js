@@ -296,9 +296,16 @@ export const allocationApi = {
     api.get(`/allocations/by-project/${projectId}`).then((res) => res.data),
   getByEmployee: (employeeId) =>
     api.get(`/allocations/by-employee/${employeeId}`).then((res) => res.data),
-  getPage: ({ page = 1, pageSize = 10, search = "" } = {}) =>
+  getPage: ({ page = 1, pageSize = 10, search = "", projectView = "active" } = {}) =>
     api
-      .get("/allocations/page", { params: { page, page_size: pageSize, search } })
+      .get("/allocations/page", {
+        params: {
+          page,
+          page_size: pageSize,
+          search,
+          project_view: projectView,
+        },
+      })
       .then((res) => res.data),
 
   getProjectDetail: (projectId) =>
