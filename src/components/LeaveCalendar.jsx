@@ -120,10 +120,9 @@ function EventChip({ ev }) {
 
   return (
     <div
-      className={`truncate text-[9.5px] font-semibold leading-tight ${
-        isRejected ? "line-through opacity-60 text-slate-500" :
-        isWfh ? "text-purple-700 font-bold" : "text-blue-700 font-bold"
-      }`}
+      className={`truncate text-[9.5px] font-semibold leading-tight ${isRejected ? "line-through opacity-60 text-slate-500" :
+          isWfh ? "text-purple-700 font-bold" : "text-blue-700 font-bold"
+        }`}
     >
       {label}
     </div>
@@ -389,6 +388,7 @@ export default function LeaveCalendar({
       : data.wfh || [];
 
     for (const leave of leaves) {
+      if (leave.status === "rejected") continue;
       const start = new Date(leave.start_date + "T00:00:00");
       const end = new Date(leave.end_date + "T00:00:00");
       for (let d = new Date(start); d <= end; d.setDate(d.getDate() + 1)) {
@@ -401,6 +401,7 @@ export default function LeaveCalendar({
       }
     }
     for (const wfh of wfhs) {
+      if (wfh.status === "rejected") continue;
       const key = toYMD(wfh.date || wfh.wfh_date || "");
       if (!key) continue;
       if (!map[key]) map[key] = [];
@@ -1375,26 +1376,6 @@ export default function LeaveCalendar({
                         </div>
                       )}
 
-                      {/* ─── SECTION 4: REJECTED REQUESTS ─── */}
-                      {visibleRejected.length > 0 && (
-                        <div className="space-y-2 pt-2 border-t border-stone-200/60 mt-4">
-                          <div className="flex items-center gap-1.5 pb-1.5 border-b-2 border-rose-400/90 mb-2">
-                            <X className="w-3.5 h-3.5 text-rose-600 shrink-0" />
-                            <h4 className="text-[11px] font-extrabold text-rose-900 uppercase tracking-wider">
-                              Rejected
-                            </h4>
-                            <span className="px-1.5 py-0.5 text-[10px] font-extrabold rounded-full bg-rose-100 text-rose-700 border border-rose-200 leading-none ml-0.5">
-                              {visibleRejected.length}
-                            </span>
-                          </div>
-
-                          <div className="space-y-2">
-                            {visibleRejected.map((ev) =>
-                              renderLeaveCard(ev, false),
-                            )}
-                          </div>
-                        </div>
-                      )}
                   </>
                 )}
               </div>
