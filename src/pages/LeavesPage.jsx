@@ -1084,8 +1084,7 @@ const LeavesPage = () => {
                           label: "Undo rejection",
                           icon: RotateCcw,
                           disabled: undoRejectMutation.isPending,
-                          onClick: () =>
-                            undoRejectMutation.mutate(leave.leave_id),
+                          onClick: () => undoRejectMutation.mutate(leave.leave_id),
                         },
                         { divider: true },
                         {
@@ -1275,19 +1274,19 @@ const LeavesPage = () => {
                         onClick: () => wfhUndoApproveMutation.mutate(w.id),
                       },
                       w.status === "rejected" && {
-                        label: "Undo rejection",
-                        icon: RotateCcw,
-                        disabled: wfhUndoRejectMutation.isPending,
-                        onClick: () => wfhUndoRejectMutation.mutate(w.id),
-                      },
-                      { divider: true },
-                      {
-                        label: "Delete",
-                        icon: Trash2,
-                        tone: "danger",
-                        onClick: () => setWfhDeleteConfirm(w.id),
-                      },
-                    ]}
+                          label: "Undo rejection",
+                          icon: RotateCcw,
+                          disabled: wfhUndoRejectMutation.isPending,
+                          onClick: () => wfhUndoRejectMutation.mutate(w.id),
+                        },
+                        { divider: true },
+                        {
+                          label: "Delete",
+                          icon: Trash2,
+                          tone: "danger",
+                          onClick: () => setWfhDeleteConfirm(w.id),
+                        },
+                      ]}
                   />
                 </div>
               ),
