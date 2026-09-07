@@ -197,7 +197,9 @@ const AdminPerformancePage = () => {
   useEffect(() => {
     const restore = () => {
       const s = getPageState(PAGE_KEY);
-      if (s.tab === "employees" || s.tab === "pm" || s.tab === "history") setTab(s.tab);
+      if (s.tab === "employees" || s.tab === "pm" || s.tab === "hr" || s.tab === "history") {
+        setTab(s.tab);
+      }
       if (s.search != null) {
         setSearch(s.search);
         setDebouncedSearch(s.search);
@@ -290,17 +292,22 @@ const AdminPerformancePage = () => {
         limit: PAGE_SIZE,
         period: currentPeriodQuery,
       };
-      params.type = (isPmTab || isHrTab) ? "pm" : "employee";
 
-      if (debouncedSearch.trim()) params.search = debouncedSearch.trim();
-
+      // Correct type per tab
       if (isPmTab) {
+        params.type = "pm";
         params.role_filter = "pm";
       } else if (isHrTab) {
+        params.type = "hr";          // ← was incorrectly "pm"
         params.role_filter = "hr";
-      } else if (roleFilter !== "all") {
-        params.role_filter = roleFilter;
+      } else {
+        params.type = "employee";
+        if (roleFilter !== "all") {
+          params.role_filter = roleFilter;
+        }
       }
+
+      if (debouncedSearch.trim()) params.search = debouncedSearch.trim();
       if (projectFilter !== "all") params.project_id = projectFilter;
       if (statusFilter !== "all") params.status = statusFilter;
       if (pmFilter !== "all") params.pm_id = pmFilter;

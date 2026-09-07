@@ -22,7 +22,14 @@ export default function ForcePasswordChangeModal() {
       }
       const user = JSON.parse(userStr);
       setCurrentUser(user);
-      if (user && user.must_change_password) {
+      
+      const isAuthRoute = 
+        window.location.pathname.startsWith('/login') ||
+        window.location.pathname.startsWith('/forgot-password') ||
+        window.location.pathname.startsWith('/reset-password') ||
+        window.location.pathname.startsWith('/employee-signup');
+
+      if (user && user.must_change_password && !isAuthRoute) {
         setIsOpen(true);
       } else {
         setIsOpen(false);
