@@ -841,7 +841,7 @@ export const checkinApi = {
   getAdminPaginated: (params) => api.get("/checkins/admin/paginated", { params }).then((res) => res.data),
   getAdminMatrix: (month_year) => api.get("/checkins/admin/matrix", { params: { month_year } }).then((res) => res.data),
   getTeamMatrix: (month_year) => api.get("/checkins/team/matrix", { params: { month_year } }).then((res) => res.data),
-  confirmTeam: () => api.post("/checkins/team/confirm").then((res) => res.data),
+  confirmTeam: (employee_ids) => api.post("/checkins/team/confirm", { employee_ids }).then((res) => res.data),
 };
 
 export default api;
