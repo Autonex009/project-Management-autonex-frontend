@@ -45,6 +45,7 @@ const TeamCheckInsPage = () => {
   const [statusFilter, setStatusFilter] = useState("");
   const [timeFilter, setTimeFilter] = useState("");
   const [activeTab, setActiveTab] = useState("today");
+  const [selectedIds, setSelectedIds] = useState(new Set());
   const limit = 20;
 
   const { data, isLoading, isError } = useQuery({
@@ -66,13 +67,14 @@ const TeamCheckInsPage = () => {
   const projectsList = projectsData?.items || [];
 
   const { mutate: confirmAll, isPending: confirming } = useMutation({
-    mutationFn: () => checkinApi.confirmTeam(),
+    mutationFn: () => checkinApi.confirmTeam(selectedIds.size > 0 ? Array.from(selectedIds) : undefined),
     onSuccess: (result) => {
       toast.success(
         result.confirmed > 0
           ? `Confirmed ${result.confirmed} check-in${result.confirmed === 1 ? "" : "s"}.`
           : "Nothing new to confirm.",
       );
+      setSelectedIds(new Set());
       queryClient.invalidateQueries({ queryKey: ["checkins-team-today"] });
     },
     onError: () => toast.error("Couldn't confirm the roster. Please try again."),
@@ -80,9 +82,65 @@ const TeamCheckInsPage = () => {
 
   const items = data?.items || [];
   const totalCount = data?.total || 0; // for pagination
-  const pendingOnPage = items.filter((r) => r.checked_in && !r.pm_confirmed_at).length;
+  const pendingItems = items.filter((r) => r.checked_in && !r.pm_confirmed_at);
+  const pendingOnPage = pendingItems.length;
+
+  const allSelected = pendingOnPage > 0 && pendingItems.every(r => selectedIds.has(r.employee_id));
+  
+  const toggleAll = () => {
+    if (allSelected) {
+      // If all on current page are selected, deselect them all
+      const newSet = new Set(selectedIds);
+      pendingItems.forEach(r => newSet.delete(r.employee_id));
+      setSelectedIds(newSet);
+    } else {
+      // Select all pending on current page
+      const newSet = new Set(selectedIds);
+      pendingItems.forEach(r => newSet.add(r.employee_id));
+      setSelectedIds(newSet);
+    }
+  };
+
+  const toggleRow = (empId) => {
+    const newSet = new Set(selectedIds);
+    if (newSet.has(empId)) {
+      newSet.delete(empId);
+    } else {
+      newSet.add(empId);
+    }
+    setSelectedIds(newSet);
+  };
 
   const columns = [
+    {
+      key: "selection",
+      label: (
+        <input
+          type="checkbox"
+          className="rounded border-slate-300 text-indigo-600 focus:ring-indigo-500 cursor-pointer w-4 h-4"
+          checked={allSelected}
+          onChange={toggleAll}
+          disabled={pendingOnPage === 0}
+        />
+      ),
+      width: "w-[4%]",
+      render: (_, row) => {
+        const isPending = row.checked_in && !row.pm_confirmed_at;
+        if (!isPending) return null;
+        
+        return (
+          <input
+            type="checkbox"
+            className="rounded border-slate-300 text-indigo-600 focus:ring-indigo-500 cursor-pointer w-4 h-4"
+            checked={selectedIds.has(row.employee_id)}
+            onChange={(e) => {
+              e.stopPropagation();
+              toggleRow(row.employee_id);
+            }}
+          />
+        );
+      },
+    },
     {
       key: "employee",
       label: "Employee",
@@ -256,9 +314,14 @@ const TeamCheckInsPage = () => {
           />
           <Button
             onClick={() => confirmAll()}
-            disabled={confirming}
+            disabled={confirming || pendingItems.length === 0}
           >
-            {confirming ? "Confirming…" : "Confirm New Check-ins"}
+            {confirming 
+              ? "Confirming…" 
+              : selectedIds.size > 0 
+                ? `Confirm Selected (${selectedIds.size})` 
+                : "Confirm All Pending"
+            }
           </Button>
         </div>
       </div>

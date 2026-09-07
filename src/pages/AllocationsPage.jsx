@@ -55,6 +55,7 @@ const AllocationsPage = () => {
   const prefix = isScoped ? "/pm" : "/admin";
   const [selectedEmployees, setSelectedEmployees] = useState([]);
   const [filterTab, setFilterTab] = useState("all");
+  const [projectView, setProjectView] = useState("active"); // "active" | "archived"
   const [editingAllocation, setEditingAllocation] = useState(null); // { projectId, projectName }
   const [confirmState, setConfirmState] = useState(null);
   const [showAllAllocated, setShowAllAllocated] = useState(false);
@@ -87,20 +88,21 @@ const AllocationsPage = () => {
   // ── CHANGED: one pre-aggregated page from the server, instead of
   // projects + allocations + employees + leaves + wfh + parentProjects all
   // joined and recomputed for every project in the browser. ─────────────
-  const {
-    data: pageData,
-    isLoading: pageLoading,
-    isFetching: pageFetching,
-  } = useQuery({
-    queryKey: ["allocations-page", currentPage, searchQuery],
-    queryFn: () =>
-      allocationApi.getPage({
-        page: currentPage,
-        pageSize: PAGE_SIZE,
-        search: searchQuery,
-      }),
-    keepPreviousData: true,
-  });
+    const {
+      data: pageData,
+      isLoading: pageLoading,
+      isFetching: pageFetching,
+    } = useQuery({
+      queryKey: ["allocations-page", currentPage, searchQuery, projectView],
+      queryFn: () =>
+        allocationApi.getPage({
+          page: currentPage,
+          pageSize: PAGE_SIZE,
+          search: searchQuery,
+          projectView,
+        }),
+      keepPreviousData: true,
+    });
 
   const rows = pageData?.items || [];
   const totalPages = pageData?.total_pages || 0;
@@ -111,6 +113,13 @@ const AllocationsPage = () => {
     queryKey: ["sub-projects"],
     queryFn: () => subProjectApi.getAll(),
   });
+
+  const selectableProjects = useMemo(() => {
+    const ARCHIVED = new Set(["completed", "on-hold", "cancelled"]);
+    return projects.filter(
+      (p) => !ARCHIVED.has((p.project_status || "active").toLowerCase().trim()),
+    );
+  }, [projects]);
 
   // ── CHANGED: full employee roster and the "who's on another project"
   // map are only fetched once the Create-Allocation modal is actually
@@ -197,6 +206,10 @@ const AllocationsPage = () => {
       }
     }
   }, [location.state, projects]);
+
+  useEffect(() => {
+    setCurrentPage(1);
+  }, [projectView]);
 
   // ── Derive available / allocated-elsewhere employee lists for the modal
   // from the lazily-fetched roster + employee-projects map + this project's
@@ -326,28 +339,59 @@ const AllocationsPage = () => {
   return (
     <div className="space-y-4">
       {/* Toolbar — search (left) · create allocation (right) */}
-      <div className="flex flex-wrap items-center justify-between gap-2">
-        <SearchBar
-          responsive
-          value={searchQuery}
-          onChange={(val) => {
-            setSearchQuery(val);
-            setCurrentPage(1); // CHANGED: search now re-queries the server, so reset to page 1
-          }}
-          placeholder="Search projects or employees..."
-        />
-        <button
-          type="button"
-          onClick={() => {
-            setSelectedProject(null);
-            setSelectedEmployees([]);
-            setIsModalOpen(true);
-          }}
-          className="inline-flex items-center gap-1.5 h-9 px-3.5 rounded-lg bg-indigo-600 text-white text-[13px] font-semibold hover:bg-indigo-700 shadow-sm transition-colors"
-        >
-          <Plus className="w-4 h-4" />
-          Create Allocation
-        </button>
+      <div className="flex flex-wrap items-center gap-2 border-b border-slate-200 pb-2">
+        {/* Active / Archived tabs */}
+        <div className="flex items-center shrink-0">
+          {[
+            { key: "active", label: "Active" },
+            { key: "archived", label: "Archived" },
+          ].map((t) => {
+            const isActive = projectView === t.key;
+            return (
+              <button
+                key={t.key}
+                type="button"
+                onClick={() => setProjectView(t.key)}
+                className={`inline-flex items-center gap-2 px-4 py-2 text-sm font-semibold border-b-2 -mb-px transition-colors ${
+                  isActive
+                    ? "border-indigo-600 text-indigo-600"
+                    : "border-transparent text-slate-500 hover:text-slate-700"
+                }`}
+              >
+                {t.label}
+              </button>
+            );
+          })}
+        </div>
+
+        {/* Search grows to fill middle */}
+        <div className="flex-1 min-w-[200px]">
+          <SearchBar
+            responsive
+            value={searchQuery}
+            onChange={(val) => {
+              setSearchQuery(val);
+              setCurrentPage(1);
+            }}
+            placeholder="Search projects or employees..."
+          />
+        </div>
+
+        {/* Create only on Active tab */}
+        {projectView === "active" && (
+          <button
+            type="button"
+            onClick={() => {
+              setSelectedProject(null);
+              setSelectedEmployees([]);
+              setIsModalOpen(true);
+            }}
+            className="inline-flex items-center gap-1.5 h-9 px-3.5 rounded-lg bg-indigo-600 text-white text-[13px] font-semibold hover:bg-indigo-700 shadow-sm transition-colors shrink-0"
+          >
+            <Plus className="w-4 h-4" />
+            Create Allocation
+          </button>
+        )}
       </div>
 
       <Table
@@ -533,10 +577,16 @@ const AllocationsPage = () => {
         pageSize={PAGE_SIZE}
         onPageChange={setCurrentPage}
         emptyState={{
-          title: searchQuery ? "No matching allocations" : "No allocations yet",
+          title: searchQuery
+            ? "No matching allocations"
+            : projectView === "archived"
+              ? "No archived projects"
+              : "No allocations yet",
           description: searchQuery
             ? "Try adjusting your search query."
-            : "Create your first allocation to get started",
+            : projectView === "archived"
+              ? "Completed, on-hold, or cancelled projects with allocations will appear here."
+              : "Create your first allocation to get started",
         }}
       />
 
@@ -554,14 +604,14 @@ const AllocationsPage = () => {
                   Select Project <span className="text-red-500">*</span>
                 </label>
                 <Dropdown
-                  options={projects.map((project) => {
+                  options={selectableProjects.map((project) => {
                     const row = rows.find((r) => r.project_id === project.id);
                     const req = row ? row.required_manpower : project.required_manpower || 0;
                     return { value: project.id.toString(), label: `${project.name} - Required: ${req}` };
                   })}
                   value={selectedProject?.id?.toString() || ""}
                   onChange={(val) => {
-                    const project = projects.find((p) => p.id === parseInt(val));
+                    const project = selectableProjects.find((p) => p.id === parseInt(val));
                     setSelectedProject(project);
                     setSelectedEmployees([]);
                   }}

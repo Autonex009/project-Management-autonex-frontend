@@ -44,8 +44,9 @@ function PoolSidebar({
         </div>
       </div>
 
-      {/* Select all */}
+      {/* Select all + Top 10 */}
       <div className="flex items-center gap-2 px-3 py-1.5 border-b border-slate-100 shrink-0 bg-slate-50/70">
+        {/* ── Select all ── */}
         <input
           type="checkbox"
           checked={allSelected}
@@ -60,16 +61,62 @@ function PoolSidebar({
           className="w-3.5 h-3.5 rounded text-indigo-600 border-slate-300 cursor-pointer"
         />
         <span className="text-[10px] font-bold text-slate-500 flex-1">
-          {selectedInPool.length > 0 ? `${selectedInPool.length} selected` : "Select all"}
+          Select all
+          {selectedInPool.length > 0 && (
+            <span className="ml-1.5 text-indigo-600">({selectedInPool.length})</span>
+          )}
         </span>
-        {selectedInPool.length === 0 && candidates.length > 0 && (
-          <button
-            onClick={() => candidates.slice(0, 10).forEach(c => { if (!selectedIds.includes(c.userId)) onToggle(c.userId); })}
-            className="text-[10px] font-bold text-indigo-600 hover:underline"
-          >
-            Top 10
-          </button>
-        )}
+
+        {/* ── Top 10 (fully independent) ── */}
+        {candidates.length > 0 && (() => {
+          const top10 = candidates.slice(0, 10);
+          const top10Ids = top10.map(c => c.userId);
+
+          // Fully checked only when EXACTLY the top 10 are selected
+          const isExactlyTop10 =
+            top10Ids.length > 0 &&
+            top10Ids.every(id => selectedIds.includes(id)) &&
+            selectedIds.length === top10Ids.length;
+
+          // Indeterminate only when some (but not all) of the top 10 are selected
+          // AND no candidates outside the top 10 are selected
+          const onlyTop10Involved = selectedIds.every(id => top10Ids.includes(id));
+          const someTop10Selected = top10Ids.some(id => selectedIds.includes(id));
+          const allTop10Selected = top10Ids.every(id => selectedIds.includes(id));
+          const showIndeterminate = onlyTop10Involved && someTop10Selected && !allTop10Selected;
+
+          return (
+            <label className="flex items-center gap-1.5 cursor-pointer select-none">
+              <input
+                type="checkbox"
+                checked={isExactlyTop10}
+                ref={el => {
+                  if (el) el.indeterminate = showIndeterminate;
+                }}
+                onChange={e => {
+                  if (e.target.checked) {
+                    // Select only the top 10 → clear everything else first
+                    selectedIds.forEach(id => {
+                      if (!top10Ids.includes(id)) onToggle(id);
+                    });
+                    top10Ids.forEach(id => {
+                      if (!selectedIds.includes(id)) onToggle(id);
+                    });
+                  } else {
+                    // Deselect only the top 10
+                    top10Ids.forEach(id => {
+                      if (selectedIds.includes(id)) onToggle(id);
+                    });
+                  }
+                }}
+                className="w-3.5 h-3.5 rounded text-indigo-600 border-slate-300 cursor-pointer"
+              />
+              <span className="text-[10px] font-bold text-indigo-600">
+                Top 10
+              </span>
+            </label>
+          );
+        })()}
       </div>
 
       {/* Candidate list */}
@@ -203,7 +250,7 @@ const OnboardingPipelinePage = () => {
 
   // ── Derived ────────────────────────────────────────────────────────────────
   const pipelineInProgress = pipeline.filter(p => ["pending_confirmation", "in_progress", "day_5_pending"].includes(p.status));
-  const pipelineHistory    = pipeline.filter(p => ["passed", "failed"].includes(p.status));
+  const pipelineHistory = pipeline.filter(p => ["passed", "failed"].includes(p.status));
   const pool = poolCandidates.filter(c => !pipeline.some(p => p.candidate_id === c.userId));
 
   const filteredPool = pool.filter(c => !poolSearch || c.name?.toLowerCase().includes(poolSearch.toLowerCase()));
@@ -266,10 +313,10 @@ const OnboardingPipelinePage = () => {
   };
 
   return (
-    <div className="p-6 flex flex-col gap-4" style={{ height: "calc(100vh - 64px)" }}>
+    <div className="h-[calc(100vh-64px)] flex flex-col overflow-hidden">
 
       {/* Split layout: pool sidebar + calendar */}
-      <div className="flex gap-4 flex-1 min-h-0">
+      <div className="flex gap-3 flex-1 min-h-0 p-3">
 
         {/* Pool Sidebar */}
         <PoolSidebar
