@@ -261,9 +261,9 @@ const MyLeavesPanel = ({
   const [formLeaveType, setFormLeaveType] = useState("paid");
   const [editFormLeaveType, setEditFormLeaveType] = useState("paid");
 
-  // Edit/delete only allowed when the date is strictly in the future
-  const canModify = (leave) => leave.start_date > today;
-  const canModifyWfh = (wfh) => wfh.wfh_date > today;
+  // Edit/delete only allowed when the date is strictly in the future AND status is pending
+  const canModify = (leave) => leave.start_date > today && (leave.status === "pending" || !leave.status);
+  const canModifyWfh = (wfh) => wfh.wfh_date > today && (wfh.status === "pending" || !wfh.status);
 
   const { data: allLeaves = [], isLoading } = useQuery({
     queryKey: ["my-leaves", employeeId],
