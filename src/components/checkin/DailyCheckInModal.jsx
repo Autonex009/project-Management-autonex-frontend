@@ -49,8 +49,9 @@ export default function DailyCheckInModal() {
   useEffect(() => {
     if (!status) return;
     setWorkMode(status.suggested_work_mode || "WFO");
-    if (status.project_options?.length === 1) {
-      setSelectedProjects([status.project_options[0].project_id]);
+    // Default-check every allocated project; user can still uncheck any of them.
+    if (status.project_options?.length > 0) {
+      setSelectedProjects(status.project_options.map((p) => p.project_id));
     }
   }, [status]);
 
