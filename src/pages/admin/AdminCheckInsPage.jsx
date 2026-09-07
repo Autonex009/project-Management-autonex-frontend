@@ -8,7 +8,7 @@ import {
   ShieldCheck,
   AlertTriangle,
 } from "lucide-react";
-import { checkinApi, parentProjectApi } from "../../services/api";
+import { checkinApi, subProjectApi } from "../../services/api";
 import Table from "../../components/ui/Table";
 import Button from "../../components/ui/Button";
 import UserAvatar from "../../components/ui/UserAvatar";
@@ -56,11 +56,11 @@ const AdminCheckInsPage = () => {
   });
 
   const { data: projectsData } = useQuery({
-    queryKey: ["all-projects"],
-    queryFn: () => parentProjectApi.getAll(),
+    queryKey: ["all-sub-projects"],
+    queryFn: () => subProjectApi.getAll(),
     staleTime: 5 * 60 * 1000,
   });
-  const projectsList = projectsData?.items || [];
+  const projectsList = Array.isArray(projectsData) ? projectsData : (projectsData?.items || []);
 
   const items = data?.items || [];
   const totalCount = data?.total || 0;
