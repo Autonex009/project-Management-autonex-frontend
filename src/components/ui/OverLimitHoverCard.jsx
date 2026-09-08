@@ -2,8 +2,8 @@ import React from "react";
 import { AlertTriangle } from "lucide-react";
 import { getLeaveOverLimitInfo } from "../../utils/leaveTypes";
 
-export default function OverLimitHoverCard({ leave, allLeaves = [], className = "" }) {
-  const { overDaysText, totalMonthDays, limit } = getLeaveOverLimitInfo(leave, allLeaves);
+export default function OverLimitHoverCard({ leave, allLeaves = [], employeeType = "", className = "" }) {
+  const { overDaysText, totalMonthDays, limit } = getLeaveOverLimitInfo(leave, allLeaves, employeeType);
   const remarkText = leave?.approval_remark;
 
   return (

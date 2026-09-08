@@ -611,7 +611,7 @@ const LeavesPage = () => {
       !validateConsecutiveLeaves(startDate, endDate, empLeaves, null, isHalf)
     ) {
       toast.error(
-        "Safe guard triggered: You cannot apply for 5 or more consecutive leaves.",
+        "Safe guard triggered: You cannot apply for more than 5 consecutive leaves.",
       );
       return;
     }
@@ -899,7 +899,7 @@ const LeavesPage = () => {
                           {empName}
                         </span>
                         {leave.flagged && (
-                          <OverLimitHoverCard leave={leave} allLeaves={leaves} />
+                          <OverLimitHoverCard leave={leave} allLeaves={leaves} employeeType={emp?.employee_type} />
                         )}
                         {leave.is_emergency && (
                           <FlagChip icon={Siren} label="Emergency" tone="red" pulse />
