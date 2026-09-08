@@ -1,7 +1,8 @@
-import { useState } from "react";
+import { useState, useRef, useEffect } from "react";
 import { Link, useSearchParams } from "react-router-dom";
 import { useMutation, useQuery } from "@tanstack/react-query";
 import Spinner from "../components/ui/LoadingSpinner";
+import { X, ChevronDown } from "lucide-react";
 import {
   User,
   Mail,
@@ -56,6 +57,131 @@ const INPUT_CLASS =
  *    address. The backend reads the email out of the token and ignores anything
  *    the client sends, so a typo can never reach the admin's approval queue.
  */
+
+const WorkCategoryMultiSelect = ({ value = [], onChange }) => {
+  const [isOpen, setIsOpen] = useState(false);
+  const [customSkill, setCustomSkill] = useState("");
+  const [options, setOptions] = useState(WORK_CATEGORIES);
+  const ref = useRef(null);
+
+  useEffect(() => {
+    const handler = (e) => {
+      if (ref.current && !ref.current.contains(e.target)) setIsOpen(false);
+    };
+    document.addEventListener("mousedown", handler);
+    return () => document.removeEventListener("mousedown", handler);
+  }, []);
+
+  const toggle = (skill) => {
+    onChange(
+      value.includes(skill)
+        ? value.filter((s) => s !== skill)
+        : [...value, skill],
+    );
+  };
+
+  const addCustom = () => {
+    const skill = customSkill.trim();
+    if (!skill) return;
+    if (!options.includes(skill)) {
+      setOptions((prev) => [...prev, skill]);
+    }
+    if (!value.includes(skill)) {
+      onChange([...value, skill]);
+    }
+    setCustomSkill("");
+  };
+
+  return (
+    <div ref={ref} className="relative">
+      <div
+        onClick={() => setIsOpen(!isOpen)}
+        className="w-full px-4 py-2 border border-slate-200 rounded-xl bg-white cursor-pointer flex items-center justify-between min-h-[42px]"
+      >
+        <div className="flex flex-wrap gap-1 flex-1">
+          {value.length > 0 ? (
+            value.map((skill) => (
+              <span
+                key={skill}
+                className="inline-flex items-center gap-1 px-2 py-0.5 rounded text-xs bg-emerald-100 text-emerald-700 border border-emerald-200"
+              >
+                {skill}
+                <button
+                  type="button"
+                  onClick={(e) => {
+                    e.stopPropagation();
+                    toggle(skill);
+                  }}
+                  className="hover:text-red-600"
+                >
+                  <X className="w-3 h-3" />
+                </button>
+              </span>
+            ))
+          ) : (
+            <span className="text-slate-400 text-sm">
+              Select work category...
+            </span>
+          )}
+        </div>
+        <ChevronDown
+          className={`w-4 h-4 text-slate-400 transition-transform ${isOpen ? "rotate-180" : ""}`}
+        />
+      </div>
+
+      {isOpen && (
+        <div className="absolute z-50 w-full mt-1 bg-white border border-slate-200 rounded-xl shadow-xl max-h-72 flex flex-col overflow-hidden">
+          <div className="overflow-y-auto flex-1">
+            {options.map((skill) => (
+              <label
+                key={skill}
+                className="flex items-center gap-2 px-4 py-2 hover:bg-slate-50 cursor-pointer text-sm"
+              >
+                <input
+                  type="checkbox"
+                  checked={value.includes(skill)}
+                  onChange={() => toggle(skill)}
+                  className="w-4 h-4 text-emerald-600 rounded border-slate-300"
+                />
+                <span className="text-slate-900">{skill}</span>
+              </label>
+            ))}
+          </div>
+
+          {/* Custom option — same idea as Edit Employee skills */}
+          <div className="border-t border-slate-200 p-3 bg-slate-50">
+            <div className="flex gap-2">
+              <input
+                type="text"
+                value={customSkill}
+                onChange={(e) => setCustomSkill(e.target.value)}
+                onKeyDown={(e) => {
+                  if (e.key === "Enter") {
+                    e.preventDefault();
+                    addCustom();
+                  }
+                }}
+                placeholder="Add custom category..."
+                className="flex-1 px-3 py-1.5 text-sm border border-slate-200 rounded-md outline-none focus:ring-2 focus:ring-emerald-100 focus:border-emerald-500"
+              />
+              <button
+                type="button"
+                onClick={addCustom}
+                className="px-3 py-1.5 text-sm font-medium rounded-md bg-emerald-600 text-white hover:bg-emerald-700"
+              >
+                Add
+              </button>
+            </div>
+            <p className="mt-1.5 text-[11px] text-slate-400">
+              Press Enter or click Add
+            </p>
+          </div>
+        </div>
+      )}
+    </div>
+  );
+};
+
 const EmployeeSignupPage = () => {
   const [searchParams] = useSearchParams();
   const token = searchParams.get("token");
@@ -119,7 +245,10 @@ const EmployeeSignupPage = () => {
       toast.error("Name is required");
       return;
     }
-    // No email in the payload on purpose — the server takes it from the token.
+    if (!form.skills || form.skills.length === 0) {
+      toast.error("Please select at least one work category");
+      return;
+    }
     submitMutation.mutate({ ...form, verification_token: token });
   };
 
@@ -471,15 +600,11 @@ const EmployeeSignupPage = () => {
             {/* Work Category */}
             <div>
               <label className="block text-sm font-medium text-slate-700 mb-1.5">
-                Work Category
+                Work Category <span className="text-red-500">*</span>
               </label>
-              <Dropdown
-                options={["", ...WORK_CATEGORIES]}
-                value={form.skills[0] || ""}
-                onChange={(e) =>
-                  setForm((f) => ({ ...f, skills: e ? [e] : [] }))
-                }
-                placeholder="Select a work category..."
+              <WorkCategoryMultiSelect
+                value={form.skills}
+                onChange={(skills) => setForm((f) => ({ ...f, skills }))}
               />
             </div>
 

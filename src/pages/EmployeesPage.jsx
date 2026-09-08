@@ -1457,7 +1457,7 @@ const EmployeesPage = () => {
         include_archived: statusParam === "archived",
         search: debouncedSearch || undefined,
         skill: skillFilter || undefined,
-        designation: designationFilter.length > 0 ? designationFilter[0] : undefined,
+        designation: designationFilter.length > 0 ? designationFilter.join(",") : undefined,
         col_designation: colDesignation || undefined,
         col_type: colType || undefined,
         sort_by: sortBy || undefined,

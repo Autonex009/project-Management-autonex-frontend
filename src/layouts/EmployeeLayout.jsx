@@ -7,6 +7,8 @@ import { usePageDetailTitle } from "../utils/pageDetailTitle";
 import EmployeeSidebar from "./EmployeeSidebar";
 import AppShellLayout from "../layouts/AppShellLayout";
 import CandidateConfirmationPage from "../pages/hr/CandidateConfirmationPage";
+import usePageStateStore from "../store/usePageStateStore";
+import useScrollStore from "../store/useScrollStore";
 
 const EmployeeLayout = () => {
   const location = useLocation();
@@ -62,6 +64,10 @@ const EmployeeLayout = () => {
       .logout()
       .catch(() => {})
       .finally(() => {
+        // Clear persisted page UI state
+        usePageStateStore.getState().clearAll();
+        useScrollStore.setState({ memory: {}, scrollPositions: {} });
+
         localStorage.removeItem("token");
         localStorage.removeItem("user");
         localStorage.removeItem("role");
