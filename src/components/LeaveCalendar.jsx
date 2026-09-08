@@ -120,10 +120,9 @@ function EventChip({ ev }) {
 
   return (
     <div
-      className={`truncate text-[9.5px] font-semibold leading-tight ${
-        isRejected ? "line-through opacity-60 text-slate-500" :
-        isWfh ? "text-purple-700 font-bold" : "text-blue-700 font-bold"
-      }`}
+      className={`truncate text-[9.5px] font-semibold leading-tight ${isRejected ? "line-through opacity-60 text-slate-500" :
+          isWfh ? "text-purple-700 font-bold" : "text-blue-700 font-bold"
+        }`}
     >
       {label}
     </div>
@@ -389,6 +388,7 @@ export default function LeaveCalendar({
       : data.wfh || [];
 
     for (const leave of leaves) {
+      if (leave.status === "rejected") continue;
       const start = new Date(leave.start_date + "T00:00:00");
       const end = new Date(leave.end_date + "T00:00:00");
       for (let d = new Date(start); d <= end; d.setDate(d.getDate() + 1)) {
@@ -401,6 +401,7 @@ export default function LeaveCalendar({
       }
     }
     for (const wfh of wfhs) {
+      if (wfh.status === "rejected") continue;
       const key = toYMD(wfh.date || wfh.wfh_date || "");
       if (!key) continue;
       if (!map[key]) map[key] = [];

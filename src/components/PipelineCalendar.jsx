@@ -20,6 +20,7 @@ const FIXED_HOLIDAYS = [
 const STAGE = {
   assigned: {
     label: "Assigned",
+    desc: "HR assigned this candidate to a mentor & project",
     icon: UserPlus,
     chipBg: "bg-blue-100 border-blue-300 text-blue-700",
     dot: "bg-blue-500",
@@ -27,6 +28,7 @@ const STAGE = {
   },
   accepted: {
     label: "Accepted",
+    desc: "Candidate accepted the assignment from their portal",
     icon: UserCheck,
     chipBg: "bg-teal-100 border-teal-300 text-teal-700",
     dot: "bg-teal-500",
@@ -34,6 +36,7 @@ const STAGE = {
   },
   pending_confirmation: {
     label: "Awaiting Acceptance",
+    desc: "Assigned but candidate has not yet confirmed",
     icon: Clock,
     barBg: "bg-blue-50 border-blue-200 text-blue-600",
     dot: "bg-blue-400",
@@ -41,6 +44,7 @@ const STAGE = {
   },
   in_progress: {
     label: "In Training",
+    desc: "Candidate is actively in their 5-day onboarding",
     icon: PlayCircle,
     barBg: "bg-amber-50 border-amber-200 text-amber-700",
     dot: "bg-amber-500",
@@ -48,6 +52,7 @@ const STAGE = {
   },
   day_5_pending: {
     label: "Eval Due",
+    desc: "Training complete — evaluation pending from TL",
     icon: AlertCircle,
     barBg: "bg-red-50 border-red-300 text-red-700",
     dot: "bg-red-500",
@@ -56,6 +61,7 @@ const STAGE = {
   },
   passed: {
     label: "Passed ✓",
+    desc: "Candidate passed evaluation and has been allocated",
     icon: Star,
     barBg: "bg-emerald-50 border-emerald-200 text-emerald-700",
     dot: "bg-emerald-500",
@@ -63,6 +69,7 @@ const STAGE = {
   },
   failed: {
     label: "Failed",
+    desc: "Candidate did not pass evaluation and was notified",
     icon: Ban,
     barBg: "bg-rose-50 border-rose-200 text-rose-600",
     dot: "bg-rose-500",
@@ -149,9 +156,8 @@ function ActivityModal({ title, subtitle, groups, onClose }) {
                 return (
                   <div key={key} className="rounded-xl border border-slate-200 overflow-hidden">
                     <div
-                      className={`flex items-center gap-2 px-4 py-2.5 border-b ${
-                        s.badge || "bg-slate-50 border-slate-200"
-                      }`}
+                      className={`flex items-center gap-2 px-4 py-2.5 border-b ${s.badge || "bg-slate-50 border-slate-200"
+                        }`}
                     >
                       <span className={`w-2.5 h-2.5 rounded-full ${s.dot}`} />
                       <Icon className="w-4 h-4 opacity-70" />
@@ -184,11 +190,10 @@ function ActivityModal({ title, subtitle, groups, onClose }) {
                   key={i}
                   item={{
                     name: item.candidateName,
-                    meta: `${
-                      item.buddy
+                    meta: `${item.buddy
                         ? `Mentor: ${formatDisplayName(item.buddy)} · `
                         : ""
-                    }${item.project || "No project"}`,
+                      }${item.project || "No project"}`,
                     raw: item.rawPipeline || item,
                     status: item.status,
                   }}
@@ -318,8 +323,8 @@ function CandidateRow({ item, isUrgent, isCompletedSection = false }) {
 
             <span
               className={`inline-flex items-center gap-1 text-[10px] font-bold px-2 py-0.5 rounded-full ${isPassed
-                  ? "bg-emerald-100 text-emerald-700"
-                  : "bg-rose-100 text-rose-700"
+                ? "bg-emerald-100 text-emerald-700"
+                : "bg-rose-100 text-rose-700"
                 }`}
             >
               {isPassed ? (
@@ -475,9 +480,9 @@ export default function PipelineCalendar({
             stageKey: p.status,
             name,
             meta: `${p.buddy ? `Mentor: ${formatDisplayName(p.buddy)} · ` : ""}${isActive ? `Day ${p.daysElapsed || 0} of 5` :
-                isPendingConfirm ? "Awaiting candidate confirmation" :
-                  p.status === "passed" ? "Allocated ✓" :
-                    p.status === "failed" ? "Failed & Notified" : ""
+              isPendingConfirm ? "Awaiting candidate confirmation" :
+                p.status === "passed" ? "Allocated ✓" :
+                  p.status === "failed" ? "Failed & Notified" : ""
               }`,
             raw: p,
           };
