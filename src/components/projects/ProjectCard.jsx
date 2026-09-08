@@ -357,7 +357,7 @@ const ProjectCard = ({
           it were editable. */}
       <div className="mt-3.5 mb-4 rounded-md bg-slate-50/40 p-3.5 ring-1 ring-slate-200">
         <div className="grid grid-cols-2 gap-x-4 gap-y-3">
-          <CardField label="Manpower required">
+          <CardField label="Required Team">
             {/* Both counts spell out their manager and lead slots, because the
                 requirement includes them — otherwise 2 against a project asking
                 for one reviewer reads as wrong. */}
@@ -367,7 +367,7 @@ const ProjectCard = ({
             </p>
           </CardField>
 
-          <CardField label="Manpower current">
+          <CardField label="Current Team">
             {/* Hovering the count opens the roster popover — who is on the
                 project, and the way through to Allocations. */}
             <AllocationPopover
@@ -612,9 +612,9 @@ const ProjectCard = ({
                   onClick={onAdvanced}
                   title="Edit"
                   aria-label="Edit"
-                  className="rounded-lg p-1.5 text-slate-400 hover:bg-indigo-50 hover:text-indigo-600"
+                  className="inline-flex items-center gap-1.5 rounded-lg px-2.5 py-1.5 text-xs font-medium text-slate-500 hover:bg-indigo-50 hover:text-indigo-600 transition-colors"
                 >
-                  <Edit className="h-4 w-4" />
+                  Edit <Edit className="h-3.5 w-3.5" />
                 </button>
               )}
               {onDelete && (
@@ -623,9 +623,9 @@ const ProjectCard = ({
                   onClick={onDelete}
                   title="Delete"
                   aria-label="Delete"
-                  className="rounded-lg p-1.5 text-slate-400 hover:bg-red-50 hover:text-red-600"
+                  className="inline-flex items-center gap-1.5 rounded-lg px-2.5 py-1.5 text-xs font-medium text-slate-500 hover:bg-red-50 hover:text-red-600 transition-colors"
                 >
-                  <Trash2 className="h-4 w-4" />
+                  Delete <Trash2 className="h-3.5 w-3.5" />
                 </button>
               )}
             </>

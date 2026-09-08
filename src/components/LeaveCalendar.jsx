@@ -1375,26 +1375,6 @@ export default function LeaveCalendar({
                         </div>
                       )}
 
-                      {/* ─── SECTION 4: REJECTED REQUESTS ─── */}
-                      {visibleRejected.length > 0 && (
-                        <div className="space-y-2 pt-2 border-t border-stone-200/60 mt-4">
-                          <div className="flex items-center gap-1.5 pb-1.5 border-b-2 border-rose-400/90 mb-2">
-                            <X className="w-3.5 h-3.5 text-rose-600 shrink-0" />
-                            <h4 className="text-[11px] font-extrabold text-rose-900 uppercase tracking-wider">
-                              Rejected
-                            </h4>
-                            <span className="px-1.5 py-0.5 text-[10px] font-extrabold rounded-full bg-rose-100 text-rose-700 border border-rose-200 leading-none ml-0.5">
-                              {visibleRejected.length}
-                            </span>
-                          </div>
-
-                          <div className="space-y-2">
-                            {visibleRejected.map((ev) =>
-                              renderLeaveCard(ev, false),
-                            )}
-                          </div>
-                        </div>
-                      )}
                   </>
                 )}
               </div>
