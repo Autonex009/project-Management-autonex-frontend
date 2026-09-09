@@ -1,7 +1,10 @@
+// store/usePageStateStore.js
 import { create } from "zustand";
 import { persist, createJSONStorage } from "zustand/middleware";
 
 const TTL_MS = 10 * 60 * 1000; // 10 minutes
+
+const STORAGE_KEY = "page-ui-state";
 
 const ttlStorage = {
   getItem: (name) => {
@@ -51,10 +54,14 @@ const usePageStateStore = create(
           delete next[key];
           return { pages: next };
         }),
-      clearAll: () => set({ pages: {} }),
+      clearAll: () => {
+        set({ pages: {} });
+        // also wipe the raw sessionStorage entry so nothing can be re-hydrated
+        sessionStorage.removeItem(STORAGE_KEY);
+      },
     }),
     {
-      name: "page-ui-state",
+      name: STORAGE_KEY,
       storage: createJSONStorage(() => ttlStorage),
       partialize: (state) => ({ pages: state.pages }),
     }
