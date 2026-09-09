@@ -41,6 +41,7 @@ import {
   Lock,
   Archive,
   FileText,
+  UserMinus
 } from "lucide-react";
 import toast from "react-hot-toast";
 import UserAvatar from "../components/ui/UserAvatar";
@@ -87,10 +88,10 @@ const STATUS_COLORS = {
 // Stored Encord IDs are trimmed here: a few carry leading whitespace from import.
 const matchesSearchTerm = (employee, term) => {
   if (!term) return true;
-  
+
   // Split search term by spaces to match individual words
   const searchParts = term.trim().split(/\s+/);
-  
+
   // Combine all searchable fields into one big string
   const fieldsText = [
     employee.name,
@@ -344,15 +345,18 @@ function EmployeeArchiveModal({ employee, onClose, onConfirm, isPending }) {
       <Modal.Header onClose={onClose}>
         <div className="flex items-center gap-3">
           <div
-            className={`w-11 h-11 rounded-full flex items-center justify-center flex-shrink-0 ${hasAllocations ? "bg-amber-50 text-amber-500" : "bg-red-50 text-red-500"}`}
+            className={`w-11 h-11 rounded-full flex items-center justify-center flex-shrink-0 ${hasAllocations ? "bg-amber-50 text-amber-500" : "bg-red-50 text-red-500"
+              }`}
           >
             <AlertCircle className="w-5 h-5" />
           </div>
           <div>
             <h2 className="text-base font-semibold text-slate-800">
-              {hasAllocations ? "Cannot Archive Employee" : "Archive Employee"}
+              Archive Employee
             </h2>
-            <p className="text-sm text-slate-400">{formatDisplayName(employee.name)}</p>
+            <p className="text-sm text-slate-400">
+              {formatDisplayName(employee.name)}
+            </p>
           </div>
         </div>
       </Modal.Header>
@@ -366,12 +370,15 @@ function EmployeeArchiveModal({ employee, onClose, onConfirm, isPending }) {
       ) : (
         <>
           <Modal.Body className="space-y-4">
-            {hasAllocations ? (
+            {/* Warning when the employee is still allocated */}
+            {hasAllocations && (
               <div className="space-y-3">
                 <p className="text-sm text-slate-600 leading-relaxed">
-                  <strong>{formatDisplayName(employee.name)}</strong> cannot be archived because
-                  they are currently allocated to the following projects. Please
-                  remove their allocations first:
+                  <strong>{formatDisplayName(employee.name)}</strong> is currently
+                  allocated to the following project
+                  {allocations.length === 1 ? "" : "s"}. Archiving will{" "}
+                  <strong>remove them from all of these projects</strong> and then
+                  archive the employee.
                 </p>
                 <div className="bg-slate-50 border border-slate-100 rounded-xl p-3 space-y-2 max-h-48 overflow-y-auto">
                   {allocations.map((alloc) => (
@@ -385,67 +392,83 @@ function EmployeeArchiveModal({ employee, onClose, onConfirm, isPending }) {
                           `Project (ID: ${alloc.sub_project_id})`}
                       </span>
                       <span className="text-slate-400 font-normal">
-                        {alloc.total_daily_hours}h/day (
-                        {alloc.allocation_percentage}%)
+                        {alloc.total_daily_hours}h/day
+                        {alloc.allocation_percentage != null
+                          ? ` (${alloc.allocation_percentage}%)`
+                          : ""}
                       </span>
                     </div>
                   ))}
                 </div>
               </div>
-            ) : (
-              <div className="space-y-4">
-                <p className="text-sm text-slate-600 leading-relaxed">
-                  Are you sure you want to archive{" "}
-                  <strong>{formatDisplayName(employee.name)}</strong>?
-                </p>
-                <div className="bg-amber-50 border border-amber-100 rounded-xl p-4 space-y-2.5">
+            )}
+
+            {/* Standard confirmation copy (always shown) */}
+            <div className="space-y-4">
+              <p className="text-sm text-slate-600 leading-relaxed">
+                Are you sure you want to archive{" "}
+                <strong>{formatDisplayName(employee.name)}</strong>?
+              </p>
+              <div className="bg-amber-50 border border-amber-100 rounded-xl p-4 space-y-2.5">
+                <div className="flex gap-2.5 text-xs text-amber-850 leading-relaxed">
+                  <span className="flex-shrink-0">
+                    <Lock className="w-4 h-4 text-amber-500" />
+                  </span>
+                  <span>
+                    System access to the portal will be immediately revoked.
+                  </span>
+                </div>
+                {hasAllocations && (
                   <div className="flex gap-2.5 text-xs text-amber-850 leading-relaxed">
-                    <span className="flex-shrink-0"><Lock className="w-4 h-4 text-amber-500" /></span>
+                    <span className="flex-shrink-0">
+                      <UserMinus className="w-4 h-4 text-amber-500" />
+                    </span>
                     <span>
-                      System access to the portal will be immediately revoked.
+                      They will be removed from all currently allocated projects.
                     </span>
                   </div>
-                  <div className="flex gap-2.5 text-xs text-amber-850 leading-relaxed">
-                    <span className="flex-shrink-0"><Archive className="w-4 h-4 text-amber-500" /></span>
-                    <span>
-                      All historical data (leaves, project allocations history)
-                      will be preserved for records.
-                    </span>
-                  </div>
-                  <div className="flex gap-2.5 text-xs text-amber-850 leading-relaxed">
-                    <span className="flex-shrink-0"><RotateCcw className="w-4 h-4 text-amber-500" /></span>
-                    <span>
-                      You can restore this employee at any time from the
-                      "Archived / Former" tab.
-                    </span>
-                  </div>
+                )}
+                <div className="flex gap-2.5 text-xs text-amber-850 leading-relaxed">
+                  <span className="flex-shrink-0">
+                    <Archive className="w-4 h-4 text-amber-500" />
+                  </span>
+                  <span>
+                    All historical data (leaves, project allocations history)
+                    will be preserved for records.
+                  </span>
+                </div>
+                <div className="flex gap-2.5 text-xs text-amber-850 leading-relaxed">
+                  <span className="flex-shrink-0">
+                    <RotateCcw className="w-4 h-4 text-amber-500" />
+                  </span>
+                  <span>
+                    You can restore this employee at any time from the
+                    &quot;Archived / Former&quot; tab. Previous project
+                    allocations are <strong>not</strong> restored.
+                  </span>
                 </div>
               </div>
-            )}
+            </div>
           </Modal.Body>
+
           <Modal.Footer>
-            {hasAllocations ? (
-              <Button variant="cancel" onClick={onClose}>
-                Close
-              </Button>
-            ) : (
-              <>
-                <button
-                  onClick={onClose}
-                  className="px-4 py-2 border border-slate-200 hover:bg-slate-50 text-slate-700 rounded-xl text-sm font-medium transition-colors"
-                >
-                  Cancel
-                </button>
-                <Button
-                  variant="warning"
-                  onClick={onConfirm}
-                  disabled={isPending}
-                  isLoading={isPending}
-                >
-                  {!isPending && "Archive"}
-                </Button>
-              </>
-            )}
+            <button
+              onClick={onClose}
+              className="px-4 py-2 border border-slate-200 hover:bg-slate-50 text-slate-700 rounded-xl text-sm font-medium transition-colors"
+            >
+              Cancel
+            </button>
+            <Button
+              variant="warning"
+              onClick={onConfirm}
+              disabled={isPending}
+              isLoading={isPending}
+            >
+              {!isPending &&
+                (hasAllocations
+                  ? "Remove from projects & Archive"
+                  : "Archive")}
+            </Button>
           </Modal.Footer>
         </>
       )}
@@ -1129,9 +1152,8 @@ const StatTile = ({
   <button
     type="button"
     onClick={onClick}
-    className={`p-2 rounded-xl text-center border transition-all hover:scale-[1.02] ${
-      active ? activeBg : idleBg
-    }`}
+    className={`p-2 rounded-xl text-center border transition-all hover:scale-[1.02] ${active ? activeBg : idleBg
+      }`}
   >
     <div
       className={`text-base sm:text-lg font-extrabold font-mono leading-none ${textClass}`}
@@ -1305,7 +1327,7 @@ const EmployeesPage = () => {
   const [formDesignation, setFormDesignation] = useState("Annotator/ Reviewer");
   const [formEmployeeType, setFormEmployeeType] = useState("Full-time");
   const [formWorkModel, setFormWorkModel] = useState("WFO");
-    const PAGE_SIZE = 10;
+  const PAGE_SIZE = 10;
 
   // ============================================================
   // PERSISTENCE KEYS
@@ -1872,7 +1894,7 @@ const EmployeesPage = () => {
   //   colWorkModel,
   // ]);
 
-  
+
   const handleSelectColDesignation = (roleKey) => {
     if (colDesignation === roleKey) {
       setColDesignation("");
@@ -2072,166 +2094,166 @@ const EmployeesPage = () => {
           />
         </KpiCard>
       </div>
-        {/* Tabs and Toolbar Row */}
-        <div className="flex flex-wrap items-end justify-between gap-4 border-b border-slate-200">
-          {/* Tabs for Active Team vs Archived */}
-          <div className="flex">
-            <button
-              onClick={() => {
-                const params = new URLSearchParams(searchParams);
-                params.delete("status");
-                setSearchParams(params);
-              }}
-              className={`px-4 py-2 text-sm font-semibold border-b-2 -mb-px transition-colors ${statusParam !== "archived"
-                ? "border-indigo-600 text-indigo-600"
-                : "border-transparent text-slate-500 hover:text-slate-700"
-                }`}
-            >
-              <span className="inline-flex items-center gap-2">
-                Active Team
-                {hasTeamCounts && (
-                  <span
-                    className={`rounded-md px-1.5 py-0.5 text-xs font-semibold tabular-nums ${statusParam !== "archived"
-                      ? "bg-indigo-50 text-indigo-600"
-                      : "bg-slate-100 text-slate-500"
-                      }`}
-                  >
-                    {activeTeamCount}
-                  </span>
-                )}
-              </span>
-            </button>
-            <button
-              onClick={() => {
-                const params = new URLSearchParams(searchParams);
-                params.set("status", "archived");
-                setSearchParams(params);
-              }}
-              className={`px-4 py-2 text-sm font-semibold border-b-2 -mb-px transition-colors ${statusParam === "archived"
-                ? "border-indigo-600 text-indigo-600"
-                : "border-transparent text-slate-500 hover:text-slate-700"
-                }`}
-            >
-              <span className="inline-flex items-center gap-2">
-                Archived / Former
-                {hasTeamCounts && (
-                  <span
-                    className={`rounded-md px-1.5 py-0.5 text-xs font-semibold tabular-nums ${statusParam === "archived"
-                      ? "bg-indigo-50 text-indigo-600"
-                      : "bg-slate-100 text-slate-500"
-                      }`}
-                  >
-                    {archivedTeamCount}
-                  </span>
-                )}
-              </span>
-            </button>
-          </div>
-
-          {/* Right cluster: chips · search · filter · sort · add */}
-          <div className="flex flex-wrap items-center gap-2 pb-2">
-            {idleOnly && (
-              <span className="inline-flex items-center gap-1.5 px-2.5 py-1.5 rounded-lg text-xs font-medium bg-amber-50 text-amber-700 border border-amber-200">
-                Idle Only
-                <button
-                  type="button"
-                  onClick={() => {
-                    const params = new URLSearchParams(searchParams);
-                    params.delete("idleOnly");
-                    setSearchParams(params);
-                  }}
-                  className="hover:text-amber-900"
+      {/* Tabs and Toolbar Row */}
+      <div className="flex flex-wrap items-end justify-between gap-4 border-b border-slate-200">
+        {/* Tabs for Active Team vs Archived */}
+        <div className="flex">
+          <button
+            onClick={() => {
+              const params = new URLSearchParams(searchParams);
+              params.delete("status");
+              setSearchParams(params);
+            }}
+            className={`px-4 py-2 text-sm font-semibold border-b-2 -mb-px transition-colors ${statusParam !== "archived"
+              ? "border-indigo-600 text-indigo-600"
+              : "border-transparent text-slate-500 hover:text-slate-700"
+              }`}
+          >
+            <span className="inline-flex items-center gap-2">
+              Active Team
+              {hasTeamCounts && (
+                <span
+                  className={`rounded-md px-1.5 py-0.5 text-xs font-semibold tabular-nums ${statusParam !== "archived"
+                    ? "bg-indigo-50 text-indigo-600"
+                    : "bg-slate-100 text-slate-500"
+                    }`}
                 >
-                  <X className="w-3 h-3" />
-                </button>
-              </span>
-            )}
-            {statusParam === "archived" && (
-              <span className="inline-flex items-center gap-1.5 px-2.5 py-1.5 rounded-lg text-xs font-medium bg-indigo-50 text-indigo-700 border border-indigo-200">
-                Status: Archived
-                <button
-                  type="button"
-                  onClick={() => {
-                    const params = new URLSearchParams(searchParams);
-                    params.delete("status");
-                    setSearchParams(params);
-                  }}
-                  className="hover:text-indigo-900"
+                  {activeTeamCount}
+                </span>
+              )}
+            </span>
+          </button>
+          <button
+            onClick={() => {
+              const params = new URLSearchParams(searchParams);
+              params.set("status", "archived");
+              setSearchParams(params);
+            }}
+            className={`px-4 py-2 text-sm font-semibold border-b-2 -mb-px transition-colors ${statusParam === "archived"
+              ? "border-indigo-600 text-indigo-600"
+              : "border-transparent text-slate-500 hover:text-slate-700"
+              }`}
+          >
+            <span className="inline-flex items-center gap-2">
+              Archived / Former
+              {hasTeamCounts && (
+                <span
+                  className={`rounded-md px-1.5 py-0.5 text-xs font-semibold tabular-nums ${statusParam === "archived"
+                    ? "bg-indigo-50 text-indigo-600"
+                    : "bg-slate-100 text-slate-500"
+                    }`}
                 >
-                  <X className="w-3 h-3" />
-                </button>
-              </span>
-            )}
+                  {archivedTeamCount}
+                </span>
+              )}
+            </span>
+          </button>
+        </div>
 
-            <FilterButton
-              predefinedSkills={predefinedSkills}
-              skillFilter={skillFilter}
-              setSkillFilter={setSkillFilter}
-              designationOptions={designationOptions}
-              designationFilter={designationFilter}
-              setDesignationFilter={(val) => {
-                setDesignationFilter(val);
-                if (!val || val.length === 0) setColDesignation("");
+        {/* Right cluster: chips · search · filter · sort · add */}
+        <div className="flex flex-wrap items-center gap-2 pb-2">
+          {idleOnly && (
+            <span className="inline-flex items-center gap-1.5 px-2.5 py-1.5 rounded-lg text-xs font-medium bg-amber-50 text-amber-700 border border-amber-200">
+              Idle Only
+              <button
+                type="button"
+                onClick={() => {
+                  const params = new URLSearchParams(searchParams);
+                  params.delete("idleOnly");
+                  setSearchParams(params);
+                }}
+                className="hover:text-amber-900"
+              >
+                <X className="w-3 h-3" />
+              </button>
+            </span>
+          )}
+          {statusParam === "archived" && (
+            <span className="inline-flex items-center gap-1.5 px-2.5 py-1.5 rounded-lg text-xs font-medium bg-indigo-50 text-indigo-700 border border-indigo-200">
+              Status: Archived
+              <button
+                type="button"
+                onClick={() => {
+                  const params = new URLSearchParams(searchParams);
+                  params.delete("status");
+                  setSearchParams(params);
+                }}
+                className="hover:text-indigo-900"
+              >
+                <X className="w-3 h-3" />
+              </button>
+            </span>
+          )}
+
+          <FilterButton
+            predefinedSkills={predefinedSkills}
+            skillFilter={skillFilter}
+            setSkillFilter={setSkillFilter}
+            designationOptions={designationOptions}
+            designationFilter={designationFilter}
+            setDesignationFilter={(val) => {
+              setDesignationFilter(val);
+              if (!val || val.length === 0) setColDesignation("");
+            }}
+            typeFilter={colType}
+            setTypeFilter={setColType}
+            typeOptions={typeValues}
+            workModelFilter={colWorkModel}
+            setWorkModelFilter={setColWorkModel}
+            workModelOptions={workModelValues}
+            onChange={() => setCurrentPage(1)}
+          />
+
+          <SortMenu sortBy={sortBy} setSortBy={setSortBy} />
+
+          {/* Search */}
+          <div className="relative">
+            <Search className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-slate-400 pointer-events-none" />
+            <input
+              type="text"
+              value={searchQuery}
+              onChange={(e) => {
+                setSearchQuery(e.target.value);
+                setCurrentPage(1);
               }}
-              typeFilter={colType}
-              setTypeFilter={setColType}
-              typeOptions={typeValues}
-              workModelFilter={colWorkModel}
-              setWorkModelFilter={setColWorkModel}
-              workModelOptions={workModelValues}
-              onChange={() => setCurrentPage(1)}
+              placeholder="Search name, email or Encord ID..."
+              title="Searches the loaded roster first, then the server by Encord ID"
+              className="h-9 w-52 sm:w-64 pl-9 pr-9 rounded-lg border border-slate-200 bg-white text-[13px] text-slate-700 placeholder:text-slate-400 focus:outline-none focus:ring-2 focus:ring-indigo-100 focus:border-indigo-300 transition-all"
             />
-
-            <SortMenu sortBy={sortBy} setSortBy={setSortBy} />
-
-            {/* Search */}
-            <div className="relative">
-              <Search className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-slate-400 pointer-events-none" />
-              <input
-                type="text"
-                value={searchQuery}
-                onChange={(e) => {
-                  setSearchQuery(e.target.value);
+            {searchQuery ? (
+              <button
+                type="button"
+                onClick={() => {
+                  setSearchQuery("");
                   setCurrentPage(1);
                 }}
-                placeholder="Search name, email or Encord ID..."
-                title="Searches the loaded roster first, then the server by Encord ID"
-                className="h-9 w-52 sm:w-64 pl-9 pr-9 rounded-lg border border-slate-200 bg-white text-[13px] text-slate-700 placeholder:text-slate-400 focus:outline-none focus:ring-2 focus:ring-indigo-100 focus:border-indigo-300 transition-all"
-              />
-              {searchQuery ? (
-                <button
-                  type="button"
-                  onClick={() => {
-                    setSearchQuery("");
-                    setCurrentPage(1);
-                  }}
-                  className="absolute right-2.5 top-1/2 -translate-y-1/2 text-slate-400 hover:text-slate-600"
-                >
-                  <X className="w-3.5 h-3.5" />
-                </button>
-              ) : (
-                <kbd className="absolute right-2.5 top-1/2 -translate-y-1/2 hidden sm:inline-flex items-center h-5 px-1.5 rounded border border-slate-200 bg-slate-50 text-[10px] font-medium text-slate-400 pointer-events-none">
-                  ⌘1
-                </kbd>
-              )}
-            </div>
-
-            <button
-              type="button"
-              onClick={() => {
-                setEditingEmployee(null);
-                setFormDesignation("Annotator/ Reviewer");
-                setFormEmployeeType("Full-time");
-                setFormWorkModel("WFO");
-                setIsModalOpen(true);
-              }}
-              className="inline-flex items-center gap-1.5 h-9 px-3.5 rounded-lg bg-indigo-600 text-white text-[13px] font-semibold hover:bg-indigo-700 shadow-sm transition-colors"
-            >
-              <Plus className="w-4 h-4" />
-              Add Employee
-            </button>
+                className="absolute right-2.5 top-1/2 -translate-y-1/2 text-slate-400 hover:text-slate-600"
+              >
+                <X className="w-3.5 h-3.5" />
+              </button>
+            ) : (
+              <kbd className="absolute right-2.5 top-1/2 -translate-y-1/2 hidden sm:inline-flex items-center h-5 px-1.5 rounded border border-slate-200 bg-slate-50 text-[10px] font-medium text-slate-400 pointer-events-none">
+                ⌘1
+              </kbd>
+            )}
           </div>
+
+          <button
+            type="button"
+            onClick={() => {
+              setEditingEmployee(null);
+              setFormDesignation("Annotator/ Reviewer");
+              setFormEmployeeType("Full-time");
+              setFormWorkModel("WFO");
+              setIsModalOpen(true);
+            }}
+            className="inline-flex items-center gap-1.5 h-9 px-3.5 rounded-lg bg-indigo-600 text-white text-[13px] font-semibold hover:bg-indigo-700 shadow-sm transition-colors"
+          >
+            <Plus className="w-4 h-4" />
+            Add Employee
+          </button>
         </div>
+      </div>
 
       {/* Server-search notice. Shown only when the rows below did not come from
           the current view, so an archived person appearing is explained rather
@@ -2492,79 +2514,79 @@ const EmployeesPage = () => {
                   {(extra > 0 ||
                     (managers[0] || "").length > 18 ||
                     formatDisplayName(managers[0]) !== managers[0]) && (
-                    <div
-                      className={`absolute left-0 ${positionClass} hidden group-hover:flex flex-col gap-1.5 z-30 p-2.5 bg-white text-slate-700 rounded-xl shadow-xl border border-slate-200 min-w-[180px] max-w-[260px] pointer-events-none`}
-                    >
-                      <div className="text-xs font-semibold text-slate-400 uppercase tracking-wider">
-                        Reporting Manager{managers.length > 1 ? "s" : ""} (
-                        {managers.length})
+                      <div
+                        className={`absolute left-0 ${positionClass} hidden group-hover:flex flex-col gap-1.5 z-30 p-2.5 bg-white text-slate-700 rounded-xl shadow-xl border border-slate-200 min-w-[180px] max-w-[260px] pointer-events-none`}
+                      >
+                        <div className="text-xs font-semibold text-slate-400 uppercase tracking-wider">
+                          Reporting Manager{managers.length > 1 ? "s" : ""} (
+                          {managers.length})
+                        </div>
+                        <div className="flex flex-wrap gap-1">
+                          {managers.map((name, idx) => (
+                            <span
+                              key={idx}
+                              className="inline-flex items-center px-2 py-0.5 rounded-md text-xs font-medium bg-indigo-50 text-indigo-700 border border-indigo-200"
+                            >
+                              {name}
+                            </span>
+                          ))}
+                        </div>
                       </div>
-                      <div className="flex flex-wrap gap-1">
-                        {managers.map((name, idx) => (
-                          <span
-                            key={idx}
-                            className="inline-flex items-center px-2 py-0.5 rounded-md text-xs font-medium bg-indigo-50 text-indigo-700 border border-indigo-200"
-                          >
-                            {name}
-                          </span>
-                        ))}
-                      </div>
-                    </div>
-                  )}
+                    )}
                 </div>
               );
             },
           },
           {
-            key: "skills",
-            label: "Skills",
-            width: "w-[16%]",
-            render: (value, row) => {
-              const skillsList = Array.isArray(value) ? value : [];
-              if (skillsList.length === 0) {
-                return <span className="text-xs text-slate-400">—</span>;
+            key: "today_checkin",
+            label: "Today's Check-in",
+            width: "w-[15%]",
+            render: (_, row) => {
+              const checkedInAt = row.today_checked_in_at;
+              const floor = row.today_office_floor;
+              const workMode = row.today_work_mode;
+
+              if (!checkedInAt) {
+                return (
+                  <span className="text-[13px] text-slate-400 font-medium">—</span>
+                );
               }
 
-              const visibleRows = displayedEmployees.slice(
-                (currentPage - 1) * PAGE_SIZE,
-                currentPage * PAGE_SIZE,
-              );
-              const pageIndex = visibleRows.indexOf(row);
-              const isNearTop = pageIndex < 4;
-              const positionClass = isNearTop
-                ? "top-full mt-1.5"
-                : "bottom-full mb-1.5";
-              const extra = skillsList.length - 1;
+              let timeStr = "—";
+              try {
+                const d = new Date(checkedInAt);
+                timeStr = d.toLocaleTimeString("en-IN", {
+                  hour: "2-digit",
+                  minute: "2-digit",
+                  hour12: true,
+                });
+              } catch {
+                /* keep fallback */
+              }
+
+              // Clean single-line format
+              const secondary =
+                workMode === "WFO" && floor
+                  ? `Floor ${floor}`
+                  : workMode || null;
 
               return (
-                <div className="group relative flex items-center gap-1 flex-nowrap whitespace-nowrap cursor-default">
-                  <span className="pointer-events-none min-w-0 truncate max-w-[140px] inline-block rounded-md border border-indigo-200 bg-indigo-50 px-2 py-0.5 text-[12px] font-medium text-indigo-700">
-                    {skillsList[0]}
+                <div className="flex items-center gap-1.5 min-w-0 whitespace-nowrap">
+                  <span className="text-[13px] font-semibold text-slate-800 tabular-nums">
+                    {timeStr}
                   </span>
-                  {extra > 0 && (
-                    <span className="inline-flex items-center justify-center flex-shrink-0 h-5 min-w-5 rounded-full bg-slate-100 px-1 text-[10px] font-semibold text-slate-500">
-                      +{extra}
-                    </span>
-                  )}
-
-                  {(extra > 0 || (skillsList[0] || "").length > 18) && (
-                    <div
-                      className={`absolute left-0 ${positionClass} hidden group-hover:flex flex-col gap-1.5 z-30 p-2.5 bg-white text-slate-700 rounded-xl shadow-xl border border-slate-200 min-w-[180px] max-w-[260px] pointer-events-none`}
-                    >
-                      <div className="text-xs font-semibold text-slate-400 uppercase tracking-wider">
-                        All Skills ({skillsList.length})
-                      </div>
-                      <div className="flex flex-wrap gap-1">
-                        {skillsList.map((skill, idx) => (
-                          <span
-                            key={idx}
-                            className="inline-flex items-center px-2 py-0.5 rounded-md text-xs font-medium bg-indigo-50 text-indigo-700 border border-indigo-200"
-                          >
-                            {skill}
-                          </span>
-                        ))}
-                      </div>
-                    </div>
+                  {secondary && (
+                    <>
+                      <span className="text-slate-300">·</span>
+                      <span
+                        className={`text-[12px] font-medium ${workMode === "WFO" && floor
+                            ? "text-indigo-600"
+                            : "text-slate-500"
+                          }`}
+                      >
+                        {secondary}
+                      </span>
+                    </>
                   )}
                 </div>
               );
