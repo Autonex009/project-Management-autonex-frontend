@@ -501,7 +501,7 @@ const MyLeavesPanel = ({
       !validateConsecutiveLeaves(sDate, eDate, allLeaves, null, isHalf)
     ) {
       toast.error(
-        "Safe guard triggered: You cannot apply for 5 or more consecutive leaves.",
+        "Safe guard triggered: You cannot apply for more than 5 consecutive leaves.",
       );
       return;
     }
@@ -604,7 +604,7 @@ const MyLeavesPanel = ({
       )
     ) {
       toast.error(
-        "Safe guard triggered: You cannot apply for 5 or more consecutive leaves.",
+        "Safe guard triggered: You cannot apply for more than 5 consecutive leaves.",
       );
       return;
     }
@@ -1144,7 +1144,7 @@ const MyLeavesPanel = ({
                                   {getLeaveTypeLabel(leave.leave_type)}
                                 </p>
                                 {leave.flagged && (
-                                  <OverLimitHoverCard leave={leave} allLeaves={allLeaves} />
+                                  <OverLimitHoverCard leave={leave} allLeaves={allLeaves} employeeType={user.employee_type} />
                                 )}
                                 {leave.is_emergency && (
                                   <span className="inline-flex items-center gap-1 px-2 py-0.5 rounded-full text-[10px] font-semibold bg-red-100 text-red-700 border border-red-200">

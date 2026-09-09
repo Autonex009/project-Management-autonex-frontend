@@ -1,3 +1,4 @@
+
 import React, { useState } from "react";
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
 import toast from "react-hot-toast";
@@ -10,7 +11,7 @@ import {
   ShieldCheck,
   AlertTriangle,
 } from "lucide-react";
-import { checkinApi, parentProjectApi } from "../../services/api";
+import { checkinApi, subProjectApi } from "../../services/api";
 import Table from "../../components/ui/Table";
 import UserAvatar from "../../components/ui/UserAvatar";
 import Dropdown from "../../components/ui/Dropdown";
@@ -60,11 +61,11 @@ const TeamCheckInsPage = () => {
   });
 
   const { data: projectsData } = useQuery({
-    queryKey: ["all-projects"],
-    queryFn: () => parentProjectApi.getAll(),
+    queryKey: ["all-sub-projects"],
+    queryFn: () => subProjectApi.getAll(),
     staleTime: 5 * 60 * 1000,
   });
-  const projectsList = projectsData?.items || [];
+  const projectsList = Array.isArray(projectsData) ? projectsData : (projectsData?.items || []);
 
   const { mutate: confirmAll, isPending: confirming } = useMutation({
     mutationFn: () => checkinApi.confirmTeam(selectedIds.size > 0 ? Array.from(selectedIds) : undefined),
