@@ -6,6 +6,8 @@ import { useBreadcrumbTrail } from "../hooks/useBreadcrumbTrail";
 import { usePageDetailTitle } from "../utils/pageDetailTitle";
 import AdminSidebar from "./AdminSidebar";
 import AppShellLayout from "../layouts/AppShellLayout";
+import usePageStateStore from "../store/usePageStateStore";
+import useScrollStore from "../store/useScrollStore";
 
 const ADMIN_ROUTE_LABELS = {
   "/admin/modules": "Training Modules",
@@ -85,6 +87,10 @@ const AdminLayout = () => {
     } catch (err) {
       console.error("Logout sync failed", err);
     } finally {
+      // Clear persisted page UI state (search, filters, page, etc.)
+      usePageStateStore.getState().clearAll();
+      useScrollStore.setState({ memory: {}, scrollPositions: {} });
+
       localStorage.clear();
       queryClient.clear();
       window.location.href = "/login/admin";

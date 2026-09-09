@@ -267,7 +267,7 @@ export function validateConsecutiveLeaves(
     if (!isNonWorkingDay(ds)) {
       if (leaveDates.has(ds)) {
         consecutiveRun++;
-        if (consecutiveRun >= 5) {
+        if (consecutiveRun > 5) {
           return false; // Safely blocked!
         }
       } else {
@@ -279,9 +279,11 @@ export function validateConsecutiveLeaves(
   return true;
 }
 
-export function getLeaveOverLimitInfo(leave, allLeaves = []) {
+export function getLeaveOverLimitInfo(leave, allLeaves = [], employeeType = "") {
+  const limit = isIntern(employeeType) ? 1 : 2;
+
   if (!leave || !leave.start_date) {
-    return { overDays: 1, overDaysText: "1 day", totalMonthDays: 3, limit: 2 };
+    return { overDays: 1, overDaysText: "1 day", totalMonthDays: limit + 1, limit };
   }
 
   const startDate = new Date(leave.start_date + "T00:00:00");
@@ -302,7 +304,6 @@ export function getLeaveOverLimitInfo(leave, allLeaves = []) {
     totalMonthDays += getWorkingDayCount(l.start_date, l.end_date, l.is_half_day);
   });
 
-  const limit = 2;
   const currentDuration = getWorkingDayCount(leave.start_date, leave.end_date, leave.is_half_day) || 1;
   const calculatedOver = totalMonthDays > limit
     ? totalMonthDays - limit

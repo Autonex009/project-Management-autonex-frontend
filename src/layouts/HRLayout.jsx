@@ -4,6 +4,8 @@ import { useBreadcrumbTrail } from "../hooks/useBreadcrumbTrail";
 import HRSidebar from "./HRSidebar";
 import AppShellLayout from "./AppShellLayout";
 import api, { signupRequestApi } from "../services/api";
+import usePageStateStore from "../store/usePageStateStore";
+import useScrollStore from "../store/useScrollStore";
 
 const HR_ROUTE_LABELS = {
   "/hr/dashboard": "Dashboard",
@@ -47,6 +49,10 @@ const HRLayout = () => {
     } catch (err) {
       console.error("Logout sync failed", err);
     } finally {
+      // Clear persisted page UI state
+      usePageStateStore.getState().clearAll();
+      useScrollStore.setState({ memory: {}, scrollPositions: {} });
+
       localStorage.clear();
       queryClient.clear();
       window.location.href = "/login/admin";

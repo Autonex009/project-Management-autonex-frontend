@@ -648,25 +648,49 @@ const EmployeeDashboard = () => {
 
   /* ── Profile ─────────────────────────────────────── */
   const profile = useMemo(() => {
-    const name = employee?.name || account?.name || localUser.name || "";
-    const jobTitle = employee?.designation || account?.role || "Annotator/Reviewer";
+    // Only fall back to the logged-in user's data when viewing *yourself*.
+    // When HR/Admin/PM views another employee, never leak their own avatar/name/etc.
+    const name =
+      employee?.name ||
+      (isSelf ? account?.name || localUser.name : "") ||
+      "";
+    const jobTitle =
+      employee?.designation ||
+      (isSelf ? account?.role : null) ||
+      "Annotator/Reviewer";
     const status = employee?.status || "active";
+
+    // CRITICAL FIX: do not show the viewer's avatar on another employee's profile
     const avatarUrl =
-      employee?.avatar_url || account?.avatar_url || localUser.avatar_url || null;
+      employee?.avatar_url ||
+      (isSelf ? account?.avatar_url || localUser.avatar_url : null) ||
+      null;
+
     const rawJoiningDate = employee?.joining_date || employee?.created_at;
     const joiningDate = rawJoiningDate
       ? format(parseISO(rawJoiningDate), "dd MMM yyyy")
       : "";
     const tenure = calculateTenure(rawJoiningDate);
-    const badge = employee?.employee_type || localUser.employee_type || "";
+
+    const badge =
+      employee?.employee_type ||
+      (isSelf ? localUser.employee_type : "") ||
+      "";
     const initials = getNameInitials(name);
 
-    const email = employee?.email || account?.email || localUser.email || "";
-    const rawPhone = employee?.phone || account?.phone || "";
+    const email =
+      employee?.email ||
+      (isSelf ? account?.email || localUser.email : "") ||
+      "";
+    const rawPhone =
+      employee?.phone || (isSelf ? account?.phone || "" : "") || "";
     const phone = formatPhoneNumber(rawPhone);
     const encordId = employee?.encord_id || "";
     const slackUserId = employee?.slack_user_id || "";
-    const skills = employee?.skills || account?.skills || localUser.skills || [];
+    const skills =
+      employee?.skills ||
+      (isSelf ? account?.skills || localUser.skills : []) ||
+      [];
     const empId = employee?.id || employeeId || "";
     const workingHours = employee?.working_hours_per_day;
     const weeklyAvailability = employee?.weekly_availability;
@@ -689,7 +713,7 @@ const EmployeeDashboard = () => {
       workingHours,
       weeklyAvailability,
     };
-  }, [account, employee, localUser, employeeId]);
+  }, [account, employee, localUser, employeeId, isSelf]);
 
   useEffect(() => {
     if (isAdmin && params.id && profile.name) {

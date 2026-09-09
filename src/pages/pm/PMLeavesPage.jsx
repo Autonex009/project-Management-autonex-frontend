@@ -446,7 +446,7 @@ const PMLeavesPage = () => {
       !validateConsecutiveLeaves(startDate, endDate, empLeaves, null, isHalf)
     ) {
       toast.error(
-        "Safe guard triggered: You cannot apply for 5 or more consecutive leaves.",
+        "Safe guard triggered: You cannot apply for more than 5 consecutive leaves.",
       );
       return;
     }
