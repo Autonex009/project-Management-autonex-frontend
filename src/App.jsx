@@ -32,6 +32,10 @@ function CheckInOAuthToastHandler() {
         toast.error("Check-in blocked: You must be connected to the Office Wi-Fi.", {
           duration: 5000,
         });
+      } else if (error === "ip_mismatch") {
+        toast.error("Check-in blocked: Network mismatch. Initiation and Slack confirmation must be on the same network.", {
+          duration: 6000,
+        });
       } else if (error === "account_mismatch") {
         toast.error("Check-in blocked: Account mismatch. You cannot verify using someone else's Slack account.", {
           duration: 6000,
@@ -46,6 +50,8 @@ function CheckInOAuthToastHandler() {
       queryClient.invalidateQueries({ queryKey: ["checkin-today"] });
       params.delete("checkin_error");
       params.delete("ip");
+      params.delete("portal_ip");
+      params.delete("client_ip");
       const newSearch = params.toString() ? `?${params.toString()}` : "";
       navigate(`${location.pathname}${newSearch}`, { replace: true });
     }
