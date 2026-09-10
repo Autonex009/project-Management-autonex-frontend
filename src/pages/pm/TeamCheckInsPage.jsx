@@ -45,17 +45,21 @@ const TeamCheckInsPage = () => {
   const [projectId, setProjectId] = useState("");
   const [statusFilter, setStatusFilter] = useState("");
   const [timeFilter, setTimeFilter] = useState("");
+  const [workModeFilter, setWorkModeFilter] = useState("");
+  const [officeFloorFilter, setOfficeFloorFilter] = useState("");
   const [activeTab, setActiveTab] = useState("today");
   const [selectedIds, setSelectedIds] = useState(new Set());
   const limit = 20;
 
   const { data, isLoading, isError } = useQuery({
-    queryKey: ["checkins-team-today", page, search, projectId, statusFilter, timeFilter],
+    queryKey: ["checkins-team-today", page, search, projectId, statusFilter, timeFilter, workModeFilter, officeFloorFilter],
     queryFn: () => checkinApi.getTeamToday({ 
       page, limit, search, 
       project_id: projectId || undefined, 
       status: statusFilter, 
-      time_filter: timeFilter 
+      time_filter: timeFilter,
+      work_mode: workModeFilter,
+      office_floor: officeFloorFilter
     }),
     staleTime: 60 * 1000,
   });
@@ -180,7 +184,7 @@ const TeamCheckInsPage = () => {
     {
       key: "status",
       label: "Status",
-      width: "w-[16%]",
+      width: "w-[12%]",
       render: (_, row) =>
         row.checked_in ? (
           <span className="inline-flex items-center gap-1 rounded-full bg-emerald-50 px-2 py-0.5 text-xs font-medium text-emerald-700">
@@ -195,13 +199,21 @@ const TeamCheckInsPage = () => {
     {
       key: "mode",
       label: "Mode",
-      width: "w-[10%]",
+      width: "w-[8%]",
       render: (_, row) => <WorkModePill mode={row.work_mode} />,
+    },
+    {
+      key: "floor",
+      label: "Floor",
+      width: "w-[8%]",
+      render: (_, row) => (
+        <span className="text-slate-600 font-medium">{row.office_floor || "—"}</span>
+      ),
     },
     {
       key: "time",
       label: "Checked in",
-      width: "w-[12%]",
+      width: "w-[10%]",
       render: (_, row) => (
         <span className="text-slate-500">{fmtTime(row.checked_in_at)}</span>
       ),
@@ -301,6 +313,33 @@ const TeamCheckInsPage = () => {
               options={[
                 { value: "", label: "All Times" },
                 { value: "late", label: "After 10:00 AM" }
+              ]}
+            />
+          </div>
+
+          <div className="w-32">
+            <Dropdown
+              value={workModeFilter}
+              onChange={(v) => { setWorkModeFilter(v); setPage(1); }}
+              placeholder="All Modes"
+              options={[
+                { value: "", label: "All Modes" },
+                { value: "WFO", label: "WFO" },
+                { value: "WFH", label: "WFH" }
+              ]}
+            />
+          </div>
+
+          <div className="w-28">
+            <Dropdown
+              value={officeFloorFilter}
+              onChange={(v) => { setOfficeFloorFilter(v); setPage(1); }}
+              placeholder="All Floors"
+              options={[
+                { value: "", label: "All Floors" },
+                { value: "7", label: "Floor 7" },
+                { value: "9", label: "Floor 9" },
+                { value: "17", label: "Floor 17" }
               ]}
             />
           </div>
