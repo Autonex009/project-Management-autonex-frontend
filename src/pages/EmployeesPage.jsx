@@ -2546,6 +2546,13 @@ const EmployeesPage = () => {
               const floor = row.today_office_floor;
               const workMode = row.today_work_mode;
 
+              if (row.is_on_leave) {
+                return (
+                  <span className="inline-flex items-center gap-1 rounded-full bg-amber-50 px-2 py-0.5 text-[11px] font-medium text-amber-700 whitespace-nowrap">
+                    On Leave
+                  </span>
+                );
+              }
               if (!checkedInAt) {
                 return (
                   <span className="text-[13px] text-slate-400 font-medium">—</span>
