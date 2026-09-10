@@ -1,7 +1,7 @@
 import React, { useEffect, useMemo, useState } from "react";
 import { useLocation } from "react-router-dom";
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
-import { CalendarCheck, Home, Building2, Smile, Meh, Frown, Zap } from "lucide-react";
+import { CalendarCheck, Home, Building2, Smile, Meh, Frown, Zap, AlertCircle, Send, ArrowLeft, Clock, ShieldAlert, RotateCcw } from "lucide-react";
 import toast from "react-hot-toast";
 import Modal from "../ui/Modal";
 import Button from "../ui/Button";
@@ -23,6 +23,9 @@ export default function DailyCheckInModal() {
   const [workMode, setWorkMode] = useState("WFO");
   const [selectedProjects, setSelectedProjects] = useState([]);
   const [mood, setMood] = useState(null);
+  const [submitError, setSubmitError] = useState(null);
+  const [isSlackPending, setIsSlackPending] = useState(false);
+  const [countdown, setCountdown] = useState(90);
 
   const { isDismissed, isOpenManually, dismiss } = useCheckinStore();
 
@@ -44,6 +47,7 @@ export default function DailyCheckInModal() {
     queryFn: () => checkinApi.getToday(),
     enabled: hasEmployeeRecord,
     staleTime: 0,
+    refetchInterval: isSlackPending ? 2500 : false,
   });
 
   useEffect(() => {
@@ -55,13 +59,36 @@ export default function DailyCheckInModal() {
     }
   }, [status]);
 
-  const isAuthRoute = 
+  // If check-in was confirmed via Slack while waiting, close and notify
+  useEffect(() => {
+    if (status?.already_checked_in && isSlackPending) {
+      setIsSlackPending(false);
+      toast.success("Check-in confirmed via Slack!");
+      queryClient.invalidateQueries({ queryKey: ["checkin-today"] });
+    }
+  }, [status?.already_checked_in, isSlackPending, queryClient]);
+
+  // 90-second countdown for single-use Slack verification link
+  useEffect(() => {
+    if (!isSlackPending) {
+      setCountdown(90);
+      return;
+    }
+    setCountdown(90);
+    const interval = setInterval(() => {
+      setCountdown((prev) => (prev > 0 ? prev - 1 : 0));
+    }, 1000);
+    return () => clearInterval(interval);
+  }, [isSlackPending]);
+
+  const isExcludedRoute = 
     location.pathname.startsWith('/login') ||
     location.pathname.startsWith('/forgot-password') ||
     location.pathname.startsWith('/reset-password') ||
-    location.pathname.startsWith('/employee-signup');
+    location.pathname.startsWith('/employee-signup') ||
+    location.pathname.startsWith('/verify-checkin');
 
-  const shouldPrompt = hasEmployeeRecord && !isLoading && status && !status.already_checked_in && !isAuthRoute;
+  const shouldPrompt = hasEmployeeRecord && !isLoading && status && !status.already_checked_in && !isExcludedRoute;
   const isOpen = Boolean(shouldPrompt && (!isDismissed || isOpenManually));
 
   const toggleProject = (id) => {
@@ -72,23 +99,37 @@ export default function DailyCheckInModal() {
 
   const { mutate: submit, isPending } = useMutation({
     mutationFn: () =>
-      checkinApi.submit({
+      checkinApi.requestConfirmation({
         work_mode: workMode,
         project_ids: selectedProjects,
         mood,
       }),
-    onSuccess: () => {
-      toast.success("Checked in — have a great day!");
-      queryClient.invalidateQueries({ queryKey: ["checkin-today"] });
+    onSuccess: (res) => {
+      setSubmitError(null);
+      if (res?.status === "pending_slack") {
+        setIsSlackPending(true);
+        toast.success("Confirmation link sent to your Slack!");
+      } else {
+        toast.success("Checked in — have a great day!");
+        queryClient.invalidateQueries({ queryKey: ["checkin-today"] });
+      }
     },
     onError: (err) => {
       const msg =
         err?.response?.data?.detail?.[0]?.msg ||
         err?.response?.data?.detail ||
         "Couldn't submit your check-in. Please try again.";
-      toast.error(typeof msg === "string" ? msg : "Couldn't submit your check-in.");
+      const errorText = typeof msg === "string" ? msg : "Couldn't submit your check-in.";
+      setSubmitError(errorText);
+      toast.error(errorText);
     },
   });
+
+  const buttonLabel = useMemo(() => {
+    if (isPending) return status?.has_slack ? "Sending Link…" : "Checking in…";
+    if (status?.has_slack) return "Send Confirmation Link";
+    return "Check In";
+  }, [isPending, status?.has_slack]);
 
   const projectOptions = useMemo(() => status?.project_options || [], [status]);
   
@@ -113,8 +154,8 @@ export default function DailyCheckInModal() {
   if (!isOpen) return null;
 
   return (
-    <Modal isOpen={isOpen} onClose={dismiss} size="md" disableBackdropClose={!isOpenManually}>
-      <Modal.Header onClose={dismiss}>
+    <Modal isOpen={isOpen} onClose={() => { dismiss(); setIsSlackPending(false); }} size="md" disableBackdropClose={!isOpenManually}>
+      <Modal.Header onClose={() => { dismiss(); setIsSlackPending(false); }}>
         <div className="flex items-center gap-3">
           <div className="flex h-10 w-10 items-center justify-center rounded-xl bg-indigo-50 text-indigo-600">
             <CalendarCheck className="h-5 w-5" />
@@ -127,102 +168,189 @@ export default function DailyCheckInModal() {
       </Modal.Header>
 
       <Modal.Body className="space-y-6">
-        <section>
-          <h3 className="mb-2 text-xs font-semibold uppercase tracking-wider text-slate-500">
-            Where are you working from?
-          </h3>
-          <div className="grid grid-cols-2 gap-3">
-            <button
-              type="button"
-              onClick={() => setWorkMode("WFO")}
-              className={`flex flex-col items-center gap-2 rounded-2xl border p-4 transition-colors ${workMode === "WFO" ? "border-indigo-500 bg-indigo-50 text-indigo-700" : "border-slate-200 text-slate-500 hover:border-slate-300"}`}
-            >
-              <Building2 className="h-5 w-5" />
-              <span className="text-sm font-medium">Office (WFO)</span>
-            </button>
-            <button
-              type="button"
-              onClick={() => setWorkMode("WFH")}
-              className={`flex flex-col items-center gap-2 rounded-2xl border p-4 transition-colors ${workMode === "WFH" ? "border-indigo-500 bg-indigo-50 text-indigo-700" : "border-slate-200 text-slate-500 hover:border-slate-300"}`}
-            >
-              <Home className="h-5 w-5" />
-              <span className="text-sm font-medium">Home (WFH)</span>
-            </button>
-          </div>
-        </section>
-
-        <section>
-          <h3 className="mb-2 text-xs font-semibold uppercase tracking-wider text-slate-500">
-            Which project(s) are you on today?
-          </h3>
-          <div className="space-y-3">
-            {projectOptions.length === 0 && (
-              <p className="rounded-xl bg-slate-50 p-3 text-sm text-slate-500">
-                No active project allocations found. Select a project from the list below:
-              </p>
-            )}
-            
-            {projectOptions.length > 0 && (
-              <div className="space-y-2">
-                {projectOptions.map((p) => (
-                  <label
-                    key={p.project_id}
-                    className={`flex cursor-pointer items-center gap-3 rounded-xl border p-3 text-sm transition-colors ${selectedProjects.includes(p.project_id) ? "border-indigo-400 bg-indigo-50/60" : "border-slate-200 hover:border-slate-300"}`}
-                  >
-                    <input
-                      type="checkbox"
-                      checked={selectedProjects.includes(p.project_id)}
-                      onChange={() => toggleProject(p.project_id)}
-                      className="h-4 w-4 rounded border-slate-300 text-indigo-600 focus:ring-indigo-500"
-                    />
-                    <span className="font-medium text-slate-800">{p.project_name}</span>
-                  </label>
-                ))}
+        {isSlackPending ? (
+          <div className="py-6 px-4 rounded-2xl bg-indigo-50/70 border border-indigo-100 text-center space-y-4 animate-in fade-in zoom-in-95">
+            {countdown > 0 ? (
+              <div className="w-14 h-14 rounded-2xl bg-indigo-600 text-white flex items-center justify-center mx-auto shadow-md shadow-indigo-200">
+                <Send className="h-7 w-7 animate-pulse" />
+              </div>
+            ) : (
+              <div className="w-14 h-14 rounded-2xl bg-amber-500 text-white flex items-center justify-center mx-auto shadow-md shadow-amber-200">
+                <Clock className="h-7 w-7" />
               </div>
             )}
-            
-            <MultiSelect
-              options={fallbackOptions}
-              value={selectedProjects.filter(id => !projectOptions.some(p => p.project_id === id))}
-              onChange={(newDropdownValues) => {
-                const assignedValues = selectedProjects.filter(id => projectOptions.some(p => p.project_id === id));
-                setSelectedProjects([...assignedValues, ...newDropdownValues]);
-              }}
-              placeholder={projectOptions.length > 0 ? "Search other projects..." : "Search projects..."}
-            />
-          </div>
-        </section>
 
-        <section>
-          <h3 className="mb-2 text-xs font-semibold uppercase tracking-wider text-slate-500">
-            How are you feeling today? <span className="font-normal normal-case text-slate-400">(optional)</span>
-          </h3>
-          <div className="grid grid-cols-4 gap-2">
-            {MOODS.map(({ value, label, icon: Icon, tone }) => (
-              <button
-                key={value}
-                type="button"
-                onClick={() => setMood((m) => (m === value ? null : value))}
-                title={label}
-                className={`flex flex-col items-center gap-1.5 rounded-xl border p-3 transition-colors ${mood === value ? tone : "border-slate-200 text-slate-400 hover:border-slate-300"}`}
-              >
-                <Icon className="h-4 w-4" />
-                <span className="text-[11px] font-medium">{label}</span>
-              </button>
-            ))}
+            <div className="space-y-1">
+              <h3 className="text-base font-semibold text-slate-900">
+                {countdown > 0 ? "Confirmation Sent to Slack" : "Verification Link Expired"}
+              </h3>
+              <p className="text-xs text-slate-600 max-w-sm mx-auto leading-relaxed">
+                {countdown > 0 ? (
+                  <>
+                    <strong>Autonex-PMT-Bot</strong> sent a single-use verification link to your Slack DM. Please open Slack on this device and click <strong>Confirm Check-In</strong>.
+                  </>
+                ) : (
+                  <>The 90-second confirmation window has expired. Please click below to generate a new link.</>
+                )}
+              </p>
+            </div>
+
+            {countdown > 0 ? (
+              <div className="inline-flex items-center gap-2 px-3.5 py-1.5 rounded-full bg-white border border-indigo-200 text-xs font-medium text-indigo-700 shadow-sm">
+                <span className="relative flex h-2 w-2">
+                  <span className="animate-ping absolute inline-flex h-full w-full rounded-full bg-indigo-400 opacity-75"></span>
+                  <span className="relative inline-flex rounded-full h-2 w-2 bg-indigo-600"></span>
+                </span>
+                <span>Waiting for click • ⏳ <strong>{countdown}s</strong> remaining</span>
+              </div>
+            ) : (
+              <div className="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-full bg-amber-100 text-xs font-semibold text-amber-800 border border-amber-200">
+                <Clock className="h-3.5 w-3.5" />
+                <span>Link expired. Click Resend Link below.</span>
+              </div>
+            )}
+
+            <p className="text-[11px] text-slate-400">
+              🔒 <strong>Single-use link:</strong> Bound to your account and Wi-Fi. Do not forward.
+            </p>
           </div>
-        </section>
+        ) : (
+          <>
+            <section>
+              <h3 className="mb-2 text-xs font-semibold uppercase tracking-wider text-slate-500">
+                Where are you working from?
+              </h3>
+              <div className="grid grid-cols-2 gap-3">
+                <button
+                  type="button"
+                  onClick={() => {
+                    setWorkMode("WFO");
+                    setSubmitError(null);
+                  }}
+                  className={`flex flex-col items-center gap-2 rounded-2xl border p-4 transition-colors ${workMode === "WFO" ? "border-indigo-500 bg-indigo-50 text-indigo-700" : "border-slate-200 text-slate-500 hover:border-slate-300"}`}
+                >
+                  <Building2 className="h-5 w-5" />
+                  <span className="text-sm font-medium">Office (WFO)</span>
+                </button>
+                <button
+                  type="button"
+                  onClick={() => {
+                    setWorkMode("WFH");
+                    setSubmitError(null);
+                  }}
+                  className={`flex flex-col items-center gap-2 rounded-2xl border p-4 transition-colors ${workMode === "WFH" ? "border-indigo-500 bg-indigo-50 text-indigo-700" : "border-slate-200 text-slate-500 hover:border-slate-300"}`}
+                >
+                  <Home className="h-5 w-5" />
+                  <span className="text-sm font-medium">Home (WFH)</span>
+                </button>
+              </div>
+
+              {submitError && (
+                <div className="mt-3 flex items-start gap-2.5 rounded-xl border border-amber-200 bg-amber-50 p-3 text-xs text-amber-900">
+                  <AlertCircle className="h-4 w-4 shrink-0 text-amber-600 mt-0.5" />
+                  <div className="flex-1 leading-relaxed font-medium">
+                    {submitError}
+                  </div>
+                </div>
+              )}
+            </section>
+
+            <section>
+              <h3 className="mb-2 text-xs font-semibold uppercase tracking-wider text-slate-500">
+                Which project(s) are you on today?
+              </h3>
+              <div className="space-y-3">
+                {projectOptions.length === 0 && (
+                  <p className="rounded-xl bg-slate-50 p-3 text-sm text-slate-500">
+                    No active project allocations found. Select a project from the list below:
+                  </p>
+                )}
+                
+                {projectOptions.length > 0 && (
+                  <div className="space-y-2">
+                    {projectOptions.map((p) => (
+                      <label
+                        key={p.project_id}
+                        className={`flex cursor-pointer items-center gap-3 rounded-xl border p-3 text-sm transition-colors ${selectedProjects.includes(p.project_id) ? "border-indigo-400 bg-indigo-50/60" : "border-slate-200 hover:border-slate-300"}`}
+                      >
+                        <input
+                          type="checkbox"
+                          checked={selectedProjects.includes(p.project_id)}
+                          onChange={() => toggleProject(p.project_id)}
+                          className="h-4 w-4 rounded border-slate-300 text-indigo-600 focus:ring-indigo-500"
+                        />
+                        <span className="font-medium text-slate-800">{p.project_name}</span>
+                      </label>
+                    ))}
+                  </div>
+                )}
+                
+                <MultiSelect
+                  options={fallbackOptions}
+                  value={selectedProjects.filter(id => !projectOptions.some(p => p.project_id === id))}
+                  onChange={(newDropdownValues) => {
+                    const assignedValues = selectedProjects.filter(id => projectOptions.some(p => p.project_id === id));
+                    setSelectedProjects([...assignedValues, ...newDropdownValues]);
+                  }}
+                  placeholder={projectOptions.length > 0 ? "Search other projects..." : "Search projects..."}
+                />
+              </div>
+            </section>
+
+            <section>
+              <h3 className="mb-2 text-xs font-semibold uppercase tracking-wider text-slate-500">
+                How are you feeling today? <span className="font-normal normal-case text-slate-400">(optional)</span>
+              </h3>
+              <div className="grid grid-cols-4 gap-2">
+                {MOODS.map(({ value, label, icon: Icon, tone }) => (
+                  <button
+                    key={value}
+                    type="button"
+                    onClick={() => setMood((m) => (m === value ? null : value))}
+                    title={label}
+                    className={`flex flex-col items-center gap-1.5 rounded-xl border p-3 transition-colors ${mood === value ? tone : "border-slate-200 text-slate-400 hover:border-slate-300"}`}
+                  >
+                    <Icon className="h-4 w-4" />
+                    <span className="text-[11px] font-medium">{label}</span>
+                  </button>
+                ))}
+              </div>
+            </section>
+          </>
+        )}
       </Modal.Body>
 
       <Modal.Footer>
-        <Button
-          type="button"
-          onClick={() => submit()}
-          disabled={!canSubmit}
-          className="w-full justify-center"
-        >
-          {isPending ? "Checking in…" : "Check In"}
-        </Button>
+        {isSlackPending ? (
+          <div className="flex gap-2.5 w-full">
+            <Button
+              type="button"
+              variant="secondary"
+              onClick={() => setIsSlackPending(false)}
+              className="flex-1 justify-center"
+            >
+              <ArrowLeft className="h-4 w-4 mr-1.5" />
+              Edit Details
+            </Button>
+            <Button
+              type="button"
+              onClick={() => submit()}
+              disabled={isPending}
+              className="flex-1 justify-center"
+            >
+              {isPending ? "Resending…" : "Resend Link"}
+            </Button>
+          </div>
+        ) : (
+          <Button
+            type="button"
+            onClick={() => submit()}
+            disabled={!canSubmit}
+            className="w-full justify-center"
+          >
+            {buttonLabel}
+          </Button>
+        )}
       </Modal.Footer>
     </Modal>
   );

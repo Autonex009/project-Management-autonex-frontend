@@ -89,6 +89,7 @@ const AdminCompanySettingsPage = lazy(
   () => import("./pages/admin/AdminCompanySettingsPage"),
 );
 const AdminCheckInsPage = lazy(() => import("./pages/admin/AdminCheckInsPage"));
+const VerifyCheckInPage = lazy(() => import("./pages/VerifyCheckInPage"));
 
 // HR Routes
 const HRDashboard = lazy(() => import("./pages/hr/HRDashboard"));
@@ -137,6 +138,7 @@ function App() {
               <Route path="/forgot-password" element={<ForgotPassword />} />
               <Route path="/reset-password" element={<ResetPassword />} />
               <Route path="/employee-signup" element={<EmployeeSignupPage />} />
+              <Route path="/verify-checkin" element={<VerifyCheckInPage />} />
               <Route
                 path="/login"
                 element={<Navigate to="/login/admin" replace />}
