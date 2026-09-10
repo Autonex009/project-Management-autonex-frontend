@@ -1,5 +1,5 @@
 /* eslint-disable react/prop-types */
-import React, { Suspense, lazy, useState, useEffect } from "react";
+import React, { Suspense, lazy, useState, useEffect, useRef } from "react";
 import { Routes, Route, Navigate, useLocation, useNavigate } from "react-router-dom";
 import { QueryClient, QueryClientProvider, useQueryClient } from "@tanstack/react-query";
 import toast, { Toaster } from "react-hot-toast";
@@ -12,50 +12,135 @@ function CheckInOAuthToastHandler() {
   const location = useLocation();
   const navigate = useNavigate();
   const queryClient = useQueryClient();
+  const [mounted, setMounted] = useState(false);
+  const handledRef = useRef(false);
 
   useEffect(() => {
+    setMounted(true);
+
     const params = new URLSearchParams(location.search);
     const result = params.get("checkin_result");
     const error = params.get("checkin_error");
+    const isOAuthPopup =
+      params.get("oauth_popup") === "1" ||
+      (typeof window !== "undefined" && (window.name === "slack_oauth_checkin" || Boolean(window.opener)));
 
+    if (!result && !error) return;
+    if (handledRef.current) return;
+    handledRef.current = true;
+
+    // 1. Broadcast result to the main portal tab via BroadcastChannel
+    try {
+      const bc = new BroadcastChannel("autonex_checkin_oauth");
+      bc.postMessage({
+        type: "SLACK_CHECKIN_COMPLETE",
+        result,
+        error,
+        search: location.search,
+      });
+      bc.close();
+    } catch (_) {}
+
+    // 2. If in popup tab, close automatically without displaying toast here
+    if (isOAuthPopup) {
+      try {
+        window.close();
+      } catch (_) {}
+
+      const timer = setTimeout(() => {
+        try {
+          window.close();
+        } catch (_) {}
+      }, 500);
+
+      return () => clearTimeout(timer);
+    }
+
+    // 3. Fallback for direct / same-tab redirects ONLY
     if (result === "success") {
       toast.success("✓ Checked in successfully via Slack!", {
+        id: "slack-checkin-toast",
         duration: 4000,
         icon: "🎉",
       });
       queryClient.invalidateQueries({ queryKey: ["checkin-today"] });
       params.delete("checkin_result");
+      params.delete("oauth_popup");
       const newSearch = params.toString() ? `?${params.toString()}` : "";
       navigate(`${location.pathname}${newSearch}`, { replace: true });
     } else if (error) {
+      let errorMsg = "Check-in failed. Please try again.";
       if (error === "office_ip_required") {
-        toast.error("Check-in blocked: You must be connected to the Office Wi-Fi.", {
-          duration: 5000,
-        });
+        errorMsg = "Check-in blocked: You must be connected to the Office Wi-Fi.";
       } else if (error === "ip_mismatch") {
-        toast.error("Check-in blocked: Network mismatch. Initiation and Slack confirmation must be on the same network.", {
-          duration: 6000,
-        });
+        errorMsg = "Check-in blocked: Network mismatch. Initiation and Slack confirmation must be on the same network.";
       } else if (error === "account_mismatch") {
-        toast.error("Check-in blocked: Account mismatch. You cannot verify using someone else's Slack account.", {
-          duration: 6000,
-        });
+        errorMsg = "Check-in blocked: Account mismatch. You cannot verify using someone else's Slack account.";
       } else if (error === "slack_access_denied") {
-        toast("Slack verification was cancelled.", { icon: "ℹ️" });
+        errorMsg = "Slack verification was cancelled.";
       } else if (error === "token_expired") {
-        toast.error("Check-in session expired. Please try checking in again.");
-      } else {
-        toast.error("Check-in failed. Please try again.");
+        errorMsg = "Check-in session expired. Please try checking in again.";
       }
+      toast.error(errorMsg, { id: "slack-checkin-toast", duration: 6000 });
       queryClient.invalidateQueries({ queryKey: ["checkin-today"] });
       params.delete("checkin_error");
       params.delete("ip");
       params.delete("portal_ip");
       params.delete("client_ip");
+      params.delete("oauth_popup");
       const newSearch = params.toString() ? `?${params.toString()}` : "";
       navigate(`${location.pathname}${newSearch}`, { replace: true });
     }
   }, [location.search, location.pathname, navigate, queryClient]);
+
+  if (!mounted || typeof window === "undefined") {
+    return null;
+  }
+
+  const params = new URLSearchParams(location.search);
+  const result = params.get("checkin_result");
+  const error = params.get("checkin_error");
+  const isOAuthPopup =
+    params.get("oauth_popup") === "1" ||
+    window.name === "slack_oauth_checkin" ||
+    Boolean(window.opener);
+
+  if (isOAuthPopup && (result || error)) {
+    return (
+      <div className="fixed inset-0 bg-slate-900/90 backdrop-blur-sm text-white flex flex-col items-center justify-center z-[999999] p-4 text-center">
+        <div className="bg-white text-slate-900 rounded-3xl p-8 max-w-sm w-full shadow-2xl border border-slate-100 flex flex-col items-center">
+          {result === "success" ? (
+            <>
+              <div className="w-16 h-16 rounded-2xl bg-emerald-50 text-emerald-600 flex items-center justify-center text-3xl font-bold mb-4 ring-8 ring-emerald-50/50">
+                ✓
+              </div>
+              <h1 className="text-xl font-bold text-slate-900 mb-1">Check-in Verified!</h1>
+              <p className="text-slate-500 text-xs mb-6 leading-relaxed">
+                Slack verification was successful. Your check-in has been recorded. This tab will close automatically.
+              </p>
+            </>
+          ) : (
+            <>
+              <div className="w-16 h-16 rounded-2xl bg-rose-50 text-rose-600 flex items-center justify-center text-3xl font-bold mb-4 ring-8 ring-rose-50/50">
+                ✕
+              </div>
+              <h1 className="text-xl font-bold text-slate-900 mb-1">Verification Failed</h1>
+              <p className="text-slate-500 text-xs mb-6 leading-relaxed">
+                Check-in verification could not be completed. You can return to the main portal tab.
+              </p>
+            </>
+          )}
+          <button
+            type="button"
+            onClick={() => window.close()}
+            className="w-full py-2.5 px-4 bg-indigo-600 hover:bg-indigo-700 text-white text-sm font-semibold rounded-xl shadow-sm transition-all cursor-pointer"
+          >
+            Close Tab
+          </button>
+        </div>
+      </div>
+    );
+  }
 
   return null;
 }
