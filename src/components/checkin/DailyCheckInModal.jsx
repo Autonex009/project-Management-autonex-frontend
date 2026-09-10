@@ -3,7 +3,7 @@ import { useLocation } from "react-router-dom";
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
 import { 
   CalendarCheck, Home, Building2, Smile, Meh, Frown, Zap, 
-  AlertCircle, ChefHat, Send, ArrowLeft, Clock, ShieldAlert
+  AlertCircle, ChefHat, ShieldAlert
 } from "lucide-react";
 import toast from "react-hot-toast";
 import Modal from "../ui/Modal";
@@ -11,6 +11,15 @@ import Button from "../ui/Button";
 import { checkinApi, subProjectApi } from "../../services/api";
 import { MultiSelect } from "../ui/MultiSelect";
 import useCheckinStore from "../../store/useCheckinStore";
+
+const SlackIcon = ({ className = "w-4 h-4" }) => (
+  <svg className={className} viewBox="0 0 122.8 122.8" fill="none">
+    <path d="M25.8 77.6c0 7.1-5.8 12.9-12.9 12.9S0 84.7 0 77.6s5.8-12.9 12.9-12.9h12.9v12.9zm6.5 0c0-7.1 5.8-12.9 12.9-12.9s12.9 5.8 12.9 12.9v32.3c0 7.1-5.8 12.9-12.9 12.9s-12.9-5.8-12.9-12.9V77.6z" fill="#E01E5A"/>
+    <path d="M45.2 25.8c-7.1 0-12.9-5.8-12.9-12.9S38.1 0 45.2 0s12.9 5.8 12.9 12.9v12.9H45.2zm0 6.5c7.1 0 12.9 5.8 12.9 12.9s-5.8 12.9-12.9 12.9H12.9C5.8 58.1 0 52.3 0 45.2s5.8-12.9 12.9-12.9h32.3z" fill="#36C5F0"/>
+    <path d="M97 45.2c0-7.1 5.8-12.9 12.9-12.9s12.9 5.8 12.9 12.9-5.8 12.9-12.9 12.9H97V45.2zm-6.5 0c0 7.1-5.8 12.9-12.9 12.9s-12.9-5.8-12.9-12.9V12.9C64.7 5.8 70.5 0 77.6 0s12.9 5.8 12.9 12.9v32.3z" fill="#2EB67D"/>
+    <path d="M77.6 97c7.1 0 12.9 5.8 12.9 12.9s-5.8 12.9-12.9 12.9-12.9-5.8-12.9-12.9V97h12.9zm0-6.5c-7.1 0-12.9-5.8-12.9-12.9s5.8-12.9 12.9-12.9h32.3c7.1 0 12.9 5.8 12.9 12.9s-5.8 12.9-12.9 12.9H77.6z" fill="#ECB22E"/>
+  </svg>
+);
 
 const MOODS = [
   { value: "great", label: "Great", icon: Zap, tone: "text-emerald-600 bg-emerald-50 border-emerald-200" },
@@ -63,8 +72,6 @@ export default function DailyCheckInModal() {
   const [tiffinType, setTiffinType] = useState("");
   const [validationErrors, setValidationErrors] = useState({});
   const [submitError, setSubmitError] = useState(null);
-  const [isSlackPending, setIsSlackPending] = useState(false);
-  const [countdown, setCountdown] = useState(90);
 
   const { isDismissed, isOpenManually, dismiss } = useCheckinStore();
 
@@ -84,7 +91,6 @@ export default function DailyCheckInModal() {
     queryFn: () => checkinApi.getToday(),
     enabled: hasEmployeeRecord,
     staleTime: 0,
-    refetchInterval: isSlackPending ? 2500 : false,
   });
 
   useEffect(() => {
@@ -99,29 +105,6 @@ export default function DailyCheckInModal() {
     setTiffinType("");
     setValidationErrors({});
   }, [status]);
-
-  // If check-in was confirmed via Slack while waiting, close and notify
-  useEffect(() => {
-    if (status?.already_checked_in && isSlackPending) {
-      setIsSlackPending(false);
-      toast.success("Check-in confirmed via Slack!");
-      queryClient.invalidateQueries({ queryKey: ["checkin-today"] });
-      dismiss();
-    }
-  }, [status?.already_checked_in, isSlackPending, queryClient, dismiss]);
-
-  // 90-second countdown for single-use Slack verification link
-  useEffect(() => {
-    if (!isSlackPending) {
-      setCountdown(90);
-      return;
-    }
-    setCountdown(90);
-    const interval = setInterval(() => {
-      setCountdown((prev) => (prev > 0 ? prev - 1 : 0));
-    }, 1000);
-    return () => clearInterval(interval);
-  }, [isSlackPending]);
 
   const isExcludedRoute = 
     location.pathname.startsWith('/login') ||
@@ -164,20 +147,24 @@ export default function DailyCheckInModal() {
   };
 
   const { mutate: submit, isPending } = useMutation({
-    mutationFn: () =>
-      checkinApi.requestConfirmation({
+    mutationFn: () => {
+      const payload = {
         work_mode: workMode,
         project_ids: selectedProjects,
         mood,
         office_floor: workMode === "WFO" ? officeFloor : null,
         lunch_preference: workMode === "WFO" ? lunchPreference : null,
         tiffin_type: lunchPreference === "order_tiffin" ? tiffinType : null,
-      }),
+      };
+      if (status?.has_slack) {
+        return checkinApi.requestSlackOAuth(payload);
+      }
+      return checkinApi.submit(payload);
+    },
     onSuccess: (res) => {
       setSubmitError(null);
-      if (res?.status === "pending_slack") {
-        setIsSlackPending(true);
-        toast.success("Confirmation link sent to your Slack!");
+      if (res?.oauth_url) {
+        window.location.href = res.oauth_url;
       } else {
         toast.success("✓ Checked in — have a great day!", {
           duration: 3000,
@@ -205,8 +192,8 @@ export default function DailyCheckInModal() {
   };
 
   const buttonLabel = useMemo(() => {
-    if (isPending) return status?.has_slack ? "Sending Link…" : "Checking in…";
-    if (status?.has_slack) return "Send Confirmation Link";
+    if (isPending) return status?.has_slack ? "Connecting to Slack…" : "Checking in…";
+    if (status?.has_slack) return "Verify with Slack";
     return "Check In";
   }, [isPending, status?.has_slack]);
 
@@ -231,9 +218,9 @@ export default function DailyCheckInModal() {
   if (!isOpen) return null;
 
   return (
-    <Modal isOpen={isOpen} onClose={() => { dismiss(); setIsSlackPending(false); }} size="md" disableBackdropClose={!isOpenManually}>
+    <Modal isOpen={isOpen} onClose={dismiss} size="md" disableBackdropClose={!isOpenManually}>
       {/* Header */}
-      <Modal.Header onClose={() => { dismiss(); setIsSlackPending(false); }}>
+      <Modal.Header onClose={dismiss}>
         <div className="flex items-center gap-3">
           <div className="flex h-11 w-11 items-center justify-center rounded-full bg-gradient-to-br from-indigo-100 to-indigo-50 text-indigo-600 shadow-sm">
             <CalendarCheck className="h-6 w-6" />
@@ -248,396 +235,325 @@ export default function DailyCheckInModal() {
       </Modal.Header>
 
       <Modal.Body className="space-y-6 max-h-[70vh] overflow-y-auto">
-        {isSlackPending ? (
-          <div className="py-6 px-4 rounded-2xl bg-indigo-50/70 border border-indigo-100 text-center space-y-4 animate-in fade-in zoom-in-95">
-            {countdown > 0 ? (
-              <div className="w-14 h-14 rounded-2xl bg-indigo-600 text-white flex items-center justify-center mx-auto shadow-md shadow-indigo-200">
-                <Send className="h-7 w-7 animate-pulse" />
-              </div>
-            ) : (
-              <div className="w-14 h-14 rounded-2xl bg-amber-500 text-white flex items-center justify-center mx-auto shadow-md shadow-amber-200">
-                <Clock className="h-7 w-7" />
-              </div>
-            )}
-
-            <div className="space-y-1">
-              <h3 className="text-base font-semibold text-slate-900">
-                {countdown > 0 ? "Confirmation Sent to Slack" : "Verification Link Expired"}
-              </h3>
-              <p className="text-xs text-slate-600 max-w-sm mx-auto leading-relaxed">
-                {countdown > 0 ? (
-                  <>
-                    <strong>Autonex-PMT-Bot</strong> sent a single-use verification link to your Slack DM. Please open Slack on this device and click <strong>Confirm Check-In</strong>.
-                  </>
-                ) : (
-                  <>The 90-second confirmation window has expired. Please click below to generate a new link.</>
-                )}
-              </p>
+        {/* Office Wi-Fi alert banner if non-office IP detected for WFO */}
+        {status?.is_office_network === false && workMode === "WFO" && (
+          <div className="flex items-start gap-2.5 rounded-xl border border-amber-200 bg-amber-50 p-3 text-xs text-amber-900">
+            <ShieldAlert className="h-4 w-4 shrink-0 text-amber-600 mt-0.5" />
+            <div className="leading-relaxed">
+              <strong>Office Wi-Fi required:</strong> You appear to be outside the office network or on VPN. Please connect to office Wi-Fi before checking in WFO.
             </div>
-
-            {countdown > 0 ? (
-              <div className="inline-flex items-center gap-2 px-3.5 py-1.5 rounded-full bg-white border border-indigo-200 text-xs font-medium text-indigo-700 shadow-sm">
-                <span className="relative flex h-2 w-2">
-                  <span className="animate-ping absolute inline-flex h-full w-full rounded-full bg-indigo-400 opacity-75"></span>
-                  <span className="relative inline-flex rounded-full h-2 w-2 bg-indigo-600"></span>
-                </span>
-                <span>Waiting for click • ⏳ <strong>{countdown}s</strong> remaining</span>
-              </div>
-            ) : (
-              <div className="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-full bg-amber-100 text-xs font-semibold text-amber-800 border border-amber-200">
-                <Clock className="h-3.5 w-3.5" />
-                <span>Link expired. Click Resend Link below.</span>
-              </div>
-            )}
-
-            <p className="text-[11px] text-slate-400">
-              🔒 <strong>Single-use link:</strong> Bound to your account and Wi-Fi. Do not forward.
-            </p>
           </div>
-        ) : (
-          <>
-            {/* Office Wi-Fi alert banner if non-office IP detected for WFO */}
-            {status?.is_office_network === false && workMode === "WFO" && (
-              <div className="flex items-start gap-2.5 rounded-xl border border-amber-200 bg-amber-50 p-3 text-xs text-amber-900">
-                <ShieldAlert className="h-4 w-4 shrink-0 text-amber-600 mt-0.5" />
-                <div className="leading-relaxed">
-                  <strong>Office Wi-Fi required:</strong> You appear to be outside the office network or on VPN. Please connect to office Wi-Fi before checking in WFO.
-                </div>
-              </div>
-            )}
+        )}
 
-            {/* Work Mode Selection */}
-            <section className="space-y-3">
-              <SectionHeader title="Where are you working today?" />
-              <div className="grid grid-cols-2 gap-3">
-                {[
-                  { mode: "WFO", label: "Office", icon: Building2, desc: "Coming to office" },
-                  { mode: "WFH", label: "Home", icon: Home, desc: "Working from home" }
-                ].map(({ mode, label, icon: Icon, desc }) => (
+        {/* Work Mode Selection */}
+        <section className="space-y-3">
+          <SectionHeader title="Where are you working today?" />
+          <div className="grid grid-cols-2 gap-3">
+            {[
+              { mode: "WFO", label: "Office", icon: Building2, desc: "Coming to office" },
+              { mode: "WFH", label: "Home", icon: Home, desc: "Working from home" }
+            ].map(({ mode, label, icon: Icon, desc }) => (
+              <button
+                key={mode}
+                type="button"
+                onClick={() => {
+                  setWorkMode(mode);
+                  setOfficeFloor("");
+                  setLunchPreference("");
+                  setTiffinType("");
+                  setValidationErrors({});
+                  setSubmitError(null);
+                }}
+                className={`group relative overflow-hidden rounded-2xl border-2 p-4 transition-all duration-200 ${
+                  workMode === mode
+                    ? "border-indigo-500 bg-indigo-50 shadow-md"
+                    : "border-slate-200 bg-white hover:border-slate-300 hover:bg-slate-50"
+                }`}
+              >
+                <div className="flex flex-col items-center gap-3 relative z-10">
+                  <div className={`p-2.5 rounded-full transition-colors ${
+                    workMode === mode
+                      ? "bg-indigo-100 text-indigo-600"
+                      : "bg-slate-100 text-slate-600 group-hover:bg-slate-200"
+                  }`}>
+                    <Icon className="h-5 w-5" />
+                  </div>
+                  <div className="text-center">
+                    <div className="font-semibold text-slate-900">{label}</div>
+                    <div className="text-xs text-slate-500 mt-1">{desc}</div>
+                  </div>
+                </div>
+              </button>
+            ))}
+          </div>
+        </section>
+
+        {/* WFO-Only Section */}
+        {workMode === "WFO" && (
+          <>
+            {/* Office Floor Selection */}
+            <section className="space-y-3 pt-2 border-t border-slate-100">
+              <SectionHeader title="Which floor will you work from?" required icon={Building2} />
+              <div className="grid grid-cols-3 gap-2">
+                {OFFICE_FLOORS.map((floor) => (
                   <button
-                    key={mode}
+                    key={floor.value}
                     type="button"
                     onClick={() => {
-                      setWorkMode(mode);
-                      setOfficeFloor("");
-                      setLunchPreference("");
-                      setTiffinType("");
-                      setValidationErrors({});
-                      setSubmitError(null);
+                      setOfficeFloor(floor.value);
+                      setValidationErrors((prev) => ({...prev, officeFloor: ""}));
                     }}
-                    className={`group relative overflow-hidden rounded-2xl border-2 p-4 transition-all duration-200 ${
-                      workMode === mode
-                        ? "border-indigo-500 bg-indigo-50 shadow-md"
-                        : "border-slate-200 bg-white hover:border-slate-300 hover:bg-slate-50"
+                    className={`py-3 px-2 rounded-xl border-2 font-semibold text-sm transition-all duration-150 ${
+                      officeFloor === floor.value
+                        ? "border-indigo-500 bg-indigo-50 text-indigo-700 shadow-sm"
+                        : "border-slate-200 text-slate-600 hover:border-slate-300 hover:bg-slate-50"
                     }`}
                   >
-                    <div className="flex flex-col items-center gap-3 relative z-10">
-                      <div className={`p-2.5 rounded-full transition-colors ${
-                        workMode === mode
-                          ? "bg-indigo-100 text-indigo-600"
-                          : "bg-slate-100 text-slate-600 group-hover:bg-slate-200"
-                      }`}>
-                        <Icon className="h-5 w-5" />
-                      </div>
-                      <div className="text-center">
-                        <div className="font-semibold text-slate-900">{label}</div>
-                        <div className="text-xs text-slate-500 mt-1">{desc}</div>
+                    Floor {floor.label}
+                  </button>
+                ))}
+              </div>
+              {validationErrors.officeFloor && (
+                <div className="flex items-center gap-2 text-red-600 text-sm mt-2">
+                  <AlertCircle className="w-4 h-4" />
+                  <span>{validationErrors.officeFloor}</span>
+                </div>
+              )}
+            </section>
+
+            {/* Lunch Preference Selection */}
+            <section className="space-y-3 pt-2 border-t border-slate-100">
+              <SectionHeader title="What's your lunch plan?" required icon={ChefHat} />
+              <div className="space-y-2">
+                {LUNCH_PREFERENCES.map((pref) => (
+                  <button
+                    key={pref.value}
+                    type="button"
+                    onClick={() => {
+                      setLunchPreference(pref.value);
+                      if (pref.value !== "order_tiffin") {
+                        setTiffinType("");
+                      }
+                      setValidationErrors((prev) => ({...prev, lunchPreference: "", tiffinType: ""}));
+                    }}
+                    className={`w-full group relative overflow-hidden rounded-xl border-2 p-3 transition-all duration-150 text-left ${
+                      lunchPreference === pref.value
+                        ? "border-indigo-400 bg-indigo-50/70"
+                        : "border-slate-200 bg-white hover:border-slate-300"
+                    }`}
+                  >
+                    <div className="flex items-center gap-3 relative z-10">
+                      <input
+                        type="radio"
+                        name="lunch_preference"
+                        checked={lunchPreference === pref.value}
+                        onChange={() => {}}
+                        className="w-4 h-4 cursor-pointer accent-indigo-600"
+                      />
+                      <div className="flex-1">
+                        <div className={`font-medium ${
+                          lunchPreference === pref.value
+                            ? "text-indigo-900"
+                            : "text-slate-900"
+                        }`}>
+                          {pref.label}
+                        </div>
+                        <div className="text-xs text-slate-500 mt-0.5">
+                          {pref.desc}
+                        </div>
                       </div>
                     </div>
                   </button>
                 ))}
               </div>
-            </section>
+              {validationErrors.lunchPreference && (
+                <div className="flex items-center gap-2 text-red-600 text-sm mt-2">
+                  <AlertCircle className="w-4 h-4" />
+                  <span>{validationErrors.lunchPreference}</span>
+                </div>
+              )}
 
-            {/* WFO-Only Section */}
-            {workMode === "WFO" && (
-              <>
-                {/* Office Floor Selection */}
-                <section className="space-y-3 pt-2 border-t border-slate-100">
-                  <SectionHeader title="Which floor will you work from?" required icon={Building2} />
-                  <div className="grid grid-cols-3 gap-2">
-                    {OFFICE_FLOORS.map((floor) => (
-                      <button
-                        key={floor.value}
-                        type="button"
-                        onClick={() => {
-                          setOfficeFloor(floor.value);
-                          setValidationErrors((prev) => ({...prev, officeFloor: ""}));
-                        }}
-                        className={`py-3 px-2 rounded-xl border-2 font-semibold text-sm transition-all duration-150 ${
-                          officeFloor === floor.value
-                            ? "border-indigo-500 bg-indigo-50 text-indigo-700 shadow-sm"
-                            : "border-slate-200 text-slate-600 hover:border-slate-300 hover:bg-slate-50"
-                        }`}
-                      >
-                        Floor {floor.label}
-                      </button>
-                    ))}
-                  </div>
-                  {validationErrors.officeFloor && (
-                    <div className="flex items-center gap-2 text-red-600 text-sm mt-2">
-                      <AlertCircle className="w-4 h-4" />
-                      <span>{validationErrors.officeFloor}</span>
-                    </div>
-                  )}
-                </section>
-
-                {/* Lunch Preference Selection */}
-                <section className="space-y-3 pt-2 border-t border-slate-100">
-                  <SectionHeader title="What's your lunch plan?" required icon={ChefHat} />
+              {/* Tiffin Type Selection (Conditional) */}
+              {lunchPreference === "order_tiffin" && (
+                <div className="mt-4 p-4 rounded-xl bg-gradient-to-br from-indigo-50 to-blue-50 border border-indigo-100">
+                  <label className="text-xs font-semibold uppercase tracking-wider text-indigo-900 block mb-3">
+                    Select tiffin type
+                    <RequiredBadge />
+                  </label>
                   <div className="space-y-2">
-                    {LUNCH_PREFERENCES.map((pref) => (
+                    {TIFFIN_TYPES.map((tiff) => (
                       <button
-                        key={pref.value}
+                        key={tiff.value}
                         type="button"
                         onClick={() => {
-                          setLunchPreference(pref.value);
-                          if (pref.value !== "order_tiffin") {
-                            setTiffinType("");
-                          }
-                          setValidationErrors((prev) => ({...prev, lunchPreference: "", tiffinType: ""}));
+                          setTiffinType(tiff.value);
+                          setValidationErrors((prev) => ({...prev, tiffinType: ""}));
                         }}
-                        className={`w-full group relative overflow-hidden rounded-xl border-2 p-3 transition-all duration-150 text-left ${
-                          lunchPreference === pref.value
-                            ? "border-indigo-400 bg-indigo-50/70"
-                            : "border-slate-200 bg-white hover:border-slate-300"
+                        className={`w-full group relative overflow-hidden rounded-lg border-2 p-2.5 transition-all duration-150 text-left ${
+                          tiffinType === tiff.value
+                            ? "border-indigo-400 bg-white shadow-sm"
+                            : "border-indigo-200 bg-white/60 hover:border-indigo-300"
                         }`}
                       >
-                        <div className="flex items-center gap-3 relative z-10">
+                        <div className="flex items-center gap-2.5 relative z-10">
                           <input
                             type="radio"
-                            name="lunch_preference"
-                            checked={lunchPreference === pref.value}
+                            name="tiffin_type"
+                            checked={tiffinType === tiff.value}
                             onChange={() => {}}
                             className="w-4 h-4 cursor-pointer accent-indigo-600"
                           />
                           <div className="flex-1">
-                            <div className={`font-medium ${
-                              lunchPreference === pref.value
+                            <div className={`font-medium text-sm ${
+                              tiffinType === tiff.value
                                 ? "text-indigo-900"
-                                : "text-slate-900"
+                                : "text-slate-700"
                             }`}>
-                              {pref.label}
+                              {tiff.label}
                             </div>
-                            <div className="text-xs text-slate-500 mt-0.5">
-                              {pref.desc}
+                            <div className="text-xs text-slate-500">
+                              {tiff.desc}
                             </div>
                           </div>
                         </div>
                       </button>
                     ))}
                   </div>
-                  {validationErrors.lunchPreference && (
-                    <div className="flex items-center gap-2 text-red-600 text-sm mt-2">
+                  {validationErrors.tiffinType && (
+                    <div className="flex items-center gap-2 text-red-600 text-sm mt-3">
                       <AlertCircle className="w-4 h-4" />
-                      <span>{validationErrors.lunchPreference}</span>
+                      <span>{validationErrors.tiffinType}</span>
                     </div>
                   )}
-
-                  {/* Tiffin Type Selection (Conditional) */}
-                  {lunchPreference === "order_tiffin" && (
-                    <div className="mt-4 p-4 rounded-xl bg-gradient-to-br from-indigo-50 to-blue-50 border border-indigo-100">
-                      <label className="text-xs font-semibold uppercase tracking-wider text-indigo-900 block mb-3">
-                        Select tiffin type
-                        <RequiredBadge />
-                      </label>
-                      <div className="space-y-2">
-                        {TIFFIN_TYPES.map((tiff) => (
-                          <button
-                            key={tiff.value}
-                            type="button"
-                            onClick={() => {
-                              setTiffinType(tiff.value);
-                              setValidationErrors((prev) => ({...prev, tiffinType: ""}));
-                            }}
-                            className={`w-full group relative overflow-hidden rounded-lg border-2 p-2.5 transition-all duration-150 text-left ${
-                              tiffinType === tiff.value
-                                ? "border-indigo-400 bg-white shadow-sm"
-                                : "border-indigo-200 bg-white/60 hover:border-indigo-300"
-                            }`}
-                          >
-                            <div className="flex items-center gap-2.5 relative z-10">
-                              <input
-                                type="radio"
-                                name="tiffin_type"
-                                checked={tiffinType === tiff.value}
-                                onChange={() => {}}
-                                className="w-4 h-4 cursor-pointer accent-indigo-600"
-                              />
-                              <div className="flex-1">
-                                <div className={`font-medium text-sm ${
-                                  tiffinType === tiff.value
-                                    ? "text-indigo-900"
-                                    : "text-slate-700"
-                                }`}>
-                                  {tiff.label}
-                                </div>
-                                <div className="text-xs text-slate-500">
-                                  {tiff.desc}
-                                </div>
-                              </div>
-                            </div>
-                          </button>
-                        ))}
-                      </div>
-                      {validationErrors.tiffinType && (
-                        <div className="flex items-center gap-2 text-red-600 text-sm mt-3">
-                          <AlertCircle className="w-4 h-4" />
-                          <span>{validationErrors.tiffinType}</span>
-                        </div>
-                      )}
-                    </div>
-                  )}
-                </section>
-              </>
-            )}
-
-            {/* Projects Selection */}
-            <section className={`space-y-3 ${workMode === "WFO" ? "pt-2 border-t border-slate-100" : ""}`}>
-              <SectionHeader title="Which projects are you working on?" required />
-              <div className="space-y-3">
-                {projectOptions.length === 0 ? (
-                  <p className="rounded-xl bg-slate-50 p-3 text-sm text-slate-500 italic">
-                    No active allocations found. Select from available projects below:
-                  </p>
-                ) : (
-                  <div className="space-y-2">
-                    <p className="text-xs text-slate-500 font-medium">Allocated Projects</p>
-                    {projectOptions.map((p) => (
-                      <label
-                        key={p.project_id}
-                        className={`flex cursor-pointer items-center gap-3 rounded-lg border-2 p-3 text-sm transition-all duration-150 ${
-                          selectedProjects.includes(p.project_id)
-                            ? "border-indigo-300 bg-indigo-50"
-                            : "border-slate-200 bg-white hover:border-slate-300"
-                        }`}
-                      >
-                        <input
-                          type="checkbox"
-                          checked={selectedProjects.includes(p.project_id)}
-                          onChange={() => toggleProject(p.project_id)}
-                          className="w-4 h-4 rounded accent-indigo-600 cursor-pointer"
-                        />
-                        <span className={`font-medium ${
-                          selectedProjects.includes(p.project_id)
-                            ? "text-indigo-900"
-                            : "text-slate-800"
-                        }`}>
-                          {p.project_name}
-                        </span>
-                      </label>
-                    ))}
-                  </div>
-                )}
-                
-                <div>
-                  <p className="text-xs text-slate-500 font-medium mb-2">Other Projects</p>
-                  <MultiSelect
-                    options={fallbackOptions}
-                    value={selectedProjects.filter(id => !projectOptions.some(p => p.project_id === id))}
-                    onChange={(newDropdownValues) => {
-                      const assignedValues = selectedProjects.filter(id => projectOptions.some(p => p.project_id === id));
-                      setSelectedProjects([...assignedValues, ...newDropdownValues]);
-                      setValidationErrors((prev) => ({...prev, projects: ""}));
-                    }}
-                    placeholder={projectOptions.length > 0 ? "Add more..." : "Search projects..."}
-                  />
-                </div>
-              </div>
-              {validationErrors.projects && (
-                <div className="flex items-center gap-2 text-red-600 text-sm mt-2">
-                  <AlertCircle className="w-4 h-4" />
-                  <span>{validationErrors.projects}</span>
                 </div>
               )}
             </section>
+          </>
+        )}
 
-            {/* Mood Selection (Optional) */}
-            <section className="space-y-3 pt-2 border-t border-slate-100">
-              <SectionHeader title="How are you feeling today?" />
-              <p className="text-xs text-slate-500 mb-2">Optional • Just for our records</p>
-              <div className="grid grid-cols-4 gap-2">
-                {MOODS.map(({ value, label, icon: Icon, tone }) => (
-                  <button
-                    key={value}
-                    type="button"
-                    onClick={() => setMood((m) => (m === value ? null : value))}
-                    title={label}
-                    className={`group flex flex-col items-center gap-2 rounded-xl border-2 p-3 transition-all duration-150 ${
-                      mood === value
-                        ? tone.replace("border-", "border-2 border-") + " shadow-sm"
-                        : "border-slate-200 text-slate-400 hover:border-slate-300 hover:bg-slate-50"
+        {/* Projects Selection */}
+        <section className={`space-y-3 ${workMode === "WFO" ? "pt-2 border-t border-slate-100" : ""}`}>
+          <SectionHeader title="Which projects are you working on?" required />
+          <div className="space-y-3">
+            {projectOptions.length === 0 ? (
+              <p className="rounded-xl bg-slate-50 p-3 text-sm text-slate-500 italic">
+                No active allocations found. Select from available projects below:
+              </p>
+            ) : (
+              <div className="space-y-2">
+                <p className="text-xs text-slate-500 font-medium">Allocated Projects</p>
+                {projectOptions.map((p) => (
+                  <label
+                    key={p.project_id}
+                    className={`flex cursor-pointer items-center gap-3 rounded-lg border-2 p-3 text-sm transition-all duration-150 ${
+                      selectedProjects.includes(p.project_id)
+                        ? "border-indigo-300 bg-indigo-50"
+                        : "border-slate-200 bg-white hover:border-slate-300"
                     }`}
                   >
-                    <Icon className="h-5 w-5" />
-                    <span className="text-[10px] font-semibold text-center leading-tight">{label}</span>
-                  </button>
+                    <input
+                      type="checkbox"
+                      checked={selectedProjects.includes(p.project_id)}
+                      onChange={() => toggleProject(p.project_id)}
+                      className="w-4 h-4 rounded accent-indigo-600 cursor-pointer"
+                    />
+                    <span className={`font-medium ${
+                      selectedProjects.includes(p.project_id)
+                        ? "text-indigo-900"
+                        : "text-slate-800"
+                    }`}>
+                      {p.project_name}
+                    </span>
+                  </label>
                 ))}
               </div>
-            </section>
-
-            {/* Submit Error Banner */}
-            {submitError && (
-              <div className="flex items-start gap-2.5 rounded-xl border border-red-200 bg-red-50 p-3 text-xs text-red-900">
-                <AlertCircle className="h-4 w-4 shrink-0 text-red-600 mt-0.5" />
-                <div className="flex-1 leading-relaxed font-medium">
-                  {submitError}
-                </div>
-              </div>
             )}
-          </>
+            
+            <div>
+              <p className="text-xs text-slate-500 font-medium mb-2">Other Projects</p>
+              <MultiSelect
+                options={fallbackOptions}
+                value={selectedProjects.filter(id => !projectOptions.some(p => p.project_id === id))}
+                onChange={(newDropdownValues) => {
+                  const assignedValues = selectedProjects.filter(id => projectOptions.some(p => p.project_id === id));
+                  setSelectedProjects([...assignedValues, ...newDropdownValues]);
+                  setValidationErrors((prev) => ({...prev, projects: ""}));
+                }}
+                placeholder={projectOptions.length > 0 ? "Add more..." : "Search projects..."}
+              />
+            </div>
+          </div>
+          {validationErrors.projects && (
+            <div className="flex items-center gap-2 text-red-600 text-sm mt-2">
+              <AlertCircle className="w-4 h-4" />
+              <span>{validationErrors.projects}</span>
+            </div>
+          )}
+        </section>
+
+        {/* Mood Selection (Optional) */}
+        <section className="space-y-3 pt-2 border-t border-slate-100">
+          <SectionHeader title="How are you feeling today?" />
+          <p className="text-xs text-slate-500 mb-2">Optional • Just for our records</p>
+          <div className="grid grid-cols-4 gap-2">
+            {MOODS.map(({ value, label, icon: Icon, tone }) => (
+              <button
+                key={value}
+                type="button"
+                onClick={() => setMood((m) => (m === value ? null : value))}
+                title={label}
+                className={`group flex flex-col items-center gap-2 rounded-xl border-2 p-3 transition-all duration-150 ${
+                  mood === value
+                    ? tone.replace("border-", "border-2 border-") + " shadow-sm"
+                    : "border-slate-200 text-slate-400 hover:border-slate-300 hover:bg-slate-50"
+                }`}
+              >
+                <Icon className="h-5 w-5" />
+                <span className="text-[10px] font-semibold text-center leading-tight">{label}</span>
+              </button>
+            ))}
+          </div>
+        </section>
+
+        {/* Submit Error Banner */}
+        {submitError && (
+          <div className="flex items-start gap-2.5 rounded-xl border border-red-200 bg-red-50 p-3 text-xs text-red-900">
+            <AlertCircle className="h-4 w-4 shrink-0 text-red-600 mt-0.5" />
+            <div className="flex-1 leading-relaxed font-medium">
+              {submitError}
+            </div>
+          </div>
         )}
       </Modal.Body>
 
       {/* Footer */}
       <Modal.Footer>
-        {isSlackPending ? (
-          <div className="flex gap-2.5 w-full">
+        <div className="flex flex-col w-full gap-2">
+          <div className="flex gap-3 w-full">
             <Button
               type="button"
               variant="secondary"
-              onClick={() => setIsSlackPending(false)}
-              className="flex-1 justify-center"
+              onClick={dismiss}
+              className="flex-1"
+              disabled={isPending}
             >
-              <ArrowLeft className="h-4 w-4 mr-1.5" />
-              Edit Details
+              Cancel
             </Button>
             <Button
               type="button"
-              onClick={() => submit()}
+              onClick={handleSubmit}
               disabled={isPending}
-              className="flex-1 justify-center"
+              loading={isPending}
+              className="flex-1 justify-center gap-2 font-medium"
             >
-              {isPending ? "Resending…" : "Resend Link"}
+              {status?.has_slack && !isPending && <SlackIcon className="w-4 h-4" />}
+              <span>{buttonLabel}</span>
             </Button>
           </div>
-        ) : (
-          <div className="flex flex-col w-full gap-2">
-            <div className="flex gap-3 w-full">
-              <Button
-                type="button"
-                variant="secondary"
-                onClick={dismiss}
-                className="flex-1"
-                disabled={isPending}
-              >
-                Cancel
-              </Button>
-              <Button
-                type="button"
-                onClick={handleSubmit}
-                disabled={isPending}
-                loading={isPending}
-                className="flex-1 justify-center"
-              >
-                {buttonLabel}
-              </Button>
-            </div>
-            <p className="text-xs text-slate-400 text-center mt-1">
-              Fields marked with <span className="text-red-500 font-semibold">*</span> are required
-            </p>
-          </div>
-        )}
+          <p className="text-xs text-slate-400 text-center mt-1">
+            Fields marked with <span className="text-red-500 font-semibold">*</span> are required
+          </p>
+        </div>
       </Modal.Footer>
     </Modal>
   );

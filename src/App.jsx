@@ -1,12 +1,58 @@
 /* eslint-disable react/prop-types */
-import React, { Suspense, lazy, useState } from "react";
-import { Routes, Route, Navigate } from "react-router-dom";
-import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
-import { Toaster } from "react-hot-toast";
+import React, { Suspense, lazy, useState, useEffect } from "react";
+import { Routes, Route, Navigate, useLocation, useNavigate } from "react-router-dom";
+import { QueryClient, QueryClientProvider, useQueryClient } from "@tanstack/react-query";
+import toast, { Toaster } from "react-hot-toast";
 import ProtectedRoute from "./routes/ProtectedRoute";
 import ErrorBoundary from "./components/ErrorBoundary";
 import ForcePasswordChangeModal from "./components/ForcePasswordChangeModal";
 import DailyCheckInModal from "./components/checkin/DailyCheckInModal";
+
+function CheckInOAuthToastHandler() {
+  const location = useLocation();
+  const navigate = useNavigate();
+  const queryClient = useQueryClient();
+
+  useEffect(() => {
+    const params = new URLSearchParams(location.search);
+    const result = params.get("checkin_result");
+    const error = params.get("checkin_error");
+
+    if (result === "success") {
+      toast.success("✓ Checked in successfully via Slack!", {
+        duration: 4000,
+        icon: "🎉",
+      });
+      queryClient.invalidateQueries({ queryKey: ["checkin-today"] });
+      params.delete("checkin_result");
+      const newSearch = params.toString() ? `?${params.toString()}` : "";
+      navigate(`${location.pathname}${newSearch}`, { replace: true });
+    } else if (error) {
+      if (error === "office_ip_required") {
+        toast.error("Check-in blocked: You must be connected to the Office Wi-Fi.", {
+          duration: 5000,
+        });
+      } else if (error === "account_mismatch") {
+        toast.error("Check-in blocked: Account mismatch. You cannot verify using someone else's Slack account.", {
+          duration: 6000,
+        });
+      } else if (error === "slack_access_denied") {
+        toast("Slack verification was cancelled.", { icon: "ℹ️" });
+      } else if (error === "token_expired") {
+        toast.error("Check-in session expired. Please try checking in again.");
+      } else {
+        toast.error("Check-in failed. Please try again.");
+      }
+      queryClient.invalidateQueries({ queryKey: ["checkin-today"] });
+      params.delete("checkin_error");
+      params.delete("ip");
+      const newSearch = params.toString() ? `?${params.toString()}` : "";
+      navigate(`${location.pathname}${newSearch}`, { replace: true });
+    }
+  }, [location.search, location.pathname, navigate, queryClient]);
+
+  return null;
+}
 
 // Layouts
 import AdminLayout from "./layouts/AdminLayout";
@@ -128,6 +174,7 @@ function App() {
             }}
           />
           <ForcePasswordChangeModal />
+          <CheckInOAuthToastHandler />
           <DailyCheckInModal />
           <Suspense fallback={null}>
             <Routes>
