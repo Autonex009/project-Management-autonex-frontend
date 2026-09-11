@@ -7,6 +7,7 @@ import {
   CircleDashed,
   ShieldCheck,
   AlertTriangle,
+  Smile,
 } from "lucide-react";
 import { checkinApi, subProjectApi } from "../../services/api";
 import Table from "../../components/ui/Table";
@@ -16,6 +17,7 @@ import Dropdown from "../../components/ui/Dropdown";
 import StatCard from "../../components/dashboard/StatCard";
 import SearchBar from "../../components/ui/SearchBar";
 import HistoryMatrix from "../../components/checkin/HistoryMatrix";
+import MetricDots from "../../components/ui/MetricDots";
 import { formatDisplayName } from "../../utils/displayName";
 
 const fmtTime = (v) =>
@@ -41,16 +43,20 @@ const AdminCheckInsPage = () => {
   const [projectId, setProjectId] = useState("");
   const [statusFilter, setStatusFilter] = useState("");
   const [timeFilter, setTimeFilter] = useState("");
+  const [workModeFilter, setWorkModeFilter] = useState("");
+  const [officeFloorFilter, setOfficeFloorFilter] = useState("");
   const [activeTab, setActiveTab] = useState("today");
   const limit = 20;
 
   const { data, isLoading, isError } = useQuery({
-    queryKey: ["checkins-admin-today", page, search, projectId, statusFilter, timeFilter],
+    queryKey: ["checkins-admin-today", page, search, projectId, statusFilter, timeFilter, workModeFilter, officeFloorFilter],
     queryFn: () => checkinApi.getAdminPaginated({ 
       page, limit, search, 
       project_id: projectId || undefined, 
       status: statusFilter, 
-      time_filter: timeFilter 
+      time_filter: timeFilter,
+      work_mode: workModeFilter,
+      office_floor: officeFloorFilter
     }),
     staleTime: 60 * 1000,
   });
@@ -104,9 +110,16 @@ const AdminCheckInsPage = () => {
     {
       key: "status",
       label: "Status",
-      width: "w-[16%]",
-      render: (_, row) =>
-        row.checked_in ? (
+      width: "w-[12%]",
+      render: (_, row) => {
+        if (row.is_on_leave) {
+          return (
+            <span className="inline-flex items-center gap-1 rounded-full bg-amber-50 px-2 py-0.5 text-xs font-medium text-amber-700">
+              <CircleDashed className="h-3 w-3" /> On Leave
+            </span>
+          );
+        }
+        return row.checked_in ? (
           <span className="inline-flex items-center gap-1 rounded-full bg-emerald-50 px-2 py-0.5 text-xs font-medium text-emerald-700">
             <CheckCircle2 className="h-3 w-3" /> Checked in
           </span>
@@ -114,18 +127,27 @@ const AdminCheckInsPage = () => {
           <span className="inline-flex items-center gap-1 rounded-full bg-slate-100 px-2 py-0.5 text-xs font-medium text-slate-500">
             <CircleDashed className="h-3 w-3" /> Not yet
           </span>
-        ),
+        );
+      },
     },
     {
       key: "mode",
       label: "Mode",
-      width: "w-[10%]",
+      width: "w-[8%]",
       render: (_, row) => <WorkModePill mode={row.work_mode} />,
+    },
+    {
+      key: "floor",
+      label: "Floor",
+      width: "w-[8%]",
+      render: (_, row) => (
+        <span className="text-slate-600 font-medium">{row.office_floor || "—"}</span>
+      ),
     },
     {
       key: "time",
       label: "Checked in",
-      width: "w-[12%]",
+      width: "w-[10%]",
       render: (_, row) => (
         <span className="text-slate-500">{fmtTime(row.checked_in_at)}</span>
       ),
@@ -204,39 +226,121 @@ const AdminCheckInsPage = () => {
               ]}
             />
           </div>
+
+          <div className="w-32">
+            <Dropdown
+              value={workModeFilter}
+              onChange={(v) => { setWorkModeFilter(v); setPage(1); }}
+              placeholder="All Modes"
+              options={[
+                { value: "", label: "All Modes" },
+                { value: "WFO", label: "WFO" },
+                { value: "WFH", label: "WFH" }
+              ]}
+            />
+          </div>
+
+          <div className="w-28">
+            <Dropdown
+              value={officeFloorFilter}
+              onChange={(v) => { setOfficeFloorFilter(v); setPage(1); }}
+              placeholder="All Floors"
+              options={[
+                { value: "", label: "All Floors" },
+                { value: "7", label: "Floor 7" },
+                { value: "9", label: "Floor 9" },
+                { value: "17", label: "Floor 17" }
+              ]}
+            />
+          </div>
         </div>
 
         <div className="flex items-center gap-3 w-full md:w-auto">
           <SearchBar 
             value={search} 
             onChange={(v) => { setSearch(v); setPage(1); }} 
-            placeholder="Search employees..." 
+            placeholder="Search by employee name..." 
             className="w-full md:w-72"
           />
         </div>
       </div>
 
-      <div className="grid grid-cols-1 sm:grid-cols-3 gap-3 mb-6">
+      <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-3 mb-6">
         <StatCard
-          title="Total Active Employees"
+          title="Active Employees"
           value={data?.kpi_total ?? 0}
           icon={Building2}
           tone="indigo"
           hint="on payroll"
+          breakdown={[
+            { label: "Confirmed by PM", value: data?.kpi_confirmed ?? 0 },
+            { label: "Pending confirmation", value: (data?.kpi_checked_in ?? 0) - (data?.kpi_confirmed ?? 0) }
+          ]}
         />
         <StatCard
           title="Checked In Today"
           value={data?.kpi_checked_in ?? 0}
           icon={CheckCircle2}
           tone="emerald"
-          hint="so far today"
+          hint={
+            <MetricDots
+              items={[
+                {
+                  label: "WFO",
+                  value: data?.kpi_wfo ?? 0,
+                  dot: "bg-emerald-500",
+                  tone: "text-emerald-600",
+                },
+                {
+                  label: "WFH",
+                  value: data?.kpi_wfh ?? 0,
+                  dot: "bg-sky-500",
+                  tone: "text-sky-600",
+                },
+              ]}
+            />
+          }
+          breakdown={[
+            { label: "Late (After 10 AM)", value: data?.kpi_late ?? 0 },
+            { label: "Already Checked Out", value: data?.kpi_checked_out ?? 0 },
+          ]}
         />
         <StatCard
-          title="Confirmed by PM"
-          value={data?.kpi_confirmed ?? 0}
-          icon={ShieldCheck}
-          tone="sky"
-          hint="reviewed by managers"
+          title="Office & Lunch"
+          value={data?.kpi_wfo ?? 0}
+          icon={Building2}
+          tone="amber"
+          hint="on premises"
+          breakdown={[
+            {
+              title: "Floors",
+              rows: [
+                { label: "Floor 7", value: data?.kpi_floor_7 ?? 0 },
+                { label: "Floor 9", value: data?.kpi_floor_9 ?? 0 },
+                { label: "Floor 17", value: data?.kpi_floor_17 ?? 0 },
+              ]
+            },
+            {
+              title: "Lunch Prefs",
+              rows: [
+                { label: "Order Tiffin", value: data?.kpi_order_tiffin ?? 0 },
+                { label: "Canteen", value: data?.kpi_canteen ?? 0 },
+              ]
+            }
+          ]}
+        />
+        <StatCard
+          title="Company Mood"
+          value={data?.kpi_checked_in ?? 0}
+          icon={Smile}
+          tone="rose"
+          hint="overall vibe"
+          breakdown={[
+            { label: "Great", value: data?.kpi_mood_great ?? 0 },
+            { label: "Okay", value: data?.kpi_mood_okay ?? 0 },
+            { label: "Low", value: data?.kpi_mood_low ?? 0 },
+            { label: "Stressed", value: data?.kpi_mood_stressed ?? 0 },
+          ]}
         />
       </div>
 

@@ -1,8 +1,8 @@
 import React, { useEffect, useMemo, useState } from "react";
 import { useLocation } from "react-router-dom";
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
-import { 
-  CalendarCheck, Home, Building2, Smile, Meh, Frown, Zap, 
+import {
+  CalendarCheck, Home, Building2, Smile, Meh, Frown, Zap,
   AlertCircle, ChefHat
 } from "lucide-react";
 import toast from "react-hot-toast";
@@ -96,7 +96,7 @@ export default function DailyCheckInModal() {
     setValidationErrors({});
   }, [status]);
 
-  const isAuthRoute = 
+  const isAuthRoute =
     location.pathname.startsWith('/login') ||
     location.pathname.startsWith('/forgot-password') ||
     location.pathname.startsWith('/reset-password') ||
@@ -109,7 +109,7 @@ export default function DailyCheckInModal() {
     setSelectedProjects((prev) =>
       prev.includes(id) ? prev.filter((p) => p !== id) : [...prev, id],
     );
-    setValidationErrors((prev) => ({...prev, projects: ""}));
+    setValidationErrors((prev) => ({ ...prev, projects: "" }));
   };
 
   const validateForm = () => {
@@ -146,10 +146,24 @@ export default function DailyCheckInModal() {
         tiffin_type: lunchPreference === "order_tiffin" ? tiffinType : null,
       }),
     onSuccess: () => {
-      toast.success("✓ Checked in — have a great day!", {
-        duration: 3000,
-        icon: "👋",
-      });
+      // Calculate the current hour in IST
+      const istHour = parseInt(
+        new Date().toLocaleTimeString('en-US', { timeZone: 'Asia/Kolkata', hour12: false, hour: 'numeric' }),
+        10
+      );
+      // If it is 12 PM or later, and they ordered food from the office
+      if (istHour >= 12 && workMode === "WFO" && (lunchPreference === "order_tiffin" || lunchPreference === "canteen")) {
+        toast("The list is already finalized and sent. Please contact Ashish Jadhav to confirm.", {
+          duration: 6000,
+          icon: "⚠️",
+          style: { maxWidth: 500 }
+        });
+      } else {
+        toast.success("✓ Checked in — have a great day!", {
+          duration: 3000,
+          icon: "👋",
+        });
+      }
       queryClient.invalidateQueries({ queryKey: ["checkin-today"] });
       dismiss();
     },
@@ -169,7 +183,7 @@ export default function DailyCheckInModal() {
   };
 
   const projectOptions = useMemo(() => status?.project_options || [], [status]);
-  
+
   const { data: allProjects } = useQuery({
     queryKey: ["all-sub-projects"],
     queryFn: () => subProjectApi.getAll(),
@@ -224,18 +238,16 @@ export default function DailyCheckInModal() {
                   setTiffinType("");
                   setValidationErrors({});
                 }}
-                className={`group relative overflow-hidden rounded-2xl border-2 p-4 transition-all duration-200 ${
-                  workMode === mode
+                className={`group relative overflow-hidden rounded-2xl border-2 p-4 transition-all duration-200 ${workMode === mode
                     ? "border-indigo-500 bg-indigo-50 shadow-md"
                     : "border-slate-200 bg-white hover:border-slate-300 hover:bg-slate-50"
-                }`}
+                  }`}
               >
                 <div className="flex flex-col items-center gap-3 relative z-10">
-                  <div className={`p-2.5 rounded-full transition-colors ${
-                    workMode === mode
+                  <div className={`p-2.5 rounded-full transition-colors ${workMode === mode
                       ? "bg-indigo-100 text-indigo-600"
                       : "bg-slate-100 text-slate-600 group-hover:bg-slate-200"
-                  }`}>
+                    }`}>
                     <Icon className="h-5 w-5" />
                   </div>
                   <div className="text-center">
@@ -261,13 +273,12 @@ export default function DailyCheckInModal() {
                     type="button"
                     onClick={() => {
                       setOfficeFloor(floor.value);
-                      setValidationErrors((prev) => ({...prev, officeFloor: ""}));
+                      setValidationErrors((prev) => ({ ...prev, officeFloor: "" }));
                     }}
-                    className={`py-3 px-2 rounded-xl border-2 font-semibold text-sm transition-all duration-150 ${
-                      officeFloor === floor.value
+                    className={`py-3 px-2 rounded-xl border-2 font-semibold text-sm transition-all duration-150 ${officeFloor === floor.value
                         ? "border-indigo-500 bg-indigo-50 text-indigo-700 shadow-sm"
                         : "border-slate-200 text-slate-600 hover:border-slate-300 hover:bg-slate-50"
-                    }`}
+                      }`}
                   >
                     Floor {floor.label}
                   </button>
@@ -294,28 +305,26 @@ export default function DailyCheckInModal() {
                       if (pref.value !== "order_tiffin") {
                         setTiffinType("");
                       }
-                      setValidationErrors((prev) => ({...prev, lunchPreference: "", tiffinType: ""}));
+                      setValidationErrors((prev) => ({ ...prev, lunchPreference: "", tiffinType: "" }));
                     }}
-                    className={`w-full group relative overflow-hidden rounded-xl border-2 p-3 transition-all duration-150 text-left ${
-                      lunchPreference === pref.value
+                    className={`w-full group relative overflow-hidden rounded-xl border-2 p-3 transition-all duration-150 text-left ${lunchPreference === pref.value
                         ? "border-indigo-400 bg-indigo-50/70"
                         : "border-slate-200 bg-white hover:border-slate-300"
-                    }`}
+                      }`}
                   >
                     <div className="flex items-center gap-3 relative z-10">
                       <input
                         type="radio"
                         name="lunch_preference"
                         checked={lunchPreference === pref.value}
-                        onChange={() => {}}
+                        onChange={() => { }}
                         className="w-4 h-4 cursor-pointer accent-indigo-600"
                       />
                       <div className="flex-1">
-                        <div className={`font-medium ${
-                          lunchPreference === pref.value
+                        <div className={`font-medium ${lunchPreference === pref.value
                             ? "text-indigo-900"
                             : "text-slate-900"
-                        }`}>
+                          }`}>
                           {pref.label}
                         </div>
                         <div className="text-xs text-slate-500 mt-0.5">
@@ -347,28 +356,26 @@ export default function DailyCheckInModal() {
                         type="button"
                         onClick={() => {
                           setTiffinType(tiff.value);
-                          setValidationErrors((prev) => ({...prev, tiffinType: ""}));
+                          setValidationErrors((prev) => ({ ...prev, tiffinType: "" }));
                         }}
-                        className={`w-full group relative overflow-hidden rounded-lg border-2 p-2.5 transition-all duration-150 text-left ${
-                          tiffinType === tiff.value
+                        className={`w-full group relative overflow-hidden rounded-lg border-2 p-2.5 transition-all duration-150 text-left ${tiffinType === tiff.value
                             ? "border-indigo-400 bg-white shadow-sm"
                             : "border-indigo-200 bg-white/60 hover:border-indigo-300"
-                        }`}
+                          }`}
                       >
                         <div className="flex items-center gap-2.5 relative z-10">
                           <input
                             type="radio"
                             name="tiffin_type"
                             checked={tiffinType === tiff.value}
-                            onChange={() => {}}
+                            onChange={() => { }}
                             className="w-4 h-4 cursor-pointer accent-indigo-600"
                           />
                           <div className="flex-1">
-                            <div className={`font-medium text-sm ${
-                              tiffinType === tiff.value
+                            <div className={`font-medium text-sm ${tiffinType === tiff.value
                                 ? "text-indigo-900"
                                 : "text-slate-700"
-                            }`}>
+                              }`}>
                               {tiff.label}
                             </div>
                             <div className="text-xs text-slate-500">
@@ -405,11 +412,10 @@ export default function DailyCheckInModal() {
                 {projectOptions.map((p) => (
                   <label
                     key={p.project_id}
-                    className={`flex cursor-pointer items-center gap-3 rounded-lg border-2 p-3 text-sm transition-all duration-150 ${
-                      selectedProjects.includes(p.project_id)
+                    className={`flex cursor-pointer items-center gap-3 rounded-lg border-2 p-3 text-sm transition-all duration-150 ${selectedProjects.includes(p.project_id)
                         ? "border-indigo-300 bg-indigo-50"
                         : "border-slate-200 bg-white hover:border-slate-300"
-                    }`}
+                      }`}
                   >
                     <input
                       type="checkbox"
@@ -417,18 +423,17 @@ export default function DailyCheckInModal() {
                       onChange={() => toggleProject(p.project_id)}
                       className="w-4 h-4 rounded accent-indigo-600 cursor-pointer"
                     />
-                    <span className={`font-medium ${
-                      selectedProjects.includes(p.project_id)
+                    <span className={`font-medium ${selectedProjects.includes(p.project_id)
                         ? "text-indigo-900"
                         : "text-slate-800"
-                    }`}>
+                      }`}>
                       {p.project_name}
                     </span>
                   </label>
                 ))}
               </div>
             )}
-            
+
             <div>
               <p className="text-xs text-slate-500 font-medium mb-2">Other Projects</p>
               <MultiSelect
@@ -437,7 +442,7 @@ export default function DailyCheckInModal() {
                 onChange={(newDropdownValues) => {
                   const assignedValues = selectedProjects.filter(id => projectOptions.some(p => p.project_id === id));
                   setSelectedProjects([...assignedValues, ...newDropdownValues]);
-                  setValidationErrors((prev) => ({...prev, projects: ""}));
+                  setValidationErrors((prev) => ({ ...prev, projects: "" }));
                 }}
                 placeholder={projectOptions.length > 0 ? "Add more..." : "Search projects..."}
               />
@@ -462,11 +467,10 @@ export default function DailyCheckInModal() {
                 type="button"
                 onClick={() => setMood((m) => (m === value ? null : value))}
                 title={label}
-                className={`group flex flex-col items-center gap-2 rounded-xl border-2 p-3 transition-all duration-150 ${
-                  mood === value
+                className={`group flex flex-col items-center gap-2 rounded-xl border-2 p-3 transition-all duration-150 ${mood === value
                     ? tone.replace("border-", "border-2 border-") + " shadow-sm"
                     : "border-slate-200 text-slate-400 hover:border-slate-300 hover:bg-slate-50"
-                }`}
+                  }`}
               >
                 <Icon className="h-5 w-5" />
                 <span className="text-[10px] font-semibold text-center leading-tight">{label}</span>

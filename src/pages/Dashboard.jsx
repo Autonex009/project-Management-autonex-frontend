@@ -658,6 +658,9 @@ const Dashboard = () => {
             goFromKpi(`/admin/analytics/${projectId}`)
           }
           onViewAllUsers={() => goFromKpi("/admin/employees")}
+          onOpenUser={(employeeId) => 
+            goFromKpi(`/admin/employees/${employeeId}`)
+          }
         />
       </div>
     </div>

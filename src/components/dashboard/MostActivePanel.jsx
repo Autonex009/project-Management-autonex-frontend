@@ -160,6 +160,7 @@ const MostActivePanel = ({
   onViewAnalytics,
   onOpenProject,
   onViewAllUsers,
+  onOpenUser,
 }) => {
   const [tab, setTab] = useState("users");
   const [hovered, setHovered] = useState(null);
@@ -175,7 +176,7 @@ const MostActivePanel = ({
         name: u.employee_name || u.user_email,
         sub: u.employee_name ? u.user_email : "Autonex account",
         hours: Number(u.hours || 0),
-        onClick: onViewAllUsers,
+        onClick: u.employee_id ? () => onOpenUser?.(u.employee_id) : onViewAllUsers,
       }))
     : topProjects.map((p) => ({
         id: p.encord_project_hash,
