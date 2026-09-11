@@ -307,6 +307,11 @@ const Dashboard = () => {
     };
   }, [dashboardKpis, todayStr]);
 
+  // Role based routing
+  const userRole = JSON.parse(localStorage.getItem("user") || "{}").role;
+  const routePrefix = userRole === "pm" ? "/pm" : "/admin";
+  const employeesRoute = userRole === "pm" ? "/pm/my-team" : "/admin/employees";
+
   // KPI cards navigate with router state so useBreadcrumbTrail treats it as a
   // drill rather than a top-level jump — the trail then reads
   // "Autonex › Dashboard › Leaves" instead of resetting to just the destination.
@@ -475,7 +480,7 @@ const Dashboard = () => {
                 },
               ]}
               breakdownFooter={`${workforce.onRoster.length} on roster · excludes archived`}
-              onClick={() => goFromKpi("/admin/employees")}
+              onClick={() => goFromKpi(employeesRoute)}
             />
             <StatCard
               compact
@@ -498,7 +503,7 @@ const Dashboard = () => {
                 { label: "Vendor", sections: [{ rows: projectsByVendor }] },
               ]}
               breakdownFooter={`${totalProjects} projects · includes archived`}
-              onClick={() => goFromKpi("/admin/sub-projects")}
+              onClick={() => goFromKpi(`${routePrefix}/sub-projects`)}
             />
             {/* Leave + WFH share one slot, split across the card's height. */}
             <SplitStatCard
@@ -521,9 +526,9 @@ const Dashboard = () => {
                   tabs: timingTabs(leaveDesk.timing),
                   todayPeople: leaveDesk.todayPeople,
                   emptyLabel: "Nothing pending for this period",
-                  onClick: () => goFromKpi("/admin/leaves"),
+                  onClick: () => goFromKpi(`${routePrefix}/leaves`),
                   onSelectPerson: (person) =>
-                    goToPerson("/admin/leaves", person),
+                    goToPerson(`${routePrefix}/leaves`, person),
                 },
                 {
                   key: "wfh",
@@ -543,9 +548,9 @@ const Dashboard = () => {
                   tabs: timingTabs(wfhDesk.timing),
                   todayPeople: wfhDesk.todayPeople,
                   emptyLabel: "Nothing pending for this period",
-                  onClick: () => goFromKpi("/admin/leaves?tab=WFH%20Requests"),
+                  onClick: () => goFromKpi(`${routePrefix}/leaves?tab=WFH%20Requests`),
                   onSelectPerson: (person) =>
-                    goToPerson("/admin/leaves?tab=WFH%20Requests", person),
+                    goToPerson(`${routePrefix}/leaves?tab=WFH%20Requests`, person),
                 },
               ]}
             />
@@ -558,7 +563,7 @@ const Dashboard = () => {
             headerAction={
               <button
                 type="button"
-                onClick={() => goFromKpi("/admin/projects")}
+                onClick={() => goFromKpi(`${routePrefix}/projects`)}
                 className="hidden sm:flex items-center text-[13px] font-medium text-indigo-600 hover:text-indigo-700 transition-colors"
               >
                 View all
@@ -575,7 +580,7 @@ const Dashboard = () => {
             onRowClick={(row) => {
               // Analytics only exists for Encord-mapped projects.
               if (row?.project?.encord_project_hash) {
-                navigate(`/admin/analytics/${row.project.id}`, {
+                navigate(`${routePrefix}/analytics/${row.project.id}`, {
                   state: { from: "dashboard" },
                 });
               }
@@ -653,13 +658,13 @@ const Dashboard = () => {
         <MostActivePanel
           overview={autonexOverview}
           daily={autonexDaily}
-          onViewAnalytics={() => goFromKpi("/admin/analytics")}
+          onViewAnalytics={() => goFromKpi(`${routePrefix}/analytics`)}
           onOpenProject={(projectId) =>
-            goFromKpi(`/admin/analytics/${projectId}`)
+            goFromKpi(`${routePrefix}/analytics/${projectId}`)
           }
-          onViewAllUsers={() => goFromKpi("/admin/employees")}
+          onViewAllUsers={() => goFromKpi(employeesRoute)}
           onOpenUser={(employeeId) => 
-            goFromKpi(`/admin/employees/${employeeId}`)
+            goFromKpi(`${employeesRoute}/${employeeId}`)
           }
         />
       </div>
