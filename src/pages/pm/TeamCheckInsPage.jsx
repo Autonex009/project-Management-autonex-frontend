@@ -64,6 +64,8 @@ const TeamCheckInsPage = () => {
   const [projectIds, setProjectIds] = useState([]);
   const [statusFilters, setStatusFilters] = useState([]);
   const [timeFilters, setTimeFilters] = useState([]);
+  const [customTimeFrom, setCustomTimeFrom] = useState("");
+  const [customTimeTo, setCustomTimeTo] = useState("");
   const [workModeFilters, setWorkModeFilters] = useState([]);
   const [officeFloorFilters, setOfficeFloorFilters] = useState([]);
   const [sentimentFilters, setSentimentFilters] = useState([]);
@@ -73,28 +75,34 @@ const TeamCheckInsPage = () => {
 
   const { data, isLoading, isError } = useQuery({
     queryKey: [
-      "checkins-team-today", 
-      page, 
-      search, 
-      projectIds, 
-      statusFilters, 
-      timeFilters, 
-      workModeFilters, 
+      "checkins-team-today",
+      page,
+      search,
+      projectIds,
+      statusFilters,
+      timeFilters,
+      customTimeFrom,       
+      customTimeTo,         
+      workModeFilters,
       officeFloorFilters,
-      sentimentFilters
+      sentimentFilters,
     ],
-    queryFn: () => checkinApi.getTeamToday({ 
-      page, limit, search, 
-      project_id: projectIds.join(",") || undefined, 
-      status: statusFilters.join(","), 
-      time_filter: timeFilters.join(","),
-      work_mode: workModeFilters.join(","),
-      office_floor: officeFloorFilters.join(","),
-      sentiment: sentimentFilters.join(",")
-    }),
+    queryFn: () =>
+      checkinApi.getTeamToday({
+        page,
+        limit,
+        search,
+        project_id: projectIds.join(",") || undefined,
+        status: statusFilters.join(","),
+        time_filter: timeFilters.join(","),
+        time_from: timeFilters.includes("custom") ? customTimeFrom || undefined : undefined,
+        time_to: timeFilters.includes("custom") ? customTimeTo || undefined : undefined,
+        work_mode: workModeFilters.join(","),
+        office_floor: officeFloorFilters.join(","),
+        sentiment: sentimentFilters.join(","),
+      }),
     staleTime: 60 * 1000,
   });
-
   const { data: projectsData } = useQuery({
     queryKey: ["all-sub-projects"],
     queryFn: () => subProjectApi.getAll(),
@@ -122,7 +130,7 @@ const TeamCheckInsPage = () => {
   const pendingOnPage = pendingItems.length;
 
   const allSelected = pendingOnPage > 0 && pendingItems.every(r => selectedIds.has(r.employee_id));
-  
+
   const toggleAll = () => {
     if (allSelected) {
       const newSet = new Set(selectedIds);
@@ -145,19 +153,22 @@ const TeamCheckInsPage = () => {
     setSelectedIds(newSet);
   };
 
-  const hasActiveFilters = 
-    projectIds.length > 0 || 
-    statusFilters.length > 0 || 
-    timeFilters.length > 0 || 
-    workModeFilters.length > 0 || 
-    officeFloorFilters.length > 0 || 
-    sentimentFilters.length > 0 || 
-    search.trim() !== "";
+  const hasActiveFilters =
+    projectIds.length > 0 ||
+    statusFilters.length > 0 ||
+    timeFilters.length > 0 ||
+    workModeFilters.length > 0 ||
+    officeFloorFilters.length > 0 ||
+    sentimentFilters.length > 0 ||
+    search.trim() !== "" ||
+    (timeFilters.includes("custom") && (customTimeFrom || customTimeTo));
 
   const clearAllFilters = () => {
     setProjectIds([]);
     setStatusFilters([]);
     setTimeFilters([]);
+    setCustomTimeFrom("");
+    setCustomTimeTo("");
     setWorkModeFilters([]);
     setOfficeFloorFilters([]);
     setSentimentFilters([]);
@@ -181,7 +192,7 @@ const TeamCheckInsPage = () => {
       render: (_, row) => {
         const isPending = row.checked_in && !row.pm_confirmed_at;
         if (!isPending) return null;
-        
+
         return (
           <input
             type="checkbox"
@@ -449,6 +460,10 @@ const TeamCheckInsPage = () => {
                 setStatusFilters={(v) => { setStatusFilters(v); setPage(1); }}
                 timeFilters={timeFilters}
                 setTimeFilters={(v) => { setTimeFilters(v); setPage(1); }}
+                customTimeFrom={customTimeFrom}          
+                setCustomTimeFrom={setCustomTimeFrom}    
+                customTimeTo={customTimeTo}             
+                setCustomTimeTo={setCustomTimeTo}       
                 workModeFilters={workModeFilters}
                 setWorkModeFilters={(v) => { setWorkModeFilters(v); setPage(1); }}
                 officeFloorFilters={officeFloorFilters}
@@ -471,20 +486,20 @@ const TeamCheckInsPage = () => {
             </div>
 
             <div className="flex items-center gap-3 w-full md:w-auto">
-              <SearchBar 
-                value={search} 
-                onChange={(v) => { setSearch(v); setPage(1); }} 
-                placeholder="Search by employee name..." 
+              <SearchBar
+                value={search}
+                onChange={(v) => { setSearch(v); setPage(1); }}
+                placeholder="Search by employee name..."
                 className="w-64"
               />
               <Button
                 onClick={() => confirmAll()}
                 disabled={confirming || pendingItems.length === 0}
               >
-                {confirming 
-                  ? "Confirming…" 
-                  : selectedIds.size > 0 
-                    ? `Confirm Selected (${selectedIds.size})` 
+                {confirming
+                  ? "Confirming…"
+                  : selectedIds.size > 0
+                    ? `Confirm Selected (${selectedIds.size})`
                     : "Confirm All Pending"
                 }
               </Button>

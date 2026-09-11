@@ -9,12 +9,14 @@ import {
   AlertTriangle,
   Smile,
   RotateCcw,
+  BarChart3,
 } from "lucide-react";
 import { checkinApi, subProjectApi } from "../../services/api";
 import Table from "../../components/ui/Table";
 import Button from "../../components/ui/Button";
 import UserAvatar from "../../components/ui/UserAvatar";
 import CheckinFilterDropdown from "../../components/checkin/CheckinFilterDropdown";
+import CompanySentimentsModal from "../../components/checkin/CompanySentimentsModal";
 import StatCard from "../../components/dashboard/StatCard";
 import SearchBar from "../../components/ui/SearchBar";
 import HistoryMatrix from "../../components/checkin/HistoryMatrix";
@@ -61,33 +63,43 @@ const AdminCheckInsPage = () => {
   const [projectIds, setProjectIds] = useState([]);
   const [statusFilters, setStatusFilters] = useState([]);
   const [timeFilters, setTimeFilters] = useState([]);
+  const [customTimeFrom, setCustomTimeFrom] = useState("");
+  const [customTimeTo, setCustomTimeTo] = useState("");
   const [workModeFilters, setWorkModeFilters] = useState([]);
   const [officeFloorFilters, setOfficeFloorFilters] = useState([]);
   const [sentimentFilters, setSentimentFilters] = useState([]);
   const [activeTab, setActiveTab] = useState("today");
+  const [isSentimentModalOpen, setIsSentimentModalOpen] = useState(false);
   const limit = 20;
 
   const { data, isLoading, isError } = useQuery({
     queryKey: [
-      "checkins-admin-today", 
-      page, 
-      search, 
-      projectIds, 
-      statusFilters, 
-      timeFilters, 
-      workModeFilters, 
+      "checkins-admin-today",
+      page,
+      search,
+      projectIds,
+      statusFilters,
+      timeFilters,
+      customTimeFrom,        // ← NEW
+      customTimeTo,          // ← NEW
+      workModeFilters,
       officeFloorFilters,
-      sentimentFilters
+      sentimentFilters,
     ],
-    queryFn: () => checkinApi.getAdminPaginated({ 
-      page, limit, search, 
-      project_id: projectIds.join(",") || undefined, 
-      status: statusFilters.join(","), 
-      time_filter: timeFilters.join(","),
-      work_mode: workModeFilters.join(","),
-      office_floor: officeFloorFilters.join(","),
-      sentiment: sentimentFilters.join(",")
-    }),
+    queryFn: () =>
+      checkinApi.getAdminPaginated({
+        page,
+        limit,
+        search,
+        project_id: projectIds.join(",") || undefined,
+        status: statusFilters.join(","),
+        time_filter: timeFilters.join(","),
+        time_from: timeFilters.includes("custom") ? customTimeFrom || undefined : undefined,
+        time_to: timeFilters.includes("custom") ? customTimeTo || undefined : undefined,
+        work_mode: workModeFilters.join(","),
+        office_floor: officeFloorFilters.join(","),
+        sentiment: sentimentFilters.join(","),
+      }),
     staleTime: 60 * 1000,
   });
 
@@ -101,19 +113,22 @@ const AdminCheckInsPage = () => {
   const items = data?.items || [];
   const totalCount = data?.total || 0;
 
-  const hasActiveFilters = 
-    projectIds.length > 0 || 
-    statusFilters.length > 0 || 
-    timeFilters.length > 0 || 
-    workModeFilters.length > 0 || 
-    officeFloorFilters.length > 0 || 
-    sentimentFilters.length > 0 || 
-    search.trim() !== "";
+  const hasActiveFilters =
+    projectIds.length > 0 ||
+    statusFilters.length > 0 ||
+    timeFilters.length > 0 ||
+    workModeFilters.length > 0 ||
+    officeFloorFilters.length > 0 ||
+    sentimentFilters.length > 0 ||
+    search.trim() !== "" ||
+    (timeFilters.includes("custom") && (customTimeFrom || customTimeTo));
 
   const clearAllFilters = () => {
     setProjectIds([]);
     setStatusFilters([]);
     setTimeFilters([]);
+    setCustomTimeFrom("");
+    setCustomTimeTo("");
     setWorkModeFilters([]);
     setOfficeFloorFilters([]);
     setSentimentFilters([]);
@@ -258,6 +273,10 @@ const AdminCheckInsPage = () => {
                 setStatusFilters={(v) => { setStatusFilters(v); setPage(1); }}
                 timeFilters={timeFilters}
                 setTimeFilters={(v) => { setTimeFilters(v); setPage(1); }}
+                customTimeFrom={customTimeFrom}          
+                setCustomTimeFrom={setCustomTimeFrom}    
+                customTimeTo={customTimeTo}             
+                setCustomTimeTo={setCustomTimeTo}       
                 workModeFilters={workModeFilters}
                 setWorkModeFilters={(v) => { setWorkModeFilters(v); setPage(1); }}
                 officeFloorFilters={officeFloorFilters}
@@ -279,13 +298,21 @@ const AdminCheckInsPage = () => {
               )}
             </div>
 
-            <div className="flex items-center gap-3 w-full sm:w-auto">
-              <SearchBar 
-                value={search} 
-                onChange={(v) => { setSearch(v); setPage(1); }} 
-                placeholder="Search by employee name..." 
-                className="w-full sm:w-72"
+            <div className="flex flex-wrap items-center gap-2.5 w-full sm:w-auto">
+              <SearchBar
+                value={search}
+                onChange={(v) => { setSearch(v); setPage(1); }}
+                placeholder="Search by employee name..."
+                className="w-full sm:w-64"
               />
+              <Button
+                variant="outline"
+                size="sm"
+                onClick={() => setIsSentimentModalOpen(true)}
+                className="text-xs text-indigo-700 bg-indigo-50/70 hover:bg-indigo-100 border-indigo-200 flex items-center gap-1.5 cursor-pointer h-[38px] px-3 font-semibold shrink-0"
+              >
+                <BarChart3 className="w-3.5 h-3.5 text-indigo-600" /> View Sentiments Analysis
+              </Button>
             </div>
           </div>
 
@@ -397,7 +424,8 @@ const AdminCheckInsPage = () => {
               value={data?.kpi_checked_in ?? 0}
               icon={Smile}
               tone="rose"
-              hint="overall vibe"
+              hint="Click for full analysis →"
+              onClick={() => setIsSentimentModalOpen(true)}
               breakdown={[
                 { label: "Great 😁", value: data?.kpi_mood_great ?? 0 },
                 { label: "Okay 🙂", value: data?.kpi_mood_okay ?? 0 },
@@ -429,6 +457,12 @@ const AdminCheckInsPage = () => {
               }}
             />
           )}
+
+          {/* Company Sentiments Analytics Modal */}
+          <CompanySentimentsModal
+            isOpen={isSentimentModalOpen}
+            onClose={() => setIsSentimentModalOpen(false)}
+          />
         </>
       ) : (
         <HistoryMatrix role="admin" />

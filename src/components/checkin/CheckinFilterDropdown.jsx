@@ -10,6 +10,10 @@ const CheckinFilterDropdown = ({
   statusFilters,
   setStatusFilters,
   timeFilters,
+  customTimeFrom,
+  setCustomTimeFrom,
+  customTimeTo,
+  setCustomTimeTo,
   setTimeFilters,
   workModeFilters,
   setWorkModeFilters,
@@ -42,18 +46,18 @@ const CheckinFilterDropdown = ({
     timeFilters.length +
     workModeFilters.length +
     officeFloorFilters.length +
-    sentimentFilters.length;
+    sentimentFilters.length +
+    (timeFilters.includes("custom") && (customTimeFrom || customTimeTo) ? 1 : 0);
 
   return (
     <div ref={ref} className="relative inline-block text-left">
       <button
         type="button"
         onClick={() => setIsOpen(!isOpen)}
-        className={`inline-flex items-center gap-2 px-3.5 py-2 rounded-xl border text-sm font-medium transition-all shadow-sm cursor-pointer ${
-          activeCount > 0
-            ? "bg-indigo-50/80 border-indigo-200 text-indigo-700 shadow-indigo-100"
-            : "bg-white border-slate-200 text-slate-700 hover:bg-slate-50 hover:border-slate-300"
-        }`}
+        className={`inline-flex items-center gap-2 px-3.5 py-2 rounded-xl border text-sm font-medium transition-all shadow-sm cursor-pointer ${activeCount > 0
+          ? "bg-indigo-50/80 border-indigo-200 text-indigo-700 shadow-indigo-100"
+          : "bg-white border-slate-200 text-slate-700 hover:bg-slate-50 hover:border-slate-300"
+          }`}
       >
         <Filter className={`w-4 h-4 ${activeCount > 0 ? "text-indigo-600" : "text-slate-400"}`} />
         <span>Filters</span>
@@ -63,9 +67,8 @@ const CheckinFilterDropdown = ({
           </span>
         )}
         <ChevronDown
-          className={`w-4 h-4 text-slate-400 transition-transform ${
-            isOpen ? "rotate-180" : ""
-          }`}
+          className={`w-4 h-4 text-slate-400 transition-transform ${isOpen ? "rotate-180" : ""
+            }`}
         />
       </button>
 
@@ -108,7 +111,10 @@ const CheckinFilterDropdown = ({
                 value={projectIds}
                 onChange={setProjectIds}
                 placeholder="All Projects"
-                options={projectsList.map((p) => ({ value: p.id, label: p.name }))}
+                options={[
+                  { value: "unassigned", label: "Idle / Unassigned" },
+                  ...projectsList.map((p) => ({ value: p.id, label: p.name })),
+                ]}
               />
             </div>
 
@@ -157,14 +163,39 @@ const CheckinFilterDropdown = ({
             </div>
 
             {/* Check-in Time Filter */}
-            <div className="space-y-1">
+            <div className="space-y-1 sm:col-span-2">
               <label className="text-xs font-medium text-slate-600">Check-in Time</label>
               <MultiSelect
                 value={timeFilters}
                 onChange={setTimeFilters}
                 placeholder="All Times"
-                options={[{ value: "late", label: "After 10:00 AM" }]}
+                options={[
+                  { value: "before_9", label: "Before 9:00 AM" },
+                  { value: "9_10", label: "9:00 – 10:00 AM" },
+                  { value: "10_11", label: "10:00 – 11:00 AM" },
+                  { value: "11_12", label: "11:00 – 12:00 PM" },
+                  { value: "custom", label: "Custom range" },
+                ]}
               />
+
+              {/* Custom time range inputs – only shown when "Custom range" is selected */}
+              {timeFilters.includes("custom") && (
+                <div className="mt-2 flex items-center gap-2">
+                  <input
+                    type="time"
+                    value={customTimeFrom || ""}
+                    onChange={(e) => setCustomTimeFrom(e.target.value)}
+                    className="rounded-lg border border-slate-300 px-2.5 py-1.5 text-sm w-28 focus:outline-none focus:ring-2 focus:ring-indigo-500 focus:border-indigo-500"
+                  />
+                  <span className="text-slate-400 text-xs font-medium">to</span>
+                  <input
+                    type="time"
+                    value={customTimeTo || ""}
+                    onChange={(e) => setCustomTimeTo(e.target.value)}
+                    className="rounded-lg border border-slate-300 px-2.5 py-1.5 text-sm w-28 focus:outline-none focus:ring-2 focus:ring-indigo-500 focus:border-indigo-500"
+                  />
+                </div>
+              )}
             </div>
 
             {/* Office Floor Filter */}
