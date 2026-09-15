@@ -34,3 +34,4 @@ coverage/
 node_modules
 .vercel
 .agents/
+graphify-out/
