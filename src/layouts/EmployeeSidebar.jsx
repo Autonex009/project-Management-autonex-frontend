@@ -106,6 +106,7 @@ const EmployeeSidebar = ({
       { to: `${prefix}/my-leaves`, label: "My Leaves", icon: CalendarCheck },
       { to: `${prefix}/side-projects`, label: "Side Projects", icon: Rocket },
       { to: `${prefix}/guidelines`, label: "Guidelines", icon: FileText },
+      { to: `${prefix}/referrals`, label: "Referrals", icon: Users2 },
       {
         to: `${prefix}/onboarding`,
         label: "My Onboarding",

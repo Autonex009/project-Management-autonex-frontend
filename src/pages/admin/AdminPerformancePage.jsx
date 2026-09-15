@@ -31,6 +31,7 @@ import CustomKPICards from "./CustomKPICards";
 import Table from "../../components/ui/Table";
 import MetricDots from "../../components/ui/MetricDots";
 import Dropdown from "../../components/ui/Dropdown";
+import MultiSelect from "../../components/ui/MultiSelect";
 import UserAvatar from "../../components/ui/UserAvatar";
 import { formatDisplayName } from "../../utils/displayName";
 
@@ -177,10 +178,22 @@ const AdminPerformancePage = () => {
     const timer = setTimeout(() => setDebouncedSearch(search), 300);
     return () => clearTimeout(timer);
   }, [search]);
-  const [roleFilter, setRoleFilter] = useState("all");
-  const [projectFilter, setProjectFilter] = useState("all");
-  const [statusFilter, setStatusFilter] = useState("all");
-  const [pmFilter, setPmFilter] = useState("all");
+  const toArray = (val) => {
+    if (!val || val === "all") return [];
+    if (Array.isArray(val)) return val.filter((x) => x !== "all");
+    if (typeof val === "string") return val.split(",").map((s) => s.trim()).filter((s) => s && s !== "all");
+    return [];
+  };
+
+  const formatFilterVal = (arr) => {
+    if (!arr || !Array.isArray(arr) || arr.length === 0) return undefined;
+    return arr.join(",");
+  };
+
+  const [roleFilter, setRoleFilter] = useState([]);
+  const [projectFilter, setProjectFilter] = useState([]);
+  const [statusFilter, setStatusFilter] = useState([]);
+  const [pmFilter, setPmFilter] = useState([]);
   const [showFilters, setShowFilters] = useState(false);
   const [perfPage, setPerfPage] = useState(1);
   const [bonusPage, setBonusPage] = useState(1);
@@ -204,10 +217,10 @@ const AdminPerformancePage = () => {
         setSearch(s.search);
         setDebouncedSearch(s.search);
       }
-      if (s.roleFilter != null) setRoleFilter(s.roleFilter);
-      if (s.projectFilter != null) setProjectFilter(s.projectFilter);
-      if (s.statusFilter != null) setStatusFilter(s.statusFilter);
-      if (s.pmFilter != null) setPmFilter(s.pmFilter);
+      if (s.roleFilter != null) setRoleFilter(toArray(s.roleFilter));
+      if (s.projectFilter != null) setProjectFilter(toArray(s.projectFilter));
+      if (s.statusFilter != null) setStatusFilter(toArray(s.statusFilter));
+      if (s.pmFilter != null) setPmFilter(toArray(s.pmFilter));
       if (s.perfPage != null) setPerfPage(s.perfPage);
       if (s.bonusPage != null) setBonusPage(s.bonusPage);
       if (s.bonusOpen != null) setBonusOpen(!!s.bonusOpen);
@@ -273,8 +286,10 @@ const AdminPerformancePage = () => {
         period: currentPeriodQuery
       };
       if (search.trim()) params.search = search.trim();
-      if (roleFilter !== "all") params.role_filter = roleFilter;
-      if (projectFilter !== "all") params.project_id = projectFilter;
+      const rf = formatFilterVal(roleFilter);
+      if (rf) params.role_filter = rf;
+      const pf = formatFilterVal(projectFilter);
+      if (pf) params.project_id = pf;
       return perfEvalApi.getAdminKpi(params);
     },
     staleTime: 1000 * 60 * 5,
@@ -302,15 +317,19 @@ const AdminPerformancePage = () => {
         params.role_filter = "hr";
       } else {
         params.type = "employee";
-        if (roleFilter !== "all") {
-          params.role_filter = roleFilter;
+        const rf = formatFilterVal(roleFilter);
+        if (rf) {
+          params.role_filter = rf;
         }
       }
 
       if (debouncedSearch.trim()) params.search = debouncedSearch.trim();
-      if (projectFilter !== "all") params.project_id = projectFilter;
-      if (statusFilter !== "all") params.status = statusFilter;
-      if (pmFilter !== "all") params.pm_id = pmFilter;
+      const pf = formatFilterVal(projectFilter);
+      if (pf) params.project_id = pf;
+      const sf = formatFilterVal(statusFilter);
+      if (sf) params.status = sf;
+      const pmf = formatFilterVal(pmFilter);
+      if (pmf) params.pm_id = pmf;
 
       return perfEvalApi.getAll(params);
     },
@@ -408,10 +427,15 @@ const AdminPerformancePage = () => {
     [mainProjects],
   );
 
+  const matchesRoleList = (emp, selectedRoles) => {
+    if (!selectedRoles || selectedRoles.length === 0 || selectedRoles.includes("all")) return true;
+    return selectedRoles.some((key) => matchesRole(emp, key));
+  };
+
   const filteredEmployeesCount = useMemo(() => {
     return employees.filter(emp => {
       if (search.trim() && !emp.name.toLowerCase().includes(search.trim().toLowerCase())) return false;
-      if (!matchesRole(emp, roleFilter)) return false;
+      if (!matchesRoleList(emp, roleFilter)) return false;
       // projectFilter isn't perfectly computable on the raw employee list locally,
       // so the denominator reflects the total employees matching the role/search.
       return true;
@@ -900,13 +924,13 @@ const AdminPerformancePage = () => {
               <button
                 type="button"
                 onClick={() => setShowFilters((prev) => !prev)}
-                className={`flex h-8 items-center gap-2 rounded-lg border px-3 text-[13px] font-medium transition-colors ${showFilters || projectFilter !== "all" || statusFilter !== "all" || pmFilter !== "all" ? "border-indigo-300 bg-indigo-50 text-indigo-700" : "border-slate-200 bg-white text-slate-700 hover:border-slate-300"}`}
+                className={`flex h-8 items-center gap-2 rounded-lg border px-3 text-[13px] font-medium transition-colors ${showFilters || projectFilter.length > 0 || statusFilter.length > 0 || pmFilter.length > 0 ? "border-indigo-300 bg-indigo-50 text-indigo-700" : "border-slate-200 bg-white text-slate-700 hover:border-slate-300"}`}
               >
                 <Filter className="h-4 w-4" />
                 Filters
-                {(projectFilter !== "all" || statusFilter !== "all" || pmFilter !== "all") && (
+                {(projectFilter.length > 0 || statusFilter.length > 0 || pmFilter.length > 0) && (
                   <span className="flex h-4 w-4 items-center justify-center rounded-full bg-indigo-600 text-[10px] font-bold text-white">
-                    {[projectFilter, statusFilter, pmFilter].filter(f => f !== "all").length}
+                    {(projectFilter.length > 0 ? 1 : 0) + (statusFilter.length > 0 ? 1 : 0) + (pmFilter.length > 0 ? 1 : 0)}
                   </span>
                 )}
               </button>
@@ -920,11 +944,11 @@ const AdminPerformancePage = () => {
                       <button
                         type="button"
                         onClick={() => {
-                          setProjectFilter("all");
-                          setStatusFilter("all");
-                          setPmFilter("all");
+                          setProjectFilter([]);
+                          setStatusFilter([]);
+                          setPmFilter([]);
                         }}
-                        className="text-xs font-medium text-indigo-600 hover:text-indigo-700"
+                        className="text-xs font-medium text-indigo-600 hover:text-indigo-700 cursor-pointer"
                       >
                         Reset
                       </button>
@@ -933,41 +957,39 @@ const AdminPerformancePage = () => {
                     <div className="space-y-4">
                       <div className="space-y-1.5">
                         <label className="text-xs font-medium text-slate-500">Project</label>
-                        <Dropdown
+                        <MultiSelect
                           className="w-full"
-                          value={String(projectFilter)}
+                          value={projectFilter}
                           onChange={(val) => setProjectFilter(val)}
-                          options={[
-                            { value: "all", label: "All Projects" },
-                            ...projects.map((p) => ({ value: String(p.id), label: p.name })),
-                          ]}
+                          options={projects.map((p) => ({ value: String(p.id), label: p.name }))}
+                          placeholder="Select projects"
+                          searchable
                         />
                       </div>
 
                       <div className="space-y-1.5">
                         <label className="text-xs font-medium text-slate-500">Status</label>
-                        <Dropdown
+                        <MultiSelect
                           className="w-full"
-                          value={String(statusFilter)}
+                          value={statusFilter}
                           onChange={(val) => setStatusFilter(val)}
                           options={[
-                            { value: "all", label: "All Statuses" },
                             { value: "submitted", label: "Pending Review" },
                             { value: "reviewed", label: "Reviewed" },
                           ]}
+                          placeholder="Select statuses"
                         />
                       </div>
 
                       <div className="space-y-1.5">
                         <label className="text-xs font-medium text-slate-500">Program Manager</label>
-                        <Dropdown
+                        <MultiSelect
                           className="w-full"
-                          value={String(pmFilter)}
+                          value={pmFilter}
                           onChange={(val) => setPmFilter(val)}
-                          options={[
-                            { value: "all", label: "All PMs" },
-                            ...pmOptions,
-                          ]}
+                          options={pmOptions}
+                          placeholder="Select PMs"
+                          searchable
                         />
                       </div>
                     </div>
@@ -978,13 +1000,26 @@ const AdminPerformancePage = () => {
 
             <div className="inline-flex items-center gap-0.5 overflow-x-auto rounded-lg border border-slate-200 bg-slate-50 p-0.5">
               {ROLE_FILTERS.map((r) => {
-                const active = roleFilter === r.key;
+                const active = r.key === "all"
+                  ? (roleFilter.length === 0 || roleFilter.includes("all"))
+                  : roleFilter.includes(r.key);
                 return (
                   <button
                     key={r.key}
                     type="button"
-                    onClick={() => setRoleFilter(r.key)}
-                    className={`whitespace-nowrap rounded-md px-3 py-1 text-[13px] font-semibold transition-all ${active ? "bg-white text-slate-900 shadow-sm ring-1 ring-slate-200/70" : "text-slate-500 hover:text-slate-800"}`}
+                    onClick={() => {
+                      if (r.key === "all") {
+                        setRoleFilter([]);
+                      } else {
+                        setRoleFilter((prev) => {
+                          const current = Array.isArray(prev) ? prev : [];
+                          return current.includes(r.key)
+                            ? current.filter((k) => k !== r.key)
+                            : [...current, r.key];
+                        });
+                      }
+                    }}
+                    className={`whitespace-nowrap rounded-md px-3 py-1 text-[13px] font-semibold transition-all cursor-pointer ${active ? "bg-white text-slate-900 shadow-sm ring-1 ring-slate-200/70" : "text-slate-500 hover:text-slate-800"}`}
                   >
                     {r.label}
                   </button>

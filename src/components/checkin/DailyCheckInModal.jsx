@@ -152,7 +152,7 @@ export default function DailyCheckInModal() {
         10
       );
       // If it is 12 PM or later, and they ordered food from the office
-      if (istHour >= 12 && workMode === "WFO" && (lunchPreference === "order_tiffin" || lunchPreference === "canteen")) {
+      if (istHour >= 11 && workMode === "WFO" && (lunchPreference === "order_tiffin" || lunchPreference === "canteen")) {
         toast("The list is already finalized and sent. Please contact Ashish Jadhav to confirm.", {
           duration: 6000,
           icon: "⚠️",

@@ -1,12 +1,18 @@
 import { create } from "zustand";
 
+const toArray = (val) => {
+  if (Array.isArray(val)) return val;
+  if (!val || val === "all") return [];
+  return [val];
+};
+
 const useProjectsStore = create((set) => ({
-  // Filters and State
-  selectedOrganization: "all",
-  selectedPm: "all",
-  selectedTeamLead: "all",
-  selectedStatus: "all",
-  selectedPriority: "all",
+  // Filters and State (stored as arrays for multi-select support)
+  selectedOrganization: [],
+  selectedPm: [],
+  selectedTeamLead: [],
+  selectedStatus: [],
+  selectedPriority: [],
   projectView: "active", // 'active' | 'archived' | 'development'
   autonexOnly: false,
   subProjectSearch: "",
@@ -14,11 +20,11 @@ const useProjectsStore = create((set) => ({
   filtersOpen: false,
 
   // Setters
-  setSelectedOrganization: (selectedOrganization) => set({ selectedOrganization }),
-  setSelectedPm: (selectedPm) => set({ selectedPm }),
-  setSelectedTeamLead: (selectedTeamLead) => set({ selectedTeamLead }),
-  setSelectedStatus: (selectedStatus) => set({ selectedStatus }),
-  setSelectedPriority: (selectedPriority) => set({ selectedPriority }),
+  setSelectedOrganization: (selectedOrganization) => set({ selectedOrganization: toArray(selectedOrganization) }),
+  setSelectedPm: (selectedPm) => set({ selectedPm: toArray(selectedPm) }),
+  setSelectedTeamLead: (selectedTeamLead) => set({ selectedTeamLead: toArray(selectedTeamLead) }),
+  setSelectedStatus: (selectedStatus) => set({ selectedStatus: toArray(selectedStatus) }),
+  setSelectedPriority: (selectedPriority) => set({ selectedPriority: toArray(selectedPriority) }),
   setProjectView: (projectView) => set({ projectView }),
   setAutonexOnly: (updater) =>
     set((state) => ({
@@ -37,11 +43,11 @@ const useProjectsStore = create((set) => ({
   // Reset
   resetFilters: () =>
     set({
-      selectedOrganization: "all",
-      selectedPm: "all",
-      selectedTeamLead: "all",
-      selectedStatus: "all",
-      selectedPriority: "all",
+      selectedOrganization: [],
+      selectedPm: [],
+      selectedTeamLead: [],
+      selectedStatus: [],
+      selectedPriority: [],
       projectView: "active",
       autonexOnly: false,
       subProjectSearch: "",

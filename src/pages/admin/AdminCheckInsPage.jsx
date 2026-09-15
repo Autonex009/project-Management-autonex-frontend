@@ -8,12 +8,18 @@ import {
   ShieldCheck,
   AlertTriangle,
   Smile,
+  Meh,
+  Frown,
+  Zap,
+  RotateCcw,
+  BarChart3,
 } from "lucide-react";
 import { checkinApi, subProjectApi } from "../../services/api";
 import Table from "../../components/ui/Table";
 import Button from "../../components/ui/Button";
 import UserAvatar from "../../components/ui/UserAvatar";
-import Dropdown from "../../components/ui/Dropdown";
+import CheckinFilterDropdown from "../../components/checkin/CheckinFilterDropdown";
+import CompanySentimentsModal from "../../components/checkin/CompanySentimentsModal";
 import StatCard from "../../components/dashboard/StatCard";
 import SearchBar from "../../components/ui/SearchBar";
 import HistoryMatrix from "../../components/checkin/HistoryMatrix";
@@ -37,27 +43,67 @@ const WorkModePill = ({ mode }) =>
     <span className="text-xs text-slate-400">—</span>
   );
 
+const SentimentPill = ({ mood }) => {
+  if (!mood) return <span className="text-xs text-slate-400">—</span>;
+  const config = {
+    great: { label: "Great", icon: Zap, bg: "bg-emerald-50 text-emerald-700 border-emerald-200" },
+    okay: { label: "Okay", icon: Smile, bg: "bg-sky-50 text-sky-700 border-sky-200" },
+    low: { label: "Low", icon: Meh, bg: "bg-amber-50 text-amber-700 border-amber-200" },
+    stressed: { label: "Stressed", icon: Frown, bg: "bg-rose-50 text-rose-700 border-rose-200" },
+  };
+  const item = config[mood.toLowerCase()] || { label: mood, icon: Meh, bg: "bg-slate-50 text-slate-700 border-slate-200" };
+  const Icon = item.icon;
+  return (
+    <span className={`inline-flex items-center gap-1.5 px-2 py-0.5 rounded-full border text-xs font-medium ${item.bg}`}>
+      <Icon className="w-3.5 h-3.5 shrink-0" />
+      <span>{item.label}</span>
+    </span>
+  );
+};
+
 const AdminCheckInsPage = () => {
   const [page, setPage] = useState(1);
   const [search, setSearch] = useState("");
-  const [projectId, setProjectId] = useState("");
-  const [statusFilter, setStatusFilter] = useState("");
-  const [timeFilter, setTimeFilter] = useState("");
-  const [workModeFilter, setWorkModeFilter] = useState("");
-  const [officeFloorFilter, setOfficeFloorFilter] = useState("");
+  const [projectIds, setProjectIds] = useState([]);
+  const [statusFilters, setStatusFilters] = useState([]);
+  const [timeFilters, setTimeFilters] = useState([]);
+  const [customTimeFrom, setCustomTimeFrom] = useState("");
+  const [customTimeTo, setCustomTimeTo] = useState("");
+  const [workModeFilters, setWorkModeFilters] = useState([]);
+  const [officeFloorFilters, setOfficeFloorFilters] = useState([]);
+  const [sentimentFilters, setSentimentFilters] = useState([]);
   const [activeTab, setActiveTab] = useState("today");
+  const [isSentimentModalOpen, setIsSentimentModalOpen] = useState(false);
   const limit = 20;
 
   const { data, isLoading, isError } = useQuery({
-    queryKey: ["checkins-admin-today", page, search, projectId, statusFilter, timeFilter, workModeFilter, officeFloorFilter],
-    queryFn: () => checkinApi.getAdminPaginated({ 
-      page, limit, search, 
-      project_id: projectId || undefined, 
-      status: statusFilter, 
-      time_filter: timeFilter,
-      work_mode: workModeFilter,
-      office_floor: officeFloorFilter
-    }),
+    queryKey: [
+      "checkins-admin-today",
+      page,
+      search,
+      projectIds,
+      statusFilters,
+      timeFilters,
+      customTimeFrom,        // ← NEW
+      customTimeTo,          // ← NEW
+      workModeFilters,
+      officeFloorFilters,
+      sentimentFilters,
+    ],
+    queryFn: () =>
+      checkinApi.getAdminPaginated({
+        page,
+        limit,
+        search,
+        project_id: projectIds.join(",") || undefined,
+        status: statusFilters.join(","),
+        time_filter: timeFilters.join(","),
+        time_from: timeFilters.includes("custom") ? customTimeFrom || undefined : undefined,
+        time_to: timeFilters.includes("custom") ? customTimeTo || undefined : undefined,
+        work_mode: workModeFilters.join(","),
+        office_floor: officeFloorFilters.join(","),
+        sentiment: sentimentFilters.join(","),
+      }),
     staleTime: 60 * 1000,
   });
 
@@ -71,11 +117,34 @@ const AdminCheckInsPage = () => {
   const items = data?.items || [];
   const totalCount = data?.total || 0;
 
+  const hasActiveFilters =
+    projectIds.length > 0 ||
+    statusFilters.length > 0 ||
+    timeFilters.length > 0 ||
+    workModeFilters.length > 0 ||
+    officeFloorFilters.length > 0 ||
+    sentimentFilters.length > 0 ||
+    search.trim() !== "" ||
+    (timeFilters.includes("custom") && (customTimeFrom || customTimeTo));
+
+  const clearAllFilters = () => {
+    setProjectIds([]);
+    setStatusFilters([]);
+    setTimeFilters([]);
+    setCustomTimeFrom("");
+    setCustomTimeTo("");
+    setWorkModeFilters([]);
+    setOfficeFloorFilters([]);
+    setSentimentFilters([]);
+    setSearch("");
+    setPage(1);
+  };
+
   const columns = [
     {
       key: "employee",
       label: "Employee",
-      width: "w-[26%]",
+      width: "w-[24%]",
       render: (_, row) => (
         <div className="flex min-w-0 items-center gap-2.5">
           <UserAvatar src={row.avatar_url} name={row.name} size="w-8 h-8 text-[13px]" />
@@ -100,7 +169,7 @@ const AdminCheckInsPage = () => {
     {
       key: "projects",
       label: "Projects",
-      width: "w-[24%]",
+      width: "w-[20%]",
       render: (_, row) => (
         <span className="block truncate text-slate-600">
           {row.project_names.join(", ") || "—"}
@@ -137,6 +206,12 @@ const AdminCheckInsPage = () => {
       render: (_, row) => <WorkModePill mode={row.work_mode} />,
     },
     {
+      key: "sentiment",
+      label: "Sentiment",
+      width: "w-[12%]",
+      render: (_, row) => <SentimentPill mood={row.mood} />,
+    },
+    {
       key: "floor",
       label: "Floor",
       width: "w-[8%]",
@@ -168,6 +243,10 @@ const AdminCheckInsPage = () => {
     },
   ];
 
+  const approvedLeaveCount = data?.kpi_approved_leaves_count ?? 0;
+  const pendingLeaveCount = data?.kpi_pending_leaves_count ?? 0;
+  const totalOnLeave = approvedLeaveCount + pendingLeaveCount;
+
   return (
     <div className="space-y-4">
       {/* Tabs */}
@@ -188,185 +267,276 @@ const AdminCheckInsPage = () => {
 
       {activeTab === 'today' ? (
         <>
-          <div className="flex flex-col md:flex-row items-start md:items-center justify-between gap-4 mb-2">
-        <div className="flex flex-wrap items-center gap-3">
-          <div className="w-40">
-            <Dropdown
-              value={projectId}
-              onChange={(v) => { setProjectId(v); setPage(1); }}
-              placeholder="All Projects"
-              options={[
-                { value: "", label: "All Projects" },
-                ...projectsList.map((p) => ({ value: p.id, label: p.name }))
+          <div className="flex flex-col sm:flex-row items-start sm:items-center justify-between gap-3 mb-2">
+            <div className="flex items-center gap-3 w-full sm:w-auto">
+              <CheckinFilterDropdown
+                projectIds={projectIds}
+                setProjectIds={(v) => { setProjectIds(v); setPage(1); }}
+                projectsList={projectsList}
+                statusFilters={statusFilters}
+                setStatusFilters={(v) => { setStatusFilters(v); setPage(1); }}
+                timeFilters={timeFilters}
+                setTimeFilters={(v) => { setTimeFilters(v); setPage(1); }}
+                customTimeFrom={customTimeFrom}          
+                setCustomTimeFrom={setCustomTimeFrom}    
+                customTimeTo={customTimeTo}             
+                setCustomTimeTo={setCustomTimeTo}       
+                workModeFilters={workModeFilters}
+                setWorkModeFilters={(v) => { setWorkModeFilters(v); setPage(1); }}
+                officeFloorFilters={officeFloorFilters}
+                setOfficeFloorFilters={(v) => { setOfficeFloorFilters(v); setPage(1); }}
+                sentimentFilters={sentimentFilters}
+                setSentimentFilters={(v) => { setSentimentFilters(v); setPage(1); }}
+                onClearAll={clearAllFilters}
+              />
+
+              {hasActiveFilters && (
+                <Button
+                  variant="outline"
+                  size="sm"
+                  onClick={clearAllFilters}
+                  className="text-xs text-rose-600 hover:text-rose-700 border-rose-200 hover:bg-rose-50 flex items-center gap-1.5 cursor-pointer h-[38px] px-2.5"
+                >
+                  <RotateCcw className="w-3.5 h-3.5" /> Clear Filters
+                </Button>
+              )}
+            </div>
+
+            <div className="flex flex-wrap items-center gap-2.5 w-full sm:w-auto">
+              <SearchBar
+                value={search}
+                onChange={(v) => { setSearch(v); setPage(1); }}
+                placeholder="Search by employee name..."
+                className="w-full sm:w-64"
+              />
+              <Button
+                variant="outline"
+                size="sm"
+                onClick={() => setIsSentimentModalOpen(true)}
+                className="text-xs text-indigo-700 bg-indigo-50/70 hover:bg-indigo-100 border-indigo-200 flex items-center gap-1.5 cursor-pointer h-[38px] px-3 font-semibold shrink-0"
+              >
+                <BarChart3 className="w-3.5 h-3.5 text-indigo-600" /> View Sentiments Analysis
+              </Button>
+            </div>
+          </div>
+
+          <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-3 mb-6">
+            <StatCard
+              title="Active Employees"
+              value={data?.kpi_total ?? 0}
+              icon={Building2}
+              tone="indigo"
+              hint={
+                <MetricDots
+                  items={[
+                    {
+                      label: "On Leave",
+                      value: totalOnLeave,
+                      dot: "bg-amber-500",
+                      tone: "text-amber-600",
+                    },
+                    {
+                      label: "Approved",
+                      value: approvedLeaveCount,
+                      dot: "bg-emerald-500",
+                      tone: "text-emerald-600",
+                    },
+                    {
+                      label: "Pending",
+                      value: pendingLeaveCount,
+                      dot: "bg-amber-400",
+                      tone: "text-amber-600",
+                    },
+                  ]}
+                />
+              }
+              breakdown={[
+                {
+                  title: "Leave Summary",
+                  rows: [
+                    { label: "Approved Leaves", value: approvedLeaveCount },
+                    { label: "Pending Leaves", value: pendingLeaveCount },
+                  ]
+                },
+                ...((data?.kpi_approved_leaves_names || []).length > 0 ? [{
+                  title: `Approved (${data.kpi_approved_leaves_names.length})`,
+                  rows: data.kpi_approved_leaves_names.map(name => ({ label: formatDisplayName(name) }))
+                }] : []),
+                ...((data?.kpi_pending_leaves_names || []).length > 0 ? [{
+                  title: `Pending Approval (${data.kpi_pending_leaves_names.length})`,
+                  rows: data.kpi_pending_leaves_names.map(name => ({ label: formatDisplayName(name) }))
+                }] : [])
+              ]}
+            />
+
+            <StatCard
+              title="Checked In Today"
+              value={data?.kpi_checked_in ?? 0}
+              icon={CheckCircle2}
+              tone="emerald"
+              hint={
+                <MetricDots
+                  items={[
+                    {
+                      label: "WFO",
+                      value: data?.kpi_wfo ?? 0,
+                      dot: "bg-emerald-500",
+                      tone: "text-emerald-600",
+                    },
+                    {
+                      label: "WFH",
+                      value: data?.kpi_wfh ?? 0,
+                      dot: "bg-sky-500",
+                      tone: "text-sky-600",
+                    },
+                    {
+                      label: "Pending PM",
+                      value: Math.max(0, (data?.kpi_checked_in ?? 0) - (data?.kpi_confirmed ?? 0)),
+                      dot: "bg-amber-500",
+                      tone: "text-amber-600",
+                    },
+                    ...((data?.kpi_late ?? 0) > 0 ? [{
+                      label: "Late",
+                      value: data.kpi_late,
+                      dot: "bg-rose-500",
+                      tone: "text-rose-600",
+                    }] : [])
+                  ]}
+                />
+              }
+              breakdown={[
+                {
+                  title: "Work Mode",
+                  rows: [
+                    { label: "WFO", value: data?.kpi_wfo ?? 0 },
+                    { label: "WFH", value: data?.kpi_wfh ?? 0 },
+                  ]
+                },
+                {
+                  title: "PM Confirmation",
+                  rows: [
+                    { label: "Confirmed by PM", value: data?.kpi_confirmed ?? 0 },
+                    { label: "Pending Confirmation", value: Math.max(0, (data?.kpi_checked_in ?? 0) - (data?.kpi_confirmed ?? 0)) },
+                  ]
+                },
+                {
+                  title: "Timing & Checkout",
+                  rows: [
+                    { label: "Late (After 10 AM)", value: data?.kpi_late ?? 0 },
+                    { label: "Already Checked Out", value: data?.kpi_checked_out ?? 0 },
+                  ]
+                }
+              ]}
+            />
+
+            <StatCard
+              title="Office & Lunch"
+              value={data?.kpi_wfo ?? 0}
+              icon={Building2}
+              tone="amber"
+              hint={
+                <MetricDots
+                  items={[
+                    {
+                      label: "F7/9/17",
+                      value: `${data?.kpi_floor_7 ?? 0}/${data?.kpi_floor_9 ?? 0}/${data?.kpi_floor_17 ?? 0}`,
+                      dot: "bg-indigo-400",
+                      tone: "text-indigo-700",
+                    },
+                    {
+                      label: "Tiffin",
+                      value: data?.kpi_order_tiffin ?? 0,
+                      dot: "bg-amber-500",
+                      tone: "text-amber-700",
+                    },
+                    {
+                      label: "Canteen",
+                      value: data?.kpi_canteen ?? 0,
+                      dot: "bg-emerald-500",
+                      tone: "text-emerald-700",
+                    },
+                  ]}
+                />
+              }
+              breakdown={[
+                {
+                  title: "Floors",
+                  rows: [
+                    { label: "Floor 7", value: data?.kpi_floor_7 ?? 0 },
+                    { label: "Floor 9", value: data?.kpi_floor_9 ?? 0 },
+                    { label: "Floor 17", value: data?.kpi_floor_17 ?? 0 },
+                  ]
+                },
+                {
+                  title: "Lunch Prefs",
+                  rows: [
+                    { label: "Order Tiffin", value: data?.kpi_order_tiffin ?? 0 },
+                    { label: "Canteen", value: data?.kpi_canteen ?? 0 },
+                  ]
+                }
+              ]}
+            />
+
+            <StatCard
+              title="Company Sentiments"
+              value={data?.kpi_checked_in ?? 0}
+              icon={Smile}
+              tone="rose"
+              hint={
+                <div className="flex flex-wrap items-center gap-1.5 font-mono text-[11px] w-full">
+                  <span className="inline-flex items-center gap-1 bg-emerald-50 text-emerald-800 px-1.5 py-0.5 rounded-md font-semibold border border-emerald-100/80" title="Great">
+                    <Zap className="w-3 h-3 text-emerald-600" /> <span className="tabular-nums">{data?.kpi_mood_great ?? 0}</span>
+                  </span>
+                  <span className="inline-flex items-center gap-1 bg-sky-50 text-sky-800 px-1.5 py-0.5 rounded-md font-semibold border border-sky-100/80" title="Okay">
+                    <Smile className="w-3 h-3 text-sky-600" /> <span className="tabular-nums">{data?.kpi_mood_okay ?? 0}</span>
+                  </span>
+                  <span className="inline-flex items-center gap-1 bg-amber-50 text-amber-800 px-1.5 py-0.5 rounded-md font-semibold border border-amber-100/80" title="Low">
+                    <Meh className="w-3 h-3 text-amber-600" /> <span className="tabular-nums">{data?.kpi_mood_low ?? 0}</span>
+                  </span>
+                  <span className="inline-flex items-center gap-1 bg-rose-50 text-rose-800 px-1.5 py-0.5 rounded-md font-semibold border border-rose-100/80" title="Stressed">
+                    <Frown className="w-3 h-3 text-rose-600" /> <span className="tabular-nums">{data?.kpi_mood_stressed ?? 0}</span>
+                  </span>
+                </div>
+              }
+              onClick={() => setIsSentimentModalOpen(true)}
+              breakdown={[
+                { label: "Great", value: data?.kpi_mood_great ?? 0 },
+                { label: "Okay", value: data?.kpi_mood_okay ?? 0 },
+                { label: "Low energy", value: data?.kpi_mood_low ?? 0 },
+                { label: "Stressed", value: data?.kpi_mood_stressed ?? 0 },
               ]}
             />
           </div>
 
-          <div className="w-36">
-            <Dropdown
-              value={statusFilter}
-              onChange={(v) => { setStatusFilter(v); setPage(1); }}
-              placeholder="All Statuses"
-              options={[
-                { value: "", label: "All Statuses" },
-                { value: "checked_in", label: "Checked In" },
-                { value: "pending", label: "Not Yet" }
-              ]}
+          {isError ? (
+            <div className="rounded-3xl border border-dashed border-red-200 bg-red-50/40 p-12 text-center shadow-sm">
+              <h2 className="text-lg font-semibold text-red-700">Couldn't load company check-ins</h2>
+              <p className="mt-2 text-sm text-red-500">Something went wrong. Try refreshing the page.</p>
+            </div>
+          ) : (
+            <Table
+              variant="untitled"
+              columns={columns}
+              data={items}
+              loading={isLoading}
+              skeletonRows={10}
+              pageSize={limit}
+              currentPage={page}
+              totalItems={totalCount}
+              onPageChange={setPage}
+              emptyState={{
+                title: "No employees found",
+                description: "No one matches your search criteria.",
+              }}
             />
-          </div>
+          )}
 
-          <div className="w-36">
-            <Dropdown
-              value={timeFilter}
-              onChange={(v) => { setTimeFilter(v); setPage(1); }}
-              placeholder="All Times"
-              options={[
-                { value: "", label: "All Times" },
-                { value: "late", label: "After 10:00 AM" }
-              ]}
-            />
-          </div>
-
-          <div className="w-32">
-            <Dropdown
-              value={workModeFilter}
-              onChange={(v) => { setWorkModeFilter(v); setPage(1); }}
-              placeholder="All Modes"
-              options={[
-                { value: "", label: "All Modes" },
-                { value: "WFO", label: "WFO" },
-                { value: "WFH", label: "WFH" }
-              ]}
-            />
-          </div>
-
-          <div className="w-28">
-            <Dropdown
-              value={officeFloorFilter}
-              onChange={(v) => { setOfficeFloorFilter(v); setPage(1); }}
-              placeholder="All Floors"
-              options={[
-                { value: "", label: "All Floors" },
-                { value: "7", label: "Floor 7" },
-                { value: "9", label: "Floor 9" },
-                { value: "17", label: "Floor 17" }
-              ]}
-            />
-          </div>
-        </div>
-
-        <div className="flex items-center gap-3 w-full md:w-auto">
-          <SearchBar 
-            value={search} 
-            onChange={(v) => { setSearch(v); setPage(1); }} 
-            placeholder="Search by employee name..." 
-            className="w-full md:w-72"
+          {/* Company Sentiments Analytics Modal */}
+          <CompanySentimentsModal
+            isOpen={isSentimentModalOpen}
+            onClose={() => setIsSentimentModalOpen(false)}
           />
-        </div>
-      </div>
-
-      <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-3 mb-6">
-        <StatCard
-          title="Active Employees"
-          value={data?.kpi_total ?? 0}
-          icon={Building2}
-          tone="indigo"
-          hint="on payroll"
-          breakdown={[
-            { label: "Confirmed by PM", value: data?.kpi_confirmed ?? 0 },
-            { label: "Pending confirmation", value: (data?.kpi_checked_in ?? 0) - (data?.kpi_confirmed ?? 0) }
-          ]}
-        />
-        <StatCard
-          title="Checked In Today"
-          value={data?.kpi_checked_in ?? 0}
-          icon={CheckCircle2}
-          tone="emerald"
-          hint={
-            <MetricDots
-              items={[
-                {
-                  label: "WFO",
-                  value: data?.kpi_wfo ?? 0,
-                  dot: "bg-emerald-500",
-                  tone: "text-emerald-600",
-                },
-                {
-                  label: "WFH",
-                  value: data?.kpi_wfh ?? 0,
-                  dot: "bg-sky-500",
-                  tone: "text-sky-600",
-                },
-              ]}
-            />
-          }
-          breakdown={[
-            { label: "Late (After 10 AM)", value: data?.kpi_late ?? 0 },
-            { label: "Already Checked Out", value: data?.kpi_checked_out ?? 0 },
-          ]}
-        />
-        <StatCard
-          title="Office & Lunch"
-          value={data?.kpi_wfo ?? 0}
-          icon={Building2}
-          tone="amber"
-          hint="on premises"
-          breakdown={[
-            {
-              title: "Floors",
-              rows: [
-                { label: "Floor 7", value: data?.kpi_floor_7 ?? 0 },
-                { label: "Floor 9", value: data?.kpi_floor_9 ?? 0 },
-                { label: "Floor 17", value: data?.kpi_floor_17 ?? 0 },
-              ]
-            },
-            {
-              title: "Lunch Prefs",
-              rows: [
-                { label: "Order Tiffin", value: data?.kpi_order_tiffin ?? 0 },
-                { label: "Canteen", value: data?.kpi_canteen ?? 0 },
-              ]
-            }
-          ]}
-        />
-        <StatCard
-          title="Company Mood"
-          value={data?.kpi_checked_in ?? 0}
-          icon={Smile}
-          tone="rose"
-          hint="overall vibe"
-          breakdown={[
-            { label: "Great", value: data?.kpi_mood_great ?? 0 },
-            { label: "Okay", value: data?.kpi_mood_okay ?? 0 },
-            { label: "Low", value: data?.kpi_mood_low ?? 0 },
-            { label: "Stressed", value: data?.kpi_mood_stressed ?? 0 },
-          ]}
-        />
-      </div>
-
-      {isError ? (
-        <div className="rounded-3xl border border-dashed border-red-200 bg-red-50/40 p-12 text-center shadow-sm">
-          <h2 className="text-lg font-semibold text-red-700">Couldn't load company check-ins</h2>
-          <p className="mt-2 text-sm text-red-500">Something went wrong. Try refreshing the page.</p>
-        </div>
-      ) : (
-        <Table
-          variant="untitled"
-          columns={columns}
-          data={items}
-          loading={isLoading}
-          skeletonRows={10}
-          pageSize={limit}
-          currentPage={page}
-          totalItems={totalCount}
-          onPageChange={setPage}
-          emptyState={{
-            title: "No employees found",
-            description: "No one matches your search criteria.",
-          }}
-        />
-      )}
-      </>
+        </>
       ) : (
         <HistoryMatrix role="admin" />
       )}
