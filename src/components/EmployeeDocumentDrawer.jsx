@@ -165,7 +165,7 @@ const DYNAMIC_FIELDS = {
     }
   ],
   fulltime_offer_letter: [
-    { key: "annual_ctc", label: "Annual CTC (₹)", placeholder: "e.g. 600000", type: "text" },
+    { key: "annual_ctc", label: "Base (₹)", placeholder: "e.g. 600000", type: "text" },
     { key: "performance_variable", label: "Performance Bonus (₹)", placeholder: "e.g. 50000 (optional)", type: "text" },
     { key: "retention_bonus", label: "Retention Bonus (₹)", placeholder: "e.g. 50000 (optional)", type: "text" },
   ],
