@@ -53,6 +53,7 @@ import {
   totalRequiredManpower,
 } from "../utils/workforce";
 import Dropdown from "../components/ui/Dropdown";
+import MultiSelect from "../components/ui/MultiSelect";
 import ConfirmDialog from "../components/ui/ConfirmDialog";
 import Modal from "../components/ui/Modal";
 import StatCard from "../components/dashboard/StatCard";
@@ -68,8 +69,8 @@ import {
   formatCreatedDate,
   typeLabel,
   DEVELOPER_TYPE_KEY,
-  isDeveloperProject, 
-  PROJECT_TYPE_CATEGORIES, 
+  isDeveloperProject,
+  PROJECT_TYPE_CATEGORIES,
 } from "../utils/projectConstants";
 import ProjectCard from "../components/projects/ProjectCard";
 import { TeamLeadMultiSelect, PmMultiSelect } from "../components/projects/ProjectDropdowns";
@@ -179,6 +180,13 @@ const ProjectsPage = () => {
     staleTime: 60000,
   });
 
+  const formatFilterVal = (val) => {
+    if (Array.isArray(val)) {
+      return val.length > 0 ? val.join(",") : undefined;
+    }
+    return val && val !== "all" ? val : undefined;
+  };
+
   const { data: paginatedData, isLoading, isFetching } = useQuery({
     queryKey: [
       "sub-projects-paginated",
@@ -203,12 +211,12 @@ const ProjectsPage = () => {
         search: subProjectSearch || undefined,
         main_project_id: filterMainProjectId || undefined,
         project_view: projectView,
-        status: statusParam || (selectedStatus !== "all" ? selectedStatus : undefined),
-        priority: selectedPriority !== "all" ? selectedPriority : undefined,
-        organization: selectedOrganization !== "all" ? selectedOrganization : undefined,
+        status: statusParam || formatFilterVal(selectedStatus),
+        priority: formatFilterVal(selectedPriority),
+        organization: formatFilterVal(selectedOrganization),
         autonex_only: autonexOnly ? true : undefined,
-        pm_id: selectedPm !== "all" ? selectedPm : undefined,
-        team_lead_id: selectedTeamLead !== "all" ? selectedTeamLead : undefined,
+        pm_id: formatFilterVal(selectedPm),
+        team_lead_id: formatFilterVal(selectedTeamLead),
         recommendation: recommendationParam || undefined,
       }),
     placeholderData: keepPreviousData,
@@ -1072,7 +1080,7 @@ const ProjectsPage = () => {
     setFormAutonexAnnotators(project.autonex_annotators ?? 0);
     setFormAutonexReviewers(project.autonex_reviewers ?? 0);
     setFormProjectStatus(project.project_status || "active");
-        setFormSentiment(project.sentiment || "");
+    setFormSentiment(project.sentiment || "");
     setModalInfoTab("status");
     setModalBuildTab("types");
     // Prefill both rosters from the project. The PM list matters even though the field is
@@ -1180,51 +1188,51 @@ const ProjectsPage = () => {
 
       {/* Active / Archived / Development tabs. Archived = Completed /
  On Hold / Cancelled; Development = projects with the Developer type. */}
-        <div className="flex items-center justify-between border-b border-slate-200 pb-2">
-          <div className="flex items-center">
-            {[
-              {
-                key: "active",
-                label: "Active Projects",
-                count: tabCounts.active,
-              },
-              { key: "archived", label: "Archived", count: tabCounts.archived },
-              {
-                key: "development",
-                label: "Development",
-                count: tabCounts.development,
-              },
-            ].map((t) => {
-              const isActive = projectView === t.key;
-              return (
-                <button
-                  key={t.key}
-                  onClick={() => {
-                    setProjectView(t.key);
-                    setSelectedStatus("all");
-                  }}
-                  type="button"
-                  className={`inline-flex items-center gap-2 px-4 py-2 text-sm font-semibold border-b-2 -mb-px transition-colors ${isActive
-                    ? "border-indigo-600 text-indigo-600"
-                    : "border-transparent text-slate-500 hover:text-slate-700"
-                    }`}
-                >
-                  {t.label}
-                  {t.key !== "active" && (
-                    <span
-                      className={`inline-flex items-center justify-center h-5 min-w-[20px] px-1.5 rounded-full text-[11px] font-semibold ${isActive
-                        ? "bg-indigo-100 text-indigo-700"
-                        : "bg-slate-100 text-slate-500"
-                        }`}
-                    >
-                      {t.count}
-                    </span>
-                  )}
-                </button>
-              );
-            })}
-          </div>
+      <div className="flex items-center justify-between border-b border-slate-200 pb-2">
+        <div className="flex items-center">
+          {[
+            {
+              key: "active",
+              label: "Active Projects",
+              count: tabCounts.active,
+            },
+            { key: "archived", label: "Archived", count: tabCounts.archived },
+            {
+              key: "development",
+              label: "Development",
+              count: tabCounts.development,
+            },
+          ].map((t) => {
+            const isActive = projectView === t.key;
+            return (
+              <button
+                key={t.key}
+                onClick={() => {
+                  setProjectView(t.key);
+                  setSelectedStatus("all");
+                }}
+                type="button"
+                className={`inline-flex items-center gap-2 px-4 py-2 text-sm font-semibold border-b-2 -mb-px transition-colors ${isActive
+                  ? "border-indigo-600 text-indigo-600"
+                  : "border-transparent text-slate-500 hover:text-slate-700"
+                  }`}
+              >
+                {t.label}
+                {t.key !== "active" && (
+                  <span
+                    className={`inline-flex items-center justify-center h-5 min-w-[20px] px-1.5 rounded-full text-[11px] font-semibold ${isActive
+                      ? "bg-indigo-100 text-indigo-700"
+                      : "bg-slate-100 text-slate-500"
+                      }`}
+                  >
+                    {t.count}
+                  </span>
+                )}
+              </button>
+            );
+          })}
         </div>
+      </div>
 
       <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-3">
         <StatCard
@@ -1339,58 +1347,76 @@ const ProjectsPage = () => {
 
         {/* Right side: active chips + Filters dropdown */}
         <div className="ml-auto flex flex-wrap items-center gap-2">
-          {selectedStatus !== "all" && (
+          {Array.isArray(selectedPriority) && selectedPriority.length > 0 && (
+            <span className="inline-flex items-center gap-1.5 rounded-lg border border-indigo-200 bg-indigo-50 px-2.5 py-1.5 text-xs font-medium text-indigo-700">
+              Priority: {selectedPriority.join(", ")}
+              <button
+                type="button"
+                onClick={() => setSelectedPriority([])}
+                className="hover:text-indigo-900 cursor-pointer"
+              >
+                <X className="w-3 h-3" />
+              </button>
+            </span>
+          )}
+          {Array.isArray(selectedStatus) && selectedStatus.length > 0 && (
             <span className="inline-flex items-center gap-1.5 rounded-lg border border-indigo-200 bg-indigo-50 px-2.5 py-1.5 text-xs font-medium text-indigo-700">
               Status:{" "}
-              {selectedStatus === "active"
-                ? "In Progress"
-                : selectedStatus === "poc"
-                  ? "POC"
-                  : selectedStatus}
+              {selectedStatus
+                .map((s) => (s === "active" ? "In Progress" : s === "poc" ? "POC" : s))
+                .join(", ")}
               <button
                 type="button"
-                onClick={() => setSelectedStatus("all")}
-                className="hover:text-indigo-900"
+                onClick={() => setSelectedStatus([])}
+                className="hover:text-indigo-900 cursor-pointer"
               >
                 <X className="w-3 h-3" />
               </button>
             </span>
           )}
-          {selectedOrganization !== "all" && (
+          {Array.isArray(selectedOrganization) && selectedOrganization.length > 0 && (
             <span className="inline-flex items-center gap-1.5 rounded-lg border border-indigo-200 bg-indigo-50 px-2.5 py-1.5 text-xs font-medium text-indigo-700">
-              {selectedOrganization}
+              Org: {selectedOrganization.join(", ")}
               <button
                 type="button"
-                onClick={() => setSelectedOrganization("all")}
-                className="hover:text-indigo-900"
+                onClick={() => setSelectedOrganization([])}
+                className="hover:text-indigo-900 cursor-pointer"
               >
                 <X className="w-3 h-3" />
               </button>
             </span>
           )}
-          {selectedPm !== "all" && (
+          {Array.isArray(selectedPm) && selectedPm.length > 0 && (
             <span className="inline-flex items-center gap-1.5 rounded-lg border border-indigo-200 bg-indigo-50 px-2.5 py-1.5 text-xs font-medium text-indigo-700">
-              {projectManagers.find((pm) => String(pm.id) === String(selectedPm))?.name || "Manager"}
+              PM:{" "}
+              {selectedPm
+                .map(
+                  (id) =>
+                    projectManagers.find((pm) => String(pm.id) === String(id))?.name || id
+                )
+                .join(", ")}
               <button
                 type="button"
-                onClick={() => setSelectedPm("all")}
-                className="hover:text-indigo-900"
+                onClick={() => setSelectedPm([])}
+                className="hover:text-indigo-900 cursor-pointer"
               >
                 <X className="w-3 h-3" />
               </button>
             </span>
           )}
-          {/* Emerald, matching the lead accents elsewhere, so it doesn't read as a
-              second manager chip. */}
-          {selectedTeamLead !== "all" && (
+          {Array.isArray(selectedTeamLead) && selectedTeamLead.length > 0 && (
             <span className="inline-flex items-center gap-1.5 rounded-lg border border-emerald-200 bg-emerald-50 px-2.5 py-1.5 text-xs font-medium text-emerald-700">
               Lead:{" "}
-              {teamLeads.find((l) => String(l.id) === String(selectedTeamLead))
-                ?.name || "Team lead"}
+              {selectedTeamLead
+                .map(
+                  (id) =>
+                    teamLeads.find((l) => String(l.id) === String(id))?.name || id
+                )
+                .join(", ")}
               <button
                 type="button"
-                onClick={() => setSelectedTeamLead("all")}
-                className="hover:text-emerald-900"
+                onClick={() => setSelectedTeamLead([])}
+                className="hover:text-emerald-900 cursor-pointer"
               >
                 <X className="w-3 h-3" />
               </button>
@@ -1414,26 +1440,22 @@ const ProjectsPage = () => {
             <button
               type="button"
               onClick={() => setFiltersOpen((o) => !o)}
-              className="inline-flex items-center gap-2 rounded-lg border border-slate-200 bg-white px-3 py-2 text-sm font-medium text-slate-600 shadow-sm hover:bg-slate-50 transition-colors"
+              className="inline-flex items-center gap-2 rounded-lg border border-slate-200 bg-white px-3 py-2 text-sm font-medium text-slate-600 shadow-sm hover:bg-slate-50 transition-colors cursor-pointer"
             >
               <SlidersHorizontal className="w-4 h-4 text-slate-400" />
               Filters
-              {[
-                selectedOrganization,
-                selectedPm,
-                selectedTeamLead,
-                selectedStatus,
-                selectedPriority,
-              ].some((v) => v !== "all") && (
+              {(selectedOrganization.length > 0 ||
+                selectedPm.length > 0 ||
+                selectedTeamLead.length > 0 ||
+                selectedStatus.length > 0 ||
+                selectedPriority.length > 0) && (
                   <span className="ml-0.5 inline-flex items-center justify-center rounded-full bg-indigo-100 px-1.5 text-[10px] font-semibold text-indigo-700">
                     {
-                      [
-                        selectedOrganization,
-                        selectedPm,
-                        selectedTeamLead,
-                        selectedStatus,
-                        selectedPriority,
-                      ].filter((v) => v !== "all").length
+                      (selectedOrganization.length > 0 ? 1 : 0) +
+                      (selectedPm.length > 0 ? 1 : 0) +
+                      (selectedTeamLead.length > 0 ? 1 : 0) +
+                      (selectedStatus.length > 0 ? 1 : 0) +
+                      (selectedPriority.length > 0 ? 1 : 0)
                     }
                   </span>
                 )}
@@ -1443,16 +1465,16 @@ const ProjectsPage = () => {
             </button>
 
             {filtersOpen && (
-              <div className="absolute right-0 top-full z-50 mt-2 w-72 rounded-xl border border-slate-200 bg-white p-3 shadow-xl space-y-3">
+              <div className="absolute right-0 top-full z-50 mt-2 w-80 rounded-xl border border-slate-200 bg-white p-3.5 shadow-xl space-y-3.5">
                 <div>
                   <label className="mb-1 block text-xs font-medium text-slate-500">
                     Priority
                   </label>
-                  <Dropdown
-                    value={selectedPriority}
+                  <MultiSelect
+                    value={Array.isArray(selectedPriority) ? selectedPriority : []}
                     onChange={setSelectedPriority}
+                    placeholder="All Priorities"
                     options={[
-                      { value: "all", label: "All priorities" },
                       { value: "P0", label: "P0" },
                       { value: "P1", label: "P1" },
                       { value: "P2", label: "P2" },
@@ -1465,13 +1487,13 @@ const ProjectsPage = () => {
                   <label className="mb-1 block text-xs font-medium text-slate-500">
                     Status
                   </label>
-                  <Dropdown
-                    value={selectedStatus}
+                  <MultiSelect
+                    value={Array.isArray(selectedStatus) ? selectedStatus : []}
                     onChange={setSelectedStatus}
+                    placeholder="All Statuses"
                     options={
                       !isAdmin
                         ? [
-                          { value: "all", label: "All statuses" },
                           { value: "active", label: "In Progress" },
                           { value: "poc", label: "POC" },
                           { value: "completed", label: "Completed" },
@@ -1480,13 +1502,11 @@ const ProjectsPage = () => {
                         ]
                         : projectView === "archived"
                           ? [
-                            { value: "all", label: "All statuses" },
                             { value: "completed", label: "Completed" },
                             { value: "on-hold", label: "On Hold" },
                             { value: "cancelled", label: "Cancelled" },
                           ]
                           : [
-                            { value: "all", label: "All statuses" },
                             { value: "active", label: "In Progress" },
                             { value: "poc", label: "POC" },
                           ]
@@ -1498,16 +1518,15 @@ const ProjectsPage = () => {
                   <label className="mb-1 block text-xs font-medium text-slate-500">
                     Organization
                   </label>
-                  <Dropdown
-                    value={selectedOrganization}
+                  <MultiSelect
+                    value={Array.isArray(selectedOrganization) ? selectedOrganization : []}
                     onChange={setSelectedOrganization}
-                    options={[
-                      { value: "all", label: "All organizations" },
-                      ...organizations.map((org) => ({
-                        value: org,
-                        label: org,
-                      })),
-                    ]}
+                    placeholder="All Organizations"
+                    searchable
+                    options={organizations.map((org) => ({
+                      value: org,
+                      label: org,
+                    }))}
                     className="w-full"
                   />
                 </div>
@@ -1516,60 +1535,52 @@ const ProjectsPage = () => {
                     <label className="mb-1 block text-xs font-medium text-slate-500">
                       Project Manager
                     </label>
-                    <Dropdown
-                      value={selectedPm}
+                    <MultiSelect
+                      value={Array.isArray(selectedPm) ? selectedPm : []}
                       onChange={setSelectedPm}
+                      placeholder="All Managers"
                       searchable
-                      searchPlaceholder="Search managers..."
-                      options={[
-                        { value: "all", label: "All managers" },
-                        ...projectManagers.map((pm) => ({
-                          value: String(pm.id),
-                          label: pm.name,
-                        })),
-                      ]}
+                      options={projectManagers.map((pm) => ({
+                        value: String(pm.id),
+                        label: pm.name,
+                      }))}
                       className="w-full"
                     />
                   </div>
                 )}
-                {/* Offered to PMs and team leads too, not just admins: with several leads on
-                    one project it is the quickest way to find your own. */}
                 <div>
                   <label className="mb-1 block text-xs font-medium text-slate-500">
                     Team Lead
                   </label>
-                  <Dropdown
-                    value={selectedTeamLead}
+                  <MultiSelect
+                    value={Array.isArray(selectedTeamLead) ? selectedTeamLead : []}
                     onChange={setSelectedTeamLead}
+                    placeholder="All Team Leads"
                     searchable
-                    searchPlaceholder="Search team leads..."
-                    options={[
-                      { value: "all", label: "All team leads" },
-                      ...teamLeads.map((lead) => ({
-                        value: String(lead.id),
-                        label: lead.name,
-                      })),
-                    ]}
+                    options={teamLeads.map((lead) => ({
+                      value: String(lead.id),
+                      label: lead.name,
+                    }))}
                     className="w-full"
                   />
                 </div>
-                {[
-                  selectedOrganization,
-                  selectedPm,
-                  selectedTeamLead,
-                  selectedStatus,
-                  selectedPriority,
-                ].some((v) => v !== "all") && (
+                {(selectedOrganization.length > 0 ||
+                  selectedPm.length > 0 ||
+                  selectedTeamLead.length > 0 ||
+                  selectedStatus.length > 0 ||
+                  selectedPriority.length > 0) && (
                     <button
+                      type="button"
                       onClick={() => {
-                        setSelectedOrganization("all");
-                        setSelectedPm("all");
-                        setSelectedTeamLead("all");
-                        setSelectedStatus("all");
+                        setSelectedOrganization([]);
+                        setSelectedPm([]);
+                        setSelectedTeamLead([]);
+                        setSelectedStatus([]);
+                        setSelectedPriority([]);
                       }}
-                      className="w-full rounded-lg border border-slate-200 py-1.5 text-xs font-medium text-slate-500 hover:bg-slate-50"
+                      className="w-full rounded-lg border border-slate-200 py-1.5 text-xs font-medium text-rose-600 hover:bg-rose-50 hover:border-rose-200 transition-colors cursor-pointer"
                     >
-                      Clear filters
+                      Clear all filters
                     </button>
                   )}
               </div>
@@ -2508,24 +2519,24 @@ const ProjectsPage = () => {
                               min="0"
                               {...(isPriorityDriver
                                 ? {
-                                    value:
-                                      field === "autonex_annotators"
-                                        ? formAutonexAnnotators
-                                        : formAutonexReviewers,
-                                    onChange: (e) => {
-                                      const n = parseInt(e.target.value, 10);
-                                      const next = Number.isFinite(n) ? n : 0;
-                                      if (field === "autonex_annotators") {
-                                        setFormAutonexAnnotators(next);
-                                      } else {
-                                        setFormAutonexReviewers(next);
-                                      }
-                                    },
-                                  }
+                                  value:
+                                    field === "autonex_annotators"
+                                      ? formAutonexAnnotators
+                                      : formAutonexReviewers,
+                                  onChange: (e) => {
+                                    const n = parseInt(e.target.value, 10);
+                                    const next = Number.isFinite(n) ? n : 0;
+                                    if (field === "autonex_annotators") {
+                                      setFormAutonexAnnotators(next);
+                                    } else {
+                                      setFormAutonexReviewers(next);
+                                    }
+                                  },
+                                }
                                 : {
-                                    defaultValue:
-                                      (editingProject || copyingProject)?.[field] ?? "",
-                                  })}
+                                  defaultValue:
+                                    (editingProject || copyingProject)?.[field] ?? "",
+                                })}
                               onWheel={(e) => e.target.blur()}
                               className="input"
                               placeholder="0"
