@@ -8,6 +8,9 @@ import {
   ShieldCheck,
   AlertTriangle,
   Smile,
+  Meh,
+  Frown,
+  Zap,
   RotateCcw,
   BarChart3,
 } from "lucide-react";
@@ -43,15 +46,16 @@ const WorkModePill = ({ mode }) =>
 const SentimentPill = ({ mood }) => {
   if (!mood) return <span className="text-xs text-slate-400">—</span>;
   const config = {
-    great: { label: "Great", icon: "😁", bg: "bg-emerald-50 text-emerald-700 border-emerald-200" },
-    okay: { label: "Okay", icon: "🙂", bg: "bg-blue-50 text-blue-700 border-blue-200" },
-    low: { label: "Low", icon: "😟", bg: "bg-amber-50 text-amber-700 border-amber-200" },
-    stressed: { label: "Stressed", icon: "😫", bg: "bg-rose-50 text-rose-700 border-rose-200" },
+    great: { label: "Great", icon: Zap, bg: "bg-emerald-50 text-emerald-700 border-emerald-200" },
+    okay: { label: "Okay", icon: Smile, bg: "bg-sky-50 text-sky-700 border-sky-200" },
+    low: { label: "Low", icon: Meh, bg: "bg-amber-50 text-amber-700 border-amber-200" },
+    stressed: { label: "Stressed", icon: Frown, bg: "bg-rose-50 text-rose-700 border-rose-200" },
   };
-  const item = config[mood.toLowerCase()] || { label: mood, icon: "😶", bg: "bg-slate-50 text-slate-700 border-slate-200" };
+  const item = config[mood.toLowerCase()] || { label: mood, icon: Meh, bg: "bg-slate-50 text-slate-700 border-slate-200" };
+  const Icon = item.icon;
   return (
     <span className={`inline-flex items-center gap-1.5 px-2 py-0.5 rounded-full border text-xs font-medium ${item.bg}`}>
-      <span>{item.icon}</span>
+      <Icon className="w-3.5 h-3.5 shrink-0" />
       <span>{item.label}</span>
     </span>
   );
@@ -323,9 +327,28 @@ const AdminCheckInsPage = () => {
               icon={Building2}
               tone="indigo"
               hint={
-                <span className="text-slate-500">
-                  <strong className="text-amber-600 font-semibold">{totalOnLeave}</strong> on leave today
-                </span>
+                <MetricDots
+                  items={[
+                    {
+                      label: "On Leave",
+                      value: totalOnLeave,
+                      dot: "bg-amber-500",
+                      tone: "text-amber-600",
+                    },
+                    {
+                      label: "Approved",
+                      value: approvedLeaveCount,
+                      dot: "bg-emerald-500",
+                      tone: "text-emerald-600",
+                    },
+                    {
+                      label: "Pending",
+                      value: pendingLeaveCount,
+                      dot: "bg-amber-400",
+                      tone: "text-amber-600",
+                    },
+                  ]}
+                />
               }
               breakdown={[
                 {
@@ -337,11 +360,11 @@ const AdminCheckInsPage = () => {
                 },
                 ...((data?.kpi_approved_leaves_names || []).length > 0 ? [{
                   title: `Approved (${data.kpi_approved_leaves_names.length})`,
-                  rows: data.kpi_approved_leaves_names.map(name => ({ label: formatDisplayName(name), value: "Approved" }))
+                  rows: data.kpi_approved_leaves_names.map(name => ({ label: formatDisplayName(name) }))
                 }] : []),
                 ...((data?.kpi_pending_leaves_names || []).length > 0 ? [{
                   title: `Pending Approval (${data.kpi_pending_leaves_names.length})`,
-                  rows: data.kpi_pending_leaves_names.map(name => ({ label: formatDisplayName(name), value: "Pending" }))
+                  rows: data.kpi_pending_leaves_names.map(name => ({ label: formatDisplayName(name) }))
                 }] : [])
               ]}
             />
@@ -366,6 +389,18 @@ const AdminCheckInsPage = () => {
                       dot: "bg-sky-500",
                       tone: "text-sky-600",
                     },
+                    {
+                      label: "Pending PM",
+                      value: Math.max(0, (data?.kpi_checked_in ?? 0) - (data?.kpi_confirmed ?? 0)),
+                      dot: "bg-amber-500",
+                      tone: "text-amber-600",
+                    },
+                    ...((data?.kpi_late ?? 0) > 0 ? [{
+                      label: "Late",
+                      value: data.kpi_late,
+                      dot: "bg-rose-500",
+                      tone: "text-rose-600",
+                    }] : [])
                   ]}
                 />
               }
@@ -399,7 +434,30 @@ const AdminCheckInsPage = () => {
               value={data?.kpi_wfo ?? 0}
               icon={Building2}
               tone="amber"
-              hint="on premises"
+              hint={
+                <MetricDots
+                  items={[
+                    {
+                      label: "F7/9/17",
+                      value: `${data?.kpi_floor_7 ?? 0}/${data?.kpi_floor_9 ?? 0}/${data?.kpi_floor_17 ?? 0}`,
+                      dot: "bg-indigo-400",
+                      tone: "text-indigo-700",
+                    },
+                    {
+                      label: "Tiffin",
+                      value: data?.kpi_order_tiffin ?? 0,
+                      dot: "bg-amber-500",
+                      tone: "text-amber-700",
+                    },
+                    {
+                      label: "Canteen",
+                      value: data?.kpi_canteen ?? 0,
+                      dot: "bg-emerald-500",
+                      tone: "text-emerald-700",
+                    },
+                  ]}
+                />
+              }
               breakdown={[
                 {
                   title: "Floors",
@@ -424,13 +482,28 @@ const AdminCheckInsPage = () => {
               value={data?.kpi_checked_in ?? 0}
               icon={Smile}
               tone="rose"
-              hint="Click for full analysis →"
+              hint={
+                <div className="flex flex-wrap items-center gap-1.5 font-mono text-[11px] w-full">
+                  <span className="inline-flex items-center gap-1 bg-emerald-50 text-emerald-800 px-1.5 py-0.5 rounded-md font-semibold border border-emerald-100/80" title="Great">
+                    <Zap className="w-3 h-3 text-emerald-600" /> <span className="tabular-nums">{data?.kpi_mood_great ?? 0}</span>
+                  </span>
+                  <span className="inline-flex items-center gap-1 bg-sky-50 text-sky-800 px-1.5 py-0.5 rounded-md font-semibold border border-sky-100/80" title="Okay">
+                    <Smile className="w-3 h-3 text-sky-600" /> <span className="tabular-nums">{data?.kpi_mood_okay ?? 0}</span>
+                  </span>
+                  <span className="inline-flex items-center gap-1 bg-amber-50 text-amber-800 px-1.5 py-0.5 rounded-md font-semibold border border-amber-100/80" title="Low">
+                    <Meh className="w-3 h-3 text-amber-600" /> <span className="tabular-nums">{data?.kpi_mood_low ?? 0}</span>
+                  </span>
+                  <span className="inline-flex items-center gap-1 bg-rose-50 text-rose-800 px-1.5 py-0.5 rounded-md font-semibold border border-rose-100/80" title="Stressed">
+                    <Frown className="w-3 h-3 text-rose-600" /> <span className="tabular-nums">{data?.kpi_mood_stressed ?? 0}</span>
+                  </span>
+                </div>
+              }
               onClick={() => setIsSentimentModalOpen(true)}
               breakdown={[
-                { label: "Great 😁", value: data?.kpi_mood_great ?? 0 },
-                { label: "Okay 🙂", value: data?.kpi_mood_okay ?? 0 },
-                { label: "Low 😟", value: data?.kpi_mood_low ?? 0 },
-                { label: "Stressed 😫", value: data?.kpi_mood_stressed ?? 0 },
+                { label: "Great", value: data?.kpi_mood_great ?? 0 },
+                { label: "Okay", value: data?.kpi_mood_okay ?? 0 },
+                { label: "Low energy", value: data?.kpi_mood_low ?? 0 },
+                { label: "Stressed", value: data?.kpi_mood_stressed ?? 0 },
               ]}
             />
           </div>

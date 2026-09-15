@@ -168,6 +168,7 @@ const CheckinFilterDropdown = ({
               <MultiSelect
                 value={timeFilters}
                 onChange={setTimeFilters}
+                closeOnSelectValues={["custom"]}
                 placeholder="All Times"
                 options={[
                   { value: "before_9", label: "Before 9:00 AM" },

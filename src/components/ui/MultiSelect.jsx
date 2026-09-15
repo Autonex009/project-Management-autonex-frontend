@@ -8,6 +8,7 @@ export const MultiSelect = ({
   placeholder = "Select...",
   className = "",
   searchable,
+  closeOnSelectValues = [],
 }) => {
   const [isOpen, setIsOpen] = useState(false);
   const [searchQuery, setSearchQuery] = useState("");
@@ -40,6 +41,9 @@ export const MultiSelect = ({
       onChange(value.filter((v) => v !== optValue));
     } else {
       onChange([...value, optValue]);
+    }
+    if (closeOnSelectValues.includes(optValue)) {
+      setIsOpen(false);
     }
   };
 

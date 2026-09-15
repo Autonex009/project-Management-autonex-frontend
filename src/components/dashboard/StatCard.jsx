@@ -331,19 +331,25 @@ const StatCard = ({
                       {section.title}
                     </p>
                   )}
-                  {(!section.rows || !Array.isArray(section.rows)) ? (console.error('Invalid section.rows:', section), null) : section.rows.map((row) => (
-                    <div
-                      key={row.label}
-                      className="flex items-center justify-between gap-3 rounded-md px-1.5 py-1 transition-colors hover:bg-slate-50"
-                    >
-                      <span className="truncate text-[13px] text-slate-600">
-                        {row.label}
-                      </span>
-                      <span className="shrink-0 font-mono text-[13px] font-semibold tabular-nums text-slate-900">
-                        {row.value ?? row.count}
-                      </span>
-                    </div>
-                  ))}
+                  {(!section.rows || !Array.isArray(section.rows)) ? (console.error('Invalid section.rows:', section), null) : section.rows.map((row) => {
+                    const val = row.value ?? row.count;
+                    const hasVal = val !== undefined && val !== null && val !== "";
+                    return (
+                      <div
+                        key={row.label}
+                        className="flex items-center justify-between gap-3 rounded-md px-1.5 py-1 transition-colors hover:bg-slate-50"
+                      >
+                        <span className="truncate text-[13px] text-slate-600">
+                          {row.label}
+                        </span>
+                        {hasVal && (
+                          <span className="shrink-0 font-mono text-[13px] font-semibold tabular-nums text-slate-900">
+                            {val}
+                          </span>
+                        )}
+                      </div>
+                    );
+                  })}
                 </div>
               ))}
             </div>
