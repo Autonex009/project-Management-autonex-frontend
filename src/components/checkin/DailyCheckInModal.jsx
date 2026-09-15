@@ -194,7 +194,7 @@ export default function DailyCheckInModal() {
   const fallbackOptions = useMemo(() => {
     const assignedIds = new Set(projectOptions.map(p => p.project_id));
     const opts = (allProjects || [])
-      .filter(p => !assignedIds.has(p.id))
+      .filter(p => !assignedIds.has(p.id) && p.project_status !== "archived")
       .map((p) => ({ label: p.name, value: p.id }));
     opts.push({ label: "Other", value: "other" });
     return opts;
