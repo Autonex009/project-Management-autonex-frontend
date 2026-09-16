@@ -61,13 +61,32 @@ const AdminCompanySettingsPage = () => {
 
   // Extract unique existing floors from configured office IPs
   const existingFloors = useMemo(() => {
-    const floorsSet = new Set();
+    const floorsSet = new Set(["Floor 7", "Floor 9", "Floor 17"]);
     (officeIps || []).forEach((ip) => {
       if (ip.floor && ip.floor.trim()) {
-        floorsSet.add(ip.floor.trim());
+        const flr = ip.floor.trim();
+        floorsSet.add(flr.startsWith("Floor") ? flr : `Floor ${flr}`);
       }
     });
-    return Array.from(floorsSet);
+    return Array.from(floorsSet).sort((a, b) => {
+      const numA = parseInt(a.replace(/\D/g, ""), 10);
+      const numB = parseInt(b.replace(/\D/g, ""), 10);
+      if (!isNaN(numA) && !isNaN(numB)) return numA - numB;
+      return a.localeCompare(b);
+    });
+  }, [officeIps]);
+
+  const sortedOfficeIps = useMemo(() => {
+    return [...(officeIps || [])].sort((a, b) => {
+      const flrA = (a.floor || "").replace(/\D/g, "");
+      const flrB = (b.floor || "").replace(/\D/g, "");
+      const numA = parseInt(flrA, 10);
+      const numB = parseInt(flrB, 10);
+      if (!isNaN(numA) && !isNaN(numB) && numA !== numB) {
+        return numA - numB;
+      }
+      return (a.ip_address || "").localeCompare(b.ip_address || "");
+    });
   }, [officeIps]);
 
   useEffect(() => {
@@ -703,13 +722,13 @@ const AdminCompanySettingsPage = () => {
             ) : null}
 
             {/* List container showing ~3 items at a time and scrollable if more */}
-            <div className="divide-y divide-stone-100 max-h-[224px] overflow-y-auto flex-1">
-              {officeIps.length === 0 ? (
+            <div className="divide-y divide-stone-100 max-h-[260px] overflow-y-auto flex-1">
+              {sortedOfficeIps.length === 0 ? (
                 <div className="p-8 text-center text-stone-500 text-sm">
                   No office IP addresses configured yet.
                 </div>
               ) : (
-                officeIps.map((item) => (
+                sortedOfficeIps.map((item) => (
                   <div
                     key={item.id}
                     className="flex items-center justify-between p-4 hover:bg-stone-50 transition-colors group"

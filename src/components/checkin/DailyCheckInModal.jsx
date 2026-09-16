@@ -219,8 +219,10 @@ export default function DailyCheckInModal() {
     if (status.project_options?.length > 0) {
       setSelectedProjects(status.project_options.map((p) => p.project_id));
     }
-    // Smart pre-selection: Pre-select detected_floor if connected via Office Wi-Fi
-    if (status.detected_floor) {
+    // Smart pre-selection: Pre-select suggested_floor or detected_floor if connected via Office Wi-Fi
+    if (status.suggested_floor) {
+      setOfficeFloor(status.suggested_floor);
+    } else if (status.detected_floor) {
       setOfficeFloor(status.detected_floor);
     } else {
       setOfficeFloor("");
@@ -348,11 +350,21 @@ export default function DailyCheckInModal() {
     },
   });
 
+  const validFloors = useMemo(() => {
+    if (status?.detected_floors && status.detected_floors.length > 0) {
+      return status.detected_floors;
+    }
+    if (status?.detected_floor) {
+      return [status.detected_floor];
+    }
+    return [];
+  }, [status?.detected_floors, status?.detected_floor]);
+
   const isOtherFloorSelected = Boolean(
     workMode === "WFO" &&
-    status?.detected_floor &&
+    validFloors.length > 0 &&
     officeFloor &&
-    officeFloor !== status.detected_floor
+    !validFloors.includes(officeFloor)
   );
 
   const doSubmit = () => {
@@ -609,6 +621,11 @@ export default function DailyCheckInModal() {
                           <Wifi className="w-3 h-3 text-emerald-600" />
                           Floor {status.detected_floor} Wi-Fi detected
                         </span>
+                      ) : status?.is_office_network ? (
+                        <span className="inline-flex items-center gap-1.5 px-2.5 py-0.5 rounded-full text-[11px] font-medium text-emerald-700 bg-emerald-50 border border-emerald-200">
+                          <Wifi className="w-3 h-3 text-emerald-600" />
+                          Office Wi-Fi detected
+                        </span>
                       ) : null
                     }
                   />
@@ -637,19 +654,21 @@ export default function DailyCheckInModal() {
                       <div className="flex-1">
                         <p className="font-semibold text-amber-900">Different Floor Selected</p>
                         <p className="text-amber-700 mt-0.5 leading-relaxed">
-                          You are connected to <strong>Floor {status.detected_floor} Wi-Fi</strong>, but selected <strong>Floor {officeFloor}</strong>.
+                          You are connected to <strong>Floor {validFloors.join(" / ")} Wi-Fi</strong>, but selected <strong>Floor {officeFloor}</strong>.
                         </p>
                       </div>
-                      <button
-                        type="button"
-                        onClick={() => {
-                          setOfficeFloor(status.detected_floor);
-                          setValidationErrors((prev) => ({ ...prev, officeFloor: "" }));
-                        }}
-                        className="text-[11px] font-semibold text-amber-800 underline hover:text-amber-950 shrink-0 pt-0.5"
-                      >
-                        Switch to Floor {status.detected_floor}
-                      </button>
+                      {validFloors.length === 1 && (
+                        <button
+                          type="button"
+                          onClick={() => {
+                            setOfficeFloor(validFloors[0]);
+                            setValidationErrors((prev) => ({ ...prev, officeFloor: "" }));
+                          }}
+                          className="text-[11px] font-semibold text-amber-800 underline hover:text-amber-950 shrink-0 pt-0.5"
+                        >
+                          Switch to Floor {validFloors[0]}
+                        </button>
+                      )}
                     </div>
                   )}
                   {validationErrors.officeFloor && (
@@ -910,9 +929,9 @@ export default function DailyCheckInModal() {
         doSubmit();
       }}
       title="Confirm Floor Selection"
-      message={`You are currently connected to the Floor ${status?.detected_floor} Wi-Fi network, but checking in for Floor ${officeFloor}.`}
+      message={`You are currently connected to the Floor ${validFloors.join(" / ")} Wi-Fi network, but checking in for Floor ${officeFloor}.`}
       details={[
-        { label: "Detected Wi-Fi Network", value: `Floor ${status?.detected_floor}` },
+        { label: "Detected Wi-Fi Network", value: `Floor ${validFloors.join(" / ")}` },
         { label: "Selected Check-in Floor", value: `Floor ${officeFloor}`, highlight: true },
       ]}
       variant="warning"
