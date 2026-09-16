@@ -6,6 +6,7 @@ import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
 import api from "../../services/api";
 import UserAvatar from "../../components/ui/UserAvatar";
 import { formatDisplayName } from "../../utils/displayName";
+import toast from "react-hot-toast";
 
 // ── Pool Sidebar ──────────────────────────────────────────────────────────────
 function PoolSidebar({
@@ -236,6 +237,7 @@ const OnboardingPipelinePage = () => {
   const assignMutation = useMutation({
     mutationFn: async (payload) => { const res = await api.post("/onboarding/pipeline/bulk-assign", payload); return res.data; },
     onSuccess: () => {
+      toast.success("Pipeline Started!");
       queryClient.invalidateQueries(["onboarding_pipeline"]);
       queryClient.invalidateQueries(["onboarding_newly_onboarded"]);
       setSelectedCandidateIds([]);

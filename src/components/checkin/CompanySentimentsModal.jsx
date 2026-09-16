@@ -2,6 +2,9 @@ import React, { useState } from "react";
 import { useQuery } from "@tanstack/react-query";
 import {
   Smile,
+  Meh,
+  Frown,
+  Zap,
   Calendar,
   TrendingUp,
   AlertTriangle,
@@ -49,10 +52,10 @@ const SENTIMENT_COLORS = {
 };
 
 const SENTIMENT_CONFIG = {
-  great: { label: "Great", icon: "😁", bg: "bg-emerald-50 text-emerald-700 border-emerald-200" },
-  okay: { label: "Okay", icon: "🙂", bg: "bg-blue-50 text-blue-700 border-blue-200" },
-  low: { label: "Low", icon: "😟", bg: "bg-amber-50 text-amber-700 border-amber-200" },
-  stressed: { label: "Stressed", icon: "😫", bg: "bg-rose-50 text-rose-700 border-rose-200" },
+  great: { label: "Great", icon: Zap, bg: "bg-emerald-50 text-emerald-700 border-emerald-200" },
+  okay: { label: "Okay", icon: Smile, bg: "bg-sky-50 text-sky-700 border-sky-200" },
+  low: { label: "Low", icon: Meh, bg: "bg-amber-50 text-amber-700 border-amber-200" },
+  stressed: { label: "Stressed", icon: Frown, bg: "bg-rose-50 text-rose-700 border-rose-200" },
 };
 
 const getTodayStr = () => {
@@ -115,10 +118,10 @@ const CompanySentimentsModal = ({ isOpen, onClose }) => {
     activeTab === "daily"
       ? dailyData
       : activeTab === "weekly"
-      ? weeklyData
-      : activeTab === "monthly"
-      ? monthlyData
-      : yearlyData;
+        ? weeklyData
+        : activeTab === "monthly"
+          ? monthlyData
+          : yearlyData;
 
   const dist = currentViewData?.distribution || { great: 0, okay: 0, low: 0, stressed: 0 };
   const total = currentViewData?.total_responses || 0;
@@ -232,7 +235,7 @@ const CompanySentimentsModal = ({ isOpen, onClose }) => {
       onClose={onClose}
       size={isMaximized ? "full" : "5xl"}
       maxHeight={isMaximized ? "98vh" : "94vh"}
-      className={isMaximized ? "max-w-[98vw] w-full" : ""}
+      className={isMaximized ? "max-w-[98vw] w-full h-[98vh] transition-all duration-200" : "transition-all duration-200"}
     >
       <Modal.Header onClose={onClose}>
         <div className="flex flex-col gap-3 pr-2">
@@ -286,11 +289,10 @@ const CompanySentimentsModal = ({ isOpen, onClose }) => {
                 <button
                   type="button"
                   onClick={() => setSelectedDate(getTodayStr())}
-                  className={`px-2.5 py-1.5 text-xs font-medium rounded-lg transition-colors ${
-                    selectedDate === getTodayStr()
-                      ? "bg-indigo-600 text-white"
-                      : "bg-slate-100 text-slate-600 hover:bg-slate-200"
-                  }`}
+                  className={`px-2.5 py-1.5 text-xs font-medium rounded-lg transition-colors ${selectedDate === getTodayStr()
+                    ? "bg-indigo-600 text-white"
+                    : "bg-slate-100 text-slate-600 hover:bg-slate-200"
+                    }`}
                 >
                   Today
                 </button>
@@ -364,44 +366,40 @@ const CompanySentimentsModal = ({ isOpen, onClose }) => {
             <button
               type="button"
               onClick={() => setActiveTab("daily")}
-              className={`px-3.5 py-1.5 text-xs font-semibold rounded-lg transition-all ${
-                activeTab === "daily"
-                  ? "bg-white text-slate-900 shadow-sm"
-                  : "text-slate-600 hover:text-slate-900"
-              }`}
+              className={`px-3.5 py-1.5 text-xs font-semibold rounded-lg transition-all ${activeTab === "daily"
+                ? "bg-white text-slate-900 shadow-sm"
+                : "text-slate-600 hover:text-slate-900"
+                }`}
             >
               Daily Breakdown ({selectedDate})
             </button>
             <button
               type="button"
               onClick={() => setActiveTab("weekly")}
-              className={`px-3.5 py-1.5 text-xs font-semibold rounded-lg transition-all ${
-                activeTab === "weekly"
-                  ? "bg-white text-slate-900 shadow-sm"
-                  : "text-slate-600 hover:text-slate-900"
-              }`}
+              className={`px-3.5 py-1.5 text-xs font-semibold rounded-lg transition-all ${activeTab === "weekly"
+                ? "bg-white text-slate-900 shadow-sm"
+                : "text-slate-600 hover:text-slate-900"
+                }`}
             >
               Weekly Trend (7 Days)
             </button>
             <button
               type="button"
               onClick={() => setActiveTab("monthly")}
-              className={`px-3.5 py-1.5 text-xs font-semibold rounded-lg transition-all ${
-                activeTab === "monthly"
-                  ? "bg-white text-slate-900 shadow-sm"
-                  : "text-slate-600 hover:text-slate-900"
-              }`}
+              className={`px-3.5 py-1.5 text-xs font-semibold rounded-lg transition-all ${activeTab === "monthly"
+                ? "bg-white text-slate-900 shadow-sm"
+                : "text-slate-600 hover:text-slate-900"
+                }`}
             >
               Monthly Trend ({data?.month_year || "Month"})
             </button>
             <button
               type="button"
               onClick={() => setActiveTab("yearly")}
-              className={`px-3.5 py-1.5 text-xs font-semibold rounded-lg transition-all ${
-                activeTab === "yearly"
-                  ? "bg-white text-slate-900 shadow-sm"
-                  : "text-slate-600 hover:text-slate-900"
-              }`}
+              className={`px-3.5 py-1.5 text-xs font-semibold rounded-lg transition-all ${activeTab === "yearly"
+                ? "bg-white text-slate-900 shadow-sm"
+                : "text-slate-600 hover:text-slate-900"
+                }`}
             >
               Annual Trend (Year {data?.year || ""})
             </button>
@@ -592,17 +590,17 @@ const CompanySentimentsModal = ({ isOpen, onClose }) => {
                         const count = dist[key] || 0;
                         const pct = roundPercent(count, total);
                         const cfg = SENTIMENT_CONFIG[key];
+                        const Icon = cfg.icon;
                         const isSelected = selectedMood === key;
                         return (
                           <div
                             key={key}
                             onClick={() => setSelectedMood(isSelected ? "all" : key)}
-                            className={`flex items-center justify-between text-xs p-1.5 rounded-lg cursor-pointer transition-colors ${
-                              isSelected ? "bg-indigo-50/80 ring-1 ring-indigo-300" : "hover:bg-slate-50"
-                            }`}
+                            className={`flex items-center justify-between text-xs p-1.5 rounded-lg cursor-pointer transition-colors ${isSelected ? "bg-indigo-50/80 ring-1 ring-indigo-300" : "hover:bg-slate-50"
+                              }`}
                           >
                             <div className="flex items-center gap-2">
-                              <span>{cfg.icon}</span>
+                              <Icon className="w-4 h-4 shrink-0" />
                               <span className="font-semibold text-slate-700">{cfg.label}</span>
                             </div>
                             <div className="flex items-center gap-3">
@@ -635,10 +633,10 @@ const CompanySentimentsModal = ({ isOpen, onClose }) => {
                     {activeTab === "daily"
                       ? "Daily Work Mode Comparison (WFO vs WFH)"
                       : activeTab === "weekly"
-                      ? "7-Day Sentiment Trend"
-                      : activeTab === "monthly"
-                      ? "Monthly Sentiment Trend"
-                      : `Annual Sentiment Trend (${data?.year || "12 Months"})`}
+                        ? "7-Day Sentiment Trend"
+                        : activeTab === "monthly"
+                          ? "Monthly Sentiment Trend"
+                          : `Annual Sentiment Trend (${data?.year || "12 Months"})`}
                   </span>
                   <span className="text-xs font-normal text-slate-400">
                     {activeTab === "daily" ? selectedDate : currentViewData?.label || ""}
@@ -661,7 +659,10 @@ const CompanySentimentsModal = ({ isOpen, onClose }) => {
                       <div className="grid grid-cols-4 gap-2">
                         {["great", "okay", "low", "stressed"].map((k) => (
                           <div key={k} className="bg-white p-2 rounded-lg border border-indigo-100 text-center">
-                            <span className="text-base">{SENTIMENT_CONFIG[k].icon}</span>
+                            {(() => {
+                              const Icon = SENTIMENT_CONFIG[k].icon;
+                              return <Icon className="w-4 h-4 mx-auto" />;
+                            })()}
                             <p className="text-[10px] font-semibold text-slate-500 uppercase mt-0.5">
                               {SENTIMENT_CONFIG[k].label}
                             </p>
@@ -687,7 +688,10 @@ const CompanySentimentsModal = ({ isOpen, onClose }) => {
                       <div className="grid grid-cols-4 gap-2">
                         {["great", "okay", "low", "stressed"].map((k) => (
                           <div key={k} className="bg-white p-2 rounded-lg border border-sky-100 text-center">
-                            <span className="text-base">{SENTIMENT_CONFIG[k].icon}</span>
+                            {(() => {
+                              const Icon = SENTIMENT_CONFIG[k].icon;
+                              return <Icon className="w-4 h-4 mx-auto" />;
+                            })()}
                             <p className="text-[10px] font-semibold text-slate-500 uppercase mt-0.5">
                               {SENTIMENT_CONFIG[k].label}
                             </p>
@@ -752,16 +756,16 @@ const CompanySentimentsModal = ({ isOpen, onClose }) => {
                     <button
                       type="button"
                       onClick={() => setSelectedMood("all")}
-                      className={`px-2.5 py-1 text-xs font-semibold rounded-lg transition-colors cursor-pointer ${
-                        selectedMood === "all"
-                          ? "bg-slate-900 text-white"
-                          : "bg-slate-100 text-slate-600 hover:bg-slate-200"
-                      }`}
+                      className={`px-2.5 py-1 text-xs font-semibold rounded-lg transition-colors cursor-pointer ${selectedMood === "all"
+                        ? "bg-slate-900 text-white"
+                        : "bg-slate-100 text-slate-600 hover:bg-slate-200"
+                        }`}
                     >
                       All ({total})
                     </button>
                     {["great", "okay", "low", "stressed"].map((key) => {
                       const cfg = SENTIMENT_CONFIG[key];
+                      const Icon = cfg.icon;
                       const cnt = (employeesByMood[key] || []).length;
                       const isSel = selectedMood === key;
                       return (
@@ -769,13 +773,12 @@ const CompanySentimentsModal = ({ isOpen, onClose }) => {
                           key={key}
                           type="button"
                           onClick={() => setSelectedMood(key)}
-                          className={`px-2.5 py-1 text-xs font-semibold rounded-lg border transition-all cursor-pointer flex items-center gap-1 ${
-                            isSel
-                              ? `${cfg.bg} ring-2 ring-indigo-500/20`
-                              : "bg-white border-slate-200 text-slate-700 hover:bg-slate-50"
-                          }`}
+                          className={`px-2.5 py-1 text-xs font-semibold rounded-lg border transition-all cursor-pointer flex items-center gap-1 ${isSel
+                            ? `${cfg.bg} ring-2 ring-indigo-500/20`
+                            : "bg-white border-slate-200 text-slate-700 hover:bg-slate-50"
+                            }`}
                         >
-                          <span>{cfg.icon}</span>
+                          <Icon className="w-3.5 h-3.5 shrink-0" />
                           <span>{cfg.label}</span>
                           <span className="font-mono text-[11px] opacity-80">({cnt})</span>
                         </button>
@@ -794,6 +797,7 @@ const CompanySentimentsModal = ({ isOpen, onClose }) => {
                 <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-3 max-h-64 overflow-y-auto pr-1">
                   {displayedEmployees.map((emp) => {
                     const cfg = SENTIMENT_CONFIG[emp.mood] || SENTIMENT_CONFIG.okay;
+                    const Icon = cfg.icon;
                     return (
                       <div
                         key={emp.employee_id}
@@ -806,7 +810,7 @@ const CompanySentimentsModal = ({ isOpen, onClose }) => {
                               {formatDisplayName(emp.name)}
                             </h4>
                             <span className={`inline-flex items-center gap-1 px-1.5 py-0.5 rounded-full text-[10px] font-semibold border ${cfg.bg}`}>
-                              {cfg.icon} {cfg.label}
+                              <Icon className="w-3 h-3 shrink-0" /> {cfg.label}
                             </span>
                           </div>
                           {emp.designation && (
@@ -819,11 +823,10 @@ const CompanySentimentsModal = ({ isOpen, onClose }) => {
                             </span>
                             {emp.project_names?.length > 0 ? (
                               <span
-                                className={`truncate font-medium ${
-                                  emp.project_names.includes("Idle / Unassigned")
-                                    ? "text-amber-700 bg-amber-50 px-1.5 py-0.5 rounded border border-amber-200"
-                                    : "text-slate-500"
-                                }`}
+                                className={`truncate font-medium ${emp.project_names.includes("Idle / Unassigned")
+                                  ? "text-amber-700 bg-amber-50 px-1.5 py-0.5 rounded border border-amber-200"
+                                  : "text-slate-500"
+                                  }`}
                                 title={emp.project_names.join(", ")}
                               >
                                 📁 {emp.project_names.join(", ")}
@@ -884,13 +887,12 @@ const CompanySentimentsModal = ({ isOpen, onClose }) => {
                           </td>
                           <td className="py-2.5 px-3 text-center">
                             <span
-                              className={`inline-flex items-center px-2 py-0.5 rounded-full text-[10px] font-semibold border ${
-                                p.positivity_index >= 75
-                                  ? "bg-emerald-50 text-emerald-700 border-emerald-200"
-                                  : p.positivity_index >= 50
+                              className={`inline-flex items-center px-2 py-0.5 rounded-full text-[10px] font-semibold border ${p.positivity_index >= 75
+                                ? "bg-emerald-50 text-emerald-700 border-emerald-200"
+                                : p.positivity_index >= 50
                                   ? "bg-amber-50 text-amber-700 border-amber-200"
                                   : "bg-rose-50 text-rose-700 border-rose-200"
-                              }`}
+                                }`}
                             >
                               {p.health_badge || (p.positivity_index >= 75 ? "🟢 Healthy" : p.positivity_index >= 50 ? "🟡 Moderate" : "🔴 At-Risk")}
                             </span>
