@@ -64,6 +64,19 @@ const SectionHeader = ({ title, required = false, icon: Icon, badge, className =
   </div>
 );
 
+const getDeviceType = () => {
+  if (typeof window === "undefined" || !window.navigator) return "desktop";
+  const ua = window.navigator.userAgent || "";
+  if (/tablet|ipad|playbook|silk/i.test(ua)) return "tablet";
+  if (/Mobile|Android|iP(hone|od)|IEMobile|BlackBerry|Kindle|Silk-Accelerated|(hpw|web)OS|Opera M(obi|ini)/i.test(ua)) {
+    return "mobile";
+  }
+  if (window.innerWidth <= 768 && ("ontouchstart" in window || navigator.maxTouchPoints > 0)) {
+    return "mobile";
+  }
+  return "desktop";
+};
+
 export default function DailyCheckInModal() {
   const queryClient = useQueryClient();
   const location = useLocation();
@@ -280,7 +293,7 @@ export default function DailyCheckInModal() {
         mood,
         office_floor: workMode === "WFO" ? officeFloor : null,
         lunch_preference: workMode === "WFO" ? lunchPreference : null,
-        tiffin_type: lunchPreference === "order_tiffin" ? tiffinType : null,
+        device_type: getDeviceType(),
       };
       if (status?.has_slack) {
         return checkinApi.requestSlackOAuth(payload);
