@@ -10,7 +10,8 @@ export default defineConfig(({ isSsrBuild }) => ({
     watch: {
       usePolling: true,
     },
-    allowedHosts: true,
+    allowedHosts: ['pmportal.autonexai360.com'],
+    // or you can use allowedHosts: true to allow all domains temporarily
   },
   build: {
     // Production optimizations - using esbuild (built-in, no extra deps)
