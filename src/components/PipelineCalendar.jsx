@@ -191,8 +191,8 @@ function ActivityModal({ title, subtitle, groups, onClose }) {
                   item={{
                     name: item.candidateName,
                     meta: `${item.buddy
-                        ? `Mentor: ${formatDisplayName(item.buddy)} · `
-                        : ""
+                      ? `Mentor: ${formatDisplayName(item.buddy)} · `
+                      : ""
                       }${item.project || "No project"}`,
                     raw: item.rawPipeline || item,
                     status: item.status,
@@ -577,7 +577,7 @@ export default function PipelineCalendar({
         {[
           { dot: "bg-indigo-500", count: summary.awaitingAcceptance, label: "Awaiting Acceptance", list: summary.awaitingList },
           { dot: "bg-amber-500", count: summary.activeTraining, label: "In Training", list: summary.activeList },
-          { dot: "bg-red-500", count: summary.dueToday, label: "Eval Due Today", urgent: summary.dueToday > 0, list: summary.dueTodayList },
+          { dot: "bg-red-500", count: summary.dueToday, label: "Eval Due", urgent: summary.dueToday > 0, list: summary.dueTodayList },
           { dot: "bg-emerald-500", count: summary.historyList.length, label: "Completed / Failed", list: summary.historyList },
         ].map(({ dot, count, label, urgent, list }, i, arr) => (
           <React.Fragment key={label}>

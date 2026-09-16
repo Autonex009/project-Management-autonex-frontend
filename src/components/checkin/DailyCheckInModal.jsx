@@ -312,10 +312,22 @@ export default function DailyCheckInModal() {
           }
         }
       } else {
-        toast.success("✓ Checked in — have a great day!", {
-          duration: 3000,
-          icon: "👋",
-        });
+        const istHour = parseInt(
+          new Date().toLocaleTimeString('en-US', { timeZone: 'Asia/Kolkata', hour12: false, hour: 'numeric' }),
+          10
+        );
+        if (istHour >= 11 && workMode === "WFO" && (lunchPreference === "order_tiffin" || lunchPreference === "canteen")) {
+          toast("The list is already finalized and sent. Please contact Ashish Jadhav to confirm.", {
+            duration: 6000,
+            icon: "⚠️",
+            style: { maxWidth: 500 }
+          });
+        } else {
+          toast.success("✓ Checked in — have a great day!", {
+            duration: 3000,
+            icon: "👋",
+          });
+        }
         queryClient.invalidateQueries({ queryKey: ["checkin-today"] });
         dismiss();
       }

@@ -412,6 +412,7 @@ function App() {
                 <Route path="my-leaves" element={<PMMyLeavesPage />} />
                 <Route path="side-projects" element={<SideProjectsPage />} />
                 <Route path="guidelines" element={<GuidelinesPage />} />
+                <Route path="referrals" element={<EmployeeReferralsPage />} />
                 <Route path="onboarding" element={<OnboardingDashboard />} />
                 <Route path="onboarding/:moduleId" element={<ModuleView />} />
                 <Route path="onboarding-mentor" element={<PMMentorshipPage />} />

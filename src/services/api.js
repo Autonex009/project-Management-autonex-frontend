@@ -80,11 +80,11 @@ api.interceptors.response.use(
           {},
           { withCredentials: true, headers: refreshHeaders }
         );
-        
+
         if (data?.token && typeof window !== "undefined") {
           localStorage.setItem("token", data.token);
         }
-        
+
         processQueue(null, data.token);
         if (data?.token) {
           originalRequest.headers.Authorization = `Bearer ${data.token}`;
@@ -96,11 +96,11 @@ api.interceptors.response.use(
           localStorage.removeItem("token");
           localStorage.removeItem("role");
           localStorage.removeItem("user");
-          
+
           // Force logout by dispatching an event that the root component can listen to
           window.dispatchEvent(new Event("auth:unauthorized"));
         }
-        
+
         return Promise.reject(err);
       } finally {
         isRefreshing = false;
@@ -274,6 +274,27 @@ export const employeeApi = {
   getInactive: () =>
     api.get("/employees/status/inactive").then((res) => res.data),
   getIdle: () => api.get("/employees/status/idle").then((res) => res.data),
+};
+
+export const employeeDocumentApi = {
+  list: (employeeId) =>
+    api.get(`/employees/${employeeId}/documents`).then((res) => res.data),
+  summary: (employeeId) =>
+    api.get(`/employees/${employeeId}/documents/summary`).then((res) => res.data),
+  generate: (employeeId, docType, dynamicData = {}) =>
+    api.post(`/employees/${employeeId}/documents/generate`, { doc_type: docType, dynamic_data: dynamicData }).then((res) => res.data),
+  upload: (employeeId, formData) =>
+    api.post(`/employees/${employeeId}/documents/upload`, formData, {
+      headers: { "Content-Type": "multipart/form-data" },
+    }).then((res) => res.data),
+  download: (employeeId, docId) =>
+    api.get(`/employees/${employeeId}/documents/${docId}/download`).then((res) => res.data),
+  remove: (employeeId, docId) =>
+    api.delete(`/employees/${employeeId}/documents/${docId}`).then((res) => res.data),
+  bulkGenerate: (employeeId) =>
+    api.post(`/employees/${employeeId}/documents/bulk-generate`).then((res) => res.data),
+  history: (employeeId, docType) =>
+    api.get(`/employees/${employeeId}/documents/${docType}/history`).then((res) => res.data),
 };
 
 export const allocationApi = {
@@ -856,11 +877,53 @@ export const checkinApi = {
   requestSlackOAuth: (data) => api.post("/checkins/request-slack-oauth", data).then((res) => res.data),
   confirmSlack: (token) => api.post("/checkins/confirm-slack", { token }).then((res) => res.data),
   checkOut: (data) => api.post("/checkins/checkout", data).then((res) => res.data),
-  getTeamToday: (params) => api.get("/checkins/team-today", { params }).then((res) => res.data),
-  getAdminPaginated: (params) => api.get("/checkins/admin/paginated", { params }).then((res) => res.data),
+  // getTeamToday: (params) => api.get("/checkins/team-today", { params }).then((res) => res.data),
+  // getAdminPaginated: (params) => api.get("/checkins/admin/paginated", { params }).then((res) => res.data),
+  // example – adjust to your actual API helper
+  getTeamToday: (params) =>
+    api
+      .get("/checkins/team-today", {
+        params: {
+          page: params.page,
+          limit: params.limit,
+          search: params.search || undefined,
+          project_id: params.project_id || undefined,
+          status: params.status || undefined,
+          time_filter: params.time_filter || undefined,
+          time_from: params.time_from || undefined,
+          time_to: params.time_to || undefined,
+          work_mode: params.work_mode || undefined,
+          office_floor: params.office_floor || undefined,
+          sentiment: params.sentiment || undefined,
+        },
+      })
+      .then((res) => res.data),   
+
+  getAdminPaginated: (params) =>
+    api
+      .get("/checkins/admin/paginated", {
+        params: {
+          page: params.page,
+          limit: params.limit,
+          search: params.search || undefined,
+          project_id: params.project_id || undefined,
+          status: params.status || undefined,
+          time_filter: params.time_filter || undefined,
+          time_from: params.time_from || undefined,
+          time_to: params.time_to || undefined,
+          work_mode: params.work_mode || undefined,
+          office_floor: params.office_floor || undefined,
+          sentiment: params.sentiment || undefined,
+        },
+      })
+      .then((res) => res.data),   
   getAdminMatrix: (month_year) => api.get("/checkins/admin/matrix", { params: { month_year } }).then((res) => res.data),
   getTeamMatrix: (month_year) => api.get("/checkins/team/matrix", { params: { month_year } }).then((res) => res.data),
   confirmTeam: (employee_ids) => api.post("/checkins/team/confirm", { employee_ids }).then((res) => res.data),
+  getSentimentAnalytics: (params) => {
+    const p = typeof params === "object" ? params : { target_date: params };
+    return api.get("/checkins/admin/sentiment-analytics", { params: p }).then((res) => res.data);
+  },
 };
 
 export default api;

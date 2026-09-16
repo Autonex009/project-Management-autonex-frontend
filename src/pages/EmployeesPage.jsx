@@ -1,6 +1,6 @@
 import { useState, useRef, useEffect } from "react";
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
-import { useSearchParams, Link } from "react-router-dom";
+import { useSearchParams, Link, useLocation } from "react-router-dom";
 import usePageStateStore from "../store/usePageStateStore";
 import { usePageScroll } from "../hooks/usePageScroll";
 import {
@@ -10,6 +10,7 @@ import {
   subProjectApi,
   parentProjectApi,
   leaveApi,
+  employeeDocumentApi,
 } from "../services/api";
 import {
   Plus,
@@ -60,9 +61,11 @@ import Table, {
   formatDateDeterministic,
 } from "../components/ui/Table";
 import Dropdown from "../components/ui/Dropdown";
+import MultiSelect from "../components/ui/MultiSelect";
 import Spinner from "../components/ui/LoadingSpinner";
 import Button from "../components/ui/Button";
 import Modal from "../components/ui/Modal";
+import EmployeeDocumentDrawer, { DocProgressBadge } from "../components/EmployeeDocumentDrawer";
 
 const LEAVE_TYPE_LABELS = {
   paid: "Paid Leave",
@@ -582,6 +585,29 @@ function EmployeeConvertToFulltimeModal({
   );
 }
 
+
+function DocsSummaryCell({ employeeId, onOpen }) {
+  const { data } = useQuery({
+    queryKey: ["employee-docs-summary", employeeId],
+    queryFn: () => employeeDocumentApi.summary(employeeId),
+    staleTime: 60_000,
+  });
+  const present = data?.present ?? 0;
+  const total = data?.total ?? 6;
+  return (
+    <button
+      onClick={onOpen}
+      className="p-1.5 text-slate-400 hover:text-indigo-600 hover:bg-indigo-50 rounded transition-colors relative"
+      title={`${present}/${total} Documents`}
+    >
+      <FileText className="w-5 h-5" />
+      {present < total && (
+        <span className="absolute top-1 right-1 w-2 h-2 bg-amber-500 border border-white rounded-full"></span>
+      )}
+    </button>
+  );
+}
+
 function EmployeeCredentialsModal({ credentials, onClose }) {
   const [copied, setCopied] = useState(false);
 
@@ -943,7 +969,21 @@ const SORT_OPTIONS = [
   { value: "name-desc", label: "Name (Z–A)" },
 ];
 
-// Toolbar "Filter" button — collapses Skills + Designation filters into a popover (Untitled-UI style).
+const TIME_OPTIONS = [
+  { value: "before_9", label: "Before 9:00 AM" },
+  { value: "9_10", label: "9:00 – 10:00 AM" },
+  { value: "10_11", label: "10:00 – 11:00 AM" },
+  { value: "11_12", label: "11:00 – 12:00 PM" },
+  { value: "custom", label: "Custom range" },
+];
+
+const FLOOR_OPTIONS = [
+  { value: "7", label: "Floor 7" },
+  { value: "9", label: "Floor 9" },
+  { value: "17", label: "Floor 17" },
+];
+
+// Toolbar "Filter" button — collapses Skills, Designation, Type, Work Model, Time, and Floor filters into a popover.
 const FilterButton = ({
   predefinedSkills,
   skillFilter,
@@ -957,6 +997,14 @@ const FilterButton = ({
   workModelFilter,
   setWorkModelFilter,
   workModelOptions,
+  timeFilter,
+  setTimeFilter,
+  customTimeFrom,
+  setCustomTimeFrom,
+  customTimeTo,
+  setCustomTimeTo,
+  officeFloorFilter,
+  setOfficeFloorFilter,
   onChange,
 }) => {
   const [open, setOpen] = useState(false);
@@ -971,10 +1019,13 @@ const FilterButton = ({
   }, []);
 
   const activeCount =
-    (skillFilter ? 1 : 0) +
-    (designationFilter.length > 0 ? 1 : 0) +
-    (typeFilter ? 1 : 0) +
-    (workModelFilter ? 1 : 0);
+    (Array.isArray(skillFilter) ? skillFilter.length : (skillFilter ? 1 : 0)) +
+    (Array.isArray(designationFilter) ? designationFilter.length : 0) +
+    (Array.isArray(typeFilter) ? typeFilter.length : (typeFilter ? 1 : 0)) +
+    (Array.isArray(workModelFilter) ? workModelFilter.length : (workModelFilter ? 1 : 0)) +
+    (Array.isArray(timeFilter) ? timeFilter.length : 0) +
+    (Array.isArray(officeFloorFilter) ? officeFloorFilter.length : 0) +
+    (Array.isArray(timeFilter) && timeFilter.includes("custom") && (customTimeFrom || customTimeTo) ? 1 : 0);
 
   return (
     <div ref={ref} className="relative">
@@ -993,73 +1044,116 @@ const FilterButton = ({
       </button>
 
       {open && (
-        <div className="absolute right-0 mt-1.5 z-40 w-[22rem] bg-white rounded-xl shadow-xl border border-slate-200 p-3">
+        <div className="absolute right-0 mt-1.5 z-40 w-[22rem] sm:w-[26rem] bg-white rounded-xl shadow-xl border border-slate-200 p-3">
           <div className="grid grid-cols-2 gap-x-2.5 gap-y-2.5">
             <div className="space-y-1">
               <label className="text-[10px] font-semibold uppercase tracking-wide text-slate-400">
                 Skills
               </label>
-              <Dropdown
-                options={[
-                  { value: "", label: "Skills" },
-                  ...predefinedSkills.map((s) => ({ value: s, label: s })),
-                ]}
-                value={skillFilter}
+              <MultiSelect
+                options={predefinedSkills.map((s) => ({ value: s, label: s }))}
+                value={Array.isArray(skillFilter) ? skillFilter : (skillFilter ? [skillFilter] : [])}
                 onChange={(val) => {
                   setSkillFilter(val);
                   onChange?.();
                 }}
                 placeholder="Skills"
-                optionsClassName="w-full"
+                searchable
               />
             </div>
             <div className="space-y-1">
               <label className="text-[10px] font-semibold uppercase tracking-wide text-slate-400">
                 Designation
               </label>
-              <DesignationMultiSelect
-                options={designationOptions}
-                value={designationFilter}
+              <MultiSelect
+                options={designationOptions.map((d) => ({ value: d, label: d }))}
+                value={Array.isArray(designationFilter) ? designationFilter : []}
                 onChange={(val) => {
                   setDesignationFilter(val);
                   onChange?.();
                 }}
+                placeholder="Designations"
+                searchable
               />
             </div>
             <div className="space-y-1">
               <label className="text-[10px] font-semibold uppercase tracking-wide text-slate-400">
                 Type
               </label>
-              <Dropdown
-                options={[
-                  { value: "", label: "Types" },
-                  ...typeOptions.map((t) => ({ value: t, label: t })),
-                ]}
-                value={typeFilter}
+              <MultiSelect
+                options={typeOptions.map((t) => ({ value: t, label: t }))}
+                value={Array.isArray(typeFilter) ? typeFilter : (typeFilter ? [typeFilter] : [])}
                 onChange={(val) => {
                   setTypeFilter(val);
                   onChange?.();
                 }}
                 placeholder="Types"
-                optionsClassName="w-full"
               />
             </div>
             <div className="space-y-1">
               <label className="text-[10px] font-semibold uppercase tracking-wide text-slate-400">
                 Work Model
               </label>
-              <Dropdown
-                options={[
-                  { value: "", label: "Work Models" },
-                  ...workModelOptions.map((w) => ({ value: w, label: w })),
-                ]}
-                value={workModelFilter}
+              <MultiSelect
+                options={workModelOptions.map((w) => ({ value: w, label: w }))}
+                value={Array.isArray(workModelFilter) ? workModelFilter : (workModelFilter ? [workModelFilter] : [])}
                 onChange={(val) => {
                   setWorkModelFilter(val);
                   onChange?.();
                 }}
                 placeholder="Work Models"
-                optionsClassName="w-full"
+              />
+            </div>
+            <div className="space-y-1">
+              <label className="text-[10px] font-semibold uppercase tracking-wide text-slate-400">
+                Check-in Time
+              </label>
+              <MultiSelect
+                options={TIME_OPTIONS}
+                value={Array.isArray(timeFilter) ? timeFilter : []}
+                closeOnSelectValues={["custom"]}
+                onChange={(val) => {
+                  setTimeFilter(val);
+                  onChange?.();
+                }}
+                placeholder="Check-in Times"
+              />
+              {Array.isArray(timeFilter) && timeFilter.includes("custom") && (
+                <div className="mt-1 flex items-center gap-1">
+                  <input
+                    type="time"
+                    value={customTimeFrom || ""}
+                    onChange={(e) => {
+                      setCustomTimeFrom(e.target.value);
+                      onChange?.();
+                    }}
+                    className="rounded border border-slate-200 px-1.5 py-1 text-xs w-20 focus:outline-none focus:ring-1 focus:ring-indigo-500"
+                  />
+                  <span className="text-slate-400 text-[10px]">to</span>
+                  <input
+                    type="time"
+                    value={customTimeTo || ""}
+                    onChange={(e) => {
+                      setCustomTimeTo(e.target.value);
+                      onChange?.();
+                    }}
+                    className="rounded border border-slate-200 px-1.5 py-1 text-xs w-20 focus:outline-none focus:ring-1 focus:ring-indigo-500"
+                  />
+                </div>
+              )}
+            </div>
+            <div className="space-y-1">
+              <label className="text-[10px] font-semibold uppercase tracking-wide text-slate-400">
+                Office Floor
+              </label>
+              <MultiSelect
+                options={FLOOR_OPTIONS}
+                value={Array.isArray(officeFloorFilter) ? officeFloorFilter : []}
+                onChange={(val) => {
+                  setOfficeFloorFilter(val);
+                  onChange?.();
+                }}
+                placeholder="Office Floors"
               />
             </div>
           </div>
@@ -1067,13 +1161,17 @@ const FilterButton = ({
             <button
               type="button"
               onClick={() => {
-                setSkillFilter("");
+                setSkillFilter([]);
                 setDesignationFilter([]);
-                setTypeFilter("");
-                setWorkModelFilter("");
+                setTypeFilter([]);
+                setWorkModelFilter([]);
+                setTimeFilter([]);
+                setCustomTimeFrom("");
+                setCustomTimeTo("");
+                setOfficeFloorFilter([]);
                 onChange?.();
               }}
-              className="w-full text-center mt-2.5 pt-2.5 text-xs font-medium text-indigo-600 hover:text-indigo-700 border-t border-slate-100"
+              className="w-full text-center mt-2.5 pt-2.5 text-xs font-medium text-indigo-600 hover:text-indigo-700 border-t border-slate-100 cursor-pointer"
             >
               Clear filters
             </button>
@@ -1314,6 +1412,8 @@ function EmployeeActionMenu({
 
 const EmployeesPage = () => {
   const queryClient = useQueryClient();
+  const location = useLocation();
+  const isHrOps = location.pathname.startsWith('/hr');
   const [searchParams, setSearchParams] = useSearchParams();
   const idleOnly = searchParams.get("idleOnly") === "true";
   const statusParam = searchParams.get("status");
@@ -1324,6 +1424,7 @@ const EmployeesPage = () => {
   const [restoreTarget, setRestoreTarget] = useState(null);
   const [convertToFulltimeTarget, setConvertToFulltimeTarget] = useState(null);
   const [newlyCreatedCredentials, setNewlyCreatedCredentials] = useState(null);
+  const [docDrawerEmployee, setDocDrawerEmployee] = useState(null);
   const [formDesignation, setFormDesignation] = useState("Annotator/ Reviewer");
   const [formEmployeeType, setFormEmployeeType] = useState("Full-time");
   const [formWorkModel, setFormWorkModel] = useState("WFO");
@@ -1356,16 +1457,30 @@ const EmployeesPage = () => {
 
   const [searchQuery, setSearchQuery] = useState(saved.searchQuery ?? "");
   const [debouncedSearch, setDebouncedSearch] = useState(saved.searchQuery ?? "");
-  const [skillFilter, setSkillFilter] = useState(saved.skillFilter ?? "");
+  const [skillFilter, setSkillFilter] = useState(
+    Array.isArray(saved.skillFilter) ? saved.skillFilter : (saved.skillFilter ? [saved.skillFilter] : [])
+  );
   const [designationFilter, setDesignationFilter] = useState(
-    saved.designationFilter ?? [],
+    Array.isArray(saved.designationFilter) ? saved.designationFilter : []
   );
   const [sortBy, setSortBy] = useState(saved.sortBy ?? "");
   const [colDesignation, setColDesignation] = useState(
     saved.colDesignation ?? "",
   );
-  const [colType, setColType] = useState(saved.colType ?? "");
-  const [colWorkModel, setColWorkModel] = useState(saved.colWorkModel ?? "");
+  const [colType, setColType] = useState(
+    Array.isArray(saved.colType) ? saved.colType : (saved.colType ? [saved.colType] : [])
+  );
+  const [colWorkModel, setColWorkModel] = useState(
+    Array.isArray(saved.colWorkModel) ? saved.colWorkModel : (saved.colWorkModel ? [saved.colWorkModel] : [])
+  );
+  const [timeFilter, setTimeFilter] = useState(
+    Array.isArray(saved.timeFilter) ? saved.timeFilter : []
+  );
+  const [customTimeFrom, setCustomTimeFrom] = useState(saved.customTimeFrom ?? "");
+  const [customTimeTo, setCustomTimeTo] = useState(saved.customTimeTo ?? "");
+  const [officeFloorFilter, setOfficeFloorFilter] = useState(
+    Array.isArray(saved.officeFloorFilter) ? saved.officeFloorFilter : []
+  );
   const [currentPage, setCurrentPage] = useState(saved.currentPage ?? 1);
 
   // ============================================================
@@ -1410,12 +1525,24 @@ const EmployeesPage = () => {
     const next = usePageStateStore.getState().pages[TAB_PAGE_KEY] || {};
     setSearchQuery(next.searchQuery ?? "");
     setDebouncedSearch(next.searchQuery ?? "");
-    setSkillFilter(next.skillFilter ?? "");
-    setDesignationFilter(next.designationFilter ?? []);
+    setSkillFilter(
+      Array.isArray(next.skillFilter) ? next.skillFilter : (next.skillFilter ? [next.skillFilter] : [])
+    );
+    setDesignationFilter(
+      Array.isArray(next.designationFilter) ? next.designationFilter : []
+    );
     setSortBy(next.sortBy ?? "");
     setColDesignation(next.colDesignation ?? "");
-    setColType(next.colType ?? "");
-    setColWorkModel(next.colWorkModel ?? "");
+    setColType(
+      Array.isArray(next.colType) ? next.colType : (next.colType ? [next.colType] : [])
+    );
+    setColWorkModel(
+      Array.isArray(next.colWorkModel) ? next.colWorkModel : (next.colWorkModel ? [next.colWorkModel] : [])
+    );
+    setTimeFilter(Array.isArray(next.timeFilter) ? next.timeFilter : []);
+    setCustomTimeFrom(next.customTimeFrom ?? "");
+    setCustomTimeTo(next.customTimeTo ?? "");
+    setOfficeFloorFilter(Array.isArray(next.officeFloorFilter) ? next.officeFloorFilter : []);
     setCurrentPage(next.currentPage ?? 1);
   }, [TAB_PAGE_KEY]);
 
@@ -1431,6 +1558,10 @@ const EmployeesPage = () => {
       colDesignation,
       colType,
       colWorkModel,
+      timeFilter,
+      customTimeFrom,
+      customTimeTo,
+      officeFloorFilter,
       currentPage,
     });
   }, [
@@ -1442,6 +1573,10 @@ const EmployeesPage = () => {
     colDesignation,
     colType,
     colWorkModel,
+    timeFilter,
+    customTimeFrom,
+    customTimeTo,
+    officeFloorFilter,
     currentPage,
     setPageState,
   ]);
@@ -1469,7 +1604,11 @@ const EmployeesPage = () => {
       designationFilter,
       colDesignation,
       colType,
-      sortBy
+      sortBy,
+      timeFilter,
+      customTimeFrom,
+      customTimeTo,
+      officeFloorFilter,
     ],
     queryFn: () =>
       employeeApi.getPaginated({
@@ -1478,11 +1617,15 @@ const EmployeesPage = () => {
         status: statusParam || undefined,
         include_archived: statusParam === "archived",
         search: debouncedSearch || undefined,
-        skill: skillFilter || undefined,
-        designation: designationFilter.length > 0 ? designationFilter.join(",") : undefined,
+        skill: Array.isArray(skillFilter) && skillFilter.length > 0 ? skillFilter.join(",") : (typeof skillFilter === "string" && skillFilter ? skillFilter : undefined),
+        designation: Array.isArray(designationFilter) && designationFilter.length > 0 ? designationFilter.join(",") : undefined,
         col_designation: colDesignation || undefined,
-        col_type: colType || undefined,
+        col_type: Array.isArray(colType) && colType.length > 0 ? colType.join(",") : (typeof colType === "string" && colType ? colType : undefined),
         sort_by: sortBy || undefined,
+        time_filter: Array.isArray(timeFilter) && timeFilter.length > 0 ? timeFilter.join(",") : undefined,
+        time_from: customTimeFrom || undefined,
+        time_to: customTimeTo || undefined,
+        office_floor: Array.isArray(officeFloorFilter) && officeFloorFilter.length > 0 ? officeFloorFilter.join(",") : undefined,
       }),
     placeholderData: (prev) => prev,
     staleTime: 1000 * 60 * 5, // 5 minutes
@@ -1803,11 +1946,13 @@ const EmployeesPage = () => {
       employee,
       searchQuery.trim().toLowerCase(),
     );
-    const matchesSkill =
-      !skillFilter ||
-      (employee.skills && employee.skills.includes(skillFilter));
+    const matchesSkill = (() => {
+      if (!skillFilter || (Array.isArray(skillFilter) && skillFilter.length === 0)) return true;
+      const skillsArr = Array.isArray(skillFilter) ? skillFilter : [skillFilter];
+      return employee.skills && skillsArr.some((s) => employee.skills.includes(s));
+    })();
     const matchesDesignation =
-      designationFilter.length === 0 ||
+      !designationFilter || designationFilter.length === 0 ||
       designationFilter.includes(employee.designation);
     const matchesColDesignation = (() => {
       if (!colDesignation) return true;
@@ -1824,20 +1969,26 @@ const EmployeesPage = () => {
       return d === colDesignation.toLowerCase();
     })();
     const matchesColType = (() => {
-      if (!colType) return true;
+      if (!colType || (Array.isArray(colType) && colType.length === 0)) return true;
+      const types = Array.isArray(colType) ? colType : [colType];
       const t = (employee.employee_type || "").toLowerCase();
-      if (colType === "Full-time") return t.includes("full");
-      if (colType === "Intern") return t.includes("intern");
-      if (colType === "Contract") return t.includes("contract") || t.includes("part");
-      return t === colType.toLowerCase();
+      return types.some((selectedType) => {
+        if (selectedType === "Full-time") return t.includes("full");
+        if (selectedType === "Intern") return t.includes("intern");
+        if (selectedType === "Contract") return t.includes("contract") || t.includes("part");
+        return t === selectedType.toLowerCase();
+      });
     })();
     const matchesColWorkModel = (() => {
-      if (!colWorkModel) return true;
+      if (!colWorkModel || (Array.isArray(colWorkModel) && colWorkModel.length === 0)) return true;
+      const models = Array.isArray(colWorkModel) ? colWorkModel : [colWorkModel];
       const wm = (employee.work_model || "WFO").toUpperCase();
-      if (colWorkModel === "WFO") return wm === "WFO" || wm.includes("OFFICE");
-      if (colWorkModel === "WFH") return wm === "WFH" || wm.includes("HOME");
-      if (colWorkModel === "Hybrid") return wm === "HYBRID";
-      return wm === colWorkModel.toUpperCase();
+      return models.some((m) => {
+        if (m === "WFO") return wm === "WFO" || wm.includes("OFFICE");
+        if (m === "WFH") return wm === "WFH" || wm.includes("HOME");
+        if (m === "Hybrid") return wm === "HYBRID";
+        return wm === m.toUpperCase();
+      });
     })();
     const isIdle = !isOnLeaveToday(employee) && !hasProject(employee);
     const matchesIdle = !idleOnly || isIdle;
@@ -1992,8 +2143,11 @@ const EmployeesPage = () => {
           <StatTile
             label="WFO"
             value={wfoCount}
-            active={colWorkModel === "WFO"}
-            onClick={() => setColWorkModel((prev) => (prev === "WFO" ? "" : "WFO"))}
+            active={Array.isArray(colWorkModel) && colWorkModel.includes("WFO")}
+            onClick={() => setColWorkModel((prev) => {
+              const arr = Array.isArray(prev) ? prev : [];
+              return arr.includes("WFO") ? arr.filter((x) => x !== "WFO") : [...arr, "WFO"];
+            })}
             activeBg="bg-indigo-100/90 border-indigo-300 ring-2 ring-indigo-500/20"
             idleBg="bg-indigo-50/60 border-indigo-100/80 hover:bg-indigo-100/60"
             textClass="text-indigo-700"
@@ -2001,8 +2155,11 @@ const EmployeesPage = () => {
           <StatTile
             label="WFH"
             value={wfhCount}
-            active={colWorkModel === "WFH"}
-            onClick={() => setColWorkModel((prev) => (prev === "WFH" ? "" : "WFH"))}
+            active={Array.isArray(colWorkModel) && colWorkModel.includes("WFH")}
+            onClick={() => setColWorkModel((prev) => {
+              const arr = Array.isArray(prev) ? prev : [];
+              return arr.includes("WFH") ? arr.filter((x) => x !== "WFH") : [...arr, "WFH"];
+            })}
             activeBg="bg-cyan-100/90 border-cyan-300 ring-2 ring-cyan-500/20"
             idleBg="bg-cyan-50/60 border-cyan-100/80 hover:bg-cyan-100/60"
             textClass="text-cyan-700"
@@ -2010,10 +2167,11 @@ const EmployeesPage = () => {
           <StatTile
             label="Hybrid"
             value={hybridCount}
-            active={colWorkModel === "Hybrid"}
-            onClick={() =>
-              setColWorkModel((prev) => (prev === "Hybrid" ? "" : "Hybrid"))
-            }
+            active={Array.isArray(colWorkModel) && colWorkModel.includes("Hybrid")}
+            onClick={() => setColWorkModel((prev) => {
+              const arr = Array.isArray(prev) ? prev : [];
+              return arr.includes("Hybrid") ? arr.filter((x) => x !== "Hybrid") : [...arr, "Hybrid"];
+            })}
             activeBg="bg-purple-100/90 border-purple-300 ring-2 ring-purple-500/20"
             idleBg="bg-purple-50/60 border-purple-100/80 hover:bg-purple-100/60"
             textClass="text-purple-700"
@@ -2029,10 +2187,11 @@ const EmployeesPage = () => {
           <StatTile
             label="Full-time"
             value={fullTimeCount}
-            active={colType === "Full-time"}
-            onClick={() =>
-              setColType((prev) => (prev === "Full-time" ? "" : "Full-time"))
-            }
+            active={Array.isArray(colType) && colType.includes("Full-time")}
+            onClick={() => setColType((prev) => {
+              const arr = Array.isArray(prev) ? prev : [];
+              return arr.includes("Full-time") ? arr.filter((x) => x !== "Full-time") : [...arr, "Full-time"];
+            })}
             activeBg="bg-emerald-100/90 border-emerald-300 ring-2 ring-emerald-500/20"
             idleBg="bg-emerald-50/60 border-emerald-100/80 hover:bg-emerald-100/60"
             textClass="text-emerald-700"
@@ -2040,8 +2199,11 @@ const EmployeesPage = () => {
           <StatTile
             label="Intern"
             value={internCount}
-            active={colType === "Intern"}
-            onClick={() => setColType((prev) => (prev === "Intern" ? "" : "Intern"))}
+            active={Array.isArray(colType) && colType.includes("Intern")}
+            onClick={() => setColType((prev) => {
+              const arr = Array.isArray(prev) ? prev : [];
+              return arr.includes("Intern") ? arr.filter((x) => x !== "Intern") : [...arr, "Intern"];
+            })}
             activeBg="bg-amber-100/90 border-amber-300 ring-2 ring-amber-500/20"
             idleBg="bg-amber-50/60 border-amber-100/80 hover:bg-amber-100/60"
             textClass="text-amber-700"
@@ -2049,10 +2211,11 @@ const EmployeesPage = () => {
           <StatTile
             label="Contract"
             value={contractCount}
-            active={colType === "Contract"}
-            onClick={() =>
-              setColType((prev) => (prev === "Contract" ? "" : "Contract"))
-            }
+            active={Array.isArray(colType) && colType.includes("Contract")}
+            onClick={() => setColType((prev) => {
+              const arr = Array.isArray(prev) ? prev : [];
+              return arr.includes("Contract") ? arr.filter((x) => x !== "Contract") : [...arr, "Contract"];
+            })}
             activeBg="bg-sky-100/90 border-sky-300 ring-2 ring-sky-500/20"
             idleBg="bg-sky-50/60 border-sky-100/80 hover:bg-sky-100/60"
             textClass="text-sky-700"
@@ -2162,7 +2325,7 @@ const EmployeesPage = () => {
                   params.delete("idleOnly");
                   setSearchParams(params);
                 }}
-                className="hover:text-amber-900"
+                className="hover:text-amber-900 cursor-pointer"
               >
                 <X className="w-3 h-3" />
               </button>
@@ -2178,7 +2341,107 @@ const EmployeesPage = () => {
                   params.delete("status");
                   setSearchParams(params);
                 }}
-                className="hover:text-indigo-900"
+                className="hover:text-indigo-900 cursor-pointer"
+              >
+                <X className="w-3 h-3" />
+              </button>
+            </span>
+          )}
+          {Array.isArray(skillFilter) && skillFilter.length > 0 && (
+            <span className="inline-flex items-center gap-1.5 px-2.5 py-1.5 rounded-lg text-xs font-medium bg-blue-50 text-blue-700 border border-blue-200">
+              Skills: {skillFilter.join(", ")}
+              <button
+                type="button"
+                onClick={() => {
+                  setSkillFilter([]);
+                  setCurrentPage(1);
+                }}
+                className="hover:text-blue-900 cursor-pointer"
+              >
+                <X className="w-3 h-3" />
+              </button>
+            </span>
+          )}
+          {Array.isArray(designationFilter) && designationFilter.length > 0 && (
+            <span className="inline-flex items-center gap-1.5 px-2.5 py-1.5 rounded-lg text-xs font-medium bg-indigo-50 text-indigo-700 border border-indigo-200">
+              Designation: {designationFilter.join(", ")}
+              <button
+                type="button"
+                onClick={() => {
+                  setDesignationFilter([]);
+                  setColDesignation("");
+                  setCurrentPage(1);
+                }}
+                className="hover:text-indigo-900 cursor-pointer"
+              >
+                <X className="w-3 h-3" />
+              </button>
+            </span>
+          )}
+          {Array.isArray(colType) && colType.length > 0 && (
+            <span className="inline-flex items-center gap-1.5 px-2.5 py-1.5 rounded-lg text-xs font-medium bg-emerald-50 text-emerald-700 border border-emerald-200">
+              Type: {colType.join(", ")}
+              <button
+                type="button"
+                onClick={() => {
+                  setColType([]);
+                  setCurrentPage(1);
+                }}
+                className="hover:text-emerald-900 cursor-pointer"
+              >
+                <X className="w-3 h-3" />
+              </button>
+            </span>
+          )}
+          {Array.isArray(colWorkModel) && colWorkModel.length > 0 && (
+            <span className="inline-flex items-center gap-1.5 px-2.5 py-1.5 rounded-lg text-xs font-medium bg-purple-50 text-purple-700 border border-purple-200">
+              Work Model: {colWorkModel.join(", ")}
+              <button
+                type="button"
+                onClick={() => {
+                  setColWorkModel([]);
+                  setCurrentPage(1);
+                }}
+                className="hover:text-purple-900 cursor-pointer"
+              >
+                <X className="w-3 h-3" />
+              </button>
+            </span>
+          )}
+          {Array.isArray(timeFilter) && timeFilter.length > 0 && (
+            <span className="inline-flex items-center gap-1.5 px-2.5 py-1.5 rounded-lg text-xs font-medium bg-amber-50 text-amber-700 border border-amber-200">
+              Time: {timeFilter.map((t) => {
+                if (t === "before_9") return "Before 9 AM";
+                if (t === "9_10") return "9-10 AM";
+                if (t === "10_11") return "10-11 AM";
+                if (t === "11_12") return "11-12 PM";
+                if (t === "custom") return `Custom (${customTimeFrom || 'start'} - ${customTimeTo || 'end'})`;
+                return t;
+              }).join(", ")}
+              <button
+                type="button"
+                onClick={() => {
+                  setTimeFilter([]);
+                  setCustomTimeFrom("");
+                  setCustomTimeTo("");
+                  setCurrentPage(1);
+                }}
+                className="hover:text-amber-900 cursor-pointer"
+              >
+                <X className="w-3 h-3" />
+              </button>
+            </span>
+          )}
+          {Array.isArray(officeFloorFilter) && officeFloorFilter.length > 0 && (
+            <span className="inline-flex items-center gap-1.5 px-2.5 py-1.5 rounded-lg text-xs font-medium bg-indigo-50 text-indigo-700 border border-indigo-200">
+              Floor: {officeFloorFilter.map((f) => `Floor ${f}`).join(", ")}
+              <button
+                type="button"
+                onClick={() => {
+                  setOfficeFloorFilter([]);
+                  setCurrentPage(1);
+                }}
+                className="hover:text-indigo-900 cursor-pointer"
               >
                 <X className="w-3 h-3" />
               </button>
@@ -2201,6 +2464,14 @@ const EmployeesPage = () => {
             workModelFilter={colWorkModel}
             setWorkModelFilter={setColWorkModel}
             workModelOptions={workModelValues}
+            timeFilter={timeFilter}
+            setTimeFilter={setTimeFilter}
+            customTimeFrom={customTimeFrom}
+            setCustomTimeFrom={setCustomTimeFrom}
+            customTimeTo={customTimeTo}
+            setCustomTimeTo={setCustomTimeTo}
+            officeFloorFilter={officeFloorFilter}
+            setOfficeFloorFilter={setOfficeFloorFilter}
             onChange={() => setCurrentPage(1)}
           />
 
@@ -2546,6 +2817,13 @@ const EmployeesPage = () => {
               const floor = row.today_office_floor;
               const workMode = row.today_work_mode;
 
+              if (row.is_on_leave) {
+                return (
+                  <span className="inline-flex items-center gap-1 rounded-full bg-amber-50 px-2 py-0.5 text-[11px] font-medium text-amber-700 whitespace-nowrap">
+                    On Leave
+                  </span>
+                );
+              }
               if (!checkedInAt) {
                 return (
                   <span className="text-[13px] text-slate-400 font-medium">—</span>
@@ -2661,6 +2939,18 @@ const EmployeesPage = () => {
               );
             },
           },
+          isHrOps ? {
+            key: "docs",
+            label: "Docs",
+            align: "center",
+            width: "w-[5%]",
+            render: (_, row) => (
+              <DocsSummaryCell
+                employeeId={row.id}
+                onOpen={() => setDocDrawerEmployee(row)}
+              />
+            ),
+          } : null,
           {
             key: "actions",
             label: "Actions",
@@ -2700,7 +2990,7 @@ const EmployeesPage = () => {
               );
             },
           },
-        ]}
+        ].filter(Boolean)}
         data={employees}
         totalItems={paginatedEmployeesData?.total || 0}
         currentPage={currentPage}
@@ -2958,6 +3248,14 @@ const EmployeesPage = () => {
         credentials={newlyCreatedCredentials}
         onClose={() => setNewlyCreatedCredentials(null)}
       />
+      {/* Employee Document Drawer */}
+      {docDrawerEmployee && (
+        <EmployeeDocumentDrawer
+          employee={docDrawerEmployee}
+          onClose={() => setDocDrawerEmployee(null)}
+        />
+      )}
+
     </div>
   );
 };
