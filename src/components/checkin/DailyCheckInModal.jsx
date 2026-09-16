@@ -3,11 +3,12 @@ import { useLocation } from "react-router-dom";
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
 import { 
   CalendarCheck, Home, Building2, Smile, Meh, Frown, Zap, 
-  AlertCircle, ChefHat, ShieldAlert, Clock
+  AlertCircle, ChefHat, ShieldAlert, Clock, Wifi, AlertTriangle
 } from "lucide-react";
 import toast from "react-hot-toast";
 import Modal from "../ui/Modal";
 import Button from "../ui/Button";
+import ConfirmDialog from "../ui/ConfirmDialog";
 import { checkinApi, subProjectApi } from "../../services/api";
 import { MultiSelect } from "../ui/MultiSelect";
 import useCheckinStore from "../../store/useCheckinStore";
@@ -50,13 +51,16 @@ const RequiredBadge = () => (
   <span className="ml-1 text-xs font-semibold text-red-500">*</span>
 );
 
-const SectionHeader = ({ title, required = false, icon: Icon }) => (
-  <div className="flex items-center gap-2 mb-3">
-    {Icon && <Icon className="w-4 h-4 text-indigo-600" />}
-    <h3 className="text-sm font-semibold text-slate-900">
-      {title}
-      {required && <RequiredBadge />}
-    </h3>
+const SectionHeader = ({ title, required = false, icon: Icon, badge, className = "mb-3" }) => (
+  <div className={`flex items-center justify-between gap-2 ${className}`}>
+    <div className="flex items-center gap-2">
+      {Icon && <Icon className="w-4 h-4 text-indigo-600" />}
+      <h3 className="text-sm font-semibold text-slate-900 flex items-center">
+        {title}
+        {required && <RequiredBadge />}
+      </h3>
+    </div>
+    {badge}
   </div>
 );
 
@@ -74,6 +78,7 @@ export default function DailyCheckInModal() {
   const [submitError, setSubmitError] = useState(null);
   const [isWaitingForSlack, setIsWaitingForSlack] = useState(false);
   const [timeLeft, setTimeLeft] = useState(30);
+  const [showFloorWarningModal, setShowFloorWarningModal] = useState(false);
   const oauthTabRef = useRef(null);
   const processedRef = useRef(false);
 
@@ -214,8 +219,12 @@ export default function DailyCheckInModal() {
     if (status.project_options?.length > 0) {
       setSelectedProjects(status.project_options.map((p) => p.project_id));
     }
-    // Reset WFO-only fields
-    setOfficeFloor("");
+    // Smart pre-selection: Pre-select detected_floor if connected via Office Wi-Fi
+    if (status.detected_floor) {
+      setOfficeFloor(status.detected_floor);
+    } else {
+      setOfficeFloor("");
+    }
     setLunchPreference("");
     setTiffinType("");
     setValidationErrors({});
@@ -327,22 +336,37 @@ export default function DailyCheckInModal() {
     },
   });
 
+  const isOtherFloorSelected = Boolean(
+    workMode === "WFO" &&
+    status?.detected_floor &&
+    officeFloor &&
+    officeFloor !== status.detected_floor
+  );
+
+  const doSubmit = () => {
+    processedRef.current = false;
+    setTimeLeft(30);
+    let newTab = null;
+    if (status?.has_slack) {
+      // Synchronously open blank window in user gesture to avoid popup blockers and focus it
+      newTab = window.open("about:blank", "slack_oauth_checkin");
+      if (newTab) {
+        try {
+          newTab.document.title = "Connecting to Slack…";
+        } catch (_) {}
+        newTab.focus();
+      }
+    }
+    submit({ newTab });
+  };
+
   const handleSubmit = () => {
     if (validateForm()) {
-      processedRef.current = false;
-      setTimeLeft(30);
-      let newTab = null;
-      if (status?.has_slack) {
-        // Synchronously open blank window in user gesture to avoid popup blockers and focus it
-        newTab = window.open("about:blank", "slack_oauth_checkin");
-        if (newTab) {
-          try {
-            newTab.document.title = "Connecting to Slack…";
-          } catch (_) {}
-          newTab.focus();
-        }
+      if (isOtherFloorSelected) {
+        setShowFloorWarningModal(true);
+        return;
       }
-      submit({ newTab });
+      doSubmit();
     }
   };
 
@@ -353,6 +377,7 @@ export default function DailyCheckInModal() {
       } catch (_) {}
     }
     setIsWaitingForSlack(false);
+    setShowFloorWarningModal(false);
     dismiss();
   };
 
@@ -363,6 +388,27 @@ export default function DailyCheckInModal() {
   }, [isPending, status?.has_slack]);
 
   const projectOptions = useMemo(() => status?.project_options || [], [status]);
+  
+  const displayFloors = useMemo(() => {
+    const floorMap = new Map();
+    // Start with default office floors (7, 9, 17)
+    OFFICE_FLOORS.forEach((f) => floorMap.set(f.value, f));
+    // Add any configured floors from status
+    if (status?.available_floors && status.available_floors.length > 0) {
+      status.available_floors.forEach((f) => {
+        const val = f.startsWith("Floor ") ? f.replace("Floor ", "") : f;
+        if (!floorMap.has(val)) {
+          floorMap.set(val, { value: val, label: val });
+        }
+      });
+    }
+    return Array.from(floorMap.values()).sort((a, b) => {
+      const numA = parseInt(a.label, 10);
+      const numB = parseInt(b.label, 10);
+      if (!isNaN(numA) && !isNaN(numB)) return numA - numB;
+      return a.label.localeCompare(b.label);
+    });
+  }, [status?.available_floors]);
   
   const { data: allProjects } = useQuery({
     queryKey: ["all-sub-projects"],
@@ -383,7 +429,8 @@ export default function DailyCheckInModal() {
   if (!isOpen) return null;
 
   return (
-    <Modal isOpen={isOpen} onClose={handleDismiss} size="md" disableBackdropClose={!isOpenManually || isWaitingForSlack}>
+    <>
+      <Modal isOpen={isOpen} onClose={handleDismiss} size="md" disableBackdropClose={!isOpenManually || isWaitingForSlack}>
       {/* Header */}
       <Modal.Header onClose={handleDismiss}>
         <div className="flex items-center gap-3">
@@ -540,9 +587,21 @@ export default function DailyCheckInModal() {
               <>
                 {/* Office Floor Selection */}
                 <section className="space-y-3 pt-2 border-t border-slate-100">
-                  <SectionHeader title="Which floor will you work from?" required icon={Building2} />
-                  <div className="grid grid-cols-3 gap-2">
-                    {OFFICE_FLOORS.map((floor) => (
+                  <SectionHeader
+                    title="Which floor will you work from?"
+                    required
+                    icon={Building2}
+                    badge={
+                      status?.detected_floor ? (
+                        <span className="inline-flex items-center gap-1.5 px-2.5 py-0.5 rounded-full text-[11px] font-medium text-emerald-700 bg-emerald-50 border border-emerald-200">
+                          <Wifi className="w-3 h-3 text-emerald-600" />
+                          Floor {status.detected_floor} Wi-Fi detected
+                        </span>
+                      ) : null
+                    }
+                  />
+                  <div className={`grid gap-2 ${displayFloors.length <= 3 ? "grid-cols-3" : "grid-cols-2 sm:grid-cols-4"}`}>
+                    {displayFloors.map((floor) => (
                       <button
                         key={floor.value}
                         type="button"
@@ -550,7 +609,7 @@ export default function DailyCheckInModal() {
                           setOfficeFloor(floor.value);
                           setValidationErrors((prev) => ({...prev, officeFloor: ""}));
                         }}
-                        className={`py-3 px-2 rounded-xl border-2 font-semibold text-sm transition-all duration-150 ${
+                        className={`relative py-3 px-2 rounded-xl border-2 font-semibold text-sm transition-all duration-150 ${
                           officeFloor === floor.value
                             ? "border-indigo-500 bg-indigo-50 text-indigo-700 shadow-sm"
                             : "border-slate-200 text-slate-600 hover:border-slate-300 hover:bg-slate-50"
@@ -560,6 +619,27 @@ export default function DailyCheckInModal() {
                       </button>
                     ))}
                   </div>
+                  {isOtherFloorSelected && (
+                    <div className="flex items-start gap-2.5 p-3 rounded-xl bg-amber-50 border border-amber-200 text-amber-900 text-xs animate-in fade-in duration-150">
+                      <AlertTriangle className="w-4 h-4 text-amber-600 shrink-0 mt-0.5" />
+                      <div className="flex-1">
+                        <p className="font-semibold text-amber-900">Different Floor Selected</p>
+                        <p className="text-amber-700 mt-0.5 leading-relaxed">
+                          You are connected to <strong>Floor {status.detected_floor} Wi-Fi</strong>, but selected <strong>Floor {officeFloor}</strong>.
+                        </p>
+                      </div>
+                      <button
+                        type="button"
+                        onClick={() => {
+                          setOfficeFloor(status.detected_floor);
+                          setValidationErrors((prev) => ({ ...prev, officeFloor: "" }));
+                        }}
+                        className="text-[11px] font-semibold text-amber-800 underline hover:text-amber-950 shrink-0 pt-0.5"
+                      >
+                        Switch to Floor {status.detected_floor}
+                      </button>
+                    </div>
+                  )}
                   {validationErrors.officeFloor && (
                     <div className="flex items-center gap-2 text-red-600 text-sm mt-2">
                       <AlertCircle className="w-4 h-4" />
@@ -573,105 +653,106 @@ export default function DailyCheckInModal() {
                   <SectionHeader title="What's your lunch plan?" required icon={ChefHat} />
                   <div className="space-y-2">
                     {LUNCH_PREFERENCES.map((pref) => (
-                      <button
-                        key={pref.value}
-                        type="button"
-                        onClick={() => {
-                          setLunchPreference(pref.value);
-                          if (pref.value !== "order_tiffin") {
-                            setTiffinType("");
-                          }
-                          setValidationErrors((prev) => ({...prev, lunchPreference: "", tiffinType: ""}));
-                        }}
-                        className={`w-full group relative overflow-hidden rounded-xl border-2 p-3 transition-all duration-150 text-left ${
-                          lunchPreference === pref.value
-                            ? "border-indigo-400 bg-indigo-50/70"
-                            : "border-slate-200 bg-white hover:border-slate-300"
-                        }`}
-                      >
-                        <div className="flex items-center gap-3 relative z-10">
-                          <input
-                            type="radio"
-                            name="lunch_preference"
-                            checked={lunchPreference === pref.value}
-                            onChange={() => {}}
-                            className="w-4 h-4 cursor-pointer accent-indigo-600"
-                          />
-                          <div className="flex-1">
-                            <div className={`font-medium ${
-                              lunchPreference === pref.value
-                                ? "text-indigo-900"
-                                : "text-slate-900"
-                            }`}>
-                              {pref.label}
-                            </div>
-                            <div className="text-xs text-slate-500 mt-0.5">
-                              {pref.desc}
+                      <React.Fragment key={pref.value}>
+                        <button
+                          type="button"
+                          onClick={() => {
+                            setLunchPreference(pref.value);
+                            if (pref.value !== "order_tiffin") {
+                              setTiffinType("");
+                            }
+                            setValidationErrors((prev) => ({...prev, lunchPreference: "", tiffinType: ""}));
+                          }}
+                          className={`w-full group relative overflow-hidden rounded-xl border-2 p-3 transition-all duration-150 text-left ${
+                            lunchPreference === pref.value
+                              ? "border-indigo-400 bg-indigo-50/70"
+                              : "border-slate-200 bg-white hover:border-slate-300"
+                          }`}
+                        >
+                          <div className="flex items-center gap-3 relative z-10">
+                            <input
+                              type="radio"
+                              name="lunch_preference"
+                              checked={lunchPreference === pref.value}
+                              onChange={() => {}}
+                              className="w-4 h-4 cursor-pointer accent-indigo-600"
+                            />
+                            <div className="flex-1">
+                              <div className={`font-medium ${
+                                lunchPreference === pref.value
+                                  ? "text-indigo-900"
+                                  : "text-slate-900"
+                              }`}>
+                                {pref.label}
+                              </div>
+                              <div className="text-xs text-slate-500 mt-0.5">
+                                {pref.desc}
+                              </div>
                             </div>
                           </div>
-                        </div>
-                      </button>
+                        </button>
+
+                        {/* Tiffin Type Selection - Rendered directly below "Order Tiffin" */}
+                        {pref.value === "order_tiffin" && lunchPreference === "order_tiffin" && (
+                          <div className="p-3.5 rounded-xl bg-gradient-to-br from-indigo-50 to-blue-50 border border-indigo-100 animate-in fade-in slide-in-from-top-1 duration-150">
+                            <label className="text-xs font-semibold uppercase tracking-wider text-indigo-900 block mb-2.5">
+                              Select tiffin type
+                              <RequiredBadge />
+                            </label>
+                            <div className="space-y-2">
+                              {TIFFIN_TYPES.map((tiff) => (
+                                <button
+                                  key={tiff.value}
+                                  type="button"
+                                  onClick={() => {
+                                    setTiffinType(tiff.value);
+                                    setValidationErrors((prev) => ({...prev, tiffinType: ""}));
+                                  }}
+                                  className={`w-full group relative overflow-hidden rounded-lg border-2 p-2.5 transition-all duration-150 text-left ${
+                                    tiffinType === tiff.value
+                                      ? "border-indigo-400 bg-white shadow-sm"
+                                      : "border-indigo-200/70 bg-white/70 hover:border-indigo-300"
+                                  }`}
+                                >
+                                  <div className="flex items-center gap-2.5 relative z-10">
+                                    <input
+                                      type="radio"
+                                      name="tiffin_type"
+                                      checked={tiffinType === tiff.value}
+                                      onChange={() => {}}
+                                      className="w-4 h-4 cursor-pointer accent-indigo-600"
+                                    />
+                                    <div className="flex-1">
+                                      <div className={`font-medium text-sm ${
+                                        tiffinType === tiff.value
+                                          ? "text-indigo-900"
+                                          : "text-slate-700"
+                                      }`}>
+                                        {tiff.label}
+                                      </div>
+                                      <div className="text-xs text-slate-500">
+                                        {tiff.desc}
+                                      </div>
+                                    </div>
+                                  </div>
+                                </button>
+                              ))}
+                            </div>
+                            {validationErrors.tiffinType && (
+                              <div className="flex items-center gap-2 text-red-600 text-sm mt-2.5">
+                                <AlertCircle className="w-4 h-4" />
+                                <span>{validationErrors.tiffinType}</span>
+                              </div>
+                            )}
+                          </div>
+                        )}
+                      </React.Fragment>
                     ))}
                   </div>
                   {validationErrors.lunchPreference && (
                     <div className="flex items-center gap-2 text-red-600 text-sm mt-2">
                       <AlertCircle className="w-4 h-4" />
                       <span>{validationErrors.lunchPreference}</span>
-                    </div>
-                  )}
-
-                  {/* Tiffin Type Selection (Conditional) */}
-                  {lunchPreference === "order_tiffin" && (
-                    <div className="mt-4 p-4 rounded-xl bg-gradient-to-br from-indigo-50 to-blue-50 border border-indigo-100">
-                      <label className="text-xs font-semibold uppercase tracking-wider text-indigo-900 block mb-3">
-                        Select tiffin type
-                        <RequiredBadge />
-                      </label>
-                      <div className="space-y-2">
-                        {TIFFIN_TYPES.map((tiff) => (
-                          <button
-                            key={tiff.value}
-                            type="button"
-                            onClick={() => {
-                              setTiffinType(tiff.value);
-                              setValidationErrors((prev) => ({...prev, tiffinType: ""}));
-                            }}
-                            className={`w-full group relative overflow-hidden rounded-lg border-2 p-2.5 transition-all duration-150 text-left ${
-                              tiffinType === tiff.value
-                                ? "border-indigo-400 bg-white shadow-sm"
-                                : "border-indigo-200 bg-white/60 hover:border-indigo-300"
-                            }`}
-                          >
-                            <div className="flex items-center gap-2.5 relative z-10">
-                              <input
-                                type="radio"
-                                name="tiffin_type"
-                                checked={tiffinType === tiff.value}
-                                onChange={() => {}}
-                                className="w-4 h-4 cursor-pointer accent-indigo-600"
-                              />
-                              <div className="flex-1">
-                                <div className={`font-medium text-sm ${
-                                  tiffinType === tiff.value
-                                    ? "text-indigo-900"
-                                    : "text-slate-700"
-                                }`}>
-                                  {tiff.label}
-                                </div>
-                                <div className="text-xs text-slate-500">
-                                  {tiff.desc}
-                                </div>
-                              </div>
-                            </div>
-                          </button>
-                        ))}
-                      </div>
-                      {validationErrors.tiffinType && (
-                        <div className="flex items-center gap-2 text-red-600 text-sm mt-3">
-                          <AlertCircle className="w-4 h-4" />
-                          <span>{validationErrors.tiffinType}</span>
-                        </div>
-                      )}
                     </div>
                   )}
                 </section>
@@ -807,5 +888,25 @@ export default function DailyCheckInModal() {
         </Modal.Footer>
       )}
     </Modal>
+
+    {/* Floor Mismatch Warning Confirmation Dialog */}
+    <ConfirmDialog
+      isOpen={showFloorWarningModal}
+      onClose={() => setShowFloorWarningModal(false)}
+      onConfirm={() => {
+        setShowFloorWarningModal(false);
+        doSubmit();
+      }}
+      title="Confirm Floor Selection"
+      message={`You are currently connected to the Floor ${status?.detected_floor} Wi-Fi network, but checking in for Floor ${officeFloor}.`}
+      details={[
+        { label: "Detected Wi-Fi Network", value: `Floor ${status?.detected_floor}` },
+        { label: "Selected Check-in Floor", value: `Floor ${officeFloor}`, highlight: true },
+      ]}
+      variant="warning"
+      confirmText={`Proceed on Floor ${officeFloor}`}
+      cancelText="Change Selection"
+    />
+  </>
   );
 }

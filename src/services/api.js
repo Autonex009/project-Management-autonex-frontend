@@ -819,6 +819,15 @@ export const wifiNetworksApi = {
   delete: (id) => api.delete(`/wifi-networks/${id}`).then((res) => res.data),
 };
 
+// === Office IP Addresses API ===
+export const officeIpsApi = {
+  getAll: () => api.get("/office-ips").then((res) => res.data),
+  create: (data) => api.post("/office-ips", data).then((res) => res.data),
+  update: (id, data) =>
+    api.put(`/office-ips/${id}`, data).then((res) => res.data),
+  delete: (id) => api.delete(`/office-ips/${id}`).then((res) => res.data),
+};
+
 // === Complaints, Warnings and Recognition ===
 export const employeeNotesApi = {
   getByEmployee: (employeeId, params = {}) =>
