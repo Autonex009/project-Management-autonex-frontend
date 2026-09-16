@@ -20,7 +20,6 @@ const PROXY_TARGET = process.env.VITE_PROXY_TARGET || 'http://localhost:8000';
 
 async function main() {
   const app = express();
-  app.set('trust proxy', true);
 
   // Proxy /api to the backend in both modes (mirrors the old vite.config proxy).
   // pathFilter keeps the middleware mounted at root so the full "/api/..." path
@@ -30,7 +29,6 @@ async function main() {
       pathFilter: '/api',
       target: PROXY_TARGET,
       changeOrigin: true,
-      xfwd: true,
     })
   );
 
