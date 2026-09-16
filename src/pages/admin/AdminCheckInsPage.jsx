@@ -13,6 +13,9 @@ import {
   Zap,
   RotateCcw,
   BarChart3,
+  Monitor,
+  Smartphone,
+  Tablet,
 } from "lucide-react";
 import { checkinApi, subProjectApi } from "../../services/api";
 import Table from "../../components/ui/Table";
@@ -57,6 +60,30 @@ const SentimentPill = ({ mood }) => {
     <span className={`inline-flex items-center gap-1.5 px-2 py-0.5 rounded-full border text-xs font-medium ${item.bg}`}>
       <Icon className="w-3.5 h-3.5 shrink-0" />
       <span>{item.label}</span>
+    </span>
+  );
+};
+
+const DeviceIcon = ({ device }) => {
+  if (!device) return null;
+  const dev = device.toLowerCase();
+  if (dev === "mobile" || dev === "phone") {
+    return (
+      <span title="Checked in from Phone" className="inline-flex items-center text-slate-400 hover:text-slate-600 transition-colors">
+        <Smartphone className="h-3.5 w-3.5" />
+      </span>
+    );
+  }
+  if (dev === "tablet") {
+    return (
+      <span title="Checked in from Tablet" className="inline-flex items-center text-slate-400 hover:text-slate-600 transition-colors">
+        <Tablet className="h-3.5 w-3.5" />
+      </span>
+    );
+  }
+  return (
+    <span title="Checked in from Desktop" className="inline-flex items-center text-slate-400 hover:text-slate-600 transition-colors">
+      <Monitor className="h-3.5 w-3.5" />
     </span>
   );
 };
@@ -222,10 +249,16 @@ const AdminCheckInsPage = () => {
     {
       key: "time",
       label: "Checked in",
-      width: "w-[10%]",
-      render: (_, row) => (
-        <span className="text-slate-500">{fmtTime(row.checked_in_at)}</span>
-      ),
+      width: "w-[11%]",
+      render: (_, row) =>
+        row.checked_in_at ? (
+          <div className="inline-flex items-center gap-1.5">
+            <span className="text-slate-500">{fmtTime(row.checked_in_at)}</span>
+            <DeviceIcon device={row.device_type} />
+          </div>
+        ) : (
+          <span className="text-slate-400">—</span>
+        ),
     },
     {
       key: "confirmed",
