@@ -13,6 +13,9 @@ import {
   Zap,
   RotateCcw,
   BarChart3,
+  Monitor,
+  Smartphone,
+  Tablet,
 } from "lucide-react";
 import { checkinApi, subProjectApi } from "../../services/api";
 import Table from "../../components/ui/Table";
@@ -58,6 +61,43 @@ const SentimentPill = ({ mood }) => {
       <Icon className="w-3.5 h-3.5 shrink-0" />
       <span>{item.label}</span>
     </span>
+  );
+};
+
+const DeviceIcon = ({ device, isNearTop = false }) => {
+  if (!device) return null;
+  const dev = device.toLowerCase();
+  let Icon = Monitor;
+  let deviceLabel = "Desktop";
+
+  if (dev === "mobile" || dev === "phone") {
+    Icon = Smartphone;
+    deviceLabel = "Phone";
+  } else if (dev === "tablet") {
+    Icon = Tablet;
+    deviceLabel = "Tablet";
+  }
+
+  const positionClass = isNearTop ? "top-full mt-1.5" : "bottom-full mb-1.5";
+
+  return (
+    <div className="group/dev relative inline-flex items-center">
+      <span className="inline-flex items-center text-slate-400 hover:text-slate-600 transition-colors cursor-default">
+        <Icon className="h-3.5 w-3.5" />
+      </span>
+      {/* Light hover card matching Employees page */}
+      <div
+        className={`absolute left-1/2 -translate-x-1/2 ${positionClass} hidden group-hover/dev:block z-40 p-2.5 bg-white rounded-xl shadow-xl border border-slate-200 min-w-[150px] pointer-events-none text-left`}
+      >
+        <div className="text-[13px] font-semibold text-slate-800 flex items-center gap-1.5">
+          <Icon className="w-3.5 h-3.5 text-slate-600 shrink-0" />
+          <span>{deviceLabel}</span>
+        </div>
+        <div className="text-[12px] text-slate-500 mt-0.5 whitespace-nowrap">
+          Checked in from {deviceLabel}
+        </div>
+      </div>
+    </div>
   );
 };
 
@@ -222,10 +262,18 @@ const AdminCheckInsPage = () => {
     {
       key: "time",
       label: "Checked in",
-      width: "w-[10%]",
-      render: (_, row) => (
-        <span className="text-slate-500">{fmtTime(row.checked_in_at)}</span>
-      ),
+      width: "w-[11%]",
+      render: (_, row) => {
+        const isNearTop = (items || []).indexOf(row) < 3;
+        return row.checked_in_at ? (
+          <div className="inline-flex items-center gap-1.5">
+            <span className="text-slate-500">{fmtTime(row.checked_in_at)}</span>
+            <DeviceIcon device={row.device_type} isNearTop={isNearTop} />
+          </div>
+        ) : (
+          <span className="text-slate-400">—</span>
+        );
+      },
     },
     {
       key: "confirmed",
