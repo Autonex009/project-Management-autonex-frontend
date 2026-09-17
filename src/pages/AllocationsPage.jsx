@@ -402,11 +402,11 @@ const AllocationsPage = () => {
           {
             key: "project",
             label: "Project",
-            width: "w-[24%]",
+            width: "w-[16%]",
             render: (_, row) => (
               <button
                 type="button"
-                onClick={() => navigate(`${prefix}/sub-projects?focus=${row.project_id}`)}
+                onClick={() => navigate(`${prefix}/sub-projects?focus=${row.project_id}&search=${encodeURIComponent(row.project_name)}&view=${projectView}`)}
                 className="group/proj -mx-1 flex w-full min-w-0 items-center gap-3 rounded-md px-1 py-0.5 text-left transition-colors hover:bg-slate-50"
               >
                 <div className="w-9 h-9 rounded-lg bg-indigo-50 text-indigo-600 flex items-center justify-center text-[13px] font-semibold ring-1 ring-slate-200 shrink-0">
@@ -429,7 +429,7 @@ const AllocationsPage = () => {
           {
             key: "allocations",
             label: "Allocated Employees",
-            width: "w-[28%]",
+            width: "w-[20%]",
             // CHANGED: renders the server-provided 6-avatar preview directly —
             // no client-side merge of allocations + PM ids + lead ids.
             render: (_, row) => (
@@ -490,7 +490,7 @@ const AllocationsPage = () => {
           {
             key: "_fill",
             label: "Current Team Status",
-            width: "w-[26%]",
+            width: "w-[32%]",
             // CHANGED: wfo/wfh/on-leave counts come straight from the row —
             // no per-employee leave/WFH scan in the browser.
             render: (_, row) => {
@@ -499,6 +499,7 @@ const AllocationsPage = () => {
                 <div className="flex items-center gap-3">
                   <AllocationPopover
                     project={{ id: row.project_id, name: row.project_name }}
+                      tempRoster={row.temp_roster || []}
                     // Lazily loads full detail on open — see fetchDetail below.
                     fetchDetail={() => allocationApi.getProjectDetail(row.project_id)}
                     triggerClassName="inline-flex items-center rounded-md focus:outline-none"
@@ -549,11 +550,30 @@ const AllocationsPage = () => {
               );
             },
           },
+            {
+              key: "daily_presence",
+              label: "Today's Temp Status",
+              width: "w-[12%]",
+              render: (_, row) => (
+                <AllocationPopover
+                  project={{ id: row.project_id, name: row.project_name }}
+                      tempRoster={row.temp_roster || []}
+                    tempOnly={true}
+                  fetchDetail={() => allocationApi.getProjectDetail(row.project_id)}
+                  triggerClassName="inline-flex items-center rounded-md focus:outline-none"
+                  badgeContent={
+                    <span className="text-[13px] font-medium text-slate-700 tabular-nums hover:text-indigo-600 cursor-pointer">
+                  {row.daily_presence_total || 0} ({(row.daily_presence_wfo || 0)} WFO &middot; {(row.daily_presence_wfh || 0)} WFH)
+                </span>
+                  }
+                />
+              ),
+            },
           {
             key: "_edit",
             label: "Actions",
             align: "right",
-            width: "w-[10%]",
+            width: "w-[8%]",
             render: (_, row) => (
               <button
                 onClick={() =>

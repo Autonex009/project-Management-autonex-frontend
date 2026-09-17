@@ -243,6 +243,30 @@ const ProjectsPage = () => {
   const [hasAutoSwitched, setHasAutoSwitched] = useState(false);
 
   useEffect(() => {
+    const searchParam = searchParams.get("search");
+    const viewParam = searchParams.get("view");
+    
+    let shouldUpdateParams = false;
+    const params = new URLSearchParams(searchParams);
+
+    if (searchParam) {
+      setSubProjectSearch(searchParam);
+      params.delete("search");
+      shouldUpdateParams = true;
+    }
+    
+    if (viewParam) {
+      setProjectView(viewParam);
+      params.delete("view");
+      shouldUpdateParams = true;
+    }
+
+    if (shouldUpdateParams) {
+      setSearchParams(params, { replace: true });
+    }
+  }, [searchParams, setSearchParams, setSubProjectSearch, setProjectView]);
+
+  useEffect(() => {
     if (projectKpis?.tab_counts && !hasAutoSwitched) {
       setHasAutoSwitched(true);
       const counts = projectKpis.tab_counts;
@@ -356,13 +380,23 @@ const ProjectsPage = () => {
   // have an approved WFH day; otherwise WFO.
   const locationByEmployeeId = useMemo(() => {
     const m = new Map();
+    // Default fallback
     employees.forEach((e) => {
       const wm = (e.work_model || "WFO").toUpperCase();
       const regularWfh = wm === "WFH" || wm.includes("HOME");
       m.set(e.id, regularWfh || wfhTodayIds.has(e.id) ? "WFH" : "WFO");
     });
+    // Override with actual data from backend
+    projects.forEach((p) => {
+      if (p.permanent_locations) {
+        Object.entries(p.permanent_locations).forEach(([empId, loc]) => {
+          m.set(Number(empId), loc);
+          m.set(String(empId), loc);
+        });
+      }
+    });
     return m;
-  }, [employees, wfhTodayIds]);
+  }, [employees, wfhTodayIds, projects]);
 
   // Scoped for both PMs and team leads. getPmSubProjects grants a project when you are its
   // PM *or* allocated to it, so a lead sees exactly the projects they lead — and nothing
@@ -1751,10 +1785,12 @@ const ProjectsPage = () => {
 
                 const pmIds = resolvePmIds(project);
                 const pmNames = pmIds.map(id => employeeIndex.get(String(id))?.name).filter(Boolean);
-                const allocatedManpower = getAllocatedManpower(project);
+                const tempCount = project.temp_count || 0;
+                const allocatedManpower = getAllocatedManpower(project) + tempCount;
 
                 return (
                   <ProjectCard
+                    tempSlots={tempCount}
                     key={project.id}
                     id={`sub-project-${project.id}`}
                     highlighted={highlightId === project.id}

@@ -1,4 +1,5 @@
 import React, { useState, useRef, useEffect } from "react";
+import { Link } from "react-router-dom";
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
 import Button from "../../components/ui/Button";
 import UserAvatar from "../../components/ui/UserAvatar";
@@ -275,13 +276,14 @@ const SkillsMultiSelect = ({ selected, onChange, options, isLoading }) => {
 const ProfilePage = () => {
   const queryClient = useQueryClient();
   const localUser = JSON.parse(localStorage.getItem("user") || "{}");
-  const employeeId = localUser.employee_id;
 
   /* ── Queries ────────────────────────────────────────────────── */
   const { data: account, isLoading: accountLoading } = useQuery({
     queryKey: ["auth-me"],
     queryFn: authApi.me,
   });
+
+  const employeeId = account?.employee_id || localUser.employee_id;
 
   const { data: employee, isLoading: employeeLoading } = useQuery({
     queryKey: ["employee-profile", employeeId],
@@ -342,6 +344,7 @@ const formatPhoneNumber = (phone) => {
 
   /* ── Edit Form State ────────────────────────────────────────── */
   const [isEditing, setIsEditing] = useState(false);
+  const [editName, setEditName] = useState("");
   const [editPhone, setEditPhone] = useState("");
   const [editSkills, setEditSkills] = useState([]);
   const [editSlackId, setEditSlackId] = useState("");
@@ -350,6 +353,7 @@ const formatPhoneNumber = (phone) => {
   const [saveSuccess, setSaveSuccess] = useState(false);
 
   const enterEditMode = () => {
+    setEditName(mergedProfile.name || "");
     setEditPhone(mergedProfile.phone || "");
     setEditSkills([...(mergedProfile.skills || [])]);
     setEditSlackId(mergedProfile.slackUserId || "");
@@ -361,6 +365,7 @@ const formatPhoneNumber = (phone) => {
 
   const cancelEdit = () => {
     setIsEditing(false);
+    setEditName("");
     setSaveError("");
   };
 
@@ -370,6 +375,7 @@ const formatPhoneNumber = (phone) => {
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ["employee-profile", employeeId] });
       queryClient.invalidateQueries({ queryKey: ["auth-me"] });
+      queryClient.invalidateQueries({ queryKey: ["employees"] });
       setIsEditing(false);
       setSaveError("");
       setSaveSuccess(true);
@@ -382,6 +388,7 @@ const formatPhoneNumber = (phone) => {
 
   const handleSave = () => {
     saveMutation.mutate({
+      name: editName.trim() || undefined,
       phone: editPhone || null,
       skills: editSkills,
       slack_user_id: editSlackId || null,
@@ -404,11 +411,7 @@ const formatPhoneNumber = (phone) => {
 
   const verifyEmailChangeMutation = useMutation({
     mutationFn: (otp) => employeeApi.verifyEmailChange(employeeId, otp),
-    onSuccess: (updated) => {
-      try {
-        const cached = JSON.parse(localStorage.getItem("user") || "{}");
-        localStorage.setItem("user", JSON.stringify({ ...cached, email: updated.email || updated.new_email }));
-      } catch {}
+    onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ["auth-me"] });
       queryClient.invalidateQueries({ queryKey: ["employee-profile", employeeId] });
       setEmailError("");
@@ -433,6 +436,7 @@ const formatPhoneNumber = (phone) => {
   const onAvatarSuccess = () => {
     queryClient.invalidateQueries({ queryKey: ["employee-profile", employeeId] });
     queryClient.invalidateQueries({ queryKey: ["auth-me"] });
+    queryClient.invalidateQueries({ queryKey: ["employees"] });
     setAvatarError("");
   };
 
@@ -533,7 +537,8 @@ const formatPhoneNumber = (phone) => {
                   <button
                     type="button"
                     onClick={() => fileInputRef.current?.click()}
-                    disabled={avatarBusy}
+                    disabled={avatarBusy || !employeeId}
+                    title={!employeeId ? "Linked employee record required" : "Change Photo"}
                     className="absolute inset-0 z-10 flex flex-col items-center justify-center bg-slate-900/65 text-white opacity-0 transition-opacity duration-200 group-hover:opacity-100 disabled:cursor-not-allowed"
                   >
                     {avatarBusy ? (
@@ -552,10 +557,25 @@ const formatPhoneNumber = (phone) => {
                 {/* Main Hero Header Info */}
                 <div className="flex-1 text-center sm:text-left min-w-0 mb-1">
                   <div className="flex flex-col sm:flex-row sm:items-center gap-2 justify-between">
-                    <div>
-                      <h1 className="text-2xl font-black tracking-tight text-slate-900">
-                        {mergedProfile.name || "Employee Profile"}
-                      </h1>
+                    <div className="min-w-0 flex-1">
+                      {isEditing ? (
+                        <div className="space-y-1 max-w-sm">
+                          <label className="text-[10px] font-bold uppercase tracking-wider text-emerald-700 block">
+                            Full Name
+                          </label>
+                          <input
+                            type="text"
+                            value={editName}
+                            onChange={(e) => setEditName(e.target.value)}
+                            placeholder="Enter full name"
+                            className="w-full rounded-xl border-2 border-emerald-400 bg-white px-3 py-1.5 text-lg font-bold text-slate-900 outline-none focus:border-emerald-600 focus:ring-2 focus:ring-emerald-500/20 shadow-xs"
+                          />
+                        </div>
+                      ) : (
+                        <h1 className="text-2xl font-black tracking-tight text-slate-900 truncate">
+                          {mergedProfile.name || "Employee Profile"}
+                        </h1>
+                      )}
                       <p className="text-sm font-semibold text-slate-500 flex items-center justify-center sm:justify-start gap-1.5 mt-0.5">
                         <span>{mergedProfile.designation || "Team Member"}</span>
                         <span className="text-slate-300">•</span>
@@ -563,7 +583,23 @@ const formatPhoneNumber = (phone) => {
                       </p>
                     </div>
 
-                    <div className="flex items-center justify-center sm:justify-end gap-1.5 mt-2 sm:mt-0">
+                    <div className="flex flex-wrap items-center justify-center sm:justify-end gap-1.5 mt-2 sm:mt-0">
+                      {employeeId && (
+                        <Link
+                          to={
+                            mergedProfile.role === "admin"
+                              ? `/admin/employees/${employeeId}`
+                              : mergedProfile.role === "pm"
+                                ? `/pm/my-team/${employeeId}`
+                                : "/employee/dashboard"
+                          }
+                          className="inline-flex items-center gap-1.5 rounded-full border border-slate-200 bg-white px-3 py-1 text-xs font-bold text-slate-700 hover:bg-slate-50 hover:border-slate-300 transition-colors shadow-xs"
+                          title="View Employee Activity Dashboard"
+                        >
+                          <Briefcase className="h-3.5 w-3.5 text-slate-500" />
+                          View Dashboard
+                        </Link>
+                      )}
                       <span className="rounded-full border border-emerald-200 bg-emerald-50 px-3 py-1 text-xs font-bold text-emerald-700 capitalize">
                         ● {mergedProfile.status || "Active"}
                       </span>
@@ -578,8 +614,8 @@ const formatPhoneNumber = (phone) => {
                     <button
                       type="button"
                       onClick={() => slackAvatarMutation.mutate()}
-                      disabled={avatarBusy}
-                      className="inline-flex items-center gap-1.5 rounded-lg border border-violet-200 bg-violet-50/70 px-2.5 py-1 text-xs font-semibold text-violet-700 hover:bg-violet-100 transition-colors"
+                      disabled={avatarBusy || !employeeId}
+                      className="inline-flex items-center gap-1.5 rounded-lg border border-violet-200 bg-violet-50/70 px-2.5 py-1 text-xs font-semibold text-violet-700 hover:bg-violet-100 transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
                     >
                       <MessageSquare className="h-3.5 w-3.5" /> Sync Slack Photo
                     </button>
@@ -588,8 +624,8 @@ const formatPhoneNumber = (phone) => {
                       <button
                         type="button"
                         onClick={() => deleteAvatarMutation.mutate()}
-                        disabled={avatarBusy}
-                        className="inline-flex items-center gap-1 rounded-lg border border-slate-200 bg-white px-2.5 py-1 text-xs font-semibold text-slate-500 hover:text-rose-600 hover:border-rose-200 transition-colors"
+                        disabled={avatarBusy || !employeeId}
+                        className="inline-flex items-center gap-1 rounded-lg border border-slate-200 bg-white px-2.5 py-1 text-xs font-semibold text-slate-500 hover:text-rose-600 hover:border-rose-200 transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
                       >
                         <Trash2 className="h-3.5 w-3.5" /> Remove Photo
                       </button>
@@ -623,7 +659,11 @@ const formatPhoneNumber = (phone) => {
                   </div>
 
                   {/* Contextual Action Button (Placed right where information gets updated) */}
-                  {!isEditing ? (
+                  {!employeeId ? (
+                    <span className="text-[11px] font-semibold text-slate-400">
+                      System Admin
+                    </span>
+                  ) : !isEditing ? (
                     <button
                       type="button"
                       onClick={enterEditMode}
@@ -654,6 +694,7 @@ const formatPhoneNumber = (phone) => {
                 </div>
 
                 <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
+                  <CompactField icon={UserRound} label="Full Name" value={isEditing ? editName : mergedProfile.name} />
                   <EmailCard
                     value={mergedProfile.email}
                     isEditing={isEditing}
