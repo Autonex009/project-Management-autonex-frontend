@@ -1,7 +1,7 @@
 import { useState, useEffect } from "react";
 import { useQuery, useQueryClient } from "@tanstack/react-query";
 import { navigation } from "../config/navigation";
-import api, { signupRequestApi } from "../services/api";
+import api, { authApi, signupRequestApi } from "../services/api";
 import { useBreadcrumbTrail } from "../hooks/useBreadcrumbTrail";
 import { usePageDetailTitle } from "../utils/pageDetailTitle";
 import AdminSidebar from "./AdminSidebar";
@@ -16,6 +16,7 @@ const ADMIN_ROUTE_LABELS = {
   "/admin/newly-onboarded": "Newly Onboarded",
   "/admin/change-log": "Audit Log",
   "/admin/company-settings": "Company Settings",
+  "/admin/profile": "Profile",
 };
 
 const resolveAdminCrumb = (pathname) => {
@@ -72,6 +73,12 @@ const AdminLayout = () => {
     }
   }, []);
 
+  const { data: account } = useQuery({
+    queryKey: ["auth-me"],
+    queryFn: authApi.me,
+    staleTime: 5 * 60 * 1000,
+  });
+
   const { data: signupCounts } = useQuery({
     queryKey: ["signup-requests-counts"],
     queryFn: () => signupRequestApi.getCounts(),
@@ -103,6 +110,7 @@ const AdminLayout = () => {
       SidebarComponent={AdminSidebar}
       sidebarProps={{
         user,
+        account,
         pendingSignupCount,
         onLogout: handleLogout,
       }}

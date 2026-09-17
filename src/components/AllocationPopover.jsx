@@ -93,6 +93,9 @@ const AllocationPopover = ({
   // fewer people than the ratio it sits beside — the card said 7 while the badge said 6,
   // the difference being a lead recorded on the project but not allocated to it.
   leadIds = [],
+  tempRoster = [],
+  tempOnly = false,
+    showTempRoster = false,
   fetchDetail,
 }) => {
   const [detailData, setDetailData] = useState(null);
@@ -337,7 +340,7 @@ const AllocationPopover = ({
         )}
 
         <div className="relative bg-white border border-slate-200 rounded-2xl shadow-2xl ring-1 ring-slate-900/5 overflow-hidden">
-          {/* Header */}
+{/* Header */}
           <div className="px-4 py-3 bg-gradient-to-r from-slate-50 to-white border-b border-slate-100 flex items-center justify-between gap-2">
             <div className="flex items-center gap-2 min-w-0">
               <div className="w-8 h-8 rounded-lg bg-emerald-50 text-emerald-600 flex items-center justify-center shrink-0">
@@ -345,7 +348,7 @@ const AllocationPopover = ({
               </div>
               <div className="min-w-0">
                 <div className="text-[10px] font-semibold text-slate-400 uppercase tracking-wider">
-                  Allocated
+                  {tempOnly ? "Temp Allocation" : "Allocated"}
                 </div>
                 <div className="text-sm font-semibold text-slate-800 truncate">
                   {project?.name || "Project"}
@@ -363,14 +366,16 @@ const AllocationPopover = ({
                 </span>
               )}
               <span className="inline-flex items-center justify-center min-w-[28px] h-7 px-2 rounded-full text-xs font-bold bg-emerald-50 text-emerald-700 border border-emerald-200">
-                {liveCount}
+                {tempOnly ? tempRoster.length : liveCount}
               </span>
             </div>
           </div>
 
           {/* Body */}
           <div className="max-h-[320px] overflow-y-auto">
-            {isLoadingDetail ? (
+              {!tempOnly && (
+<>
+{isLoadingDetail ? (
               <div className="px-3 py-6 text-center text-sm text-slate-400">
                 Loading allocations...
               </div>
@@ -521,9 +526,84 @@ const AllocationPopover = ({
                 })}
               </ul>
             )}
-          </div>
+            
 
-          {/* Footer / CTA */}
+</>
+            )}
+
+              {tempOnly && (!tempRoster || tempRoster.length === 0) && (
+                <div className="px-3 py-6 text-center">
+                  <p className="text-sm font-medium text-slate-500">
+                    No temp allocations today
+                  </p>
+                </div>
+              )}
+
+              {(tempOnly || showTempRoster) && tempRoster && tempRoster.length > 0 && (
+              <div className={!tempOnly ? "border-t border-slate-100" : ""}>
+                {!tempOnly && (
+                  <div className="px-3 py-2 bg-amber-50/50 border-b border-amber-100/50">
+                    <h4 className="text-[11px] font-bold text-amber-800 uppercase tracking-wider">
+                      Today's Temp Project Allocation Status
+                    </h4>
+                  </div>
+                )}
+                <ul className="py-1.5 divide-y divide-slate-50">
+                                    {tempRoster.map((temp, idx) => {
+                      const isArchivedOrUnknown = temp.name === "Unknown" || temp.designation === "Archived Worker";
+                      return (
+                    <li
+                      key={`temp-${idx}`}
+                      className={`flex items-center justify-between gap-3 px-3 py-2 transition-colors ${
+                        isArchivedOrUnknown ? "bg-rose-50/60 hover:bg-rose-50 border border-rose-100/50" : "hover:bg-slate-50"
+                      }`}
+                    >
+                      <Avatar
+                        name={temp.name === "Unknown" ? "Archived" : temp.name}
+                        src={temp.avatar_url}
+                        muted={isArchivedOrUnknown}
+                      />
+                      <div className="flex-1 min-w-0">
+                        <div className="flex items-center gap-1.5 min-w-0">
+                          <span className={`text-sm truncate ${isArchivedOrUnknown ? "font-medium text-rose-700" : "font-medium text-slate-800"}`} title={temp.name}>
+                            {temp.name === "Unknown" && isArchivedOrUnknown ? "Archived Worker" : temp.name}
+                          </span>
+                          {isArchivedOrUnknown && (
+                            <span className="inline-flex items-center gap-1 rounded-full bg-rose-100 px-1.5 py-0.5 text-[10px] font-semibold text-rose-700 shrink-0">
+                              Archived
+                            </span>
+                          )}
+                          {!isArchivedOrUnknown && temp.is_stale && (
+                            <span className="text-[10px] text-amber-600 truncate" title={`Data is of ${temp.stale_date}`}>
+                              Data is of {temp.stale_date}
+                            </span>
+                          )}
+                        </div>
+                        <p className="text-xs text-slate-500 truncate" title={temp.designation || 'Temp Worker'}>
+                          {temp.designation || 'Temp Worker'}
+                        </p>
+                      </div>
+                      <div className="flex items-center gap-1.5 shrink-0">
+                        <span className={`inline-flex items-center gap-1 rounded-full px-1.5 py-0.5 text-[10px] font-semibold ${temp.work_location === 'WFO' ? 'bg-indigo-50 text-indigo-700' : 'bg-fuchsia-50 text-fuchsia-700'}`}>
+                          {temp.work_location === 'WFO' ? <Building2 className="w-3 h-3" /> : <Home className="w-3 h-3" />}
+                          {temp.work_location}
+                        </span>
+                        {temp.checked_out_at && (
+                          <span className="text-[10px] font-medium px-1.5 py-0.5 rounded bg-slate-100 text-slate-500">
+                            Checked Out
+                          </span>
+                        )}
+                      </div>
+                    </li>
+                  );
+                })}
+                </ul>
+              </div>
+            )}
+</div>
+  
+            {/* Footer / CTA */}
+          {!tempOnly && (
           <div className="px-3 py-2.5 border-t border-slate-100 bg-slate-50/60">
             {staleCount > 0 && (
               <p className="mb-2 text-[11px] leading-snug text-slate-500">
@@ -544,6 +624,7 @@ const AllocationPopover = ({
               <ArrowRight className="w-3.5 h-3.5 opacity-80" />
             </Button>
           </div>
+          )}
         </div>
       </div>,
       document.body,

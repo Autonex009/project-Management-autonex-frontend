@@ -1738,12 +1738,10 @@ const EmployeesPage = () => {
       .reduce((sum, [_, count]) => sum + count, 0);
 
   // KPI Classification 4: Work Model (WFO, WFH, Hybrid)
-  // The backend Employee model does not track work_model, so the old client-side
-  // code defaulted everyone to WFO. We preserve that behavior here by
-  // placing the entire active roster into WFO.
-  const wfoCount = employeeStats?.total || 0;
-  const wfhCount = 0;
-  const hybridCount = 0;
+  const byWorkModel = employeeStats?.by_work_model || {};
+  const wfhCount = byWorkModel["WFH"] || 0;
+  const hybridCount = byWorkModel["HYBRID"] || 0;
+  const wfoCount = byWorkModel["WFO"] ?? Math.max(0, (employeeStats?.total || 0) - wfhCount - hybridCount);
 
   // Fetch skills from API
   const { data: skillsData = [], isLoading: skillsLoading } = useQuery({

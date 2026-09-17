@@ -38,11 +38,21 @@ import {
 // "(2 PM · 1 Lead)" after a manpower count, or nothing when the project has
 // neither. Both the required and the current figure carry it, so they stay
 // comparable at a glance.
-const SlotBreakdown = ({ pmSlots = 0, leadSlots = 0 }) => {
-  if (pmSlots <= 0 && leadSlots <= 0) return null;
+const SlotBreakdown = ({ pmSlots = 0, leadSlots = 0, tempSlots = 0 }) => {
+  if (pmSlots <= 0 && leadSlots <= 0 && tempSlots <= 0) return null;
+  
+  const parts = [];
+  if (pmSlots > 0 || leadSlots > 0 || tempSlots > 0) {
+     parts.push(`${pmSlots || 0} PM`);
+     parts.push(`${leadSlots || 0} Lead`);
+  }
+  if (tempSlots > 0) {
+     parts.push(`${tempSlots} temp`);
+  }
+  
   return (
     <span className="ml-1 text-[11px] font-normal text-slate-400">
-      ({pmSlots || 0} PM &middot; {leadSlots || 0} Lead)
+      ({parts.join(' \u00B7 ')})
     </span>
   );
 };
@@ -129,6 +139,7 @@ const ProjectCard = ({
   requiredManpower,
   pmSlots = 0,
   leadSlots = 0,
+  tempSlots = 0,
   allocations,
   employees,
   formerEmployees,
@@ -363,7 +374,7 @@ const ProjectCard = ({
                 for one reviewer reads as wrong. */}
             <p className="text-sm font-semibold text-slate-800 tabular-nums">
               {requiredManpower}
-              <SlotBreakdown pmSlots={pmSlots} leadSlots={leadSlots} />
+              <SlotBreakdown pmSlots={pmSlots} leadSlots={leadSlots} tempSlots={tempSlots} />
             </p>
           </CardField>
 
@@ -376,6 +387,8 @@ const ProjectCard = ({
               employees={employees}
               formerEmployees={formerEmployees}
               onLeaveEmployeeIds={onLeaveEmployeeIds}
+              tempRoster={project.temp_roster || []}
+                showTempRoster={true}
               locationByEmployeeId={locationByEmployeeId}
               onOpenAllocations={() =>
                 navigate(`${prefix}/allocations`, {
@@ -393,7 +406,7 @@ const ProjectCard = ({
                   }
                 >
                   {allocatedManpower}
-                  <SlotBreakdown pmSlots={pmSlots} leadSlots={leadSlots} />
+                  <SlotBreakdown pmSlots={pmSlots} leadSlots={leadSlots} tempSlots={tempSlots} />
                 </span>
               }
             />
