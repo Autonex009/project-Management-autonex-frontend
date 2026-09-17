@@ -7,6 +7,7 @@ import {
 } from "lucide-react";
 import { hrNavigation } from "../config/hrNavigation";
 import { useState } from "react";
+import UserAvatar from "../components/ui/UserAvatar";
 
 const COMPANY_SETTINGS_HREF = "/admin/company-settings";
 
@@ -28,11 +29,13 @@ const iconClass = (isActive) =>
 
 const HRSidebar = ({
   user = {},
+  account,
   pendingCount = 0,
   pendingSignupCount = 0,
   onNavigate,
   onLogout,
 }) => {
+  const currentUser = account || user;
   const location = useLocation();
   const handleNavigate = () => onNavigate?.();
 
@@ -105,18 +108,26 @@ const HRSidebar = ({
       <div className="shrink-0 p-2.5 border-t border-slate-200 flex items-center justify-between gap-2">
         {/* Profile */}
         <div className="group relative">
-          <button
-            type="button"
-            className="h-9 w-9 flex items-center justify-center overflow-hidden rounded-lg border border-slate-200 bg-white "
+          <Link
+            to="/hr/profile"
+            onClick={handleNavigate}
+            title="Profile"
+            className={`h-9 w-9 flex items-center justify-center overflow-hidden rounded-lg border transition-all ${
+              isRowActive("/hr/profile")
+                ? "border-blue-500 ring-2 ring-blue-500/20 bg-white shadow-sm"
+                : "border-slate-200 bg-white hover:border-blue-500 hover:ring-2 hover:ring-blue-500/20 shadow-sm"
+            }`}
           >
-            <img
-              src="/favicon.png"
-              alt="Autonex"
-              className="h-full w-full object-contain p-1"
+            <UserAvatar
+              src={currentUser?.avatar_url}
+              name={currentUser?.name || currentUser?.email || "HR Admin"}
+              size="sm"
+              className="h-full w-full rounded-lg"
+              fallbackClassName="rounded-lg border-0 bg-transparent text-slate-500 font-bold text-sm"
             />
-          </button>
+          </Link>
           <div className="absolute bottom-full left-0 mb-2 bg-slate-900 text-white text-xs px-2.5 py-1.5 rounded-lg border border-slate-700 opacity-0 group-hover:opacity-100 transition-opacity duration-200 whitespace-nowrap pointer-events-none z-50 shadow-xl">
-            {user.email || "HR Admin"} · HR Operations
+            {currentUser?.email || "HR Admin"} · HR Operations
           </div>
         </div>
 

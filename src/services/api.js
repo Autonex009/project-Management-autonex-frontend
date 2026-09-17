@@ -276,6 +276,27 @@ export const employeeApi = {
   getIdle: () => api.get("/employees/status/idle").then((res) => res.data),
 };
 
+export const employeeDocumentApi = {
+  list: (employeeId) =>
+    api.get(`/employees/${employeeId}/documents`).then((res) => res.data),
+  summary: (employeeId) =>
+    api.get(`/employees/${employeeId}/documents/summary`).then((res) => res.data),
+  generate: (employeeId, docType, dynamicData = {}) =>
+    api.post(`/employees/${employeeId}/documents/generate`, { doc_type: docType, dynamic_data: dynamicData }).then((res) => res.data),
+  upload: (employeeId, formData) =>
+    api.post(`/employees/${employeeId}/documents/upload`, formData, {
+      headers: { "Content-Type": "multipart/form-data" },
+    }).then((res) => res.data),
+  download: (employeeId, docId) =>
+    api.get(`/employees/${employeeId}/documents/${docId}/download`).then((res) => res.data),
+  remove: (employeeId, docId) =>
+    api.delete(`/employees/${employeeId}/documents/${docId}`).then((res) => res.data),
+  bulkGenerate: (employeeId) =>
+    api.post(`/employees/${employeeId}/documents/bulk-generate`).then((res) => res.data),
+  history: (employeeId, docType) =>
+    api.get(`/employees/${employeeId}/documents/${docType}/history`).then((res) => res.data),
+};
+
 export const allocationApi = {
   getAll: () => api.get("/allocations").then((res) => res.data),
   getSlim: () => api.get("/allocations/slim").then((res) => res.data),

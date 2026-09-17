@@ -1,6 +1,6 @@
 import { useState, useRef, useEffect } from "react";
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
-import { useSearchParams, Link } from "react-router-dom";
+import { useSearchParams, Link, useLocation } from "react-router-dom";
 import usePageStateStore from "../store/usePageStateStore";
 import { usePageScroll } from "../hooks/usePageScroll";
 import {
@@ -10,6 +10,7 @@ import {
   subProjectApi,
   parentProjectApi,
   leaveApi,
+  employeeDocumentApi,
 } from "../services/api";
 import {
   Plus,
@@ -64,6 +65,7 @@ import MultiSelect from "../components/ui/MultiSelect";
 import Spinner from "../components/ui/LoadingSpinner";
 import Button from "../components/ui/Button";
 import Modal from "../components/ui/Modal";
+import EmployeeDocumentDrawer, { DocProgressBadge } from "../components/EmployeeDocumentDrawer";
 
 const LEAVE_TYPE_LABELS = {
   paid: "Paid Leave",
@@ -580,6 +582,29 @@ function EmployeeConvertToFulltimeModal({
         </Button>
       </Modal.Footer>
     </Modal>
+  );
+}
+
+
+function DocsSummaryCell({ employeeId, onOpen }) {
+  const { data } = useQuery({
+    queryKey: ["employee-docs-summary", employeeId],
+    queryFn: () => employeeDocumentApi.summary(employeeId),
+    staleTime: 60_000,
+  });
+  const present = data?.present ?? 0;
+  const total = data?.total ?? 6;
+  return (
+    <button
+      onClick={onOpen}
+      className="p-1.5 text-slate-400 hover:text-indigo-600 hover:bg-indigo-50 rounded transition-colors relative"
+      title={`${present}/${total} Documents`}
+    >
+      <FileText className="w-5 h-5" />
+      {present < total && (
+        <span className="absolute top-1 right-1 w-2 h-2 bg-amber-500 border border-white rounded-full"></span>
+      )}
+    </button>
   );
 }
 
@@ -1387,6 +1412,8 @@ function EmployeeActionMenu({
 
 const EmployeesPage = () => {
   const queryClient = useQueryClient();
+  const location = useLocation();
+  const isHrOps = location.pathname.startsWith('/hr');
   const [searchParams, setSearchParams] = useSearchParams();
   const idleOnly = searchParams.get("idleOnly") === "true";
   const statusParam = searchParams.get("status");
@@ -1397,6 +1424,7 @@ const EmployeesPage = () => {
   const [restoreTarget, setRestoreTarget] = useState(null);
   const [convertToFulltimeTarget, setConvertToFulltimeTarget] = useState(null);
   const [newlyCreatedCredentials, setNewlyCreatedCredentials] = useState(null);
+  const [docDrawerEmployee, setDocDrawerEmployee] = useState(null);
   const [formDesignation, setFormDesignation] = useState("Annotator/ Reviewer");
   const [formEmployeeType, setFormEmployeeType] = useState("Full-time");
   const [formWorkModel, setFormWorkModel] = useState("WFO");
@@ -1710,12 +1738,10 @@ const EmployeesPage = () => {
       .reduce((sum, [_, count]) => sum + count, 0);
 
   // KPI Classification 4: Work Model (WFO, WFH, Hybrid)
-  // The backend Employee model does not track work_model, so the old client-side
-  // code defaulted everyone to WFO. We preserve that behavior here by
-  // placing the entire active roster into WFO.
-  const wfoCount = employeeStats?.total || 0;
-  const wfhCount = 0;
-  const hybridCount = 0;
+  const byWorkModel = employeeStats?.by_work_model || {};
+  const wfhCount = byWorkModel["WFH"] || 0;
+  const hybridCount = byWorkModel["HYBRID"] || 0;
+  const wfoCount = byWorkModel["WFO"] ?? Math.max(0, (employeeStats?.total || 0) - wfhCount - hybridCount);
 
   // Fetch skills from API
   const { data: skillsData = [], isLoading: skillsLoading } = useQuery({
@@ -2911,6 +2937,18 @@ const EmployeesPage = () => {
               );
             },
           },
+          isHrOps ? {
+            key: "docs",
+            label: "Docs",
+            align: "center",
+            width: "w-[5%]",
+            render: (_, row) => (
+              <DocsSummaryCell
+                employeeId={row.id}
+                onOpen={() => setDocDrawerEmployee(row)}
+              />
+            ),
+          } : null,
           {
             key: "actions",
             label: "Actions",
@@ -2950,7 +2988,7 @@ const EmployeesPage = () => {
               );
             },
           },
-        ]}
+        ].filter(Boolean)}
         data={employees}
         totalItems={paginatedEmployeesData?.total || 0}
         currentPage={currentPage}
@@ -3208,6 +3246,14 @@ const EmployeesPage = () => {
         credentials={newlyCreatedCredentials}
         onClose={() => setNewlyCreatedCredentials(null)}
       />
+      {/* Employee Document Drawer */}
+      {docDrawerEmployee && (
+        <EmployeeDocumentDrawer
+          employee={docDrawerEmployee}
+          onClose={() => setDocDrawerEmployee(null)}
+        />
+      )}
+
     </div>
   );
 };

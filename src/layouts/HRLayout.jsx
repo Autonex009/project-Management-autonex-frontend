@@ -3,7 +3,7 @@ import { useQueryClient, useQuery } from "@tanstack/react-query";
 import { useBreadcrumbTrail } from "../hooks/useBreadcrumbTrail";
 import HRSidebar from "./HRSidebar";
 import AppShellLayout from "./AppShellLayout";
-import api, { signupRequestApi } from "../services/api";
+import api, { authApi, signupRequestApi } from "../services/api";
 import usePageStateStore from "../store/usePageStateStore";
 import useScrollStore from "../store/useScrollStore";
 
@@ -15,6 +15,7 @@ const HR_ROUTE_LABELS = {
   "/hr/performance": "Performance",
   "/hr/signup-requests": "Signup Requests",
   "/hr/activity-log": "Activity Log",
+  "/hr/profile": "Profile",
 };
 
 const resolveHRCrumb = (pathname) => {
@@ -42,6 +43,12 @@ const HRLayout = () => {
       }
     }
   }, []);
+
+  const { data: account } = useQuery({
+    queryKey: ["auth-me"],
+    queryFn: authApi.me,
+    staleTime: 5 * 60 * 1000,
+  });
 
   const handleLogout = async () => {
     try {
@@ -73,6 +80,7 @@ const HRLayout = () => {
       SidebarComponent={HRSidebar}
       sidebarProps={{
         user,
+        account,
         pendingSignupCount,
         onLogout: handleLogout,
       }}
