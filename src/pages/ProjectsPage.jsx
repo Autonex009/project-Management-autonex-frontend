@@ -301,12 +301,15 @@ const ProjectsPage = () => {
     return new Map(employees.map((e) => [String(e.id), e]));
   }, [employees]);
   const pmEmployees = useMemo(() => {
-    return employees.filter((e) =>
-      (e.designation || "").toLowerCase().includes("program manager"),
-    );
     return employees.filter((e) => {
       const d = (e.designation || "").toLowerCase();
-      return d.includes("program manager") || d.includes("pm") || d.includes("admin") || d.includes("manager");
+      return (
+        d.includes("program manager") ||
+        d.includes("project manager") ||
+        d.includes("pm") ||
+        d.includes("admin") ||
+        d.includes("manager")
+      );
     });
   }, [employees]);
   const teamLeadEmployees = useMemo(() => {
@@ -999,12 +1002,15 @@ const ProjectsPage = () => {
       map.set(id, formatDisplayName(nameById.get(id)) || `Manager #${id}`);
     };
     employees
-      .filter((e) =>
-        (e.designation || "").toLowerCase().includes("program manager"),
-      )
       .filter((e) => {
         const d = (e.designation || "").toLowerCase();
-        return d.includes("program manager") || d.includes("pm") || d.includes("admin") || d.includes("manager");
+        return (
+          d.includes("program manager") ||
+          d.includes("project manager") ||
+          d.includes("pm") ||
+          d.includes("admin") ||
+          d.includes("manager")
+        );
       })
       .forEach((e) => add(e.id));
     visibleProjects.forEach((project) => resolvePmIds(project).forEach(add));
