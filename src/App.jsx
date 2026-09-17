@@ -185,6 +185,7 @@ function App() {
                   path="company-settings"
                   element={<AdminCompanySettingsPage />}
                 />
+                <Route path="profile" element={<ProfilePage />} />
                 {/* <Route path="onboarding-analytics" element={<AdminAnalyticsPage />} /> */}
               </Route>
 
@@ -205,6 +206,7 @@ function App() {
                 <Route path="leaves" element={<LeavesPage />} />
                 <Route path="performance" element={<AdminPerformancePage />} />
                 <Route path="activity-log" element={<ChangeLogPage />} />
+                <Route path="profile" element={<ProfilePage />} />
               </Route>
 
               {/* Root Redirect */}
