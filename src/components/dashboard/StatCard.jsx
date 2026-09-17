@@ -334,10 +334,24 @@ const StatCard = ({
                   {(!section.rows || !Array.isArray(section.rows)) ? (console.error('Invalid section.rows:', section), null) : section.rows.map((row) => {
                     const val = row.value ?? row.count;
                     const hasVal = val !== undefined && val !== null && val !== "";
+                    const isClickable = Boolean(row.onClick);
                     return (
                       <div
                         key={row.label}
-                        className="flex items-center justify-between gap-3 rounded-md px-1.5 py-1 transition-colors hover:bg-slate-50"
+                        onClick={(e) => {
+                          if (row.onClick) {
+                            e.stopPropagation();
+                            setPinned(false);
+                            setHovered(false);
+                            setSuppressed(true);
+                            row.onClick();
+                          }
+                        }}
+                        className={`flex items-center justify-between gap-3 rounded-md px-1.5 py-1 transition-colors ${
+                          isClickable
+                            ? "cursor-pointer hover:bg-indigo-50/80 hover:text-indigo-700 font-medium select-none"
+                            : "hover:bg-slate-50"
+                        }`}
                       >
                         <span className="truncate text-[13px] text-slate-600">
                           {row.label}

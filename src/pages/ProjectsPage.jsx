@@ -280,6 +280,10 @@ const ProjectsPage = () => {
     return employees.filter((e) =>
       (e.designation || "").toLowerCase().includes("program manager"),
     );
+    return employees.filter((e) => {
+      const d = (e.designation || "").toLowerCase();
+      return d.includes("program manager") || d.includes("pm") || d.includes("admin") || d.includes("manager");
+    });
   }, [employees]);
   const teamLeadEmployees = useMemo(() => {
     return employees.filter((e) =>
@@ -964,6 +968,10 @@ const ProjectsPage = () => {
       .filter((e) =>
         (e.designation || "").toLowerCase().includes("program manager"),
       )
+      .filter((e) => {
+        const d = (e.designation || "").toLowerCase();
+        return d.includes("program manager") || d.includes("pm") || d.includes("admin") || d.includes("manager");
+      })
       .forEach((e) => add(e.id));
     visibleProjects.forEach((project) => resolvePmIds(project).forEach(add));
     return [...map.entries()]

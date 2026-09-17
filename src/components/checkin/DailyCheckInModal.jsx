@@ -119,6 +119,10 @@ export default function DailyCheckInModal() {
       errors.projects = "Please select at least one project";
     }
 
+    if (!mood) {
+      errors.mood = "Please select how you are feeling today";
+    }
+
     if (workMode === "WFO") {
       if (!officeFloor) {
         errors.officeFloor = "Please select your office floor";
@@ -456,16 +460,18 @@ export default function DailyCheckInModal() {
           )}
         </section>
 
-        {/* Mood Selection (Optional) */}
+        {/* Mood Selection (Mandatory) */}
         <section className="space-y-3 pt-2 border-t border-slate-100">
-          <SectionHeader title="How are you feeling today?" />
-          <p className="text-xs text-slate-500 mb-2">Optional • Just for our records</p>
+          <SectionHeader title="How are you feeling today?" required />
           <div className="grid grid-cols-4 gap-2">
             {MOODS.map(({ value, label, icon: Icon, tone }) => (
               <button
                 key={value}
                 type="button"
-                onClick={() => setMood((m) => (m === value ? null : value))}
+                onClick={() => {
+                  setMood(value);
+                  setValidationErrors((prev) => ({ ...prev, mood: "" }));
+                }}
                 title={label}
                 className={`group flex flex-col items-center gap-2 rounded-xl border-2 p-3 transition-all duration-150 ${mood === value
                     ? tone.replace("border-", "border-2 border-") + " shadow-sm"
@@ -477,6 +483,12 @@ export default function DailyCheckInModal() {
               </button>
             ))}
           </div>
+          {validationErrors.mood && (
+            <div className="flex items-center gap-2 text-red-600 text-sm mt-1">
+              <AlertCircle className="w-4 h-4" />
+              <span>{validationErrors.mood}</span>
+            </div>
+          )}
         </section>
       </Modal.Body>
 

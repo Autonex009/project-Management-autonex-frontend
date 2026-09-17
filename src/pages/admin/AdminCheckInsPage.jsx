@@ -66,6 +66,7 @@ const AdminCheckInsPage = () => {
   const [search, setSearch] = useState("");
   const [projectIds, setProjectIds] = useState([]);
   const [statusFilters, setStatusFilters] = useState([]);
+  const [pmConfirmationFilters, setPmConfirmationFilters] = useState([]);
   const [timeFilters, setTimeFilters] = useState([]);
   const [customTimeFrom, setCustomTimeFrom] = useState("");
   const [customTimeTo, setCustomTimeTo] = useState("");
@@ -83,6 +84,7 @@ const AdminCheckInsPage = () => {
       search,
       projectIds,
       statusFilters,
+      pmConfirmationFilters,
       timeFilters,
       customTimeFrom,        // ← NEW
       customTimeTo,          // ← NEW
@@ -97,6 +99,7 @@ const AdminCheckInsPage = () => {
         search,
         project_id: projectIds.join(",") || undefined,
         status: statusFilters.join(","),
+        pm_confirmation: pmConfirmationFilters.join(","),
         time_filter: timeFilters.join(","),
         time_from: timeFilters.includes("custom") ? customTimeFrom || undefined : undefined,
         time_to: timeFilters.includes("custom") ? customTimeTo || undefined : undefined,
@@ -116,10 +119,35 @@ const AdminCheckInsPage = () => {
 
   const items = data?.items || [];
   const totalCount = data?.total || 0;
+  const applySentimentFilter = (val) => {
+    setSentimentFilters((prev) => (prev.includes(val) ? [] : [val]));
+    setPage(1);
+  };
+  const applyWorkModeFilter = (val) => {
+    setWorkModeFilters((prev) => (prev.includes(val) ? [] : [val]));
+    setPage(1);
+  };
+  const applyFloorFilter = (val) => {
+    setOfficeFloorFilters((prev) => (prev.includes(val) ? [] : [val]));
+    setPage(1);
+  };
+  const applyStatusFilter = (val) => {
+    setStatusFilters((prev) => (prev.includes(val) ? [] : [val]));
+    setPage(1);
+  };
+  const applyPmConfirmationFilter = (val) => {
+    setPmConfirmationFilters((prev) => (prev.includes(val) ? [] : [val]));
+    setPage(1);
+  };
+  const applyTimeFilter = (val) => {
+    setTimeFilters((prev) => (prev.includes(val) ? [] : [val]));
+    setPage(1);
+  };
 
   const hasActiveFilters =
     projectIds.length > 0 ||
     statusFilters.length > 0 ||
+    pmConfirmationFilters.length > 0 ||
     timeFilters.length > 0 ||
     workModeFilters.length > 0 ||
     officeFloorFilters.length > 0 ||
@@ -130,6 +158,7 @@ const AdminCheckInsPage = () => {
   const clearAllFilters = () => {
     setProjectIds([]);
     setStatusFilters([]);
+    setPmConfirmationFilters([]);
     setTimeFilters([]);
     setCustomTimeFrom("");
     setCustomTimeTo("");
@@ -275,6 +304,8 @@ const AdminCheckInsPage = () => {
                 projectsList={projectsList}
                 statusFilters={statusFilters}
                 setStatusFilters={(v) => { setStatusFilters(v); setPage(1); }}
+                pmConfirmationFilters={pmConfirmationFilters}
+                setPmConfirmationFilters={(v) => { setPmConfirmationFilters(v); setPage(1); }}
                 timeFilters={timeFilters}
                 setTimeFilters={(v) => { setTimeFilters(v); setPage(1); }}
                 customTimeFrom={customTimeFrom}          
@@ -315,7 +346,8 @@ const AdminCheckInsPage = () => {
                 onClick={() => setIsSentimentModalOpen(true)}
                 className="text-xs text-indigo-700 bg-indigo-50/70 hover:bg-indigo-100 border-indigo-200 flex items-center gap-1.5 cursor-pointer h-[38px] px-3 font-semibold shrink-0"
               >
-                <BarChart3 className="w-3.5 h-3.5 text-indigo-600" /> View Sentiments Analysis
+                <BarChart3 className="w-4 h-4 text-indigo-600 shrink-0" />
+                <span>View Sentiments Analysis</span>
               </Button>
             </div>
           </div>
@@ -382,24 +414,28 @@ const AdminCheckInsPage = () => {
                       value: data?.kpi_wfo ?? 0,
                       dot: "bg-emerald-500",
                       tone: "text-emerald-600",
+                      onClick: () => applyWorkModeFilter("WFO"),
                     },
                     {
                       label: "WFH",
                       value: data?.kpi_wfh ?? 0,
                       dot: "bg-sky-500",
                       tone: "text-sky-600",
+                      onClick: () => applyWorkModeFilter("WFH"),
                     },
                     {
                       label: "Pending PM",
                       value: Math.max(0, (data?.kpi_checked_in ?? 0) - (data?.kpi_confirmed ?? 0)),
                       dot: "bg-amber-500",
                       tone: "text-amber-600",
+                      onClick: () => applyPmConfirmationFilter("pending"),
                     },
                     ...((data?.kpi_late ?? 0) > 0 ? [{
                       label: "Late",
                       value: data.kpi_late,
                       dot: "bg-rose-500",
                       tone: "text-rose-600",
+                      onClick: () => applyTimeFilter("11_12"),
                     }] : [])
                   ]}
                 />
@@ -408,22 +444,21 @@ const AdminCheckInsPage = () => {
                 {
                   title: "Work Mode",
                   rows: [
-                    { label: "WFO", value: data?.kpi_wfo ?? 0 },
-                    { label: "WFH", value: data?.kpi_wfh ?? 0 },
+                    { label: "WFO", value: data?.kpi_wfo ?? 0, onClick: () => applyWorkModeFilter("WFO") },
+                    { label: "WFH", value: data?.kpi_wfh ?? 0, onClick: () => applyWorkModeFilter("WFH") },
                   ]
                 },
                 {
                   title: "PM Confirmation",
                   rows: [
-                    { label: "Confirmed by PM", value: data?.kpi_confirmed ?? 0 },
-                    { label: "Pending Confirmation", value: Math.max(0, (data?.kpi_checked_in ?? 0) - (data?.kpi_confirmed ?? 0)) },
+                    { label: "Confirmed by PM", value: data?.kpi_confirmed ?? 0, onClick: () => applyPmConfirmationFilter("confirmed") },
+                    { label: "Pending Confirmation", value: Math.max(0, (data?.kpi_checked_in ?? 0) - (data?.kpi_confirmed ?? 0)), onClick: () => applyPmConfirmationFilter("pending") },
                   ]
                 },
                 {
-                  title: "Timing & Checkout",
+                  title: "Timing",
                   rows: [
-                    { label: "Late (After 10 AM)", value: data?.kpi_late ?? 0 },
-                    { label: "Already Checked Out", value: data?.kpi_checked_out ?? 0 },
+                    { label: "Late (After 11 AM)", value: data?.kpi_late ?? 0, onClick: () => applyTimeFilter("11_12") },
                   ]
                 }
               ]}
@@ -438,22 +473,25 @@ const AdminCheckInsPage = () => {
                 <MetricDots
                   items={[
                     {
-                      label: "F7/9/17",
-                      value: `${data?.kpi_floor_7 ?? 0}/${data?.kpi_floor_9 ?? 0}/${data?.kpi_floor_17 ?? 0}`,
+                      label: "F7",
+                      value: data?.kpi_floor_7 ?? 0,
                       dot: "bg-indigo-400",
                       tone: "text-indigo-700",
+                      onClick: () => applyFloorFilter("7"),
                     },
                     {
-                      label: "Tiffin",
-                      value: data?.kpi_order_tiffin ?? 0,
-                      dot: "bg-amber-500",
-                      tone: "text-amber-700",
+                      label: "F9",
+                      value: data?.kpi_floor_9 ?? 0,
+                      dot: "bg-indigo-500",
+                      tone: "text-indigo-700",
+                      onClick: () => applyFloorFilter("9"),
                     },
                     {
-                      label: "Canteen",
-                      value: data?.kpi_canteen ?? 0,
-                      dot: "bg-emerald-500",
-                      tone: "text-emerald-700",
+                      label: "F17",
+                      value: data?.kpi_floor_17 ?? 0,
+                      dot: "bg-indigo-600",
+                      tone: "text-indigo-700",
+                      onClick: () => applyFloorFilter("17"),
                     },
                   ]}
                 />
@@ -462,16 +500,16 @@ const AdminCheckInsPage = () => {
                 {
                   title: "Floors",
                   rows: [
-                    { label: "Floor 7", value: data?.kpi_floor_7 ?? 0 },
-                    { label: "Floor 9", value: data?.kpi_floor_9 ?? 0 },
-                    { label: "Floor 17", value: data?.kpi_floor_17 ?? 0 },
+                    { label: "Floor 7", value: data?.kpi_floor_7 ?? 0, onClick: () => applyFloorFilter("7") },
+                    { label: "Floor 9", value: data?.kpi_floor_9 ?? 0, onClick: () => applyFloorFilter("9") },
+                    { label: "Floor 17", value: data?.kpi_floor_17 ?? 0, onClick: () => applyFloorFilter("17") },
                   ]
                 },
                 {
                   title: "Lunch Prefs",
                   rows: [
-                    { label: "Order Tiffin", value: data?.kpi_order_tiffin ?? 0 },
-                    { label: "Canteen", value: data?.kpi_canteen ?? 0 },
+                    { label: "Order Tiffin", value: data?.kpi_order_tiffin ?? 0, onClick: () => applyWorkModeFilter("WFO") },
+                    { label: "Canteen", value: data?.kpi_canteen ?? 0, onClick: () => applyWorkModeFilter("WFO") },
                   ]
                 }
               ]}
@@ -479,31 +517,58 @@ const AdminCheckInsPage = () => {
 
             <StatCard
               title="Company Sentiments"
-              value={data?.kpi_checked_in ?? 0}
+              value={(data?.kpi_mood_great ?? 0) + (data?.kpi_mood_okay ?? 0) + (data?.kpi_mood_low ?? 0) + (data?.kpi_mood_stressed ?? 0)}
               icon={Smile}
               tone="rose"
               hint={
                 <div className="flex flex-wrap items-center gap-1.5 font-mono text-[11px] w-full">
-                  <span className="inline-flex items-center gap-1 bg-emerald-50 text-emerald-800 px-1.5 py-0.5 rounded-md font-semibold border border-emerald-100/80" title="Great">
+                  <span
+                    onClick={(e) => {
+                      e.stopPropagation();
+                      applySentimentFilter("great");
+                    }}
+                    className={`inline-flex items-center gap-1 bg-emerald-50 hover:bg-emerald-100 text-emerald-800 px-1.5 py-0.5 rounded-md font-semibold border border-emerald-100/80 cursor-pointer transition-all hover:scale-105 active:scale-95 select-none ${sentimentFilters.includes("great") ? "ring-2 ring-emerald-500 bg-emerald-100 font-bold" : ""}`}
+                    title="Filter by Great sentiment"
+                  >
                     <Zap className="w-3 h-3 text-emerald-600" /> <span className="tabular-nums">{data?.kpi_mood_great ?? 0}</span>
                   </span>
-                  <span className="inline-flex items-center gap-1 bg-sky-50 text-sky-800 px-1.5 py-0.5 rounded-md font-semibold border border-sky-100/80" title="Okay">
+                  <span
+                    onClick={(e) => {
+                      e.stopPropagation();
+                      applySentimentFilter("okay");
+                    }}
+                    className={`inline-flex items-center gap-1 bg-sky-50 hover:bg-sky-100 text-sky-800 px-1.5 py-0.5 rounded-md font-semibold border border-sky-100/80 cursor-pointer transition-all hover:scale-105 active:scale-95 select-none ${sentimentFilters.includes("okay") ? "ring-2 ring-sky-500 bg-sky-100 font-bold" : ""}`}
+                    title="Filter by Okay sentiment"
+                  >
                     <Smile className="w-3 h-3 text-sky-600" /> <span className="tabular-nums">{data?.kpi_mood_okay ?? 0}</span>
                   </span>
-                  <span className="inline-flex items-center gap-1 bg-amber-50 text-amber-800 px-1.5 py-0.5 rounded-md font-semibold border border-amber-100/80" title="Low">
+                  <span
+                    onClick={(e) => {
+                      e.stopPropagation();
+                      applySentimentFilter("low");
+                    }}
+                    className={`inline-flex items-center gap-1 bg-amber-50 hover:bg-amber-100 text-amber-800 px-1.5 py-0.5 rounded-md font-semibold border border-amber-100/80 cursor-pointer transition-all hover:scale-105 active:scale-95 select-none ${sentimentFilters.includes("low") ? "ring-2 ring-amber-500 bg-amber-100 font-bold" : ""}`}
+                    title="Filter by Low sentiment"
+                  >
                     <Meh className="w-3 h-3 text-amber-600" /> <span className="tabular-nums">{data?.kpi_mood_low ?? 0}</span>
                   </span>
-                  <span className="inline-flex items-center gap-1 bg-rose-50 text-rose-800 px-1.5 py-0.5 rounded-md font-semibold border border-rose-100/80" title="Stressed">
+                  <span
+                    onClick={(e) => {
+                      e.stopPropagation();
+                      applySentimentFilter("stressed");
+                    }}
+                    className={`inline-flex items-center gap-1 bg-rose-50 hover:bg-rose-100 text-rose-800 px-1.5 py-0.5 rounded-md font-semibold border border-rose-100/80 cursor-pointer transition-all hover:scale-105 active:scale-95 select-none ${sentimentFilters.includes("stressed") ? "ring-2 ring-rose-500 bg-rose-100 font-bold" : ""}`}
+                    title="Filter by Stressed sentiment"
+                  >
                     <Frown className="w-3 h-3 text-rose-600" /> <span className="tabular-nums">{data?.kpi_mood_stressed ?? 0}</span>
                   </span>
                 </div>
               }
-              onClick={() => setIsSentimentModalOpen(true)}
               breakdown={[
-                { label: "Great", value: data?.kpi_mood_great ?? 0 },
-                { label: "Okay", value: data?.kpi_mood_okay ?? 0 },
-                { label: "Low energy", value: data?.kpi_mood_low ?? 0 },
-                { label: "Stressed", value: data?.kpi_mood_stressed ?? 0 },
+                { label: "Great", value: data?.kpi_mood_great ?? 0, onClick: () => applySentimentFilter("great") },
+                { label: "Okay", value: data?.kpi_mood_okay ?? 0, onClick: () => applySentimentFilter("okay") },
+                { label: "Low energy", value: data?.kpi_mood_low ?? 0, onClick: () => applySentimentFilter("low") },
+                { label: "Stressed", value: data?.kpi_mood_stressed ?? 0, onClick: () => applySentimentFilter("stressed") },
               ]}
             />
           </div>

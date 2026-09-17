@@ -27,7 +27,18 @@ const MetricDots = ({
       } ${className}`}
     >
       {visible.map((item) => (
-        <span key={item.label} className="inline-flex items-center gap-1">
+        <span
+          key={item.label}
+          onClick={(e) => {
+            if (item.onClick) {
+              e.stopPropagation();
+              item.onClick();
+            }
+          }}
+          className={`inline-flex items-center gap-1 ${
+            item.onClick ? "cursor-pointer hover:opacity-80 hover:underline transition-all select-none" : ""
+          }`}
+        >
           {item.dot && (
             <span className={`h-1.5 w-1.5 shrink-0 rounded-full ${item.dot}`} />
           )}
