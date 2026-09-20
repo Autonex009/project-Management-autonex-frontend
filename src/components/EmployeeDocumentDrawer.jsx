@@ -31,6 +31,7 @@ import {
 } from "lucide-react";
 import toast from "react-hot-toast";
 import { employeeDocumentApi } from "../services/api";
+import ConfirmDialog from "./ui/ConfirmDialog";
 
 // ── Constants ────────────────────────────────────────────────────────────────
 
@@ -178,6 +179,7 @@ export default function EmployeeDocumentDrawer({ employee, onClose }) {
   // Modal state for HR dynamic inputs
   const [showGenerateModal, setShowGenerateModal] = useState(false);
   const [pendingDocType, setPendingDocType] = useState(null);
+  const [deleteTarget, setDeleteTarget] = useState(null);
   const [generateForm, setGenerateForm] = useState({});
 
   const qKey = ["employee-docs", employee?.id];
@@ -232,11 +234,19 @@ export default function EmployeeDocumentDrawer({ employee, onClose }) {
   const deleteMutation = useMutation({
     mutationFn: ({ docId }) => employeeDocumentApi.remove(employee.id, docId),
     onSuccess: () => {
+      setDeleteTarget(null);
       toast.success("Document removed");
       queryClient.invalidateQueries({ queryKey: qKey });
       queryClient.invalidateQueries({ queryKey: ["employee-docs-summary", employee.id] });
     },
     onError: (err) => {
+      setDeleteTarget(null);
+      // 503 means the API is saturated, not that the document is undeletable —
+      // the record is untouched, so say "try again" rather than "failed".
+      if (err?.response?.status === 503) {
+        toast.error("Server is busy right now. Nothing was deleted — please try again shortly.");
+        return;
+      }
       toast.error(`Delete failed: ${err?.response?.data?.detail || err.message}`);
     },
   });
@@ -452,7 +462,7 @@ export default function EmployeeDocumentDrawer({ employee, onClose }) {
 
                       {isPresent && (
                         <button
-                          onClick={() => deleteMutation.mutate({ docId: doc.id })}
+                          onClick={() => setDeleteTarget({ docId: doc.id, docType })}
                           disabled={isDeleting}
                           className="p-1.5 rounded-lg text-slate-400 hover:text-red-500 hover:bg-red-50 transition-colors disabled:opacity-40"
                           title="Remove"
@@ -571,6 +581,20 @@ export default function EmployeeDocumentDrawer({ employee, onClose }) {
         </>
       )}
 
+      {/* Deleting a document also removes the underlying file from storage, so it
+          cannot be undone by re-activating the record. That became true only once
+          the API started clearing the storage object on delete, so the action now
+          asks first instead of firing on a single click. */}
+      <ConfirmDialog
+        isOpen={deleteTarget !== null}
+        onClose={() => setDeleteTarget(null)}
+        onConfirm={() => deleteMutation.mutate({ docId: deleteTarget.docId })}
+        title="Remove document"
+        message={`Remove the ${DOC_LABELS[deleteTarget?.docType] || "document"} for ${employee?.name || "this employee"}? The stored file is deleted permanently and cannot be restored.`}
+        confirmText="Remove"
+        variant="danger"
+        isPending={deleteMutation.isPending}
+      />
     </>
   );
 }
