@@ -69,6 +69,7 @@ const TeamCheckInsPage = () => {
   const [search, setSearch] = useState("");
   const [projectIds, setProjectIds] = useState([]);
   const [statusFilters, setStatusFilters] = useState([]);
+  const [pmConfirmationFilters, setPmConfirmationFilters] = useState([]);
   const [timeFilters, setTimeFilters] = useState([]);
   const [customTimeFrom, setCustomTimeFrom] = useState("");
   const [customTimeTo, setCustomTimeTo] = useState("");
@@ -87,6 +88,7 @@ const TeamCheckInsPage = () => {
       search,
       projectIds,
       statusFilters,
+      pmConfirmationFilters,
       timeFilters,
       customTimeFrom,       
       customTimeTo,         
@@ -101,6 +103,7 @@ const TeamCheckInsPage = () => {
         search,
         project_id: projectIds.join(",") || undefined,
         status: statusFilters.join(","),
+        pm_confirmation: pmConfirmationFilters.join(","),
         time_filter: timeFilters.join(","),
         time_from: timeFilters.includes("custom") ? customTimeFrom || undefined : undefined,
         time_to: timeFilters.includes("custom") ? customTimeTo || undefined : undefined,
@@ -160,9 +163,15 @@ const TeamCheckInsPage = () => {
     setSelectedIds(newSet);
   };
 
+  const applyPmConfirmationFilter = (val) => {
+    setPmConfirmationFilters((prev) => (prev.includes(val) ? [] : [val]));
+    setPage(1);
+  };
+
   const hasActiveFilters =
     projectIds.length > 0 ||
     statusFilters.length > 0 ||
+    pmConfirmationFilters.length > 0 ||
     timeFilters.length > 0 ||
     workModeFilters.length > 0 ||
     officeFloorFilters.length > 0 ||
@@ -173,6 +182,7 @@ const TeamCheckInsPage = () => {
   const clearAllFilters = () => {
     setProjectIds([]);
     setStatusFilters([]);
+    setPmConfirmationFilters([]);
     setTimeFilters([]);
     setCustomTimeFrom("");
     setCustomTimeTo("");
@@ -413,6 +423,7 @@ const TeamCheckInsPage = () => {
                       value: Math.max(0, (data?.kpi_checked_in ?? 0) - (data?.kpi_confirmed ?? 0)),
                       dot: "bg-amber-500",
                       tone: "text-amber-600",
+                      onClick: () => applyPmConfirmationFilter("pending"),
                     },
                     ...((data?.kpi_late ?? 0) > 0 ? [{
                       label: "Late",
@@ -434,15 +445,14 @@ const TeamCheckInsPage = () => {
                 {
                   title: "PM Confirmation",
                   rows: [
-                    { label: "Confirmed by you", value: data?.kpi_confirmed ?? 0 },
-                    { label: "Pending confirmation", value: Math.max(0, (data?.kpi_checked_in ?? 0) - (data?.kpi_confirmed ?? 0)) },
+                    { label: "Confirmed by you", value: data?.kpi_confirmed ?? 0, onClick: () => applyPmConfirmationFilter("confirmed") },
+                    { label: "Pending confirmation", value: Math.max(0, (data?.kpi_checked_in ?? 0) - (data?.kpi_confirmed ?? 0)), onClick: () => applyPmConfirmationFilter("pending") },
                   ]
                 },
                 {
-                  title: "Timing & Checkout",
+                  title: "Timing",
                   rows: [
-                    { label: "Late (After 10 AM)", value: data?.kpi_late ?? 0 },
-                    { label: "Already Checked Out", value: data?.kpi_checked_out ?? 0 },
+                    { label: "Late (After 11 AM)", value: data?.kpi_late ?? 0 },
                   ]
                 }
               ]}
@@ -498,7 +508,7 @@ const TeamCheckInsPage = () => {
 
             <StatCard
               title="Company Sentiments"
-              value={data?.kpi_checked_in ?? 0}
+              value={(data?.kpi_mood_great ?? 0) + (data?.kpi_mood_okay ?? 0) + (data?.kpi_mood_low ?? 0) + (data?.kpi_mood_stressed ?? 0)}
               icon={Smile}
               tone="rose"
               hint={
@@ -535,6 +545,8 @@ const TeamCheckInsPage = () => {
                 projectsList={projectsList}
                 statusFilters={statusFilters}
                 setStatusFilters={(v) => { setStatusFilters(v); setPage(1); }}
+                pmConfirmationFilters={pmConfirmationFilters}
+                setPmConfirmationFilters={(v) => { setPmConfirmationFilters(v); setPage(1); }}
                 timeFilters={timeFilters}
                 setTimeFilters={(v) => { setTimeFilters(v); setPage(1); }}
                 customTimeFrom={customTimeFrom}          
@@ -575,7 +587,9 @@ const TeamCheckInsPage = () => {
                 onClick={() => setIsSentimentModalOpen(true)}
                 className="text-xs text-indigo-700 bg-indigo-50/70 hover:bg-indigo-100 border-indigo-200 flex items-center gap-1.5 cursor-pointer h-[38px] px-3 font-semibold shrink-0"
               >
-                <BarChart3 className="w-3.5 h-3.5 text-indigo-600" /> View Sentiments Analysis
+                {/* <BarChart3 className="w-3.5 h-3.5 text-indigo-600" /> View Sentiments Analysis */}
+                <BarChart3 className="w-4 h-4 text-indigo-600 shrink-0" />
+                <span>View Sentiments Analysis</span>
               </Button>
               <Button
                 onClick={() => confirmAll()}

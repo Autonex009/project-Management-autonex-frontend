@@ -39,6 +39,8 @@ const Button = ({
     blue: "bg-blue-600 text-white hover:bg-blue-700 focus:ring-blue-500 shadow-sm",
     ghost: "text-slate-600 hover:bg-slate-100 hover:text-slate-900",
     cancel: "text-slate-600 hover:bg-slate-100 hover:text-slate-800",
+    outline:
+      "bg-white text-slate-700 border border-slate-200 hover:bg-slate-50 hover:text-slate-900 focus:ring-slate-200 shadow-sm",
     link: "whitespace-nowrap text-indigo-600 hover:underline focus:ring-indigo-200 p-0",
   };
 

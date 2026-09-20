@@ -57,6 +57,7 @@ const AllocationsPage = () => {
   const [filterTab, setFilterTab] = useState("all");
   const [projectView, setProjectView] = useState("active"); // "active" | "archived"
   const [editingAllocation, setEditingAllocation] = useState(null); // { projectId, projectName }
+  const [manageSearch, setManageSearch] = useState("");
   const [confirmState, setConfirmState] = useState(null);
   const [showAllAllocated, setShowAllAllocated] = useState(false);
 
@@ -251,6 +252,20 @@ const AllocationsPage = () => {
     };
   }, [selectedProject, employees, employeeProjectsMap, projectDetail]);
 
+  // Pre-select already allocated employees when project detail is loaded
+  useEffect(() => {
+    if (selectedProject && projectDetail?.project_id === selectedProject.id && employees.length) {
+      const liveItems = (projectDetail.items || []).filter((it) => !it.stale);
+      const initialSelected = liveItems
+        .map((it) => {
+          const emp = employees.find((e) => e.id === it.employee_id);
+          return emp ? { ...emp, allocation_id: it.allocation_id } : null;
+        })
+        .filter(Boolean);
+      setSelectedEmployees(initialSelected);
+    }
+  }, [selectedProject, projectDetail, employees]);
+
   // Required/assigned stats for the selected project — comes straight from
   // its row in the current page when available, else from the lazy detail
   // fetch (covers the case where the project isn't on the visible page,
@@ -269,7 +284,7 @@ const AllocationsPage = () => {
     e.preventDefault();
 
     const { required, assigned: currentAllocated } = selectedProjectStats;
-    const newTotal = currentAllocated + selectedEmployees.length;
+    const newTotal = selectedEmployees.length;
 
     if (newTotal > required) {
       setConfirmState({
@@ -279,7 +294,7 @@ const AllocationsPage = () => {
         details: [
           { label: "Required manpower", value: required },
           { label: "Currently allocated", value: currentAllocated },
-          { label: "You're adding", value: selectedEmployees.length },
+          { label: "Selected count", value: selectedEmployees.length },
           { label: "Total will be", value: newTotal, highlight: true },
         ],
         confirmText: "Proceed anyway",
@@ -295,7 +310,15 @@ const AllocationsPage = () => {
   };
 
   const performAllocation = () => {
-    selectedEmployees.forEach((emp) => {
+    const originalItems = (
+      projectDetail?.project_id === selectedProject?.id ? projectDetail.items : []
+    ).filter((it) => !it.stale);
+    const originalEmpIds = new Set(originalItems.map((it) => it.employee_id));
+    const selectedEmpIds = new Set(selectedEmployees.map((e) => e.id));
+
+    // 1. Create allocations for newly checked employees
+    const toCreate = selectedEmployees.filter((emp) => !originalEmpIds.has(emp.id));
+    toCreate.forEach((emp) => {
       const data = {
         employee_id: emp.id,
         sub_project_id: selectedProject.id,
@@ -312,6 +335,12 @@ const AllocationsPage = () => {
         override_reason: emp.currentProjects ? "PM Override - Dual allocation" : null,
       };
       createMutation.mutate(data);
+    });
+
+    // 2. Delete allocations for unchecked previously allocated employees
+    const toDelete = originalItems.filter((it) => !selectedEmpIds.has(it.employee_id));
+    toDelete.forEach((it) => {
+      deleteMutation.mutate(it.allocation_id);
     });
   };
 
@@ -576,9 +605,10 @@ const AllocationsPage = () => {
             width: "w-[8%]",
             render: (_, row) => (
               <button
-                onClick={() =>
-                  setEditingAllocation({ projectId: row.project_id, projectName: row.project_name })
-                }
+                onClick={() => {
+                  setManageSearch("");
+                  setEditingAllocation({ projectId: row.project_id, projectName: row.project_name });
+                }}
                 className="p-2 text-slate-500 hover:text-indigo-600 hover:bg-indigo-50 rounded-lg transition-colors"
                 title="Edit"
               >
@@ -689,7 +719,10 @@ const AllocationsPage = () => {
               <>
                 {/* On this project — uses the lazily-fetched project detail */}
                 {(() => {
-                  const items = projectDetail?.project_id === selectedProject.id ? projectDetail.items : [];
+                  const rawItems = projectDetail?.project_id === selectedProject.id ? projectDetail.items : [];
+                  const items = [...rawItems].sort((a, b) =>
+                    (formatDisplayName(a.name) || "").localeCompare(formatDisplayName(b.name) || "")
+                  );
                   const liveEmps = items.filter((x) => !x.stale);
                   const staleEmps = items.filter((x) => x.stale);
                   const distinctCount = new Set(liveEmps.map((x) => x.employee_id)).size;
@@ -788,7 +821,7 @@ const AllocationsPage = () => {
                               onClick={() => setShowAllAllocated((v) => !v)}
                               className="inline-flex items-center px-2.5 py-1 rounded-full border border-blue-200 bg-white text-[11px] font-semibold text-blue-600 hover:bg-blue-50 transition-colors shrink-0"
                             >
-                              {showAllAllocated ? "Show less" : `+${liveEmps.length - 3}`}
+                              {showAllAllocated ? "Show less" : "click here to see more"}
                             </button>
                           )}
                         </div>
@@ -845,7 +878,7 @@ const AllocationsPage = () => {
                         value={employeeSearch}
                         onChange={(e) => setEmployeeSearch(e.target.value)}
                         placeholder="Search employees by name or email..."
-                        className="h-9 w-full pl-9 pr-3 rounded-lg border border-slate-200 bg-white text-[13px] text-slate-700 placeholder:text-slate-400 focus:outline-none focus:ring-2 focus:ring-indigo-100 focus:border-indigo-300 transition-all"
+                        className="h-9 w-full pl-9 pr-3 rounded-lg border-2 border-slate-300 bg-white text-[13px] text-slate-700 placeholder:text-slate-400 focus:outline-none focus:ring-2 focus:ring-indigo-100 focus:border-indigo-400 transition-all"
                       />
                     </div>
                     <button
@@ -886,17 +919,15 @@ const AllocationsPage = () => {
                           return (
                             <div
                               key={employee.id}
-                              onClick={() => !employee.alreadyInProject && handleEmployeeToggle(employee)}
-                              className={`px-3 py-2.5 ${employee.alreadyInProject ? "opacity-50 cursor-not-allowed bg-slate-50" : "cursor-pointer hover:bg-slate-50"
-                                } ${isSelected ? "bg-blue-50/70" : ""}`}
+                              onClick={() => handleEmployeeToggle(employee)}
+                              className={`px-3 py-2.5 cursor-pointer hover:bg-slate-50 ${isSelected ? "bg-blue-50/70" : ""}`}
                             >
                               <div className="flex items-center gap-2.5 min-w-0">
                                 <input
                                   type="checkbox"
                                   checked={isSelected}
-                                  disabled={employee.alreadyInProject}
                                   onChange={() => { }}
-                                  className="rounded border-slate-300 text-blue-600 focus:ring-blue-500 disabled:opacity-40 shrink-0"
+                                  className="rounded border-slate-300 text-blue-600 focus:ring-blue-500 shrink-0"
                                 />
                                 <span className="text-[13px] font-semibold text-slate-900 shrink-0">
                                   {formatDisplayName(employee.name)}
@@ -913,7 +944,7 @@ const AllocationsPage = () => {
                                 )}
                                 {employee.currentProjects && !employee.alreadyInProject && (
                                   <span className="px-1.5 py-0.5 text-[10px] bg-orange-100 text-orange-700 rounded-full font-semibold shrink-0">
-                                    Other Project
+                                    {employee.currentProjects.map((p) => p.project_name).join(", ")}
                                   </span>
                                 )}
                                 <div className="ml-auto flex items-center gap-1.5 shrink-0">
@@ -1102,70 +1133,136 @@ const AllocationsPage = () => {
 
       {/* Edit Allocation Modal — uses the same lazy project-detail fetch */}
       {editingAllocation && (
-        <Modal isOpen onClose={() => setEditingAllocation(null)} size="2xl" maxHeight="95vh">
-          <Modal.Header onClose={() => setEditingAllocation(null)}>
-            <h2 className="text-xl font-semibold text-gray-900">
+        <Modal isOpen onClose={() => { setEditingAllocation(null); setManageSearch(""); }} size="2xl" maxHeight="95vh">
+          <Modal.Header onClose={() => { setEditingAllocation(null); setManageSearch(""); }} className="!py-4">
+            <h2 className="text-base font-semibold text-slate-900">
               Manage Allocations - {editingAllocation.projectName}
             </h2>
           </Modal.Header>
 
-          <Modal.Body className="space-y-4">
-            {(projectDetail?.project_id === editingAllocation.projectId ? projectDetail.items : []).map((it) => {
-              const name = formatDisplayName(it.name);
-              return (
-                <div
-                  key={it.allocation_id}
-                  className={`flex items-center justify-between p-4 border rounded-md ${it.stale ? "border-rose-200 bg-rose-50" : "border-gray-200 hover:bg-gray-50"
-                    }`}
-                >
-                  <div className="flex items-center gap-3">
-                    <div
-                      className={`w-10 h-10 rounded-full flex items-center justify-center font-medium ${it.stale ? "bg-rose-200 text-rose-700" : "bg-blue-500 text-white"
-                        }`}
-                    >
-                      {it.stale ? <UserX className="w-4 h-4" /> : name.charAt(0).toUpperCase()}
-                    </div>
-                    <div>
-                      <p className={`font-medium ${it.stale ? "text-rose-700" : "text-gray-900"}`} title={it.name}>
-                        {name}
-                        {it.stale && (
-                          <span className="ml-2 rounded-full bg-rose-100 px-1.5 py-0.5 text-[10px] font-semibold text-rose-700 align-middle">
-                            Archived
-                          </span>
-                        )}
-                      </p>
-                      <p className={`text-sm ${it.stale ? "text-rose-500/90" : "text-gray-500"}`}>
-                        {it.stale ? `${it.email ? `${it.email} · ` : ""}no longer on the roster — safe to remove` : it.email}
-                      </p>
-                    </div>
+          <Modal.Body className="space-y-3.5 !pt-3">
+            {/* Search Input */}
+            <div className="relative">
+              <Search className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-slate-400 pointer-events-none" />
+              <input
+                type="text"
+                value={manageSearch}
+                onChange={(e) => setManageSearch(e.target.value)}
+                placeholder="Search team members by name or email..."
+                className="h-9 w-full pl-9 pr-3 rounded-lg border-2 border-slate-300 bg-white text-[13px] text-slate-700 placeholder:text-slate-400 focus:outline-none focus:ring-2 focus:ring-indigo-100 focus:border-indigo-400 transition-all"
+              />
+            </div>
+
+            {(() => {
+              const allItems = projectDetail?.project_id === editingAllocation.projectId ? projectDetail.items : [];
+              const q = manageSearch.trim().toLowerCase();
+              const filteredItems = q
+                ? allItems.filter(
+                    (it) =>
+                      (it.name || "").toLowerCase().includes(q) ||
+                      (it.email || "").toLowerCase().includes(q)
+                  )
+                : allItems;
+
+              if (filteredItems.length === 0) {
+                return (
+                  <div className="border border-slate-200 rounded-lg p-6 text-center">
+                    <p className="text-xs text-slate-500">
+                      {q ? "No team members found matching your search" : "No allocations for this project"}
+                    </p>
                   </div>
-                  <button
-                    onClick={() => {
-                      setConfirmState({
-                        variant: "danger",
-                        title: it.stale ? "Remove stale allocation" : "Remove team member",
-                        message: it.stale
-                          ? `${name} is no longer on the roster. Remove their leftover allocation from "${editingAllocation.projectName}"?`
-                          : `Remove ${name} from this project?`,
-                        confirmText: "Remove",
-                        onConfirm: () => {
-                          deleteMutation.mutate(it.allocation_id);
-                          setEditingAllocation(null);
-                          setConfirmState(null);
-                        },
-                      });
-                    }}
-                    className="p-2 text-red-600 hover:bg-red-50 rounded"
-                    title="Remove"
-                  >
-                    <UserMinus className="w-4 h-4" />
-                  </button>
+                );
+              }
+
+              return (
+                <div className="space-y-2 max-h-96 overflow-y-auto pr-0.5">
+                  {filteredItems.map((it) => {
+                    const name = formatDisplayName(it.name);
+                    return (
+                      <div
+                        key={it.allocation_id}
+                        className={`flex items-center justify-between p-3 border rounded-lg transition-colors ${
+                          it.stale
+                            ? "border-rose-200 bg-rose-50/60"
+                            : "border-slate-200 bg-white hover:bg-slate-50"
+                        }`}
+                      >
+                        <div className="flex items-center gap-3 min-w-0">
+                          <div
+                            className={`w-9 h-9 rounded-full flex items-center justify-center text-xs font-semibold shrink-0 ${
+                              it.stale
+                                ? "bg-rose-200 text-rose-700"
+                                : "bg-indigo-600 text-white"
+                            }`}
+                          >
+                            {it.stale ? <UserX className="w-4 h-4" /> : name.charAt(0).toUpperCase()}
+                          </div>
+                          <div className="min-w-0">
+                            <p
+                              className={`text-[13px] font-semibold truncate ${
+                                it.stale ? "text-rose-700" : "text-slate-900"
+                              }`}
+                              title={it.name}
+                            >
+                              {name}
+                              {it.stale && (
+                                <span className="ml-2 rounded-full bg-rose-100 px-1.5 py-0.5 text-[10px] font-bold text-rose-700 align-middle">
+                                  Archived
+                                </span>
+                              )}
+                            </p>
+                            <p
+                              className={`text-xs truncate ${
+                                it.stale ? "text-rose-500/90" : "text-slate-500"
+                              }`}
+                            >
+                              {it.stale
+                                ? `${it.email ? `${it.email} · ` : ""}no longer on the roster — safe to remove`
+                                : it.email}
+                            </p>
+                          </div>
+                        </div>
+                        <button
+                          type="button"
+                          onClick={() => {
+                            setConfirmState({
+                              variant: "danger",
+                              title: it.stale ? "Remove stale allocation" : "Remove team member",
+                              message: it.stale
+                                ? `${name} is no longer on the roster. Remove their leftover allocation from "${editingAllocation.projectName}"?`
+                                : `Remove ${name} from this project?`,
+                              confirmText: "Remove",
+                              onConfirm: () => {
+                                deleteMutation.mutate(it.allocation_id);
+                                setEditingAllocation(null);
+                                setManageSearch("");
+                                setConfirmState(null);
+                              },
+                            });
+                          }}
+                          className="p-1.5 text-rose-500 hover:text-white hover:bg-rose-500 rounded-lg transition-colors shrink-0 ml-2"
+                          title="Remove allocation"
+                        >
+                          <UserMinus className="w-4 h-4" />
+                        </button>
+                      </div>
+                    );
+                  })}
                 </div>
               );
-            })}
+            })()}
           </Modal.Body>
           <Modal.Footer>
-            <Button variant="cancel" onClick={() => setEditingAllocation(null)} className="w-full">
+            <Button
+              type="button"
+              variant="cancel"
+              size="sm"
+              onClick={() => {
+                setEditingAllocation(null);
+                setManageSearch("");
+              }}
+              className="w-full"
+            >
               Close
             </Button>
           </Modal.Footer>

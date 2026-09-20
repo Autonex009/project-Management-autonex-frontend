@@ -9,6 +9,8 @@ const CheckinFilterDropdown = ({
   projectsList,
   statusFilters,
   setStatusFilters,
+  pmConfirmationFilters = [],
+  setPmConfirmationFilters,
   timeFilters,
   customTimeFrom,
   setCustomTimeFrom,
@@ -43,6 +45,7 @@ const CheckinFilterDropdown = ({
   const activeCount =
     projectIds.length +
     statusFilters.length +
+    (pmConfirmationFilters?.length || 0) +
     timeFilters.length +
     workModeFilters.length +
     officeFloorFilters.length +
@@ -131,6 +134,22 @@ const CheckinFilterDropdown = ({
                 ]}
               />
             </div>
+
+            {/* PM Confirmation Filter */}
+            {setPmConfirmationFilters && (
+              <div className="space-y-1">
+                <label className="text-xs font-medium text-slate-600">PM Confirmation</label>
+                <MultiSelect
+                  value={pmConfirmationFilters}
+                  onChange={setPmConfirmationFilters}
+                  placeholder="All Confirmations"
+                  options={[
+                    { value: "confirmed", label: "Confirmed by PM" },
+                    { value: "pending", label: "Pending Confirmation" },
+                  ]}
+                />
+              </div>
+            )}
 
             {/* Work Mode Filter */}
             <div className="space-y-1">

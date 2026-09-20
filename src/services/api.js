@@ -883,6 +883,7 @@ export const checkinApi = {
           work_mode: params.work_mode || undefined,
           office_floor: params.office_floor || undefined,
           sentiment: params.sentiment || undefined,
+          pm_confirmation: params.pm_confirmation || undefined,
         },
       })
       .then((res) => res.data),   
@@ -902,6 +903,7 @@ export const checkinApi = {
           work_mode: params.work_mode || undefined,
           office_floor: params.office_floor || undefined,
           sentiment: params.sentiment || undefined,
+          pm_confirmation: params.pm_confirmation || undefined,
         },
       })
       .then((res) => res.data),   
