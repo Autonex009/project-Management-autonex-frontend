@@ -177,6 +177,20 @@ const getColumns = ({
     render: (_, row) => {
       if (row.salary_missing || row.bonus_limit <= 0)
         return <span className="text-slate-300 text-xs">—</span>;
+      if (row.bonus_eligible === false)
+        return (
+          <div
+            className="flex items-center justify-end"
+            title={
+              row.bonus_ineligible_reason ||
+              "Ineligible: Self-evaluation not completed by 25th"
+            }
+          >
+            <span className="inline-flex items-center gap-1 rounded-full bg-rose-50 px-2 py-0.5 text-[11px] font-medium text-rose-600 border border-rose-200">
+              Ineligible
+            </span>
+          </div>
+        );
       if (locked)
         return row.bonus > 0 ? (
           <span className="font-medium text-amber-700">
@@ -536,10 +550,13 @@ const PayrollPage = () => {
       const totalDeduction = Math.round(totalDeductedDays * perDay * 100) / 100;
       
       // Bonus: capped at the employee's limit; uses the in-progress edit if any,
-      // else the saved/default amount from the preview.
-      const bonusLimit = emp.bonus_limit || 0;
-      const rawBonus = bonuses[emp.employee_id] ?? emp.bonus ?? 0;
-      const bonus = Math.round(Math.max(0, Math.min(Number(rawBonus) || 0, bonusLimit)) * 100) / 100;
+      // else the saved/default amount from the preview. Ineligible employees (e.g. missed self-eval) receive 0.
+      const isBonusEligible = emp.bonus_eligible !== false;
+      const bonusLimit = isBonusEligible ? (emp.bonus_limit || 0) : 0;
+      const rawBonus = isBonusEligible ? (bonuses[emp.employee_id] ?? emp.bonus ?? 0) : 0;
+      const bonus = isBonusEligible
+        ? Math.round(Math.max(0, Math.min(Number(rawBonus) || 0, bonusLimit)) * 100) / 100
+        : 0;
       
       // Additional payment: free-form, no cap (just non-negative).
       const rawAdditional =
@@ -559,7 +576,9 @@ const PayrollPage = () => {
         total_paid_days: totalPaidDays,
         total_deducted_days: totalDeductedDays,
         total_deduction: totalDeduction,
-        bonus_limit: bonusLimit,
+        bonus_limit: emp.bonus_limit || 0,
+        bonus_eligible: isBonusEligible,
+        bonus_ineligible_reason: emp.bonus_ineligible_reason,
         bonus,
         additional_payment: additional,
         final_salary: finalSalary,

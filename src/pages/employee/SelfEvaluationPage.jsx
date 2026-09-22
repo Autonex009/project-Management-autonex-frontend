@@ -21,7 +21,23 @@ import EvaluationDetail from "../../components/perf/EvaluationDetail";
 import ConfirmDialog from "../../components/ui/ConfirmDialog";
 import Table from "../../components/ui/Table";
 import { formatDisplayName } from "../../utils/displayName";
-import { endOfMonth, differenceInDays } from "date-fns";
+
+const getISTDate = () => {
+  const formatter = new Intl.DateTimeFormat("en-US", {
+    timeZone: "Asia/Kolkata",
+    year: "numeric",
+    month: "2-digit",
+    day: "2-digit",
+  });
+  const parts = Object.fromEntries(
+    formatter.formatToParts(new Date()).map((p) => [p.type, p.value]),
+  );
+  return {
+    year: parseInt(parts.year, 10),
+    month: parseInt(parts.month, 10),
+    day: parseInt(parts.day, 10),
+  };
+};
 
 const ProjectEvalPanel = ({
   project,
@@ -42,11 +58,15 @@ const ProjectEvalPanel = ({
   const currentEval = existing.find((e) => e.period === period) || null;
   const liveAverage = averageOf(PERF_PARAMETERS.map((p) => ratings[p.name]));
 
-  const isSubmissionAllowed = useMemo(() => {
-    const today = new Date();
-    const end = endOfMonth(today);
-    return differenceInDays(end, today) <= 6;
+  const istInfo = useMemo(() => {
+    const { day } = getISTDate();
+    const isOpen = day >= 22 && day <= 25;
+    const isPastDeadline = day > 25;
+    const isBeforeOpen = day < 22;
+    return { isOpen, isPastDeadline, isBeforeOpen, day };
   }, []);
+
+  const isSubmissionAllowed = istInfo.isOpen;
 
   const submitMutation = useMutation({
     mutationFn: (data) => perfEvalApi.submit(data),
@@ -107,6 +127,10 @@ const ProjectEvalPanel = ({
         <div className="flex items-center gap-3 shrink-0">
           {currentEval ? (
             <StatusBadge status={currentEval.status} />
+          ) : istInfo.isPastDeadline ? (
+            <span className="rounded-full bg-rose-50 px-2.5 py-1 text-xs font-medium text-rose-600 border border-rose-200">
+              Missed deadline
+            </span>
           ) : (
             <span className="rounded-full bg-slate-100 px-2.5 py-1 text-xs font-medium text-slate-500">
               Not submitted
@@ -153,15 +177,23 @@ const ProjectEvalPanel = ({
           ) : !isSubmissionAllowed ? (
             <div className="rounded-xl bg-slate-50 px-4 py-8 text-center border border-slate-100 mt-2">
               <Lock className="mx-auto h-8 w-8 text-slate-300 mb-2" />
-              <p className="text-sm font-medium text-slate-600">
-                Submissions Closed
+              <p className="text-sm font-medium text-slate-700">
+                {istInfo.isPastDeadline
+                  ? "Self-Evaluation Window Closed"
+                  : "Self-Evaluation Window Not Open"}
               </p>
-              <p className="text-xs text-slate-400 mt-1">
-                The performance evaluation form is only open during the last week of the month.
+              <p className="text-xs text-slate-500 mt-1 max-w-md mx-auto">
+                {istInfo.isPastDeadline
+                  ? "The self-evaluation window closed on the 25th. Submissions for this cycle are locked to finalize monthly payroll processing. Employees who missed the window are ineligible for the monthly bonus."
+                  : "The performance evaluation form is open between the 22nd and 25th of the month."}
               </p>
             </div>
           ) : (
-            <form onSubmit={handleSubmit} className="space-y-3">
+            <div className="space-y-4">
+              <div className="rounded-xl bg-amber-50/80 border border-amber-200/80 p-3 text-xs text-amber-800">
+                <strong>Self-Evaluation Window Open (22nd–25th):</strong> Submissions close automatically after the 25th to complete monthly payroll processing. Complete your evaluation to remain eligible for the monthly bonus.
+              </div>
+              <form onSubmit={handleSubmit} className="space-y-3">
               {PERF_PARAMETERS.map((p) => (
                 <div
                   key={formatDisplayName(p.name)}
@@ -210,6 +242,7 @@ const ProjectEvalPanel = ({
                 Once submitted, the review is locked and cannot be edited.
               </p>
             </form>
+            </div>
           )}
         </div>
       )}
@@ -454,8 +487,8 @@ const SelfEvaluationPage = () => {
             Monthly Self-Evaluation
           </h1>
           <p className="text-slate-500 text-[13px] mt-0.5">
-            Rate yourself on each parameter once a month. Your submission is
-            locked and reviewed by the Admin.
+            Submit your self-evaluation between the 22nd and 25th of the month. Submissions
+            close after the 25th for monthly payroll processing and are reviewed by Admin.
           </p>
         </div>
 
@@ -488,8 +521,8 @@ const SelfEvaluationPage = () => {
           Monthly Performance Review
         </h1>
         <p className="text-slate-500 text-[13px] mt-0.5">
-          Rate yourself on each parameter for every project you're allocated to.
-          Submissions are locked and reviewed by your PM.
+          Submit your review between the 22nd and 25th of the month for each allocated project. Submissions
+          close after the 25th to determine monthly bonus eligibility and are reviewed by your PM.
         </p>
       </div>
 
