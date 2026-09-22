@@ -21,7 +21,6 @@ import EvaluationDetail from "../../components/perf/EvaluationDetail";
 import ConfirmDialog from "../../components/ui/ConfirmDialog";
 import Table from "../../components/ui/Table";
 import { formatDisplayName } from "../../utils/displayName";
-import { endOfMonth, differenceInDays } from "date-fns";
 
 const getISTDate = () => {
   const formatter = new Intl.DateTimeFormat("en-US", {
