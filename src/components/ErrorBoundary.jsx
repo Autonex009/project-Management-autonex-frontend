@@ -3,19 +3,43 @@ import React from 'react';
 class ErrorBoundary extends React.Component {
   constructor(props) {
     super(props);
-    this.state = { hasError: false, error: null };
+    this.state = { hasError: false, error: null, isReloading: false };
   }
 
   static getDerivedStateFromError(error) {
-    return { hasError: true, error };
+    const isChunkLoadFailed = 
+      error?.message?.includes('Failed to fetch dynamically imported module') || 
+      error?.message?.includes('Importing a module script failed');
+
+    if (isChunkLoadFailed) {
+      const chunkFailedMessage = 'chunk_failed_reload';
+      if (!sessionStorage.getItem(chunkFailedMessage)) {
+        sessionStorage.setItem(chunkFailedMessage, 'true');
+        return { hasError: true, error, isReloading: true };
+      }
+    }
+
+    return { hasError: true, error, isReloading: false };
   }
 
   componentDidCatch(error, errorInfo) {
     console.error('ErrorBoundary caught an error:', error, errorInfo);
+    
+    if (this.state.isReloading) {
+      window.location.reload();
+    }
   }
 
   render() {
     if (this.state.hasError) {
+      if (this.state.isReloading) {
+        return (
+          <div className="flex flex-col items-center justify-center min-h-screen bg-slate-50 p-6 text-center">
+            <div className="text-slate-600 font-medium">Applying updates... Reloading application...</div>
+          </div>
+        );
+      }
+
       return (
         <div className="flex flex-col items-center justify-center min-h-screen bg-slate-50 p-6 text-center">
           <div className="bg-white p-8 rounded-2xl shadow-xl max-w-lg w-full border border-slate-200">
