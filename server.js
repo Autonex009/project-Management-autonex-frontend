@@ -60,6 +60,13 @@ async function main() {
     // Only handle GET navigations; let other methods fall through.
     if (req.method !== 'GET') return next();
     const url = req.originalUrl;
+    
+    // If the request is for a static asset that somehow reached SSR (meaning it doesn't exist), return 404
+    if (url.match(/\.(js|css|ico|png|jpg|jpeg|svg|woff|woff2|ttf|eot)$/i)) {
+      res.status(404).end('Not found');
+      return;
+    }
+
     try {
       let html;
       if (!isProd) {
@@ -75,7 +82,13 @@ async function main() {
         const { html: appHtml } = await render(url, req.headers.cookie || '');
         html = template.replace('<!--ssr-outlet-->', appHtml);
       }
-      res.status(200).set({ 'Content-Type': 'text/html' }).end(html);
+      
+      res.setHeader('Content-Type', 'text/html');
+      res.setHeader('Cache-Control', 'no-cache, no-store, must-revalidate');
+      res.setHeader('Pragma', 'no-cache');
+      res.setHeader('Expires', '0');
+      
+      res.status(200).end(html);
     } catch (e) {
       if (!isProd && vite) vite.ssrFixStacktrace(e);
       console.error(e);

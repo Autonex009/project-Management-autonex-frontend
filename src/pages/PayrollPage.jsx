@@ -183,7 +183,7 @@ const getColumns = ({
             className="flex items-center justify-end"
             title={
               row.bonus_ineligible_reason ||
-              "Ineligible: Self-evaluation not completed by 25th"
+              "Ineligible: Self-evaluation not completed by end of month"
             }
           >
             <span className="inline-flex items-center gap-1 rounded-full bg-rose-50 px-2 py-0.5 text-[11px] font-medium text-rose-600 border border-rose-200">
