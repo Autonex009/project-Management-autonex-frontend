@@ -16,10 +16,22 @@ const template = readFileSync(
 );
 
 export default async function handler(req, res) {
+  // If the request is for a static asset that somehow reached SSR (meaning it doesn't exist), return 404
+  if (req.url.match(/\.(js|css|ico|png|jpg|jpeg|svg|woff|woff2|ttf|eot)$/i)) {
+    res.status(404).end('Not found');
+    return;
+  }
+
   try {
     const { html: appHtml } = await render(req.url, req.headers.cookie || '');
     const html = template.replace('<!--ssr-outlet-->', appHtml);
+    
+    // Ensure HTML is never cached by browser or CDN
     res.setHeader('Content-Type', 'text/html');
+    res.setHeader('Cache-Control', 'no-cache, no-store, must-revalidate');
+    res.setHeader('Pragma', 'no-cache');
+    res.setHeader('Expires', '0');
+    
     res.status(200).end(html);
   } catch (e) {
     console.error(e);
