@@ -21,7 +21,22 @@ import {
   Filter,
   Lock,
 } from "lucide-react";
-import { endOfMonth, differenceInDays } from "date-fns";
+const getISTDate = () => {
+  const formatter = new Intl.DateTimeFormat("en-US", {
+    timeZone: "Asia/Kolkata",
+    year: "numeric",
+    month: "2-digit",
+    day: "2-digit",
+  });
+  const parts = Object.fromEntries(
+    formatter.formatToParts(new Date()).map((p) => [p.type, p.value]),
+  );
+  return {
+    year: parseInt(parts.year, 10),
+    month: parseInt(parts.month, 10),
+    day: parseInt(parts.day, 10),
+  };
+};
 import StarRating, { formatPeriod, currentPeriod, shiftPeriod } from "../../components/perf/StarRating";
 import { StatusPill, fmtDate, RatingCell, MonthStepper } from "../../components/perf/perfTableCells";
 import EvaluationDetail from "../../components/perf/EvaluationDetail";
@@ -453,10 +468,12 @@ const AdminPerformancePage = () => {
     return ids.map((id) => empById.get(Number(id))?.name).filter(Boolean);
   };
 
-  const isSubmissionAllowed = useMemo(() => {
-    const today = new Date();
-    const end = endOfMonth(today);
-    return differenceInDays(end, today) <= 6;
+  const istInfo = useMemo(() => {
+    const { day } = getISTDate();
+    const isOpen = day >= 22 && day <= 25;
+    const isPastDeadline = day > 25;
+    const isBeforeOpen = day < 22;
+    return { isOpen, isPastDeadline, isBeforeOpen, day };
   }, []);
 
   const pmOptions = useMemo(() => {
@@ -1103,14 +1120,14 @@ const AdminPerformancePage = () => {
               loading
               skeletonRows={10}
             />
-          ) : !isSubmissionAllowed && topTab === "active" ? (
+          ) : istInfo.isBeforeOpen && evaluationsTotal === 0 && topTab === "active" ? (
             <div className="rounded-3xl border border-dashed border-slate-200 bg-white p-12 text-center shadow-sm">
               <Lock className="mx-auto h-10 w-10 text-slate-300" />
               <h2 className="mt-4 text-lg font-semibold text-slate-800">
-                Submissions Locked
+                Self-Evaluation Window Not Open
               </h2>
               <p className="mt-2 text-sm text-slate-500 max-w-md mx-auto">
-                The current cycle is locked. Data will be available when the window opens in the last week of the month.
+                The current cycle submission window opens on the 22nd of the month.
               </p>
             </div>
           ) : evaluationsTotal === 0 && !search.trim() && roleFilter === "all" && projectFilter === "all" && statusFilter === "all" && pmFilter === "all" ? (
