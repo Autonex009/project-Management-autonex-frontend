@@ -60,8 +60,8 @@ const ProjectEvalPanel = ({
 
   const istInfo = useMemo(() => {
     const { day } = getISTDate();
-    const isOpen = day >= 22 && day <= 25;
-    const isPastDeadline = day > 25;
+    const isOpen = day >= 22;
+    const isPastDeadline = false; // Ends at month rollover
     const isBeforeOpen = day < 22;
     return { isOpen, isPastDeadline, isBeforeOpen, day };
   }, []);
@@ -183,15 +183,15 @@ const ProjectEvalPanel = ({
                   : "Self-Evaluation Window Not Open"}
               </p>
               <p className="text-xs text-slate-500 mt-1 max-w-md mx-auto">
-                {istInfo.isPastDeadline
-                  ? "The self-evaluation window closed on the 25th. Submissions for this cycle are locked to finalize monthly payroll processing. Employees who missed the window are ineligible for the monthly bonus."
-                  : "The performance evaluation form is open between the 22nd and 25th of the month."}
+                {istInfo.isBeforeOpen
+                  ? "The performance evaluation form opens on the 22nd and stays open until the end of the month."
+                  : "The self-evaluation window is closed."}
               </p>
             </div>
           ) : (
             <div className="space-y-4">
               <div className="rounded-xl bg-amber-50/80 border border-amber-200/80 p-3 text-xs text-amber-800">
-                <strong>Self-Evaluation Window Open (22nd–25th):</strong> Submissions close automatically after the 25th to complete monthly payroll processing. Complete your evaluation to remain eligible for the monthly bonus.
+                <strong>Self-Evaluation Window Open:</strong> Submissions close automatically at the end of the month. Complete your evaluation to remain eligible for the monthly bonus.
               </div>
               <form onSubmit={handleSubmit} className="space-y-3">
               {PERF_PARAMETERS.map((p) => (
@@ -487,8 +487,8 @@ const SelfEvaluationPage = () => {
             Monthly Self-Evaluation
           </h1>
           <p className="text-slate-500 text-[13px] mt-0.5">
-            Submit your self-evaluation between the 22nd and 25th of the month. Submissions
-            close after the 25th for monthly payroll processing and are reviewed by Admin.
+            Submit your self-evaluation between the 22nd and the end of the month. Submissions
+            close at the end of the month for payroll processing and are reviewed by Admin.
           </p>
         </div>
 
@@ -521,8 +521,8 @@ const SelfEvaluationPage = () => {
           Monthly Performance Review
         </h1>
         <p className="text-slate-500 text-[13px] mt-0.5">
-          Submit your review between the 22nd and 25th of the month for each allocated project. Submissions
-          close after the 25th to determine monthly bonus eligibility and are reviewed by your PM.
+          Submit your review between the 22nd and the end of the month for each allocated project. Submissions
+          close at the end of the month to determine monthly bonus eligibility and are reviewed by your PM.
         </p>
       </div>
 
