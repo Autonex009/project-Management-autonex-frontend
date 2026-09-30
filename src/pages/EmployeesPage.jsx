@@ -1609,6 +1609,7 @@ const EmployeesPage = () => {
       customTimeFrom,
       customTimeTo,
       officeFloorFilter,
+      colWorkModel,
     ],
     queryFn: () =>
       employeeApi.getPaginated({
@@ -1626,6 +1627,7 @@ const EmployeesPage = () => {
         time_from: customTimeFrom || undefined,
         time_to: customTimeTo || undefined,
         office_floor: Array.isArray(officeFloorFilter) && officeFloorFilter.length > 0 ? officeFloorFilter.join(",") : undefined,
+        col_work_model: Array.isArray(colWorkModel) && colWorkModel.length > 0 ? colWorkModel.join(",") : (typeof colWorkModel === "string" && colWorkModel ? colWorkModel : undefined),
       }),
     placeholderData: (prev) => prev,
     staleTime: 1000 * 60 * 5, // 5 minutes

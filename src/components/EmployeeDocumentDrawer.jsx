@@ -254,16 +254,9 @@ export default function EmployeeDocumentDrawer({ employee, onClose }) {
   const bulkGenerateMutation = useMutation({
     mutationFn: () => employeeDocumentApi.bulkGenerate(employee.id),
     onSuccess: (data) => {
-      const ok = (data.results || []).filter((r) => r.status === "ok").length;
-      const fail = (data.results || []).filter((r) => r.status === "error").length;
-      if (fail === 0) {
-        toast.success(`All ${ok} documents generated successfully`);
-      } else {
-        toast.error(`${ok} generated, ${fail} failed — check console`);
-        console.error("Bulk generate errors:", data.results.filter((r) => r.status === "error"));
-      }
-      queryClient.invalidateQueries({ queryKey: qKey });
-      queryClient.invalidateQueries({ queryKey: ["employee-docs-summary", employee.id] });
+      toast.success(data.message || "Bulk document generation started in the background.");
+      toast.info("This process takes a few minutes. Check back soon for the latest documents.");
+      // Note: We don't instantly invalidate the query because the documents are still generating.
     },
     onError: (err) => {
       toast.error(`Bulk generate failed: ${err?.response?.data?.detail || err.message}`);
