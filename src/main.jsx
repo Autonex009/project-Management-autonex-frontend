@@ -12,6 +12,8 @@ window.addEventListener('vite:preloadError', (event) => {
   }
 });
 
+
+//check
 ReactDOM.createRoot(document.getElementById("root")).render(
   <React.StrictMode>
     <App />
