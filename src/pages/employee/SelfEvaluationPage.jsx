@@ -1,4 +1,5 @@
 import React, { useMemo, useState } from "react";
+import { createPortal } from "react-dom";
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
 import { allocationApi, subProjectApi, perfEvalApi } from "../../services/api";
 import {
@@ -8,6 +9,7 @@ import {
   CheckCircle2,
   Lock,
   History as HistoryIcon,
+  X,
 } from "lucide-react";
 import toast from "react-hot-toast";
 import StarRating, {
@@ -45,11 +47,13 @@ const ProjectEvalPanel = ({
   submittedBy,
   existing,
   reviewerLabel = "PM",
+  isLateSubmission = false,
+  onLateSubmitSuccess,
 }) => {
   const [expanded, setExpanded] = useState(false);
   const queryClient = useQueryClient();
 
-  const [period, setPeriod] = useState(currentPeriod());
+  const [period, setPeriod] = useState(isLateSubmission ? "2026-09" : currentPeriod());
   const [ratings, setRatings] = useState({}); // { paramName: 1-5 }
   const [comment, setComment] = useState("");
   const [confirmOpen, setConfirmOpen] = useState(false);
@@ -59,12 +63,17 @@ const ProjectEvalPanel = ({
   const liveAverage = averageOf(PERF_PARAMETERS.map((p) => ratings[p.name]));
 
   const istInfo = useMemo(() => {
-    const { day } = getISTDate();
-    const isOpen = day >= 22;
-    const isPastDeadline = false; // Ends at month rollover
-    const isBeforeOpen = day < 22;
+    const { day, month } = getISTDate();
+    
+    // Exception logic for September
+    const isSeptException = period === "2026-09" && month === 10 && day >= 2 && day <= 4;
+    
+    const isOpen = (day >= 20 && day <= 24) || isSeptException;
+    const isPastDeadline = !isSeptException && day > 24;
+    const isBeforeOpen = !isSeptException && day < 20;
+    
     return { isOpen, isPastDeadline, isBeforeOpen, day };
-  }, []);
+  }, [period]);
 
   const isSubmissionAllowed = istInfo.isOpen;
 
@@ -75,6 +84,7 @@ const ProjectEvalPanel = ({
       toast.success("Review submitted");
       setRatings({});
       setComment("");
+      if (onLateSubmitSuccess) onLateSubmitSuccess();
     },
     onError: (err) =>
       toast.error(err?.response?.data?.detail || "Failed to submit"),
@@ -184,14 +194,18 @@ const ProjectEvalPanel = ({
               </p>
               <p className="text-xs text-slate-500 mt-1 max-w-md mx-auto">
                 {istInfo.isBeforeOpen
-                  ? "The performance evaluation form opens on the 22nd and stays open until the end of the month."
+                  ? "The performance evaluation form opens on the 20th and stays open until the 24th."
                   : "The self-evaluation window is closed."}
               </p>
             </div>
           ) : (
             <div className="space-y-4">
               <div className="rounded-xl bg-amber-50/80 border border-amber-200/80 p-3 text-xs text-amber-800">
-                <strong>Self-Evaluation Window Open:</strong> Submissions close automatically at the end of the month. Complete your evaluation to remain eligible for the monthly bonus.
+                {isLateSubmission ? (
+                  <><strong>Late Submission Window:</strong> You are completing your missing September evaluation.</>
+                ) : (
+                  <><strong>Self-Evaluation Window Open:</strong> Submissions close automatically on the 24th. Complete your evaluation to remain eligible for the monthly bonus.</>
+                )}
               </div>
               <form onSubmit={handleSubmit} className="space-y-3">
               {PERF_PARAMETERS.map((p) => (
@@ -299,6 +313,7 @@ const SelfEvaluationPage = () => {
   const [tab, setTab] = useState("reviews"); // 'reviews' | 'history'
   const [historyMonth, setHistoryMonth] = useState(maxHistoryMonth);
   const [expandedHistory, setExpandedHistory] = useState(null);
+  const [lateModalOpen, setLateModalOpen] = useState(false);
 
   const { data: allocations = [], isLoading: allocLoading } = useQuery({
     queryKey: ["my-allocations", employeeId],
@@ -318,6 +333,17 @@ const SelfEvaluationPage = () => {
     enabled: !!employeeId,
   });
   const myEvals = myEvalsData?.items || [];
+
+  const { month, day } = getISTDate();
+  
+  // Highly optimized in-memory check (0 network overhead)
+  const missedSeptember = useMemo(() => {
+    if (month !== 10 || day < 2 || day > 4) return false;
+    
+    // Check if they submitted ANY evaluation for "2026-09"
+    const hasSeptEval = myEvals.some(ev => ev.period === "2026-09");
+    return !hasSeptEval;
+  }, [myEvals, month, day]);
 
   const myProjects = useMemo(() => {
     const ids = new Set(allocations.map((a) => a.sub_project_id));
@@ -487,8 +513,8 @@ const SelfEvaluationPage = () => {
             Monthly Self-Evaluation
           </h1>
           <p className="text-slate-500 text-[13px] mt-0.5">
-            Submit your self-evaluation between the 22nd and the end of the month. Submissions
-            close at the end of the month for payroll processing and are reviewed by Admin.
+            Submit your self-evaluation between the 20th and the 24th of the month. Submissions
+            close on the 24th for payroll processing and are reviewed by Admin.
           </p>
         </div>
 
@@ -521,8 +547,8 @@ const SelfEvaluationPage = () => {
           Monthly Performance Review
         </h1>
         <p className="text-slate-500 text-[13px] mt-0.5">
-          Submit your review between the 22nd and the end of the month for each allocated project. Submissions
-          close at the end of the month to determine monthly bonus eligibility and are reviewed by your PM.
+          Submit your review between the 20th and the 24th of the month for each allocated project. Submissions
+          close on the 24th to determine monthly bonus eligibility and are reviewed by your PM.
         </p>
       </div>
 
@@ -545,8 +571,30 @@ const SelfEvaluationPage = () => {
           </p>
         </div>
       ) : (
-        <div className="space-y-4">
-          {myProjects.map((project) => (
+        <div>
+          {missedSeptember && (
+            <div className="mb-6 rounded-xl border border-amber-200 bg-amber-50 p-4 shadow-sm">
+              <div className="flex items-center gap-3">
+                <div className="flex h-8 w-8 items-center justify-center rounded-full bg-amber-100 text-amber-600">
+                  <HistoryIcon size={18} />
+                </div>
+                <div>
+                  <h3 className="font-medium text-amber-900">September Evaluation is Open</h3>
+                  <p className="text-sm text-amber-700">
+                    You missed your September self-evaluation. The window has been reopened for you from October 2nd to 4th.
+                  </p>
+                  <button 
+                    onClick={() => setLateModalOpen(true)}
+                    className="mt-3 inline-flex items-center rounded-lg bg-amber-600 px-4 py-2 text-sm font-medium text-white shadow-sm hover:bg-amber-700 transition-colors"
+                  >
+                    Complete September Review
+                  </button>
+                </div>
+              </div>
+            </div>
+          )}
+          <div className="space-y-4">
+            {myProjects.map((project) => (
             <ProjectEvalPanel
               key={project.id}
               project={project}
@@ -555,7 +603,44 @@ const SelfEvaluationPage = () => {
               existing={evalsByProject(project.id)}
             />
           ))}
+          </div>
         </div>
+      )}
+      
+      {lateModalOpen && createPortal(
+        <div className="fixed inset-0 z-50 flex items-center justify-center bg-slate-900/50 p-4">
+          <div className="w-full max-w-2xl bg-slate-50 rounded-2xl shadow-xl max-h-[90vh] overflow-hidden flex flex-col">
+            <div className="flex justify-between items-center p-5 border-b border-slate-200 bg-white">
+               <h2 className="text-lg font-bold text-slate-800">September Evaluation</h2>
+               <button onClick={() => setLateModalOpen(false)} className="text-slate-400 hover:text-slate-600"><X size={20} /></button>
+            </div>
+            <div className="p-5 overflow-y-auto space-y-4">
+               {isPm ? (
+                  <ProjectEvalPanel 
+                    project={PM_SELF_PROJECT} 
+                    employeeId={employeeId} 
+                    submittedBy={user.id} 
+                    existing={evalsByProject(0)} 
+                    reviewerLabel="Admin" 
+                    isLateSubmission={true}
+                    onLateSubmitSuccess={() => setLateModalOpen(false)}
+                  />
+               ) : (
+                 myProjects.map(p => (
+                   <ProjectEvalPanel 
+                     key={p.id} 
+                     project={p} 
+                     employeeId={employeeId} 
+                     submittedBy={user.id} 
+                     existing={evalsByProject(p.id)} 
+                     isLateSubmission={true} 
+                     onLateSubmitSuccess={() => setLateModalOpen(false)}
+                   />
+                 ))
+               )}
+            </div>
+          </div>
+        </div>, document.body
       )}
     </div>
   );
