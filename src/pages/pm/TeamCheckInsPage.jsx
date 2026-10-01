@@ -501,6 +501,7 @@ const TeamCheckInsPage = () => {
                   rows: [
                     { label: "Order Tiffin", value: data?.kpi_order_tiffin ?? 0 },
                     { label: "Canteen", value: data?.kpi_canteen ?? 0 },
+                    { label: "None", value: data?.kpi_lunch_none ?? 0 },
                   ]
                 }
               ]}
