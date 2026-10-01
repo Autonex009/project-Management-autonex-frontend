@@ -470,9 +470,9 @@ const AdminPerformancePage = () => {
 
   const istInfo = useMemo(() => {
     const { day } = getISTDate();
-    const isOpen = day >= 22 && day <= 25;
-    const isPastDeadline = day > 25;
-    const isBeforeOpen = day < 22;
+    const isOpen = day >= 20 && day <= 24;
+    const isPastDeadline = day > 24;
+    const isBeforeOpen = day < 20;
     return { isOpen, isPastDeadline, isBeforeOpen, day };
   }, []);
 
@@ -1127,7 +1127,7 @@ const AdminPerformancePage = () => {
                 Self-Evaluation Window Not Open
               </h2>
               <p className="mt-2 text-sm text-slate-500 max-w-md mx-auto">
-                The current cycle submission window opens on the 22nd of the month.
+                The current cycle submission window opens on the 20th of the month.
               </p>
             </div>
           ) : evaluationsTotal === 0 && !search.trim() && roleFilter === "all" && projectFilter === "all" && statusFilter === "all" && pmFilter === "all" ? (
