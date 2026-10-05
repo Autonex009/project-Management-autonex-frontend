@@ -374,7 +374,7 @@ const ProjectCard = ({
                 for one reviewer reads as wrong. */}
             <p className="text-sm font-semibold text-slate-800 tabular-nums">
               {requiredManpower}
-              <SlotBreakdown pmSlots={pmSlots} leadSlots={leadSlots} tempSlots={tempSlots} />
+              <SlotBreakdown pmSlots={pmSlots} leadSlots={leadSlots} />
             </p>
           </CardField>
 

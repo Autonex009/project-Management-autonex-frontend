@@ -22,6 +22,7 @@ const MOODS = [
 const OFFICE_FLOORS = [
   { value: "7", label: "7" },
   { value: "9", label: "9" },
+  { value: "15", label: "15" },
   { value: "17", label: "17" },
 ];
 
@@ -270,7 +271,7 @@ export default function DailyCheckInModal() {
             {/* Office Floor Selection */}
             <section className="space-y-3 pt-2 border-t border-slate-100">
               <SectionHeader title="Which floor will you work from?" required icon={Building2} />
-              <div className="grid grid-cols-3 gap-2">
+              <div className="grid grid-cols-2 sm:grid-cols-4 gap-2">
                 {OFFICE_FLOORS.map((floor) => (
                   <button
                     key={floor.value}
