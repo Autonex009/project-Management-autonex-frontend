@@ -8,22 +8,29 @@ const EmployeeProjectsPage = () => {
   const user = JSON.parse(localStorage.getItem("user") || "{}");
   const employeeId = user.employee_id;
 
-  const { data: allocations = [], isLoading } = useQuery({
+  const { data: allocations = [], isLoading: isAllocLoading } = useQuery({
     queryKey: ["my-allocations", employeeId],
     queryFn: () => allocationApi.getByEmployee(employeeId),
     enabled: !!employeeId,
   });
-  const { data: projects = [] } = useQuery({
+  const { data: projects = [], isLoading: isProjLoading } = useQuery({
     queryKey: ["sub-projects"],
     queryFn: () => subProjectApi.getAll(),
   });
 
+  const isLoading = isAllocLoading || (isProjLoading && allocations.length === 0);
+
   const myProjects = allocations
     .map((alloc) => {
       const project = projects.find((p) => p.id === alloc.sub_project_id);
-      return { ...alloc, project };
+      const projectDetails = project || {
+        name: alloc.sub_project_name || alloc.project_name || "Project",
+        client: alloc.client || "Autonex",
+        project_type: alloc.project_type || (alloc.role_tags && alloc.role_tags[0]) || "General",
+      };
+      return { ...alloc, project: projectDetails };
     })
-    .filter((a) => a.project);
+    .filter((a) => a.project && a.is_active !== false);
 
   console.log(myProjects);
   return (

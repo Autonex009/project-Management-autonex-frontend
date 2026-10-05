@@ -467,8 +467,8 @@ const TeamCheckInsPage = () => {
                 <MetricDots
                   items={[
                     {
-                      label: "F7/9/17",
-                      value: `${data?.kpi_floor_7 ?? 0}/${data?.kpi_floor_9 ?? 0}/${data?.kpi_floor_17 ?? 0}`,
+                      label: "F7/9/15/17",
+                      value: `${data?.kpi_floor_7 ?? 0}/${data?.kpi_floor_9 ?? 0}/${data?.kpi_floor_15 ?? 0}/${data?.kpi_floor_17 ?? 0}`,
                       dot: "bg-indigo-400",
                       tone: "text-indigo-700",
                     },
@@ -493,6 +493,7 @@ const TeamCheckInsPage = () => {
                   rows: [
                     { label: "Floor 7", value: data?.kpi_floor_7 ?? 0 },
                     { label: "Floor 9", value: data?.kpi_floor_9 ?? 0 },
+                    { label: "Floor 15", value: data?.kpi_floor_15 ?? 0 },
                     { label: "Floor 17", value: data?.kpi_floor_17 ?? 0 },
                   ]
                 },

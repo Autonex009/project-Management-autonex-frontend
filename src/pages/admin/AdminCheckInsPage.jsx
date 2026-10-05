@@ -487,6 +487,13 @@ const AdminCheckInsPage = () => {
                       onClick: () => applyFloorFilter("9"),
                     },
                     {
+                      label: "F15",
+                      value: data?.kpi_floor_15 ?? 0,
+                      dot: "bg-indigo-500",
+                      tone: "text-indigo-700",
+                      onClick: () => applyFloorFilter("15"),
+                    },
+                    {
                       label: "F17",
                       value: data?.kpi_floor_17 ?? 0,
                       dot: "bg-indigo-600",
@@ -502,6 +509,7 @@ const AdminCheckInsPage = () => {
                   rows: [
                     { label: "Floor 7", value: data?.kpi_floor_7 ?? 0, onClick: () => applyFloorFilter("7") },
                     { label: "Floor 9", value: data?.kpi_floor_9 ?? 0, onClick: () => applyFloorFilter("9") },
+                    { label: "Floor 15", value: data?.kpi_floor_15 ?? 0, onClick: () => applyFloorFilter("15") },
                     { label: "Floor 17", value: data?.kpi_floor_17 ?? 0, onClick: () => applyFloorFilter("17") },
                   ]
                 },

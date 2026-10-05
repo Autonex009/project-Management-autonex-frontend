@@ -980,6 +980,7 @@ const TIME_OPTIONS = [
 const FLOOR_OPTIONS = [
   { value: "7", label: "Floor 7" },
   { value: "9", label: "Floor 9" },
+  { value: "15", label: "Floor 15" },
   { value: "17", label: "Floor 17" },
 ];
 
