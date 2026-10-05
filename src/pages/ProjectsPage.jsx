@@ -1817,7 +1817,7 @@ const ProjectsPage = () => {
                     onLeaveEmployeeIds={leaveEmployeeIds}
                     locationByEmployeeId={locationByEmployeeId}
                     allocatedManpower={allocatedManpower}
-                    requiredManpower={project.required_manpower || 0}
+                    requiredManpower={getRequiredManpower(project)}
                     pmSlots={getPmSlots(project)}
                     leadSlots={getTeamLeadIds(project).filter(id => employeeIndex.has(String(id))).length}
                     allocations={allocations}
