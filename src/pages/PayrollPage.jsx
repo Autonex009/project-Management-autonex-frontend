@@ -847,7 +847,7 @@ const PayrollPage = () => {
                 </button>
     
                 {filterOpen && (
-                  <div className="absolute right-0 mt-1.5 z-40 w-56 bg-white rounded-xl shadow-xl border border-slate-200 p-3">
+                  <div className="absolute left-0 mt-1.5 z-40 w-56 bg-white rounded-xl shadow-xl border border-slate-200 p-3">
                     <div className="flex flex-col gap-2.5">
                       <div className="space-y-1">
                         <label className="text-[10px] font-semibold uppercase tracking-wide text-slate-400">
