@@ -339,6 +339,7 @@ export const allocationApi = {
 export const leaveApi = {
   getTeamSummary: (pmId) => api.get("/leaves/team-summary", { params: { pm_id: pmId } }).then((res) => res.data),
   getAll: (params) => api.get("/leaves", { params }).then((res) => res.data),
+  getBalances: (params) => api.get("/leaves/balances", { params }).then((res) => res.data),
   getTodayIds: () => api.get("/leaves/today-ids").then((res) => res.data),
   create: (data) => api.post("/leaves", data).then((res) => res.data),
   update: (id, data) => api.put(`/leaves/${id}`, data).then((res) => res.data),

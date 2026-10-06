@@ -12,6 +12,9 @@ const LEGACY_LEAVE_TYPE_ALIASES = {
   sick: "casual_sick",
   personal: "floater",
   emergency: "floater",
+  half_day: "paid",
+  first_half: "paid",
+  second_half: "paid",
 };
 
 const LEAVE_TYPE_LABELS = Object.fromEntries(
@@ -190,6 +193,8 @@ export function normalizeLeaveType(value) {
 }
 
 export function getLeaveTypeLabel(value) {
+  const raw = (value || "").trim().toLowerCase().replace(/[- ]/g, "_");
+  if (LEAVE_TYPE_LABELS[raw]) return LEAVE_TYPE_LABELS[raw];
   const normalized = normalizeLeaveType(value);
   return (
     LEAVE_TYPE_LABELS[normalized] ||
@@ -198,6 +203,8 @@ export function getLeaveTypeLabel(value) {
 }
 
 export function getLeaveTypeBadgeClass(value) {
+  const raw = (value || "").trim().toLowerCase().replace(/[- ]/g, "_");
+  if (LEAVE_TYPE_BADGES[raw]) return LEAVE_TYPE_BADGES[raw];
   return (
     LEAVE_TYPE_BADGES[normalizeLeaveType(value)] ||
     "bg-slate-100 text-slate-600"

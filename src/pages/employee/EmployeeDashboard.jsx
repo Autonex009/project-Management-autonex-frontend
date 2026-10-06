@@ -491,6 +491,12 @@ const EmployeeDashboard = () => {
     enabled: !!employeeId,
   });
 
+  const { data: serverBalances } = useQuery({
+    queryKey: ["leave-balances", employeeId],
+    queryFn: () => leaveApi.getBalances({ employee_id: employeeId }),
+    enabled: !!employeeId,
+  });
+
   const { data: myWfh = [] } = useQuery({
     queryKey: ["my-wfh", employeeId],
     queryFn: () => wfhApi.getAll({ employee_id: employeeId }),
@@ -1021,7 +1027,12 @@ const EmployeeDashboard = () => {
     allLeaves.forEach((leave) => {
       if ((leave.status || "pending").toLowerCase() !== "approved") return;
       const type = normalizeLeaveType(leave.leave_type);
-      const days = leave.is_half_day
+      const isHalf =
+        Boolean(leave.is_half_day) ||
+        leave.leave_type === "first_half" ||
+        leave.leave_type === "second_half" ||
+        leave.leave_type === "half_day";
+      const days = isHalf
         ? 0.5
         : leave.start_date && leave.end_date
           ? getWorkingDayCount(leave.start_date, leave.end_date)
@@ -1040,17 +1051,17 @@ const EmployeeDashboard = () => {
         usedYear[type] += days;
     });
 
-    const paidQuota = internOrContractor
+    const paidQuota = serverBalances?.paid?.quota ?? (internOrContractor
       ? INTERN_MONTHLY_PAID_QUOTA
-      : ANNUAL_LEAVE_QUOTA?.paid || 22;
-    const paidUsed = internOrContractor ? paidUsedThisMonth : usedYear.paid;
-    const paidRemaining = Math.max(paidQuota - paidUsed, 0);
+      : ANNUAL_LEAVE_QUOTA?.paid || 22);
+    const paidUsed = serverBalances?.paid?.used ?? (internOrContractor ? paidUsedThisMonth : usedYear.paid);
+    const paidRemaining = serverBalances?.paid?.remaining ?? Math.max(paidQuota - paidUsed, 0);
 
-    const casualQuota = internOrContractor
+    const casualQuota = serverBalances?.casual_sick?.quota ?? (internOrContractor
       ? 0
-      : ANNUAL_LEAVE_QUOTA?.casual_sick || 10;
-    const casualUsed = usedYear.casual_sick;
-    const casualRemaining = Math.max(casualQuota - casualUsed, 0);
+      : ANNUAL_LEAVE_QUOTA?.casual_sick || 10);
+    const casualUsed = serverBalances?.casual_sick?.used ?? usedYear.casual_sick;
+    const casualRemaining = serverBalances?.casual_sick?.remaining ?? Math.max(casualQuota - casualUsed, 0);
 
     let totalWfhApproved = 0;
 
