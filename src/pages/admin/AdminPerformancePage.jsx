@@ -459,13 +459,30 @@ const AdminPerformancePage = () => {
 
   const managersOfProject = (projectId) => {
     const sp = subProjectById.get(String(projectId));
-    const mp = sp ? mainProjectById.get(String(sp.main_project_id)) : null;
-    if (!mp) return [];
-    if (Array.isArray(mp.program_manager_names) && mp.program_manager_names.length > 0)
-      return mp.program_manager_names;
-    if (mp.program_manager_name) return [mp.program_manager_name];
-    const ids = mp.program_manager_ids?.length ? mp.program_manager_ids : mp.program_manager_id ? [mp.program_manager_id] : [];
-    return ids.map((id) => empById.get(Number(id))?.name).filter(Boolean);
+    if (!sp) return [];
+
+    // 1. Project Manager (from sp.pm_names or assigned_employee_ids / pm_ids)
+    if (Array.isArray(sp.pm_names) && sp.pm_names.length > 0) {
+      const validNames = sp.pm_names.filter((n) => n && n !== "Unknown");
+      if (validNames.length > 0) return validNames;
+    }
+    const pmIds = Array.isArray(sp.assigned_employee_ids) && sp.assigned_employee_ids.length > 0
+      ? sp.assigned_employee_ids
+      : (sp.pm_ids || (sp.pm_id ? [sp.pm_id] : []));
+    const resolvedPmNames = pmIds.map((id) => empById.get(Number(id))?.name).filter(Boolean);
+    if (resolvedPmNames.length > 0) return resolvedPmNames;
+
+    // 2. Team Lead fallback if no Project Manager is assigned
+    if (Array.isArray(sp.team_lead_names) && sp.team_lead_names.length > 0) {
+      const validLeads = sp.team_lead_names.filter((n) => n && n !== "Unknown");
+      if (validLeads.length > 0) return validLeads;
+    }
+    const leadIds = sp.team_lead_ids || [];
+    const resolvedLeadNames = leadIds.map((id) => empById.get(Number(id))?.name).filter(Boolean);
+    if (resolvedLeadNames.length > 0) return resolvedLeadNames;
+
+    // No fallback to parent organization / main project
+    return [];
   };
 
   const istInfo = useMemo(() => {

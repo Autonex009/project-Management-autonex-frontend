@@ -1513,7 +1513,7 @@ const ProjectsPage = () => {
             </button>
 
             {filtersOpen && (
-              <div className="absolute right-0 top-full z-50 mt-2 w-80 rounded-xl border border-slate-200 bg-white p-3.5 shadow-xl space-y-3.5">
+              <div className="absolute left-0 top-full z-50 mt-2 w-80 rounded-xl border border-slate-200 bg-white p-3.5 shadow-xl space-y-3.5">
                 <div>
                   <label className="mb-1 block text-xs font-medium text-slate-500">
                     Priority

@@ -271,21 +271,43 @@ const MyLeavesPanel = ({
     enabled: !!employeeId,
   });
 
+  const { data: serverBalances } = useQuery({
+    queryKey: ["leave-balances", employeeId],
+    queryFn: () => leaveApi.getBalances({ employee_id: employeeId }),
+    enabled: !!employeeId,
+  });
+
   const { data: myWfh = [] } = useQuery({
     queryKey: ["my-wfh", employeeId],
     queryFn: () => wfhApi.getAll({ employee_id: employeeId }),
     enabled: !!employeeId,
   });
 
-  // ── Leave balances (computed locally from approved leaves) ──
-  // Mirrors the backend entitlement model: remaining = quota − approved
-  // working-days used. Employees use annual quotas; interns accrue PAID leave
-  // monthly (1/month, resets each month). Days beyond quota become unpaid.
+  // ── Leave balances ──
+  // Uses server-authoritative balance (respects promotion cutoff dates automatically).
+  // Falls back to local calculation if server data is loading.
   const intern = isIntern(user.employee_type);
   const now = new Date();
   const currentYear = now.getFullYear();
   const currentMonth = now.getMonth(); // 0-based
   const balances = useMemo(() => {
+    if (serverBalances) {
+      const cards = [];
+      const order = ["paid", "casual_sick", "floater"];
+      order.forEach((t) => {
+        if (serverBalances[t]) {
+          cards.push({
+            type: t,
+            quota: serverBalances[t].quota,
+            used: serverBalances[t].used,
+            remaining: serverBalances[t].remaining,
+            period: serverBalances[t].period || "year",
+          });
+        }
+      });
+      return cards;
+    }
+
     const usedYear = {};
     Object.keys(ANNUAL_LEAVE_QUOTA).forEach((t) => {
       usedYear[t] = 0;
@@ -294,13 +316,17 @@ const MyLeavesPanel = ({
     allLeaves.forEach((leave) => {
       if ((leave.status || "pending") !== "approved") return;
       const type = normalizeLeaveType(leave.leave_type);
-      const days = leave.is_half_day
+      const isHalf =
+        Boolean(leave.is_half_day) ||
+        leave.leave_type === "first_half" ||
+        leave.leave_type === "second_half" ||
+        leave.leave_type === "half_day";
+      const days = isHalf
         ? 0.5
         : leave.start_date && leave.end_date
           ? getWorkingDayCount(leave.start_date, leave.end_date)
           : 1.0;
       if (!leave.start_date || !leave.end_date) {
-        // Sheet leaf placeholder with null dates
         if (type in usedYear) {
           usedYear[type] += days;
         }
@@ -346,7 +372,7 @@ const MyLeavesPanel = ({
       });
     });
     return cards;
-  }, [allLeaves, intern, currentYear, currentMonth]);
+  }, [serverBalances, allLeaves, intern, currentYear, currentMonth]);
 
   const createLeaveMutation = useMutation({
     mutationFn: (data) =>
@@ -359,6 +385,7 @@ const MyLeavesPanel = ({
     onSuccess: (data, variables) => {
       recordLeaveApplication({ ...variables, ...data });
       queryClient.invalidateQueries({ queryKey: ["my-leaves"] });
+      queryClient.invalidateQueries({ queryKey: ["leave-balances"] });
       queryClient.invalidateQueries(["leave-calendar"]);
       setShowLeaveForm(false);
       setLeaveForm({
@@ -405,6 +432,7 @@ const MyLeavesPanel = ({
       leaveApi.update(id, { ...data, employee_id: employeeId }),
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ["my-leaves"] });
+      queryClient.invalidateQueries({ queryKey: ["leave-balances"] });
       queryClient.invalidateQueries(["leave-calendar"]);
       setEditingLeave(null);
       toast.success("Leave request updated");
@@ -417,6 +445,7 @@ const MyLeavesPanel = ({
     mutationFn: (id) => leaveApi.delete(id),
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ["my-leaves"] });
+      queryClient.invalidateQueries({ queryKey: ["leave-balances"] });
       queryClient.invalidateQueries(["leave-calendar"]);
       toast.success("Leave request deleted");
     },
