@@ -28,6 +28,7 @@ import {
   isEndDateBeforeStartDate,
 } from "../utils/dateValidation";
 import { formatDisplayName, nameSearchText } from "../utils/displayName";
+import { useDynamicPopover } from "../hooks/useDynamicPopover";
 import {
   getLeaveTypeBadgeClass,
   getLeaveTypeLabel,

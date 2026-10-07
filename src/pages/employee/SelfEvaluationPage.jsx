@@ -62,18 +62,29 @@ const ProjectEvalPanel = ({
   const currentEval = existing.find((e) => e.period === period) || null;
   const liveAverage = averageOf(PERF_PARAMETERS.map((p) => ratings[p.name]));
 
+  const storedUser = JSON.parse(localStorage.getItem("user") || "{}");
+  const userRole = localStorage.getItem("role") || storedUser.role || "employee";
+
   const istInfo = useMemo(() => {
-    const { day, month } = getISTDate();
+    const { year, day, month } = getISTDate();
+    const [periodYear, periodMonth] = period.split("-").map(Number);
     
-    // Exception logic for September
-    const isSeptException = period === "2026-09" && month === 10 && day >= 2 && day <= 5;
-    
-    const isOpen = (day >= 20 && day <= 24) || isSeptException;
-    const isPastDeadline = !isSeptException && day > 24;
-    const isBeforeOpen = !isSeptException && day < 20;
+    let isOpen = false;
+    let isPastDeadline = false;
+    let isBeforeOpen = false;
+
+    if (year > periodYear || (year === periodYear && month > periodMonth)) {
+      isPastDeadline = true;
+    } else if (year < periodYear || (year === periodYear && month < periodMonth)) {
+      isBeforeOpen = true;
+    } else {
+      isOpen = day >= 20 && day <= 24;
+      isPastDeadline = day > 24;
+      isBeforeOpen = day < 20;
+    }
     
     return { isOpen, isPastDeadline, isBeforeOpen, day };
-  }, [period]);
+  }, [period, userRole]);
 
   const isSubmissionAllowed = istInfo.isOpen;
 
@@ -313,7 +324,7 @@ const SelfEvaluationPage = () => {
   const [tab, setTab] = useState("reviews"); // 'reviews' | 'history'
   const [historyMonth, setHistoryMonth] = useState(maxHistoryMonth);
   const [expandedHistory, setExpandedHistory] = useState(null);
-  const [lateModalOpen, setLateModalOpen] = useState(false);
+
 
   const { data: allocations = [], isLoading: allocLoading } = useQuery({
     queryKey: ["my-allocations", employeeId],
@@ -334,16 +345,8 @@ const SelfEvaluationPage = () => {
   });
   const myEvals = myEvalsData?.items || [];
 
-  const { month, day } = getISTDate();
+  const { year, month, day } = getISTDate();
   
-  // Highly optimized in-memory check (0 network overhead)
-  const missedSeptember = useMemo(() => {
-    if (month !== 10 || day < 2 || day > 5) return false;
-    
-    // Check if they submitted ANY evaluation for "2026-09"
-    const hasSeptEval = myEvals.some(ev => ev.period === "2026-09");
-    return !hasSeptEval;
-  }, [myEvals, month, day]);
 
   const myProjects = useMemo(() => {
     const ids = new Set(allocations.map((a) => a.sub_project_id));
@@ -504,63 +507,8 @@ const SelfEvaluationPage = () => {
     </div>
   );
 
-  const septemberBanner = missedSeptember && (
-    <div className="mb-6 rounded-xl border border-amber-200 bg-amber-50 p-4 shadow-sm">
-      <div className="flex items-center gap-3">
-        <div className="flex h-8 w-8 items-center justify-center rounded-full bg-amber-100 text-amber-600">
-          <HistoryIcon size={18} />
-        </div>
-        <div>
-          <h3 className="font-medium text-amber-900">September Evaluation is Open</h3>
-          <p className="text-sm text-amber-700">
-            You missed your September self-evaluation. The window has been reopened for you from October 2nd to 5th.
-          </p>
-          <button 
-            onClick={() => setLateModalOpen(true)}
-            className="mt-3 inline-flex items-center rounded-lg bg-amber-600 px-4 py-2 text-sm font-medium text-white shadow-sm hover:bg-amber-700 transition-colors"
-          >
-            Complete September Review
-          </button>
-        </div>
-      </div>
-    </div>
-  );
 
-  const lateModalElement = lateModalOpen && createPortal(
-    <div className="fixed inset-0 z-50 flex items-center justify-center bg-slate-900/50 p-4">
-      <div className="w-full max-w-2xl bg-slate-50 rounded-2xl shadow-xl max-h-[90vh] overflow-hidden flex flex-col">
-        <div className="flex justify-between items-center p-5 border-b border-slate-200 bg-white">
-           <h2 className="text-lg font-bold text-slate-800">September Evaluation</h2>
-           <button onClick={() => setLateModalOpen(false)} className="text-slate-400 hover:text-slate-600"><X size={20} /></button>
-        </div>
-        <div className="p-5 overflow-y-auto space-y-4">
-           {isPm ? (
-              <ProjectEvalPanel 
-                project={PM_SELF_PROJECT} 
-                employeeId={employeeId} 
-                submittedBy={user.id} 
-                existing={evalsByProject(0)} 
-                reviewerLabel="Admin" 
-                isLateSubmission={true}
-                onLateSubmitSuccess={() => setLateModalOpen(false)}
-              />
-           ) : (
-             myProjects.map(p => (
-               <ProjectEvalPanel 
-                 key={p.id} 
-                 project={p} 
-                 employeeId={employeeId} 
-                 submittedBy={user.id} 
-                 existing={evalsByProject(p.id)} 
-                 isLateSubmission={true} 
-                 onLateSubmitSuccess={() => setLateModalOpen(false)}
-               />
-             ))
-           )}
-        </div>
-      </div>
-    </div>, document.body
-  );
+
 
   // ── PM view: one self-report, reviewed by Admin ──
   if (isPm) {
@@ -586,7 +534,6 @@ const SelfEvaluationPage = () => {
           </div>
         ) : (
           <div>
-            {septemberBanner}
             <ProjectEvalPanel
               project={PM_SELF_PROJECT}
               employeeId={employeeId}
@@ -597,7 +544,6 @@ const SelfEvaluationPage = () => {
           </div>
         )}
 
-        {lateModalElement}
       </div>
     );
   }
@@ -635,7 +581,6 @@ const SelfEvaluationPage = () => {
         </div>
       ) : (
         <div>
-          {septemberBanner}
           <div className="space-y-4">
             {myProjects.map((project) => (
             <ProjectEvalPanel
@@ -650,7 +595,6 @@ const SelfEvaluationPage = () => {
         </div>
       )}
 
-      {lateModalElement}
     </div>
   );
 };

@@ -60,6 +60,7 @@ import StatCard from "../components/dashboard/StatCard";
 import useScrollStore from "../store/useScrollStore";
 import useProjectsStore from "../store/useProjectsStore";
 import { formatDisplayName } from "../utils/displayName";
+import { useDynamicPopover } from "../hooks/useDynamicPopover";
 
 import {
   STATUS_CONFIG,
@@ -157,6 +158,7 @@ const ProjectsPage = () => {
   // is the PM set and would grant them the approval rights the role exists to withhold.
   const [selectedTeamLeadIds, setSelectedTeamLeadIds] = useState([]);
   const filtersRef = useRef(null);
+  const filterAlignClass = useDynamicPopover(filtersRef, filtersOpen, 320);
   // Inline (double-click) card editing + per-card docs popover
   const [editingCardId, setEditingCardId] = useState(null);
   const [cardDraft, setCardDraft] = useState(null);
@@ -1513,7 +1515,7 @@ const ProjectsPage = () => {
             </button>
 
             {filtersOpen && (
-              <div className="absolute left-0 top-full z-50 mt-2 w-80 rounded-xl border border-slate-200 bg-white p-3.5 shadow-xl space-y-3.5">
+              <div className={`absolute ${filterAlignClass} top-full z-50 mt-2 w-80 rounded-xl border border-slate-200 bg-white p-3.5 shadow-xl space-y-3.5`}>
                 <div>
                   <label className="mb-1 block text-xs font-medium text-slate-500">
                     Priority
