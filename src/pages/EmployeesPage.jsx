@@ -3,6 +3,7 @@ import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
 import { useSearchParams, Link, useLocation } from "react-router-dom";
 import usePageStateStore from "../store/usePageStateStore";
 import { usePageScroll } from "../hooks/usePageScroll";
+import { useDynamicPopover } from "../hooks/useDynamicPopover";
 import {
   employeeApi,
   skillApi,
@@ -1010,6 +1011,7 @@ const FilterButton = ({
 }) => {
   const [open, setOpen] = useState(false);
   const ref = useRef(null);
+  const alignClass = useDynamicPopover(ref, open, 416); // 26rem = 416px
 
   useEffect(() => {
     const handler = (e) => {
@@ -1045,7 +1047,7 @@ const FilterButton = ({
       </button>
 
       {open && (
-        <div className="absolute left-0 mt-1.5 z-40 w-[22rem] sm:w-[26rem] bg-white rounded-xl shadow-xl border border-slate-200 p-3">
+        <div className={`absolute ${alignClass} mt-1.5 z-40 w-[22rem] sm:w-[26rem] bg-white rounded-xl shadow-xl border border-slate-200 p-3`}>
           <div className="grid grid-cols-2 gap-x-2.5 gap-y-2.5">
             <div className="space-y-1">
               <label className="text-[10px] font-semibold uppercase tracking-wide text-slate-400">
@@ -1187,6 +1189,7 @@ const FilterButton = ({
 const SortMenu = ({ sortBy, setSortBy }) => {
   const [open, setOpen] = useState(false);
   const ref = useRef(null);
+  const alignClass = useDynamicPopover(ref, open, 192); // w-48 = 192px
 
   useEffect(() => {
     const handler = (e) => {
@@ -1215,7 +1218,7 @@ const SortMenu = ({ sortBy, setSortBy }) => {
       </button>
 
       {open && (
-        <div className="absolute left-0 mt-1.5 z-40 w-48 bg-white rounded-xl shadow-xl border border-slate-200 py-1">
+        <div className={`absolute ${alignClass} mt-1.5 z-40 w-48 bg-white rounded-xl shadow-xl border border-slate-200 py-1`}>
           {SORT_OPTIONS.map((opt) => (
             <button
               key={opt.value || "default"}

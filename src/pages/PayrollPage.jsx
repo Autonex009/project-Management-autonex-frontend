@@ -31,6 +31,7 @@ import DatePicker from "../components/ui/DatePicker";
 import Dropdown from "../components/ui/Dropdown";
 import UserAvatar from "../components/ui/UserAvatar";
 import { formatDisplayName } from "../utils/displayName";
+import { useDynamicPopover } from "../hooks/useDynamicPopover";
 
 const LEAVE_LABELS = {
   paid: "Paid",
@@ -345,6 +346,7 @@ const PayrollPage = () => {
 
   const filterRef = useRef(null);
   const [filterOpen, setFilterOpen] = useState(false);
+  const filterAlignClass = useDynamicPopover(filterRef, filterOpen, 224);
 
   // Close filter when clicking outside
   useEffect(() => {
@@ -847,7 +849,7 @@ const PayrollPage = () => {
                 </button>
     
                 {filterOpen && (
-                  <div className="absolute left-0 mt-1.5 z-40 w-56 bg-white rounded-xl shadow-xl border border-slate-200 p-3">
+                  <div className={`absolute ${filterAlignClass} mt-1.5 z-40 w-56 bg-white rounded-xl shadow-xl border border-slate-200 p-3`}>
                     <div className="flex flex-col gap-2.5">
                       <div className="space-y-1">
                         <label className="text-[10px] font-semibold uppercase tracking-wide text-slate-400">

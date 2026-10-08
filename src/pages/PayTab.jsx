@@ -23,6 +23,7 @@ import { Table } from "../components/ui/Table";
 import Dropdown from "../components/ui/Dropdown";
 import UserAvatar from "../components/ui/UserAvatar";
 import { formatDisplayName } from "../utils/displayName";
+import { useDynamicPopover } from "../hooks/useDynamicPopover";
 
 const SORT_OPTIONS = [
   { value: "name-asc", label: "Name A → Z" },
@@ -134,6 +135,8 @@ const PayTab = () => {
   const [filterOpen, setFilterOpen] = useState(false);
   const sortRef = useRef(null);
   const filterRef = useRef(null);
+  const sortAlignClass = useDynamicPopover(sortRef, sortOpen, 208);
+  const filterAlignClass = useDynamicPopover(filterRef, filterOpen, 224);
 
   useEffect(() => {
     const handler = (e) => {
@@ -554,7 +557,7 @@ const PayTab = () => {
             </button>
 
             {filterOpen && (
-              <div className="absolute left-0 mt-1.5 z-40 w-56 bg-white rounded-xl shadow-xl border border-slate-200 p-3">
+              <div className={`absolute ${filterAlignClass} mt-1.5 z-40 w-56 bg-white rounded-xl shadow-xl border border-slate-200 p-3`}>
                 <div className="flex flex-col gap-2.5">
                   <div className="space-y-1">
                     <label className="text-[10px] font-semibold uppercase tracking-wide text-slate-400">
@@ -621,7 +624,7 @@ const PayTab = () => {
             </button>
 
             {sortOpen && (
-              <div className="absolute left-0 mt-1.5 z-40 w-52 bg-white rounded-xl shadow-xl border border-slate-200 py-1">
+              <div className={`absolute ${sortAlignClass} mt-1.5 z-40 w-52 bg-white rounded-xl shadow-xl border border-slate-200 py-1`}>
                 {SORT_OPTIONS.map((opt) => (
                   <button
                     key={opt.value}
