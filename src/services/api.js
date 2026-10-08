@@ -22,6 +22,9 @@ api.interceptors.request.use(
       if (token) {
         config.headers.Authorization = `Bearer ${token}`;
       }
+      if (window.location.pathname.startsWith('/pm')) {
+        config.headers['X-Role-View'] = 'pm';
+      }
     }
     return config;
   },

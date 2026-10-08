@@ -1,6 +1,6 @@
 /* eslint-disable react/prop-types */
-import React, { Suspense, lazy, useState } from "react";
-import { Routes, Route, Navigate } from "react-router-dom";
+import React, { Suspense, lazy, useState, useEffect, useRef } from "react";
+import { Routes, Route, Navigate, useLocation } from "react-router-dom";
 import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
 import { Toaster } from "react-hot-toast";
 import ProtectedRoute from "./routes/ProtectedRoute";
@@ -113,6 +113,25 @@ function App() {
         },
       }),
   );
+
+  const location = useLocation();
+  const prevPortal = useRef(location.pathname.split('/')[1]);
+
+  useEffect(() => {
+    const currentPortal = location.pathname.split('/')[1];
+    const trackedPortals = ['admin', 'pm', 'hr', 'employee'];
+    
+    if (
+      trackedPortals.includes(currentPortal) && 
+      trackedPortals.includes(prevPortal.current) && 
+      currentPortal !== prevPortal.current
+    ) {
+      // Clear the cache when jumping between portals to force a fresh fetch
+      // with the newly injected X-Role-View header context.
+      queryClient.clear();
+    }
+    prevPortal.current = currentPortal;
+  }, [location.pathname, queryClient]);
 
   return (
     <ErrorBoundary>
