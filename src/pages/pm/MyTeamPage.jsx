@@ -33,6 +33,8 @@ import { getPmEmployeeId, getPmSubProjects } from "../../utils/pmScope";
 import { formatDisplayName } from "../../utils/displayName";
 import { todayLocalISO, getOnLeaveTodayIds } from "../../utils/workforce";
 import toast from "react-hot-toast";
+import EvalReviewCard from "../../components/perf/EvalReviewCard";
+import { currentPeriod } from "../../components/perf/StarRating";
 
 const PAGE_SIZE = 10;
 
@@ -315,54 +317,42 @@ const AssignProjectModal = ({ employee, scopedProjects, scopedAllocations, onClo
 
 /* Modal 3: Add Performance Note / Review */
 const PerformanceNoteModal = ({ employee, scopedProjects, onClose }) => {
-  const queryClient = useQueryClient();
   const [selectedProjectId, setSelectedProjectId] = useState(scopedProjects[0]?.id || "");
-  const [rating, setRating] = useState(5);
-  const [note, setNote] = useState("");
+  const period = currentPeriod();
+  const user = JSON.parse(localStorage.getItem("user") || "{}");
 
-  const todayYearMonth = new Date().toISOString().slice(0, 7);
-
-  const submitMutation = useMutation({
-    mutationFn: async () => {
-      return perfEvalApi.submit({
-        project_id: Number(selectedProjectId),
+  const { data, isLoading } = useQuery({
+    queryKey: ["perf-evals", employee?.id, selectedProjectId, period],
+    queryFn: () =>
+      perfEvalApi.getAll({
         employee_id: employee.id,
-        period: todayYearMonth,
-        parameter_values: [
-          { name: "Quality & Delivery", employee_rating: rating },
-        ],
-        overall_comment: note.trim() || null,
-      });
-    },
-    onSuccess: () => {
-      queryClient.invalidateQueries(["perf-evals"]);
-      toast.success("Performance note saved successfully");
-      onClose();
-    },
-    onError: (err) => {
-      toast.error(err?.response?.data?.detail || "Failed to save performance note");
-    },
+        project_id: selectedProjectId,
+        period,
+      }),
+    enabled: !!employee && !!selectedProjectId,
   });
+
+  const evaluation = (data?.items || [])[0];
 
   if (!employee) return null;
 
   return (
     <div
-      className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-slate-900/40 backdrop-blur-xs"
+      className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-slate-900/40 backdrop-blur-xs overflow-y-auto"
       onClick={onClose}
     >
       <div
-        className="w-full max-w-md bg-white rounded-2xl shadow-2xl border border-slate-200 p-5 space-y-4 animate-in fade-in zoom-in-95 duration-150"
+        className="relative w-full max-w-2xl bg-slate-50 rounded-2xl shadow-2xl border border-slate-200 p-6 my-8 animate-in fade-in zoom-in-95 duration-150"
         onClick={(e) => e.stopPropagation()}
       >
-        <div className="flex items-start justify-between gap-3">
+        <div className="flex items-start justify-between gap-3 mb-5">
           <div className="flex items-center gap-3">
-            <div className="w-10 h-10 rounded-full bg-amber-50 text-amber-600 flex items-center justify-center shrink-0">
-              <Star className="w-5 h-5 fill-amber-400" />
+            <div className="w-10 h-10 rounded-full bg-indigo-50 text-indigo-600 flex items-center justify-center shrink-0">
+              <Award className="w-5 h-5" />
             </div>
             <div>
-              <h3 className="text-base font-bold text-slate-900">Performance Review Note</h3>
-              <p className="text-xs text-slate-500 mt-0.5">
+              <h3 className="text-lg font-bold text-slate-900">Performance Review</h3>
+              <p className="text-sm text-slate-500 mt-0.5">
                 Staff member: <span className="font-semibold text-slate-800">{employee.name}</span>
               </p>
             </div>
@@ -370,82 +360,47 @@ const PerformanceNoteModal = ({ employee, scopedProjects, onClose }) => {
           <button
             type="button"
             onClick={onClose}
-            className="text-slate-400 hover:text-slate-600 p-1 rounded-lg hover:bg-slate-100 cursor-pointer"
+            className="text-slate-400 hover:text-slate-600 p-2 rounded-lg hover:bg-slate-200 transition-colors cursor-pointer"
           >
-            <X className="w-4 h-4" />
+            <X className="w-5 h-5" />
           </button>
         </div>
 
-        <div className="space-y-3 pt-1">
-          <div>
-            <label className="block text-xs font-semibold text-slate-700 mb-1">
-              Project Context
-            </label>
-            <select
-              value={selectedProjectId}
-              onChange={(e) => setSelectedProjectId(e.target.value)}
-              className="w-full h-9 rounded-lg border border-slate-200 bg-white px-3 text-xs text-slate-800 focus:outline-none focus:ring-2 focus:ring-indigo-100 focus:border-indigo-300"
-            >
-              {scopedProjects.map((p) => (
-                <option key={p.id} value={p.id}>
-                  {p.name}
-                </option>
-              ))}
-            </select>
-          </div>
-
-          <div>
-            <label className="block text-xs font-semibold text-slate-700 mb-1">
-              Performance Score (1 - 5 Stars)
-            </label>
-            <div className="flex items-center gap-1.5 pt-0.5">
-              {[1, 2, 3, 4, 5].map((star) => (
-                <button
-                  key={star}
-                  type="button"
-                  onClick={() => setRating(star)}
-                  className="p-1 rounded-md hover:bg-amber-50 transition-colors cursor-pointer"
-                >
-                  <Star
-                    className={`w-6 h-6 ${
-                      star <= rating
-                        ? "text-amber-400 fill-amber-400"
-                        : "text-slate-300 fill-slate-100"
-                    }`}
-                  />
-                </button>
-              ))}
-              <span className="text-xs font-bold text-slate-700 ml-2 font-mono">{rating} / 5</span>
-            </div>
-          </div>
-
-          <div>
-            <label className="block text-xs font-semibold text-slate-700 mb-1">
-              Review Note / Milestone Feedback
-            </label>
-            <textarea
-              rows={3}
-              value={note}
-              onChange={(e) => setNote(e.target.value)}
-              placeholder="Enter quality feedback, milestone completion notes, or work performance summary..."
-              className="w-full rounded-lg border border-slate-200 bg-white p-2.5 text-xs text-slate-800 placeholder:text-slate-400 focus:outline-none focus:ring-2 focus:ring-indigo-100 focus:border-indigo-300"
-            />
-          </div>
+        <div className="mb-6">
+          <label className="block text-sm font-semibold text-slate-700 mb-2">
+            Project Context
+          </label>
+          <select
+            value={selectedProjectId}
+            onChange={(e) => setSelectedProjectId(e.target.value)}
+            className="w-full h-10 rounded-xl border border-slate-200 bg-white px-3 text-sm text-slate-800 focus:outline-none focus:ring-2 focus:ring-indigo-100 focus:border-indigo-300"
+          >
+            {scopedProjects.map((p) => (
+              <option key={p.id} value={p.id}>
+                {p.name}
+              </option>
+            ))}
+          </select>
         </div>
 
-        <div className="flex justify-end gap-2 pt-3 border-t border-slate-100">
-          <Button variant="secondary" size="sm" onClick={onClose} className="h-9">
-            Cancel
-          </Button>
-          <Button
-            variant="primary"
-            size="sm"
-            onClick={() => submitMutation.mutate()}
-            loading={submitMutation.isPending}
-            className="h-9"
-          >
-            Submit Note
-          </Button>
+        <div>
+          {isLoading ? (
+            <div className="py-10 text-center text-sm text-slate-400">Loading evaluation...</div>
+          ) : evaluation && evaluation.status !== "draft" ? (
+            <EvalReviewCard
+              evaluation={evaluation}
+              personName={employee.name}
+              reviewerId={user.id}
+            />
+          ) : (
+            <div className="rounded-xl border border-dashed border-slate-300 bg-white p-10 text-center shadow-sm">
+              <Clock3 className="mx-auto h-8 w-8 text-slate-300 mb-3" />
+              <p className="text-sm font-medium text-slate-700">Not submitted self eval</p>
+              <p className="text-xs text-slate-500 mt-1">
+                The employee hasn't submitted a self-evaluation for this project in the current period.
+              </p>
+            </div>
+          )}
         </div>
       </div>
     </div>

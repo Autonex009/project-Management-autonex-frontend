@@ -287,7 +287,12 @@ export function validateConsecutiveLeaves(
 }
 
 export function getLeaveOverLimitInfo(leave, allLeaves = [], employeeType = "") {
-  const limit = isIntern(employeeType) ? 1 : 2;
+  const isInternUser = isIntern(employeeType);
+  const limit = isInternUser ? 1 : null;
+
+  if (!isInternUser) {
+    return { overDays: 0, overDaysText: "", totalMonthDays: 0, limit };
+  }
 
   if (!leave || !leave.start_date) {
     return { overDays: 1, overDaysText: "1 day", totalMonthDays: limit + 1, limit };
