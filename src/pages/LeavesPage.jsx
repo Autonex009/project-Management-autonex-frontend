@@ -1335,9 +1335,7 @@ const LeavesPage = () => {
                   Justification Required
                 </h3>
                 <p className="text-sm text-slate-500 mt-1">
-                  This employee has exceeded the monthly paid leave limit (2
-                  leaves/month). A justification remark is required to approve
-                  this request.
+                  This request has been flagged (e.g., exceeds paid leave limit). A justification remark is required to approve this request.
                 </p>
               </div>
             </div>
