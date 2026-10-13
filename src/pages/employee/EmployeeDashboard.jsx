@@ -2162,8 +2162,8 @@ const EmployeeDashboard = () => {
             {bottomTab === "notes" && canViewNotes ? (
               <div className="grid grid-cols-3 gap-3 flex-1">
                 {/* Complaints */}
-                <div className="flex flex-col bg-white border border-stone-200 rounded-xl p-2.5">
-                  <div className="flex items-center justify-between gap-1.5 mb-2">
+                <div className="flex flex-col bg-white border border-stone-200 rounded-xl p-2.5 h-[210px]">
+                  <div className="flex items-center justify-between gap-1.5 mb-2 shrink-0">
                     <div className="flex items-center gap-1.5">
                       <AlertCircle className="w-3.5 h-3.5 text-rose-500 shrink-0" />
                       <h3 className="text-[10px] font-bold text-stone-700 uppercase tracking-wider">Complaints</h3>
@@ -2200,7 +2200,7 @@ const EmployeeDashboard = () => {
                     </div>
                   </div>
 
-                  <div className="flex flex-col gap-1.5 flex-1 overflow-y-auto db-scroll">
+                  <div className="flex flex-col gap-1.5 flex-1 min-h-0 overflow-y-auto db-scroll pr-1">
                     {openComplaints.length > 0 ? (
                       <>
                         {[...(openComplaints || [])]
@@ -2210,7 +2210,7 @@ const EmployeeDashboard = () => {
                               key={item.id ?? idx}
                               className="group relative flex items-start gap-1.5 bg-rose-50/50 border border-rose-100/70 p-1.5 rounded-lg"
                             >
-                              <p className="text-[10px] text-stone-600 leading-snug flex-1 min-w-0">
+                              <p className="text-[10px] text-stone-600 leading-snug flex-1 min-w-0 break-words">
                                 {item.title
                                   ? `${item.title}${item.content ? ` — ${item.content}` : ""
                                   }`
@@ -2274,8 +2274,8 @@ const EmployeeDashboard = () => {
                 </div>
 
                 {/* Warnings */}
-                <div className="flex flex-col bg-white border border-stone-200 rounded-xl p-2.5">
-                  <div className="flex items-center justify-between gap-1.5 mb-2">
+                <div className="flex flex-col bg-white border border-stone-200 rounded-xl p-2.5 h-[210px]">
+                  <div className="flex items-center justify-between gap-1.5 mb-2 shrink-0">
                     <div className="flex items-center gap-1.5">
                       <AlertTriangle className="w-3.5 h-3.5 text-amber-500 shrink-0" />
                       <h3 className="text-[10px] font-bold text-stone-700 uppercase tracking-wider">Warnings</h3>
@@ -2312,7 +2312,7 @@ const EmployeeDashboard = () => {
                     </div>
                   </div>
 
-                  <div className="flex flex-col gap-1.5 flex-1 overflow-y-auto db-scroll">
+                  <div className="flex flex-col gap-1.5 flex-1 min-h-0 overflow-y-auto db-scroll pr-1">
                     {openWarnings.length > 0 ? (
                       <>
                         {[...(openWarnings || [])]
@@ -2322,7 +2322,7 @@ const EmployeeDashboard = () => {
                               key={item.id ?? idx}
                               className="group relative flex items-start gap-1.5 bg-amber-50/50 border border-amber-100/70 p-1.5 rounded-lg"
                             >
-                              <p className="text-[10px] text-stone-600 leading-snug flex-1 min-w-0">
+                              <p className="text-[10px] text-stone-600 leading-snug flex-1 min-w-0 break-words">
                                 {item.title
                                   ? `${item.title}${item.content ? ` — ${item.content}` : ""
                                   }`
@@ -2384,8 +2384,8 @@ const EmployeeDashboard = () => {
                 </div>
 
                 {/* Recognition */}
-                <div className="flex flex-col bg-white border border-stone-200 rounded-xl p-2.5">
-                  <div className="flex items-center justify-between gap-1.5 mb-2">
+                <div className="flex flex-col bg-white border border-stone-200 rounded-xl p-2.5 h-[210px]">
+                  <div className="flex items-center justify-between gap-1.5 mb-2 shrink-0">
                     <div className="flex items-center gap-1.5">
                       <Award className="w-3.5 h-3.5 text-indigo-600 shrink-0" />
                       <h3 className="text-[10px] font-bold text-stone-700 uppercase tracking-wider">Recognition</h3>
@@ -2422,7 +2422,7 @@ const EmployeeDashboard = () => {
                     </div>
                   </div>
 
-                  <div className="flex flex-col gap-1.5 flex-1 overflow-y-auto db-scroll">
+                  <div className="flex flex-col gap-1.5 flex-1 min-h-0 overflow-y-auto db-scroll pr-1">
                     {openRecognitions.length > 0 ? (
                       <>
                         {[...(openRecognitions || [])]
@@ -2432,7 +2432,7 @@ const EmployeeDashboard = () => {
                               key={item.id ?? idx}
                               className="group relative flex items-start gap-1.5 bg-indigo-50/50 border border-indigo-100/70 p-1.5 rounded-lg"
                             >
-                              <p className="text-[10px] text-stone-600 leading-snug flex-1 min-w-0">
+                              <p className="text-[10px] text-stone-600 leading-snug flex-1 min-w-0 break-words">
                                 {item.title
                                   ? `${item.title}${item.content ? ` — ${item.content}` : ""
                                   }`
@@ -2496,7 +2496,7 @@ const EmployeeDashboard = () => {
                 </div>
               </div>
             ) : (
-              <div className="flex flex-col gap-2 flex-1 overflow-y-auto db-scroll">
+              <div className="flex flex-col gap-2 flex-1 min-h-0 max-h-[210px] overflow-y-auto db-scroll pr-1">
                 {perfReviews.length > 0 ? (
                   [...(perfReviews || [])].reverse().map((review, idx) => {
                     const rts = review.parameter_values?.map((p) => p.pm_rating).filter((r) => r != null) || [];
@@ -3050,6 +3050,8 @@ const EmployeeDashboard = () => {
                     <Home className="w-4 h-4 text-indigo-600" />
                   ) : attendanceModalTab === "paid" ? (
                     <Calendar className="w-4 h-4 text-indigo-600" />
+                  ) : attendanceModalTab === "floater" ? (
+                    <Star className="w-4 h-4 text-orange-500" />
                   ) : (
                     <HeartPulse className="w-4 h-4 text-amber-600" />
                   )}
@@ -3122,13 +3124,13 @@ const EmployeeDashboard = () => {
               {[
                 {
                   key: "wfh",
-                  label: "WFH Requests",
+                  label: "WFH",
                   count: modalWfhList.length,
                   icon: <Home className="w-3.5 h-3.5" />,
                 },
                 {
                   key: "paid",
-                  label: "Paid Leaves",
+                  label: "Paid",
                   count: modalLeavesList.filter(
                     (l) => normalizeLeaveType(l.leave_type) === "paid"
                   ).length,
@@ -3136,13 +3138,22 @@ const EmployeeDashboard = () => {
                 },
                 {
                   key: "casual_sick",
-                  label: "Sick / Casual Leaves",
+                  label: "Sick / Casual",
                   count: modalLeavesList.filter(
                     (l) => normalizeLeaveType(l.leave_type) === "casual_sick"
                   ).length,
                   icon: <HeartPulse className="w-3.5 h-3.5" />,
                 },
-              ].map((tab) => (
+              
+                  {
+                    key: "floater",
+                    label: "Floater",
+                    count: modalLeavesList.filter(
+                      (l) => normalizeLeaveType(l.leave_type) === "floater"
+                    ).length,
+                    icon: <Star className="w-3.5 h-3.5" />,
+                  },
+].map((tab) => (
                 <button
                   key={tab.key}
                   onClick={() => setAttendanceModalTab(tab.key)}
@@ -3216,7 +3227,8 @@ const EmployeeDashboard = () => {
               )}
 
               {(attendanceModalTab === "paid" ||
-                attendanceModalTab === "casual_sick") && (
+                attendanceModalTab === "casual_sick" ||
+                attendanceModalTab === "floater") && (
                   <div>
                     {modalLeavesList.filter(
                       (l) =>
@@ -3225,7 +3237,7 @@ const EmployeeDashboard = () => {
                       <div className="text-center py-10 text-stone-400">
                         <Calendar className="w-8 h-8 mx-auto mb-2 opacity-40 text-stone-400" />
                         <p className="text-xs font-medium">
-                          No {attendanceModalTab === "paid" ? "Paid" : "Sick/Casual"} leave records found for {format(modalSelectedMonth, "MMMM yyyy")}.
+                          No {attendanceModalTab === "paid" ? "Paid" : attendanceModalTab === "casual_sick" ? "Sick/Casual" : "Floater"} leave records found for {format(modalSelectedMonth, "MMMM yyyy")}.
                         </p>
                       </div>
                     ) : (

@@ -192,3 +192,25 @@ The duplicated Admin/Employee layout shell was extracted into the shared `AppShe
 Existing Admin vs Employee differences are preserved through props, ensuring **no intentional UI or behavioural changes**.
 
 The fix removes layout redundancy, reduces future maintenance effort, and prevents further shell-level implementation drift.
+
+---
+
+## 4. Analytics Dashboard: Smooth Expandable Heatmap Layout
+
+**File:** `src/pages/AnalyticsDashboard.jsx`  
+**Feature:** Expandable Project Team Activity Heatmap with Smooth Motion Transition
+
+### Requirements
+- Add an **Expand/Collapse button** to the right of the member search bar in the **Project Team Activity Heatmap** header.
+- **On Expand:**
+  - The Heatmap smoothly expands towards the left to full width (`lg:col-span-12`), taking top priority (`lg:order-1`).
+  - The **Project Daily Workload Trend**, **Annotation vs Review Dynamics**, and **Dual Mini Insight Cards** smoothly shift down underneath the Heatmap (`lg:col-span-12 lg:order-2`).
+  - At the bottom, the Workload Trend and Annotation vs Review Dynamics charts organize into a responsive 2-column grid (`grid grid-cols-1 lg:grid-cols-2`), optimizing horizontal space without excessive vertical scrolling.
+- **On Collapse:**
+  - Smoothly animates back to the default side-by-side 2-column layout (Left: Trend, Dynamics, Insight Cards; Right: Heatmap).
+
+### Implementation Technique
+- Uses `motion` (`motion/react`) with hardware-accelerated FLIP layout animation: `<motion.div layout transition={{ duration: 0.45, ease: [0.16, 1, 0.3, 1] }}>`.
+- Lucide `Maximize2` and `Minimize2` toggle with responsive labels (`Expand` / `Collapse`) and active styling.
+- Persists user view preference in `usePageStateStore` under `isHeatmapExpanded`.
+
