@@ -1848,21 +1848,11 @@ const EmployeesPage = () => {
       toast.success(
         `${formatDisplayName(emp?.name) || emp?.name || "Employee"} converted to Full-time`,
       );
-      logChange({
-        category: "Employees",
-        action: "Promoted Employee to Full-time",
-        actionType: "Promoted",
-        entity: "Employee",
-        entityId: emp?.id || "",
-        entityName: emp?.name || "Employee",
-        details: [
-          { field: "Employee Type", from: emp?.previous_employee_type || "Intern", to: "Full-time" },
-          { field: "Promotion Date", from: "—", to: new Date().toLocaleDateString() },
-        ],
-      });
     },
     onError: (err) => {
-      toast.error(err.response?.data?.detail || "Failed to convert employee");
+      const detail = err.response?.data?.detail;
+      const msg = typeof detail === "string" ? detail : (Array.isArray(detail) ? detail[0]?.msg : null);
+      toast.error(msg || "Failed to convert employee");
     },
   });
 
@@ -1894,10 +1884,14 @@ const EmployeesPage = () => {
       return;
     }
 
+    const ftStartDate = formData.get("converted_to_fulltime_at");
+
     const data = {
       name: formData.get("name"),
       email: formData.get("email"),
       razorpay_email: formData.get("razorpay_email") || null,
+      slack_user_id: formData.get("slack_user_id")?.trim() || null,
+      converted_to_fulltime_at: ftStartDate || null,
       employee_type: formData.get("employee_type"),
       work_model: formData.get("work_model") || "WFO",
       designation: formData.get("designation") || "Annotator/ Reviewer",
@@ -2571,7 +2565,7 @@ const EmployeesPage = () => {
                 )}
               </button>
             ),
-            width: "w-[19%]",
+            width: "w-[17%]",
             render: (value, row) => {
               const visibleRows = displayedEmployees.slice(
                 (currentPage - 1) * PAGE_SIZE,
@@ -2639,7 +2633,7 @@ const EmployeesPage = () => {
           {
             key: "designation",
             label: "Designation",
-            width: "w-[14%]",
+            width: "w-[13%]",
             render: (value) => (
               <span className="pointer-events-none text-[13px] font-medium text-slate-600 whitespace-nowrap truncate max-w-[140px] inline-block align-middle">
                 {value || "—"}
@@ -2731,6 +2725,25 @@ const EmployeesPage = () => {
             },
           },
           {
+            key: "converted_to_fulltime_at",
+            label: "Full-Time Start Date",
+            align: "left",
+            width: "w-[11%]",
+            render: (value, row) => {
+              const dateVal = row.converted_to_fulltime_at;
+              if (!dateVal) {
+                return (
+                  <span className="text-[13px] text-slate-400 font-medium">—</span>
+                );
+              }
+              return (
+                <span className="text-[13px] font-medium text-slate-700 whitespace-nowrap">
+                  {formatDateDeterministic(dateVal)}
+                </span>
+              );
+            },
+          },
+          {
             key: "work_model",
             label: "Work Model",
             align: "left",
@@ -2745,7 +2758,7 @@ const EmployeesPage = () => {
             key: "reporting_manager",
             label: "Reporting Manager",
             align: "left",
-            width: "w-[13%]",
+            width: "w-[12%]",
             render: (_, row) => {
               const managers = row.managers || [];
               if (managers.length === 0) {
@@ -2815,7 +2828,7 @@ const EmployeesPage = () => {
           {
             key: "today_checkin",
             label: "Today's Check-in",
-            width: "w-[15%]",
+            width: "w-[13%]",
             render: (_, row) => {
               const checkedInAt = row.today_checked_in_at;
               const floor = row.today_office_floor;
@@ -2877,7 +2890,7 @@ const EmployeesPage = () => {
           {
             key: "assigned_projects",
             label: "Assigned Projects",
-            width: "w-[17%]",
+            width: "w-[14%]",
             render: (_, row) => {
               if ((row.status || "").toLowerCase() === "inactive") {
                 return (
@@ -3050,14 +3063,21 @@ const EmployeesPage = () => {
           employee={convertToFulltimeTarget}
           onClose={() => setConvertToFulltimeTarget(null)}
           onConfirm={() => {
+            if (convertMutation.isPending) return;
             const currentUser = JSON.parse(
               localStorage.getItem("user") || "{}",
             );
-            convertMutation.mutate({
-              id: convertToFulltimeTarget.id,
-              converted_by: currentUser.id || null,
-            });
-            setConvertToFulltimeTarget(null);
+            convertMutation.mutate(
+              {
+                id: convertToFulltimeTarget.id,
+                converted_by: currentUser.id || null,
+              },
+              {
+                onSettled: () => {
+                  setConvertToFulltimeTarget(null);
+                },
+              }
+            );
           }}
           isPending={convertMutation.isPending}
         />
@@ -3096,7 +3116,7 @@ const EmployeesPage = () => {
               </div>
               <div>
                 <label className="block text-sm font-medium text-gray-700 mb-1">
-                  Slack Email <span className="text-red-500">*</span>
+                  Login Email <span className="text-red-500">*</span>
                 </label>
                 <input
                   type="email"
@@ -3120,6 +3140,18 @@ const EmployeesPage = () => {
                   defaultValue={editingEmployee?.razorpay_email}
                   className="input"
                   placeholder="john.razorpay@example.com"
+                />
+              </div>
+              <div>
+                <label className="block text-sm font-medium text-gray-700 mb-1">
+                  Slack User ID
+                </label>
+                <input
+                  type="text"
+                  name="slack_user_id"
+                  defaultValue={editingEmployee?.slack_user_id}
+                  className="input"
+                  placeholder="e.g. U0123456789"
                 />
               </div>
             </div>
@@ -3182,6 +3214,27 @@ const EmployeesPage = () => {
                 />
               </div>
             </div>
+
+            {formEmployeeType === "Full-time" && (
+              <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+                <div>
+                  <label className="block text-sm font-medium text-gray-700 mb-1">
+                    Full-Time Start Date
+                  </label>
+                  <input
+                    type="date"
+                    name="converted_to_fulltime_at"
+                    defaultValue={
+                      editingEmployee?.converted_to_fulltime_at
+                        ? String(editingEmployee.converted_to_fulltime_at).split("T")[0]
+                        : ""
+                    }
+                    className="input"
+                  />
+                  <p className="text-[11px] text-gray-400 mt-1">Date converted or joined as full-time</p>
+                </div>
+              </div>
+            )}
 
             <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
               <div>

@@ -18,6 +18,7 @@ import WorkforceRoleInsightCard from "../components/analytics/WorkforceRoleInsig
 import ProjectDeliveryPacingCard from "../components/analytics/ProjectDeliveryPacingCard";
 import WorkforceSplitAreaChart from "../components/analytics/WorkforceSplitAreaChart";
 import AnnotatorComparisonChart from "../components/analytics/AnnotatorComparisonChart";
+import { motion } from "motion/react";
 import {
   FolderKanban,
   Clock,
@@ -41,6 +42,8 @@ import {
   Search,
   ArrowUpDown,
   Filter,
+  Maximize2,
+  Minimize2,
 } from "lucide-react";
 import toast from "react-hot-toast";
 
@@ -77,6 +80,7 @@ const AnalyticsDashboard = () => {
   const [dateFrom, setDateFrom] = useState(saved.dateFrom ?? "");
   const [dateTo, setDateTo] = useState(saved.dateTo ?? "");
   const [heatmapSearch, setHeatmapSearch] = useState(saved.heatmapSearch ?? "");
+  const [isHeatmapExpanded, setIsHeatmapExpanded] = useState(saved.isHeatmapExpanded ?? false);
 
   const queryParams = useMemo(() => {
     const today = new Date();
@@ -270,6 +274,7 @@ const AnalyticsDashboard = () => {
       dateTo,
       selectedProjectId,
       heatmapSearch,
+      isHeatmapExpanded,
       currentPage,
       opsPage,
       healthPage,
@@ -280,6 +285,7 @@ const AnalyticsDashboard = () => {
     dateTo,
     selectedProjectId,
     heatmapSearch,
+    isHeatmapExpanded,
     currentPage,
     opsPage,
     healthPage,
@@ -674,42 +680,116 @@ const AnalyticsDashboard = () => {
           </div>
         </div>
       ) : (
-        <div className="grid grid-cols-1 lg:grid-cols-12 gap-3">
-          {/* Left Column (6 cols on lg): Project Daily Trend, Annotation vs Review, and Dual Insight Cards */}
-          <div className="lg:col-span-6 flex flex-col gap-3">
-            {/* Tile 1: Project Daily Workload Trend */}
-            <div className="rounded-2xl border border-stone-200 bg-white p-4 shadow-[0_1px_4px_rgba(28,25,23,0.06)] flex flex-col justify-between h-[320px]">
-              <div className="mb-2 flex items-center justify-between">
-                <div>
-                  <h3 className="text-sm font-bold text-stone-900">Project Daily Workload Trend</h3>
-                  <p className="text-xs text-stone-400 font-medium">Daily hours logged for {selectedProjectObj?.name || "project"}</p>
-                </div>
-                <span className="rounded-full bg-indigo-50 border border-indigo-200/80 px-2.5 py-0.5 text-xs font-bold text-indigo-700 font-mono shadow-xs">
-                  {activeKpis?.total_hours ?? activeKpis?.autonex_platform_hours ?? 0}h Total
-                </span>
+        <motion.div layout className="grid grid-cols-1 lg:grid-cols-12 gap-3 items-start">
+          {/* Project Team Activity Heatmap (expands towards left to 12 cols, shifts other cards to bottom) */}
+          <motion.div
+            layout
+            transition={{ duration: 0.45, ease: [0.16, 1, 0.3, 1] }}
+            className={`${
+              isHeatmapExpanded
+                ? "lg:col-span-12 lg:order-1"
+                : "lg:col-span-6 lg:order-2"
+            } rounded-2xl border border-stone-200 bg-white p-4 shadow-[0_1px_4px_rgba(28,25,23,0.06)] flex flex-col justify-between max-h-[1000px] w-full`}
+          >
+            <div className="mb-1.5 flex items-center justify-between gap-3 shrink-0">
+              <div>
+                <h3 className="text-sm font-bold text-stone-900">Project Team Activity Heatmap</h3>
+                <p className="text-xs text-stone-400 font-medium">Daily editor intensity matrix & team workload breakdown</p>
               </div>
-              <DailyPlatformHoursChart
-                isGlobal={false}
-                data={activeChartData}
-                height={210}
-                color="#2563eb"
-                projects={rows}
-                selectedProject={selectedProjectObj}
-              />
+
+              <div className="flex items-center gap-2 shrink-0">
+                <div className="relative">
+                  <Search className="w-3.5 h-3.5 text-stone-400 absolute left-2.5 top-1/2 -translate-y-1/2 pointer-events-none" />
+                  <input
+                    type="text"
+                    placeholder="Search member…"
+                    value={heatmapSearch}
+                    onChange={(e) => setHeatmapSearch(e.target.value)}
+                    className="h-8 pl-8 pr-2.5 rounded-lg border border-stone-200 bg-white text-xs font-medium text-stone-800 placeholder-stone-400 focus:outline-none focus:ring-2 focus:ring-indigo-500/20 w-40 shadow-xs"
+                  />
+                </div>
+
+                <button
+                  type="button"
+                  onClick={() => setIsHeatmapExpanded(!isHeatmapExpanded)}
+                  className={`h-8 px-2.5 flex items-center gap-1.5 rounded-lg border text-xs font-semibold transition-all duration-200 shadow-xs ${
+                    isHeatmapExpanded
+                      ? "bg-indigo-50 border-indigo-300 text-indigo-700 hover:bg-indigo-100"
+                      : "bg-white border-stone-200 text-stone-600 hover:bg-stone-50 hover:text-stone-900 hover:border-stone-300"
+                  }`}
+                  title={isHeatmapExpanded ? "Collapse heatmap view" : "Expand heatmap view across full width"}
+                  aria-label={isHeatmapExpanded ? "Collapse heatmap view" : "Expand heatmap view"}
+                >
+                  {isHeatmapExpanded ? (
+                    <>
+                      <Minimize2 className="w-3.5 h-3.5 text-indigo-600" />
+                      <span className="hidden sm:inline">Collapse</span>
+                    </>
+                  ) : (
+                    <>
+                      <Maximize2 className="w-3.5 h-3.5 text-stone-500" />
+                      <span className="hidden sm:inline">Expand</span>
+                    </>
+                  )}
+                </button>
+              </div>
             </div>
 
-            {/* Tile 2: Annotation vs Review Dynamics */}
-            <div className="rounded-2xl border border-stone-200 bg-white p-4 shadow-[0_1px_4px_rgba(28,25,23,0.06)] flex flex-col justify-between h-[320px]">
-              <div className="mb-2">
-                <h3 className="text-sm font-bold text-stone-900">Annotation vs Review Dynamics</h3>
-                <p className="text-xs text-stone-400 font-medium">Daily split of production annotation vs quality review time</p>
-              </div>
-              <WorkforceSplitAreaChart
-                data={activeChartData}
-                totalAnnotationHours={activeKpis?.annotation_hours}
-                totalReviewHours={activeKpis?.review_hours}
-                height={210}
+            <div className="flex-1 min-h-0 flex flex-col justify-start gap-1.5 h-full">
+              <AnnotatorComparisonChart
+                annotators={projectAnalytics?.annotators || []}
+                dailyData={projectAnalytics?.daily || []}
+                externalSearchTerm={heatmapSearch}
               />
+            </div>
+          </motion.div>
+
+          {/* Left / Bottom Column: Project Daily Trend, Annotation vs Review Dynamics, and Dual Insight Cards */}
+          <motion.div
+            layout
+            transition={{ duration: 0.45, ease: [0.16, 1, 0.3, 1] }}
+            className={`${
+              isHeatmapExpanded
+                ? "lg:col-span-12 lg:order-2"
+                : "lg:col-span-6 lg:order-1"
+            } flex flex-col gap-3 w-full`}
+          >
+            {/* Tile 1 & Tile 2 Grid: Side-by-side (2 cols on lg) when shifted to bottom, stacked when collapsed */}
+            <div className={`grid gap-3 ${isHeatmapExpanded ? "grid-cols-1 lg:grid-cols-2" : "grid-cols-1"}`}>
+              {/* Tile 1: Project Daily Workload Trend */}
+              <div className="rounded-2xl border border-stone-200 bg-white p-4 shadow-[0_1px_4px_rgba(28,25,23,0.06)] flex flex-col justify-between h-[320px]">
+                <div className="mb-2 flex items-center justify-between">
+                  <div>
+                    <h3 className="text-sm font-bold text-stone-900">Project Daily Workload Trend</h3>
+                    <p className="text-xs text-stone-400 font-medium">Daily hours logged for {selectedProjectObj?.name || "project"}</p>
+                  </div>
+                  <span className="rounded-full bg-indigo-50 border border-indigo-200/80 px-2.5 py-0.5 text-xs font-bold text-indigo-700 font-mono shadow-xs">
+                    {activeKpis?.total_hours ?? activeKpis?.autonex_platform_hours ?? 0}h Total
+                  </span>
+                </div>
+                <DailyPlatformHoursChart
+                  isGlobal={false}
+                  data={activeChartData}
+                  height={210}
+                  color="#2563eb"
+                  projects={rows}
+                  selectedProject={selectedProjectObj}
+                />
+              </div>
+
+              {/* Tile 2: Annotation vs Review Dynamics */}
+              <div className="rounded-2xl border border-stone-200 bg-white p-4 shadow-[0_1px_4px_rgba(28,25,23,0.06)] flex flex-col justify-between h-[320px]">
+                <div className="mb-2">
+                  <h3 className="text-sm font-bold text-stone-900">Annotation vs Review Dynamics</h3>
+                  <p className="text-xs text-stone-400 font-medium">Daily split of production annotation vs quality review time</p>
+                </div>
+                <WorkforceSplitAreaChart
+                  data={activeChartData}
+                  totalAnnotationHours={activeKpis?.annotation_hours}
+                  totalReviewHours={activeKpis?.review_hours}
+                  height={210}
+                />
+              </div>
             </div>
 
             {/* Tile 3: Dual Mini Insight Cards */}
@@ -731,39 +811,8 @@ const AnalyticsDashboard = () => {
                 />
               </div>
             </div>
-          </div>
-
-          {/* Right Column (6 cols on lg): Project Team Activity Heatmap */}
-          <div className="lg:col-span-6 rounded-2xl border border-stone-200 bg-white p-4 shadow-[0_1px_4px_rgba(28,25,23,0.06)] flex flex-col justify-between max-h-[1000px]">
-            <div className="mb-1.5 flex items-center justify-between gap-3 shrink-0">
-              <div>
-                <h3 className="text-sm font-bold text-stone-900">Project Team Activity Heatmap</h3>
-                <p className="text-xs text-stone-400 font-medium">Daily editor intensity matrix & team workload breakdown</p>
-              </div>
-
-              <div className="flex items-center gap-2 shrink-0">
-                <div className="relative">
-                  <Search className="w-3.5 h-3.5 text-stone-400 absolute left-2.5 top-1/2 -translate-y-1/2 pointer-events-none" />
-                  <input
-                    type="text"
-                    placeholder="Search member…"
-                    value={heatmapSearch}
-                    onChange={(e) => setHeatmapSearch(e.target.value)}
-                    className="h-8 pl-8 pr-2.5 rounded-lg border border-stone-200 bg-white text-xs font-medium text-stone-800 placeholder-stone-400 focus:outline-none focus:ring-2 focus:ring-indigo-500/20 w-40 shadow-xs"
-                  />
-                </div>
-              </div>
-            </div>
-
-            <div className="flex-1 min-h-0 flex flex-col justify-start gap-1.5 h-full">
-              <AnnotatorComparisonChart
-                annotators={projectAnalytics?.annotators || []}
-                dailyData={projectAnalytics?.daily || []}
-                externalSearchTerm={heatmapSearch}
-              />
-            </div>
-          </div>
-        </div>
+          </motion.div>
+        </motion.div>
       )}
 
       {/* Active Workforce Team Members Modal */}

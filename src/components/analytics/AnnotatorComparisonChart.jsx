@@ -4,6 +4,23 @@ import UserAvatar from "../ui/UserAvatar";
 import { formatDisplayName } from "../../utils/displayName";
 
 // Helper to style intensity cells
+
+const formatExactTime = (totalSeconds) => {
+  if (!totalSeconds) return "0h 0m";
+  const h = Math.floor(totalSeconds / 3600);
+  const m = Math.floor((totalSeconds % 3600) / 60);
+  const s = totalSeconds % 60;
+  if (h > 0) {
+    if (s > 0) return `${h}h ${m}m ${s}s`;
+    return `${h}h ${m}m`;
+  }
+  if (m > 0) {
+    if (s > 0) return `${m}m ${s}s`;
+    return `${m}m`;
+  }
+  return `${s}s`;
+};
+
 const getHeatmapColor = (hours) => {
   if (!hours || hours === 0) return "bg-slate-100/60 border-slate-200/50 text-transparent";
   if (hours < 3) return "bg-indigo-100/80 border-indigo-200 text-indigo-800 font-bold";
@@ -28,9 +45,11 @@ const AnnotatorComparisonChart = ({
   const [hoveredCell, setHoveredCell] = useState(null);
   const searchTerm = externalSearchTerm || localSearchTerm;
 
-  // Sort annotators by total hours descending
+  // Sort annotators by total hours descending and assign rank
   const sortedAnnotators = useMemo(() => {
-    return [...annotators].sort((a, b) => (b.total_hours || 0) - (a.total_hours || 0));
+    return [...annotators]
+      .sort((a, b) => (b.total_hours || 0) - (a.total_hours || 0))
+      .map((a, idx) => ({ ...a, rank: idx + 1 }));
   }, [annotators]);
 
   // Filtered annotators by search term
@@ -74,8 +93,8 @@ const AnnotatorComparisonChart = ({
     );
   }
 
-  // Calculate inner grid min-width: 180px left user pod + 52px per date column
-  const minGridWidth = 180 + datesList.length * 52;
+  // Calculate inner grid min-width: 205px left user pod + 52px per date column
+  const minGridWidth = 205 + datesList.length * 52;
 
   return (
     <div className="h-full flex flex-col justify-start gap-1.5">
@@ -108,8 +127,9 @@ const AnnotatorComparisonChart = ({
           {/* Header Row: Sticky Top (z-30) & Sticky Left Corner (z-40) */}
           <div className="flex items-center bg-stone-50 border-b border-stone-200 text-[11px] font-bold text-stone-700 sticky top-0 z-30">
             {/* Top-Left Corner Cell (Sticky Top & Left - Highest z-index z-40) */}
-            <div className="w-[180px] min-w-[180px] max-w-[180px] shrink-0 sticky left-0 z-40 bg-stone-50 border-r border-stone-200 px-3 py-2 shadow-[2px_0_5px_-2px_rgba(0,0,0,0.06)] before:content-[''] before:absolute before:right-full before:top-0 before:bottom-0 before:w-16 before:bg-stone-50">
-              Annotator
+            <div className="w-[205px] min-w-[205px] max-w-[205px] shrink-0 sticky left-0 z-40 bg-stone-50 border-r border-stone-200 px-3 py-2 shadow-[2px_0_5px_-2px_rgba(0,0,0,0.06)] before:content-[''] before:absolute before:right-full before:top-0 before:bottom-0 before:w-16 before:bg-stone-50 flex items-center gap-2">
+              <span className="w-5 text-center font-mono text-[10px] text-stone-400 font-bold">#</span>
+              <span>Annotator</span>
             </div>
             {/* Date Columns */}
             <div className="flex-1 shrink-0 flex items-center">
@@ -127,7 +147,7 @@ const AnnotatorComparisonChart = ({
 
           {/* Content Rows */}
           <div className="divide-y divide-stone-100">
-            {filteredAnnotators.map((a) => {
+            {filteredAnnotators.map((a, idx) => {
               const dailyMap = Object.fromEntries(
                 (a.daily || []).map((p) => [p.date, p])
               );
@@ -136,6 +156,7 @@ const AnnotatorComparisonChart = ({
                 a.employee_name ||
                 a.user_email?.split("@")[0] ||
                 "Unknown";
+              const rankNum = a.rank || idx + 1;
 
               return (
                 <div
@@ -143,7 +164,20 @@ const AnnotatorComparisonChart = ({
                   className="flex items-center hover:bg-stone-50/80 transition-colors py-1 group"
                 >
                   {/* Sticky Left Pod (z-20: Solid opaque background + left barrier to prevent date cell leak) */}
-                  <div className="w-[180px] min-w-[180px] max-w-[180px] shrink-0 sticky left-0 z-20 bg-white group-hover:bg-stone-50 border-r border-stone-200 px-2.5 py-0.5 flex items-center gap-2 shadow-[2px_0_5px_-2px_rgba(0,0,0,0.06)] transition-colors before:content-[''] before:absolute before:right-full before:top-0 before:bottom-0 before:w-16 before:bg-white group-hover:before:bg-stone-50">
+                  <div className="w-[205px] min-w-[205px] max-w-[205px] shrink-0 sticky left-0 z-20 bg-white group-hover:bg-stone-50 border-r border-stone-200 px-2.5 py-0.5 flex items-center gap-2 shadow-[2px_0_5px_-2px_rgba(0,0,0,0.06)] transition-colors before:content-[''] before:absolute before:right-full before:top-0 before:bottom-0 before:w-16 before:bg-white group-hover:before:bg-stone-50">
+                    <span
+                      className={`w-5 shrink-0 text-center font-mono text-[10px] font-bold select-none ${
+                        rankNum === 1
+                          ? "text-amber-600 font-black"
+                          : rankNum === 2
+                          ? "text-slate-600 font-black"
+                          : rankNum === 3
+                          ? "text-amber-700 font-black"
+                          : "text-stone-400 group-hover:text-stone-600"
+                      }`}
+                    >
+                      {rankNum}
+                    </span>
                     <UserAvatar name={displayName} size="xs" />
                     <div className="min-w-0 flex-1">
                       <div
@@ -165,6 +199,8 @@ const AnnotatorComparisonChart = ({
                       const hrs = typeof entry === "number" ? entry : (entry?.hours ?? 0);
                       const rounded = Math.round(hrs * 10) / 10;
                       const displayVal = hrs > 0 ? `${rounded}h` : "";
+                      const seconds = typeof entry === "object" ? (entry?.seconds ?? 0) : 0;
+                      
                       const labelsCreated = typeof entry === "object" ? (entry?.labels_created ?? entry?.labels ?? 0) : 0;
                       const tasksSubmitted = typeof entry === "object" ? (entry?.tasks_submitted ?? entry?.tasks ?? 0) : 0;
                       const reviewActions = typeof entry === "object" ? (entry?.review_actions ?? 0) : 0;
@@ -183,6 +219,7 @@ const AnnotatorComparisonChart = ({
                                 displayName,
                                 date: d,
                                 hours: rounded,
+                                seconds,
                                 labels: labelsCreated,
                                 tasks: tasksSubmitted,
                                 reviewActions,
@@ -225,9 +262,9 @@ const AnnotatorComparisonChart = ({
             transform: "translateX(-50%)",
           }}
         >
-          <div className="w-56 rounded-xl border border-stone-200 bg-white shadow-xl p-3 text-stone-800 animate-in fade-in zoom-in-95 duration-100">
-            {/* Header: Name, Date & Single Hours Badge */}
-            <div className="flex items-center justify-between gap-2 border-b border-stone-100 pb-2 mb-2.5">
+          <div className="w-auto min-w-[200px] rounded-xl border border-stone-200 bg-white shadow-xl p-3 text-stone-800 animate-in fade-in zoom-in-95 duration-100">
+            {/* Header: Name, Date & Exact Time Badge */}
+            <div className="flex items-center justify-between gap-3">
               <div className="min-w-0">
                 <div className="text-xs font-bold text-stone-900 truncate">
                   {hoveredCell.displayName}
@@ -238,44 +275,19 @@ const AnnotatorComparisonChart = ({
               </div>
               <div
                 className={`px-2 py-0.5 rounded-md text-xs font-mono font-bold shrink-0 ${
-                  hoveredCell.hours > 0
+                  hoveredCell.seconds > 0 || hoveredCell.hours > 0
                     ? "bg-indigo-50 text-indigo-700 border border-indigo-200/60"
                     : "bg-stone-100 text-stone-500"
                 }`}
               >
-                {hoveredCell.hours}h
+                {hoveredCell.seconds > 0 
+                  ? formatExactTime(hoveredCell.seconds) 
+                  : (hoveredCell.hours > 0 ? `${hoveredCell.hours}h` : "0h 0m")}
               </div>
             </div>
-
-            {/* Labels & Tasks Metrics */}
-            {hoveredCell.hours > 0 || hoveredCell.labels > 0 || hoveredCell.tasks > 0 ? (
-              <div className="grid grid-cols-2 gap-2">
-                <div className="rounded-lg border border-stone-100 bg-stone-50/80 p-2">
-                  <div className="text-[10px] text-stone-500 font-medium flex items-center gap-1">
-                    <Tag className="w-3 h-3 text-indigo-500" />
-                    Labels Made
-                  </div>
-                  <div className="text-base font-extrabold text-stone-900 font-mono mt-0.5">
-                    {hoveredCell.labels > 0
-                      ? hoveredCell.labels.toLocaleString()
-                      : (hoveredCell.hours > 0 ? Math.round(hoveredCell.hours * 25) : 0)}
-                  </div>
-                </div>
-
-                <div className="rounded-lg border border-stone-100 bg-stone-50/80 p-2">
-                  <div className="text-[10px] text-stone-500 font-medium flex items-center gap-1">
-                    <CheckSquare className="w-3 h-3 text-emerald-500" />
-                    Tasks Done
-                  </div>
-                  <div className="text-base font-extrabold text-stone-900 font-mono mt-0.5">
-                    {hoveredCell.tasks > 0
-                      ? hoveredCell.tasks.toLocaleString()
-                      : (hoveredCell.hours > 0 ? Math.max(1, Math.round(hoveredCell.hours * 2.5)) : 0)}
-                  </div>
-                </div>
-              </div>
-            ) : (
-              <div className="py-1 text-center text-xs text-stone-400 font-medium">
+            
+            {(!hoveredCell.seconds && !hoveredCell.hours) && (
+              <div className="mt-2 pt-2 border-t border-stone-100 text-center text-[11px] text-stone-400 font-medium">
                 No activity logged on this day
               </div>
             )}

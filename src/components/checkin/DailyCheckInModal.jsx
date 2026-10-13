@@ -27,15 +27,8 @@ const OFFICE_FLOORS = [
 ];
 
 const LUNCH_PREFERENCES = [
-  { value: "order_tiffin", label: "Order Tiffin", icon: ChefHat, desc: "Delicious home-cooked meal" },
   { value: "canteen", label: "Canteen (6th Floor)", desc: "Variety of food options" },
   { value: "none", label: "No Lunch Plan", desc: "I'll arrange my own meal" },
-];
-
-const TIFFIN_TYPES = [
-  { value: "full_meal", label: "Full Meal", desc: "Rice, dal & vegetables" },
-  { value: "no_rice", label: "No Rice", desc: "Dal & vegetables" },
-  { value: "dal_and_rice", label: "Dal & Rice", desc: "Simple & light" },
 ];
 
 const RequiredBadge = () => (
@@ -61,7 +54,6 @@ export default function DailyCheckInModal() {
   const [mood, setMood] = useState(null);
   const [officeFloor, setOfficeFloor] = useState("");
   const [lunchPreference, setLunchPreference] = useState("");
-  const [tiffinType, setTiffinType] = useState("");
   const [validationErrors, setValidationErrors] = useState({});
 
   const { isDismissed, isOpenManually, dismiss } = useCheckinStore();
@@ -93,7 +85,6 @@ export default function DailyCheckInModal() {
     // Reset WFO-only fields
     setOfficeFloor("");
     setLunchPreference("");
-    setTiffinType("");
     setValidationErrors({});
   }, [status]);
 
@@ -131,9 +122,6 @@ export default function DailyCheckInModal() {
       if (!lunchPreference) {
         errors.lunchPreference = "Please select your lunch preference";
       }
-      if (lunchPreference === "order_tiffin" && !tiffinType) {
-        errors.tiffinType = "Please select your tiffin preference";
-      }
     }
 
     setValidationErrors(errors);
@@ -148,7 +136,7 @@ export default function DailyCheckInModal() {
         mood,
         office_floor: workMode === "WFO" ? officeFloor : null,
         lunch_preference: workMode === "WFO" ? lunchPreference : null,
-        tiffin_type: lunchPreference === "order_tiffin" ? tiffinType : null,
+        tiffin_type: null,
       }),
     onSuccess: () => {
       // Calculate the current hour in IST
@@ -157,7 +145,7 @@ export default function DailyCheckInModal() {
         10
       );
       // If it is 12 PM or later, and they ordered food from the office
-      if (istHour >= 11 && workMode === "WFO" && (lunchPreference === "order_tiffin" || lunchPreference === "canteen")) {
+      if (istHour >= 11 && workMode === "WFO" && lunchPreference === "canteen") {
         toast("The list is already finalized and sent. Please contact Ashish Jadhav to confirm.", {
           duration: 6000,
           icon: "⚠️",
@@ -240,7 +228,6 @@ export default function DailyCheckInModal() {
                   setWorkMode(mode);
                   setOfficeFloor("");
                   setLunchPreference("");
-                  setTiffinType("");
                   setValidationErrors({});
                 }}
                 className={`group relative overflow-hidden rounded-2xl border-2 p-4 transition-all duration-200 ${workMode === mode
@@ -307,10 +294,7 @@ export default function DailyCheckInModal() {
                     type="button"
                     onClick={() => {
                       setLunchPreference(pref.value);
-                      if (pref.value !== "order_tiffin") {
-                        setTiffinType("");
-                      }
-                      setValidationErrors((prev) => ({ ...prev, lunchPreference: "", tiffinType: "" }));
+                      setValidationErrors((prev) => ({ ...prev, lunchPreference: "" }));
                     }}
                     className={`w-full group relative overflow-hidden rounded-xl border-2 p-3 transition-all duration-150 text-left ${lunchPreference === pref.value
                         ? "border-indigo-400 bg-indigo-50/70"
@@ -344,59 +328,6 @@ export default function DailyCheckInModal() {
                 <div className="flex items-center gap-2 text-red-600 text-sm mt-2">
                   <AlertCircle className="w-4 h-4" />
                   <span>{validationErrors.lunchPreference}</span>
-                </div>
-              )}
-
-              {/* Tiffin Type Selection (Conditional) */}
-              {lunchPreference === "order_tiffin" && (
-                <div className="mt-4 p-4 rounded-xl bg-gradient-to-br from-indigo-50 to-blue-50 border border-indigo-100">
-                  <label className="text-xs font-semibold uppercase tracking-wider text-indigo-900 block mb-3">
-                    Select tiffin type
-                    <RequiredBadge />
-                  </label>
-                  <div className="space-y-2">
-                    {TIFFIN_TYPES.map((tiff) => (
-                      <button
-                        key={tiff.value}
-                        type="button"
-                        onClick={() => {
-                          setTiffinType(tiff.value);
-                          setValidationErrors((prev) => ({ ...prev, tiffinType: "" }));
-                        }}
-                        className={`w-full group relative overflow-hidden rounded-lg border-2 p-2.5 transition-all duration-150 text-left ${tiffinType === tiff.value
-                            ? "border-indigo-400 bg-white shadow-sm"
-                            : "border-indigo-200 bg-white/60 hover:border-indigo-300"
-                          }`}
-                      >
-                        <div className="flex items-center gap-2.5 relative z-10">
-                          <input
-                            type="radio"
-                            name="tiffin_type"
-                            checked={tiffinType === tiff.value}
-                            onChange={() => { }}
-                            className="w-4 h-4 cursor-pointer accent-indigo-600"
-                          />
-                          <div className="flex-1">
-                            <div className={`font-medium text-sm ${tiffinType === tiff.value
-                                ? "text-indigo-900"
-                                : "text-slate-700"
-                              }`}>
-                              {tiff.label}
-                            </div>
-                            <div className="text-xs text-slate-500">
-                              {tiff.desc}
-                            </div>
-                          </div>
-                        </div>
-                      </button>
-                    ))}
-                  </div>
-                  {validationErrors.tiffinType && (
-                    <div className="flex items-center gap-2 text-red-600 text-sm mt-3">
-                      <AlertCircle className="w-4 h-4" />
-                      <span>{validationErrors.tiffinType}</span>
-                    </div>
-                  )}
                 </div>
               )}
             </section>
