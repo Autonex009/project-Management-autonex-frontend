@@ -174,6 +174,8 @@ const AllocationsPage = () => {
       queryClient.invalidateQueries(["allocations", "project-detail"]);
       queryClient.invalidateQueries(["allocations", "employee-projects"]);
       queryClient.invalidateQueries(["sub-projects"]);
+      queryClient.invalidateQueries(["onboarding_pipeline"]);
+      queryClient.invalidateQueries(["onboarding_newly_onboarded"]);
       toast.success("Allocation removed successfully!");
     },
     onError: (err) => {
@@ -791,13 +793,22 @@ const AllocationsPage = () => {
                                   onClick={(e) => {
                                     e.preventDefault();
                                     e.stopPropagation();
+                                    const isTrainingProject = (selectedProject?.project_type || "").toLowerCase() === "training"
+                                      || (selectedProject?.name || "").toLowerCase().includes("week 1 training")
+                                      || (it.role_tags || []).includes("Trainee");
                                     setConfirmState({
                                       variant: "danger",
-                                      title: it.stale ? "Remove stale allocation" : "Remove team member",
+                                      title: it.stale
+                                        ? "Remove stale allocation"
+                                        : isTrainingProject
+                                        ? "Cancel Training & Remove Trainee"
+                                        : "Remove team member",
                                       message: it.stale
                                         ? `${name} is no longer on the roster. Remove their leftover allocation from "${selectedProject.name}"?`
+                                        : isTrainingProject
+                                        ? `⚠️ Warning: ${name} is currently in the 5-Day Onboarding Training pipeline. Removing them from this project will cancel their active onboarding pipeline and return them to the Unassigned / Idle pool. Are you sure you want to remove them?`
                                         : `Remove ${name} from "${selectedProject.name}"?`,
-                                      confirmText: "Remove",
+                                      confirmText: isTrainingProject ? "Yes, Cancel & Remove" : "Remove",
                                       onConfirm: () => {
                                         deleteMutation.mutate(it.allocation_id);
                                         setConfirmState(null);
@@ -1225,13 +1236,22 @@ const AllocationsPage = () => {
                         <button
                           type="button"
                           onClick={() => {
+                            const isTrainingProject = (editingAllocation?.projectType || "").toLowerCase() === "training"
+                              || (editingAllocation?.projectName || "").toLowerCase().includes("week 1 training")
+                              || (it.role_tags || []).includes("Trainee");
                             setConfirmState({
                               variant: "danger",
-                              title: it.stale ? "Remove stale allocation" : "Remove team member",
+                              title: it.stale
+                                ? "Remove stale allocation"
+                                : isTrainingProject
+                                ? "Cancel Training & Remove Trainee"
+                                : "Remove team member",
                               message: it.stale
                                 ? `${name} is no longer on the roster. Remove their leftover allocation from "${editingAllocation.projectName}"?`
+                                : isTrainingProject
+                                ? `⚠️ Warning: ${name} is currently in the 5-Day Onboarding Training pipeline. Removing them from this project will cancel their active onboarding pipeline and return them to the Unassigned / Idle pool. Are you sure you want to remove them?`
                                 : `Remove ${name} from this project?`,
-                              confirmText: "Remove",
+                              confirmText: isTrainingProject ? "Yes, Cancel & Remove" : "Remove",
                               onConfirm: () => {
                                 deleteMutation.mutate(it.allocation_id);
                                 setEditingAllocation(null);
