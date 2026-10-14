@@ -19,8 +19,11 @@ const Dropdown = ({
   // for option lists whose value differs from its label (e.g. an id).
   searchable = false,
   searchPlaceholder = "Search...",
+  // 'auto' | 'top' | 'bottom' — auto flips upwards if space below the trigger is limited
+  placement = "auto",
 }) => {
   const [open, setOpen] = useState(defaultOpen);
+  const [openUpwards, setOpenUpwards] = useState(false);
   const [searchText, setSearchText] = useState("");
   const ref = useRef(null);
   const inputRef = useRef(null);
@@ -62,6 +65,46 @@ const Dropdown = ({
   useEffect(() => {
     if (!open && searchable) setSearchText("");
   }, [open, searchable]);
+
+  // Dynamic placement calculation: auto-flips upwards if space below is limited
+  useEffect(() => {
+    if (!open || !ref.current) return;
+
+    const checkPlacement = () => {
+      if (!ref.current) return;
+      if (placement === "top") {
+        setOpenUpwards(true);
+        return;
+      }
+      if (placement === "bottom") {
+        setOpenUpwards(false);
+        return;
+      }
+      const rect = ref.current.getBoundingClientRect();
+      const spaceBelow = window.innerHeight - rect.bottom;
+      const spaceAbove = rect.top;
+      const estimatedHeight = 260;
+
+      if (spaceBelow < estimatedHeight && spaceAbove > spaceBelow) {
+        setOpenUpwards(true);
+      } else {
+        setOpenUpwards(false);
+      }
+    };
+
+    checkPlacement();
+    window.addEventListener("resize", checkPlacement);
+    window.addEventListener("scroll", checkPlacement, true);
+    return () => {
+      window.removeEventListener("resize", checkPlacement);
+      window.removeEventListener("scroll", checkPlacement, true);
+    };
+  }, [open, placement]);
+
+  const positionClass =
+    placement === "top" || (placement === "auto" && openUpwards)
+      ? "bottom-full mb-1"
+      : "top-full mt-1";
 
   const displayValue = options.find(
     (opt) => (typeof opt === "string" ? opt : opt.value) === value,
@@ -162,7 +205,7 @@ const Dropdown = ({
         </div>
         {open && !disabled && (
           <div
-            className={`absolute left-0 top-full mt-1 z-[9999] ${optionsClassName} bg-white border border-slate-200 rounded-xl shadow-lg py-1 overflow-hidden max-h-64 overflow-y-auto`}
+            className={`absolute left-0 ${positionClass} z-[9999] ${optionsClassName} bg-white border border-slate-200 rounded-xl shadow-lg py-1 overflow-hidden max-h-64 overflow-y-auto`}
           >
             {filteredOptions.length > 0 ? (
               filteredOptions.map((opt) => {
@@ -240,7 +283,7 @@ const Dropdown = ({
       </button>
       {open && !disabled && (
         <div
-          className={`absolute left-0 top-full mt-1 z-[9999] ${optionsClassName} bg-white border border-slate-200 rounded-xl shadow-lg overflow-hidden`}
+          className={`absolute left-0 ${positionClass} z-[9999] ${optionsClassName} bg-white border border-slate-200 rounded-xl shadow-lg overflow-hidden`}
         >
           {searchable && (
             <div className="border-b border-slate-100 p-1.5">

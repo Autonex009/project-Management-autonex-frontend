@@ -296,23 +296,33 @@ export const Table = ({
   );
 };
 
+const MONTH_NAMES = [
+  "Jan", "Feb", "Mar", "Apr", "May", "Jun",
+  "Jul", "Aug", "Sep", "Oct", "Nov", "Dec"
+];
+
 export const formatDateDeterministic = (v) => {
   if (!v) return "—";
-  const datePart = String(v).split("T")[0];
+  const datePart = String(v).split(/[T\s]/)[0];
   const parts = datePart.split("-");
   if (parts.length === 3) {
     const year = parts[0];
-    const month = parts[1].padStart(2, "0");
-    const day = parts[2].padStart(2, "0");
-    return `${day}/${month}/${year}`;
+    const monthIdx = parseInt(parts[1], 10) - 1;
+    const day = parseInt(parts[2], 10);
+    if (!isNaN(day) && monthIdx >= 0 && monthIdx < 12) {
+      return `${day} ${MONTH_NAMES[monthIdx]} ${year}`;
+    }
   }
   try {
     const d = new Date(v);
     if (isNaN(d.getTime())) return v;
-    const day = String(d.getUTCDate()).padStart(2, "0");
-    const month = String(d.getUTCMonth() + 1).padStart(2, "0");
+    const day = d.getUTCDate();
+    const monthIdx = d.getUTCMonth();
     const year = d.getUTCFullYear();
-    return `${day}/${month}/${year}`;
+    if (monthIdx >= 0 && monthIdx < 12) {
+      return `${day} ${MONTH_NAMES[monthIdx]} ${year}`;
+    }
+    return v;
   } catch {
     return v;
   }

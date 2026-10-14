@@ -1891,7 +1891,10 @@ const EmployeesPage = () => {
       email: formData.get("email"),
       razorpay_email: formData.get("razorpay_email") || null,
       slack_user_id: formData.get("slack_user_id")?.trim() || null,
-      converted_to_fulltime_at: ftStartDate || null,
+      converted_to_fulltime_at:
+        formEmployeeType === "Full-time"
+          ? (ftStartDate?.trim() || null)
+          : null,
       employee_type: formData.get("employee_type"),
       work_model: formData.get("work_model") || "WFO",
       designation: formData.get("designation") || "Annotator/ Reviewer",
@@ -2725,12 +2728,12 @@ const EmployeesPage = () => {
             },
           },
           {
-            key: "converted_to_fulltime_at",
-            label: "Full-Time Start Date",
+            key: "date_of_joining",
+            label: "Date of Joining",
             align: "left",
             width: "w-[11%]",
-            render: (value, row) => {
-              const dateVal = row.converted_to_fulltime_at;
+            render: (_, row) => {
+              const dateVal = row.created_at;
               if (!dateVal) {
                 return (
                   <span className="text-[13px] text-slate-400 font-medium">—</span>
@@ -2758,7 +2761,7 @@ const EmployeesPage = () => {
             key: "reporting_manager",
             label: "Reporting Manager",
             align: "left",
-            width: "w-[12%]",
+            width: "w-[13%]",
             render: (_, row) => {
               const managers = row.managers || [];
               if (managers.length === 0) {
@@ -2778,28 +2781,17 @@ const EmployeesPage = () => {
               const positionClass = isNearTop
                 ? "top-full mt-1.5"
                 : "bottom-full mb-1.5";
-              const extra = managers.length - 1;
 
               return (
                 <div
                   className="group relative flex items-center gap-1 flex-nowrap whitespace-nowrap cursor-default"
                   title={managers.join(", ")}
                 >
-                  {/* Shortened here, full in the hover card below — a manager's
-                      middle name is what tells two of them apart. */}
-                  <span className="pointer-events-none text-[13px] font-medium text-slate-700 truncate max-w-[150px] inline-block">
-                    {formatDisplayName(managers[0]) || managers[0]}
+                  <span className="pointer-events-none text-[13px] font-medium text-slate-700 truncate max-w-[170px] inline-block">
+                    {managers.map((m) => formatDisplayName(m) || m).join(", ")}
                   </span>
-                  {extra > 0 && (
-                    <span className="inline-flex items-center justify-center flex-shrink-0 h-4 min-w-4 rounded-full bg-slate-100 px-1 text-[10px] font-semibold text-slate-500">
-                      +{extra}
-                    </span>
-                  )}
 
-                  {/* Also opens when the name was shortened, not just when it is
-                      long or there are several — otherwise the dropped middle
-                      name would be unreachable. */}
-                  {(extra > 0 ||
+                  {(managers.length > 1 ||
                     (managers[0] || "").length > 18 ||
                     formatDisplayName(managers[0]) !== managers[0]) && (
                       <div
@@ -2828,7 +2820,7 @@ const EmployeesPage = () => {
           {
             key: "today_checkin",
             label: "Today's Check-in",
-            width: "w-[13%]",
+            width: "w-[14%]",
             render: (_, row) => {
               const checkedInAt = row.today_checked_in_at;
               const floor = row.today_office_floor;
@@ -3095,6 +3087,7 @@ const EmployeesPage = () => {
           </h2>
         </Modal.Header>
         <form
+          key={editingEmployee?.id || "new"}
           onSubmit={handleSubmit}
           className="flex-1 flex flex-col min-h-0"
           id="employee-form"
@@ -3219,7 +3212,7 @@ const EmployeesPage = () => {
               <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
                 <div>
                   <label className="block text-sm font-medium text-gray-700 mb-1">
-                    Full-Time Start Date
+                    Date of Full Time
                   </label>
                   <input
                     type="date"
@@ -3227,11 +3220,13 @@ const EmployeesPage = () => {
                     defaultValue={
                       editingEmployee?.converted_to_fulltime_at
                         ? String(editingEmployee.converted_to_fulltime_at).split("T")[0]
+                        : editingEmployee?.created_at
+                        ? String(editingEmployee.created_at).split("T")[0]
                         : ""
                     }
                     className="input"
                   />
-                  <p className="text-[11px] text-gray-400 mt-1">Date converted or joined as full-time</p>
+                  <p className="text-[11px] text-gray-400 mt-1">Full-time start date</p>
                 </div>
               </div>
             )}
