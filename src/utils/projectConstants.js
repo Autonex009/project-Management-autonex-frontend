@@ -59,6 +59,14 @@ export const formatCreatedDate = (dateStr) => {
 
 export const PROJECT_TYPE_CATEGORIES = [
   {
+    key: "Training",
+    subtypes: [
+      "Onboarding",
+      "Week 1 Training",
+      "Domain Upskilling",
+    ],
+  },
+  {
     key: "Data Modalities",
     subtypes: [
       "Image (RGB)",
