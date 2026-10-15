@@ -462,22 +462,10 @@ const EmployeeDashboard = () => {
   });
 
   const loggedInEmpId = Number(localUser.employee_id || localUser.id || account?.employee_id);
+  const isTeamLeadOrPm = userRole === "pm" || userRole === "team_lead";
 
-  const isManagerOfEmployee = useMemo(() => {
-    if (!loggedInEmpId) return false;
-    if (userRole !== "pm" && userRole !== "team_lead") return false;
-    return allocations.some((alloc) => {
-      const proj = projects.find((p) => p.id === alloc.sub_project_id);
-      if (!proj) return false;
-      const managerIds = Array.isArray(proj.assigned_employee_ids)
-        ? proj.assigned_employee_ids.map(Number)
-        : [];
-      return managerIds.includes(loggedInEmpId);
-    });
-  }, [allocations, projects, userRole, loggedInEmpId]);
-
-  const canViewNotes = isAdminOrHr || isSelf || isManagerOfEmployee;
-  const canManageNotes = isAdminOrHr || isManagerOfEmployee;
+  const canViewNotes = isAdminOrHr || isTeamLeadOrPm || isSelf;
+  const canManageNotes = isAdminOrHr || isTeamLeadOrPm;
 
   useEffect(() => {
     if (!canViewNotes && bottomTab === "notes") {
