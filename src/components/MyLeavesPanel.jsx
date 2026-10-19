@@ -684,7 +684,20 @@ const MyLeavesPanel = ({
     setWfhDeleteConfirm(wfh);
   };
 
-  const myEmployeeIdSet = employeeId ? new Set([employeeId]) : null;
+  const myEmployeeIdSet = useMemo(() => {
+    const s = new Set();
+    const addId = (id) => {
+      if (id != null) {
+        s.add(id);
+        s.add(Number(id));
+        s.add(String(id));
+      }
+    };
+    addId(employeeId);
+    addId(user?.employee_id);
+    addId(user?.id);
+    return s.size > 0 ? s : null;
+  }, [employeeId, user?.employee_id, user?.id]);
 
   return (
     <div className="space-y-3">

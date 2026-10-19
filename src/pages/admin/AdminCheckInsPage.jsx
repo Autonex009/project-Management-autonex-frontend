@@ -410,33 +410,19 @@ const AdminCheckInsPage = () => {
                 <MetricDots
                   items={[
                     {
-                      label: "WFO",
-                      value: data?.kpi_wfo ?? 0,
-                      dot: "bg-emerald-500",
-                      tone: "text-emerald-600",
-                      onClick: () => applyWorkModeFilter("WFO"),
-                    },
-                    {
-                      label: "WFH",
-                      value: data?.kpi_wfh ?? 0,
-                      dot: "bg-sky-500",
-                      tone: "text-sky-600",
-                      onClick: () => applyWorkModeFilter("WFH"),
-                    },
-                    {
                       label: "Pending PM",
                       value: Math.max(0, (data?.kpi_checked_in ?? 0) - (data?.kpi_confirmed ?? 0)),
                       dot: "bg-amber-500",
                       tone: "text-amber-600",
                       onClick: () => applyPmConfirmationFilter("pending"),
                     },
-                    ...((data?.kpi_late ?? 0) > 0 ? [{
+                    {
                       label: "Late",
-                      value: data.kpi_late,
+                      value: data?.kpi_late ?? 0,
                       dot: "bg-rose-500",
                       tone: "text-rose-600",
                       onClick: () => applyTimeFilter("11_12"),
-                    }] : [])
+                    },
                   ]}
                 />
               }
@@ -516,7 +502,6 @@ const AdminCheckInsPage = () => {
                 {
                   title: "Lunch Prefs",
                   rows: [
-                    { label: "Order Tiffin", value: data?.kpi_order_tiffin ?? 0, onClick: () => applyWorkModeFilter("WFO") },
                     { label: "Canteen", value: data?.kpi_canteen ?? 0, onClick: () => applyWorkModeFilter("WFO") },
                     { label: "None", value: data?.kpi_lunch_none ?? 0, onClick: () => applyWorkModeFilter("WFO") },
                   ]

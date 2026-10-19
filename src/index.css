@@ -68,6 +68,26 @@
   }
 }
 
+/* Minimal slick scrollbar for balance cards and horizontal lists */
+.slick-scrollbar {
+  scrollbar-width: thin;
+  scrollbar-color: rgba(203, 213, 225, 0.7) transparent;
+}
+.slick-scrollbar::-webkit-scrollbar {
+  height: 4px;
+  width: 4px;
+}
+.slick-scrollbar::-webkit-scrollbar-track {
+  background: transparent;
+}
+.slick-scrollbar::-webkit-scrollbar-thumb {
+  background-color: rgba(203, 213, 225, 0.7);
+  border-radius: 9999px;
+}
+.slick-scrollbar::-webkit-scrollbar-thumb:hover {
+  background-color: rgba(148, 163, 184, 0.9);
+}
+
 @keyframes shimmer {
   0% {
     background-position: -200% 0;
