@@ -8,12 +8,21 @@ const CandidateConfirmationPage = () => {
   const navigate = useNavigate();
   const queryClient = useQueryClient();
 
+  const isCandidateConfirmed =
+    typeof window !== "undefined" &&
+    sessionStorage.getItem("onboarding_confirmed") === "true";
+
   const { data, isLoading } = useQuery({
     queryKey: ["onboarding_my_status"],
     queryFn: async () => {
       const res = await api.get("/onboarding/pipeline/my-status");
+      if (!res.data?.has_pending) {
+        sessionStorage.setItem("onboarding_confirmed", "true");
+      }
       return res.data;
-    }
+    },
+    enabled: !isCandidateConfirmed,
+    staleTime: 1000 * 60 * 30, // 30 minutes
   });
 
   const confirmMutation = useMutation({

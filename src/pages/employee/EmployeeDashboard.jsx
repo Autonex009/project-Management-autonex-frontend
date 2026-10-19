@@ -16,6 +16,7 @@ import {
   badgesApi,
 } from "../../services/api";
 import EncordSyncWidget from "../../components/dashboard/EncordSyncWidget";
+import useCheckinStore from "../../store/useCheckinStore";
 
 import {
   AlertCircle,
@@ -438,6 +439,8 @@ const EmployeeDashboard = () => {
   }, [employeeId, params.id]);
 
   /* ── Queries ─────────────────────────────────────── */
+  const canLoadDashboard = useCheckinStore((s) => s.canLoadDashboard);
+
   const { data: account } = useQuery({
     queryKey: ["auth-me"],
     queryFn: authApi.me,
@@ -450,34 +453,23 @@ const EmployeeDashboard = () => {
 
   const loggedInEncordId = employee?.encord_id?.trim().toLowerCase() || "";
 
-  const { data: allocations = [] } = useQuery({
+  const { data: allocations = [], isLoading: allocationsLoading } = useQuery({
     queryKey: ["my-allocations", employeeId],
     queryFn: () => allocationApi.getByEmployee(employeeId),
-    enabled: !!employeeId,
+    enabled: !!employeeId && canLoadDashboard,
   });
 
   const { data: projects = [] } = useQuery({
     queryKey: ["sub-projects"],
     queryFn: () => subProjectApi.getAll(),
+    enabled: canLoadDashboard,
   });
 
   const loggedInEmpId = Number(localUser.employee_id || localUser.id || account?.employee_id);
+  const isTeamLeadOrPm = userRole === "pm" || userRole === "team_lead";
 
-  const isManagerOfEmployee = useMemo(() => {
-    if (!loggedInEmpId) return false;
-    if (userRole !== "pm" && userRole !== "team_lead") return false;
-    return allocations.some((alloc) => {
-      const proj = projects.find((p) => p.id === alloc.sub_project_id);
-      if (!proj) return false;
-      const managerIds = Array.isArray(proj.assigned_employee_ids)
-        ? proj.assigned_employee_ids.map(Number)
-        : [];
-      return managerIds.includes(loggedInEmpId);
-    });
-  }, [allocations, projects, userRole, loggedInEmpId]);
-
-  const canViewNotes = isAdminOrHr || isSelf || isManagerOfEmployee;
-  const canManageNotes = isAdminOrHr || isManagerOfEmployee;
+  const canViewNotes = isAdminOrHr || isTeamLeadOrPm || isSelf;
+  const canManageNotes = isAdminOrHr || isTeamLeadOrPm;
 
   useEffect(() => {
     if (!canViewNotes && bottomTab === "notes") {
@@ -488,19 +480,19 @@ const EmployeeDashboard = () => {
   const { data: allLeaves = [] } = useQuery({
     queryKey: ["my-leaves", employeeId],
     queryFn: () => leaveApi.getAll({ employee_id: employeeId }),
-    enabled: !!employeeId,
+    enabled: !!employeeId && canLoadDashboard,
   });
 
   const { data: serverBalances } = useQuery({
     queryKey: ["leave-balances", employeeId],
     queryFn: () => leaveApi.getBalances({ employee_id: employeeId }),
-    enabled: !!employeeId,
+    enabled: !!employeeId && canLoadDashboard,
   });
 
   const { data: myWfh = [] } = useQuery({
     queryKey: ["my-wfh", employeeId],
     queryFn: () => wfhApi.getAll({ employee_id: employeeId }),
-    enabled: !!employeeId,
+    enabled: !!employeeId && canLoadDashboard,
   });
 
   const modalMonthYear = useMemo(() => {
@@ -534,33 +526,28 @@ const EmployeeDashboard = () => {
   const { data: perfReviewsData } = useQuery({
     queryKey: ["employee-perf-reviews", employeeId],
     queryFn: () => perfEvalApi.getAll({ employee_id: employeeId }),
-    enabled: !!employeeId,
+    enabled: !!employeeId && canLoadDashboard,
   });
   const perfReviews = perfReviewsData?.items || [];
 
-  const { data: dailyLeaderboard } = useQuery({
-    queryKey: ["leaderboard-day"],
-    queryFn: () => analyticsApi.getLeaderboard({ range: "day" }),
-  });
-  const { data: weeklyLeaderboard } = useQuery({
-    queryKey: ["leaderboard-week"],
-    queryFn: () => analyticsApi.getLeaderboard({ range: "week" }),
-  });
-  const { data: monthlyLeaderboard } = useQuery({
-    queryKey: ["leaderboard-month"],
-    queryFn: () => analyticsApi.getLeaderboard({ range: "month" }),
+  const { data: myRanks } = useQuery({
+    queryKey: ["my-leaderboard-ranks"],
+    queryFn: () => analyticsApi.getMyRanks(),
+    enabled: canLoadDashboard,
+    staleTime: 1000 * 60 * 5, // 5 minutes
   });
 
   const { data: skillsList = [], isLoading: skillsLoading } = useQuery({
     queryKey: ["skills-list"],
     queryFn: () => skillsApi.getAll(),
+    enabled: canLoadDashboard,
   });
 
   /* ── Employee Notes (complaints / warnings / recognitions) ── */
   const { data: employeeNotes = [], isLoading: notesLoading } = useQuery({
     queryKey: ["employee-notes", employeeId],
     queryFn: () => employeeNotesApi.getByEmployee(employeeId),
-    enabled: !!employeeId && canViewNotes,
+    enabled: !!employeeId && canViewNotes && canLoadDashboard,
   });
 
   const { data: employeeBadges = [] } = useQuery({
@@ -576,7 +563,7 @@ const EmployeeDashboard = () => {
             ? payload.items
             : [];
     },
-    enabled: !!employeeId,
+    enabled: !!employeeId && canLoadDashboard,
   });
 
   const { data: badgeLogs = [], isLoading: badgeLogsLoading } = useQuery({
@@ -592,7 +579,7 @@ const EmployeeDashboard = () => {
             ? payload.items
             : [];
     },
-    enabled: !!employeeId && showBadgeLogsModal,
+    enabled: !!employeeId && showBadgeLogsModal && canLoadDashboard,
   });
 
   const createNoteMutation = useMutation({
@@ -628,29 +615,9 @@ const EmployeeDashboard = () => {
     },
   });
 
-  const getEmployeeRank = (leaderboard) => {
-    if (!leaderboard?.leaderboard || !loggedInEncordId) return null;
-    const ranked = [...(leaderboard.leaderboard || [])].sort(
-      (a, b) => (b.total_hours || 0) - (a.total_hours || 0)
-    );
-    const index = ranked.findIndex(
-      (item) => (item.user_email || "").trim().toLowerCase() === loggedInEncordId
-    );
-    return index >= 0 ? index + 1 : null;
-  };
-
-  const dailyRank = useMemo(
-    () => getEmployeeRank(dailyLeaderboard),
-    [dailyLeaderboard, loggedInEncordId]
-  );
-  const weeklyRank = useMemo(
-    () => getEmployeeRank(weeklyLeaderboard),
-    [weeklyLeaderboard, loggedInEncordId]
-  );
-  const monthlyRank = useMemo(
-    () => getEmployeeRank(monthlyLeaderboard),
-    [monthlyLeaderboard, loggedInEncordId]
-  );
+  const dailyRank = myRanks?.daily_rank ?? null;
+  const weeklyRank = myRanks?.weekly_rank ?? null;
+  const monthlyRank = myRanks?.monthly_rank ?? null;
 
   /* ── Profile ─────────────────────────────────────── */
   const profile = useMemo(() => {
@@ -936,7 +903,7 @@ const EmployeeDashboard = () => {
         sub_project_id: currentSubProjectId,
         employee_id: employeeId,
       }),
-    enabled: !!employeeId,
+    enabled: !!employeeId && canLoadDashboard && !allocationsLoading,
   });
 
   const totalDailyHours = encordActivity?.total_hours ?? 0;
@@ -1063,6 +1030,10 @@ const EmployeeDashboard = () => {
     const casualUsed = serverBalances?.casual_sick?.used ?? usedYear.casual_sick;
     const casualRemaining = serverBalances?.casual_sick?.remaining ?? Math.max(casualQuota - casualUsed, 0);
 
+    const floaterQuota = serverBalances?.floater?.quota ?? (ANNUAL_LEAVE_QUOTA?.floater || 2);
+    const floaterUsed = serverBalances?.floater?.used ?? usedYear.floater;
+    const floaterRemaining = serverBalances?.floater?.remaining ?? Math.max(floaterQuota - floaterUsed, 0);
+
     let totalWfhApproved = 0;
 
     myWfh.forEach((wfh) => {
@@ -1104,6 +1075,8 @@ const EmployeeDashboard = () => {
       paidQuota,
       casualRemaining,
       casualQuota,
+      floaterRemaining,
+      floaterQuota,
       wfhRemaining,
       wfhQuota,
       currentLeave,
@@ -1616,24 +1589,24 @@ const EmployeeDashboard = () => {
                 </h3>
               </div>
 
-              <div className="grid grid-cols-3 gap-2">
+              <div className="grid grid-cols-4 gap-1.5 pt-0.5">
                 {[
                   {
-                    icon: <Home className="w-3.5 h-3.5 text-indigo-600" />,
+                    icon: <Home className="w-3 h-3 text-indigo-600" />,
                     label: "WFH",
                     remaining: leavesAndWfhStats.wfhRemaining,
                     quota: leavesAndWfhStats.wfhQuota,
                     tabKey: "wfh",
                   },
                   {
-                    icon: <Calendar className="w-3.5 h-3.5 text-indigo-600" />,
+                    icon: <Calendar className="w-3 h-3 text-indigo-600" />,
                     label: "Paid",
                     remaining: leavesAndWfhStats.paidRemaining,
                     quota: leavesAndWfhStats.paidQuota,
                     tabKey: "paid",
                   },
                   {
-                    icon: <HeartPulse className="w-3.5 h-3.5 text-amber-600" />,
+                    icon: <HeartPulse className="w-3 h-3 text-amber-600" />,
                     label: "Sick",
                     remaining: leavesAndWfhStats.isInternOrContractor
                       ? "—"
@@ -1643,29 +1616,37 @@ const EmployeeDashboard = () => {
                       : leavesAndWfhStats.casualQuota,
                     tabKey: "casual_sick",
                   },
+                  {
+                    icon: <Star className="w-3 h-3 text-amber-500 fill-amber-500/20" />,
+                    label: "Floater",
+                    remaining: leavesAndWfhStats.floaterRemaining,
+                    quota: leavesAndWfhStats.floaterQuota,
+                    tabKey: "floater",
+                  },
                 ].map(({ icon, label, remaining, quota, tabKey }) => (
                   <div
                     key={label}
                     onClick={() => handleOpenAttendanceModal(tabKey)}
                     title={`Click to view ${label} records`}
-                    className="flex flex-col items-center gap-0.5 border border-stone-200 rounded-xl pt-2 pb-1 bg-white shadow-sm cursor-pointer hover:border-stone-300 transition-colors"
+                    className="flex flex-col items-center gap-0.5 border border-stone-200/90 rounded-xl pt-2 pb-1.5 px-1 bg-white shadow-2xs hover:shadow-xs hover:border-stone-300 transition-all cursor-pointer select-none"
                   >
                     <div
-                      className={`w-7 h-7 rounded-full flex items-center justify-center ${label === "Sick" ? "bg-orange-50" : "bg-indigo-50"
-                        }`}
+                      className={`w-6 h-6 rounded-full flex items-center justify-center shrink-0 ${
+                        label === "Sick" ? "bg-orange-50" : label === "Floater" ? "bg-amber-50" : "bg-indigo-50"
+                      }`}
                     >
                       {icon}
                     </div>
-                    <div className="text-center">
-                      <div className="font-data text-lg font-extrabold text-stone-800 leading-none flex items-baseline justify-center gap-0.5">
+                    <div className="text-center w-full">
+                      <div className="font-data text-[15px] sm:text-base font-extrabold text-stone-800 leading-none flex items-baseline justify-center gap-0.5">
                         <span>{remaining}</span>
                         {quota !== "—" && (
-                          <span className="text-xs font-semibold text-stone-400">
-                            / {quota}
+                          <span className="text-[10px] sm:text-[11px] font-semibold text-stone-400">
+                            /{quota}
                           </span>
                         )}
                       </div>
-                      <span className="text-[9px] font-medium text-stone-400 mt-0.5 block uppercase tracking-wider">
+                      <span className="text-[8.5px] font-bold text-stone-400 mt-0.5 block uppercase tracking-wider truncate">
                         {label}
                       </span>
                     </div>

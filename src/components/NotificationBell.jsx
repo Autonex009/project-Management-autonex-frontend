@@ -173,8 +173,8 @@ const NotificationBell = () => {
     queryKey: ["notifications", userId],
     queryFn: () => notificationApi.getUnreadSummary(),
     enabled: !!userId && mounted,
-    staleTime: 15_000,
-    refetchOnWindowFocus: true, // global default is false; enable just for notifications
+    staleTime: 60_000,
+    refetchOnWindowFocus: false,
   });
 
   // Refetch when the route changes (skip the initial mount — the query already fetches then)

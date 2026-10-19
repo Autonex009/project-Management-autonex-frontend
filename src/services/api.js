@@ -115,6 +115,7 @@ api.interceptors.response.use(
 
 export const projectApi = {
   getAll: () => api.get("/projects").then((res) => res.data),
+  getMyProjects: () => api.get("/sub-projects/my-projects").then((res) => res.data),
   getOne: (id) => api.get(`/projects/${id}`).then((res) => res.data),
   create: (data) => api.post("/projects", data).then((res) => res.data),
   update: (id, data) =>
@@ -129,6 +130,9 @@ export const projectApi = {
 // === Sub-Projects API (formerly Projects) ===
 export const subProjectApi = {
   getAll: () => api.get("/sub-projects").then((res) => res.data),
+  getMyProjects: () => api.get("/sub-projects/my-projects").then((res) => res.data),
+  getDropdown: (params, options) =>
+    api.get("/sub-projects/dropdown", { params, ...options }).then((res) => res.data),
   getPaginated: (params) => api.get("/sub-projects/paginated", { params }).then((res) => res.data),
   getKpi: () => api.get("/sub-projects/kpi").then((res) => res.data),
   getOne: (id) => api.get(`/sub-projects/${id}`).then((res) => res.data),
@@ -205,6 +209,9 @@ export const analyticsApi = {
   // Admin leaderboard: rank team members by platform hours (range = 'month'|'week'|'day'|'custom')
   getLeaderboard: (params) =>
     api.get("/analytics/leaderboard", { params }).then((res) => res.data),
+  // Lightweight ranks for employee cards
+  getMyRanks: () =>
+    api.get("/analytics/my-ranks").then((res) => res.data),
   // Employee self-service: the signed-in user's own Encord hours/day (last N days),
   // optionally scoped to their current sub-project (adds a per-day team average).
   getMyEncordActivity: ({ days = 7, sub_project_id, employee_id } = {}) =>
@@ -304,9 +311,13 @@ export const allocationApi = {
   getAll: () => api.get("/allocations").then((res) => res.data),
   getSlim: () => api.get("/allocations/slim").then((res) => res.data),
   create: (data) => api.post("/allocations", data).then((res) => res.data),
+  /** Bulk assign employees to a project: { project_id, employee_ids, role_tags?, daily_hours? } */
+  bulkCreate: (data) => api.post("/allocations/bulk", data).then((res) => res.data),
   update: (id, data) =>
     api.put(`/allocations/${id}`, data).then((res) => res.data),
   delete: (id) => api.delete(`/allocations/${id}`).then((res) => res.data),
+  /** Bulk deactivate allocations: { project_id, allocation_ids } */
+  bulkDelete: (data) => api.post("/allocations/bulk-delete", data).then((res) => res.data),
   // NEW: Validation and filtering endpoints
   validate: (data) =>
     api.post("/allocations/validate", data).then((res) => res.data),
@@ -331,6 +342,10 @@ export const allocationApi = {
         },
       })
       .then((res) => res.data),
+
+  /** Surgical single-row fetch for 0ms React Query Cache Surgery */
+  getProjectRow: (projectId) =>
+    api.get(`/allocations/project/${projectId}/row`).then((res) => res.data),
 
   getProjectDetail: (projectId) =>
     api.get(`/allocations/project/${projectId}/detail`).then((res) => res.data),

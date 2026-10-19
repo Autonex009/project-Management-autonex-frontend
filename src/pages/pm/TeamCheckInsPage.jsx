@@ -168,6 +168,26 @@ const TeamCheckInsPage = () => {
     setPage(1);
   };
 
+  const applyFloorFilter = (val) => {
+    setOfficeFloorFilters((prev) => (prev.includes(val) ? [] : [val]));
+    setPage(1);
+  };
+
+  const applyTimeFilter = (val) => {
+    setTimeFilters((prev) => (prev.includes(val) ? [] : [val]));
+    setPage(1);
+  };
+
+  const applyWorkModeFilter = (val) => {
+    setWorkModeFilters((prev) => (prev.includes(val) ? [] : [val]));
+    setPage(1);
+  };
+
+  const applyStatusFilter = (val) => {
+    setStatusFilters((prev) => (prev.includes(val) ? [] : [val]));
+    setPage(1);
+  };
+
   const hasActiveFilters =
     projectIds.length > 0 ||
     statusFilters.length > 0 ||
@@ -407,30 +427,19 @@ const TeamCheckInsPage = () => {
                 <MetricDots
                   items={[
                     {
-                      label: "WFO",
-                      value: data?.kpi_wfo ?? 0,
-                      dot: "bg-emerald-500",
-                      tone: "text-emerald-600",
-                    },
-                    {
-                      label: "WFH",
-                      value: data?.kpi_wfh ?? 0,
-                      dot: "bg-sky-500",
-                      tone: "text-sky-600",
-                    },
-                    {
                       label: "Pending PM",
                       value: Math.max(0, (data?.kpi_checked_in ?? 0) - (data?.kpi_confirmed ?? 0)),
                       dot: "bg-amber-500",
                       tone: "text-amber-600",
                       onClick: () => applyPmConfirmationFilter("pending"),
                     },
-                    ...((data?.kpi_late ?? 0) > 0 ? [{
+                    {
                       label: "Late",
-                      value: data.kpi_late,
+                      value: data?.kpi_late ?? 0,
                       dot: "bg-rose-500",
                       tone: "text-rose-600",
-                    }] : [])
+                      onClick: () => applyTimeFilter("11_12"),
+                    },
                   ]}
                 />
               }
@@ -438,8 +447,8 @@ const TeamCheckInsPage = () => {
                 {
                   title: "Work Mode",
                   rows: [
-                    { label: "WFO", value: data?.kpi_wfo ?? 0 },
-                    { label: "WFH", value: data?.kpi_wfh ?? 0 },
+                    { label: "WFO", value: data?.kpi_wfo ?? 0, onClick: () => applyWorkModeFilter("WFO") },
+                    { label: "WFH", value: data?.kpi_wfh ?? 0, onClick: () => applyWorkModeFilter("WFH") },
                   ]
                 },
                 {
@@ -452,7 +461,7 @@ const TeamCheckInsPage = () => {
                 {
                   title: "Timing",
                   rows: [
-                    { label: "Late (After 11 AM)", value: data?.kpi_late ?? 0 },
+                    { label: "Late (After 11 AM)", value: data?.kpi_late ?? 0, onClick: () => applyTimeFilter("11_12") },
                   ]
                 }
               ]}
@@ -467,22 +476,32 @@ const TeamCheckInsPage = () => {
                 <MetricDots
                   items={[
                     {
-                      label: "F7/9/15/17",
-                      value: `${data?.kpi_floor_7 ?? 0}/${data?.kpi_floor_9 ?? 0}/${data?.kpi_floor_15 ?? 0}/${data?.kpi_floor_17 ?? 0}`,
+                      label: "F7",
+                      value: data?.kpi_floor_7 ?? 0,
                       dot: "bg-indigo-400",
                       tone: "text-indigo-700",
+                      onClick: () => applyFloorFilter("7"),
                     },
                     {
-                      label: "Tiffin",
-                      value: data?.kpi_order_tiffin ?? 0,
-                      dot: "bg-amber-500",
-                      tone: "text-amber-700",
+                      label: "F9",
+                      value: data?.kpi_floor_9 ?? 0,
+                      dot: "bg-indigo-500",
+                      tone: "text-indigo-700",
+                      onClick: () => applyFloorFilter("9"),
                     },
                     {
-                      label: "Canteen",
-                      value: data?.kpi_canteen ?? 0,
-                      dot: "bg-emerald-500",
-                      tone: "text-emerald-700",
+                      label: "F15",
+                      value: data?.kpi_floor_15 ?? 0,
+                      dot: "bg-indigo-500",
+                      tone: "text-indigo-700",
+                      onClick: () => applyFloorFilter("15"),
+                    },
+                    {
+                      label: "F17",
+                      value: data?.kpi_floor_17 ?? 0,
+                      dot: "bg-indigo-600",
+                      tone: "text-indigo-700",
+                      onClick: () => applyFloorFilter("17"),
                     },
                   ]}
                 />
@@ -491,18 +510,17 @@ const TeamCheckInsPage = () => {
                 {
                   title: "Floors",
                   rows: [
-                    { label: "Floor 7", value: data?.kpi_floor_7 ?? 0 },
-                    { label: "Floor 9", value: data?.kpi_floor_9 ?? 0 },
-                    { label: "Floor 15", value: data?.kpi_floor_15 ?? 0 },
-                    { label: "Floor 17", value: data?.kpi_floor_17 ?? 0 },
+                    { label: "Floor 7", value: data?.kpi_floor_7 ?? 0, onClick: () => applyFloorFilter("7") },
+                    { label: "Floor 9", value: data?.kpi_floor_9 ?? 0, onClick: () => applyFloorFilter("9") },
+                    { label: "Floor 15", value: data?.kpi_floor_15 ?? 0, onClick: () => applyFloorFilter("15") },
+                    { label: "Floor 17", value: data?.kpi_floor_17 ?? 0, onClick: () => applyFloorFilter("17") },
                   ]
                 },
                 {
                   title: "Lunch Prefs",
                   rows: [
-                    { label: "Order Tiffin", value: data?.kpi_order_tiffin ?? 0 },
-                    { label: "Canteen", value: data?.kpi_canteen ?? 0 },
-                    { label: "None", value: data?.kpi_lunch_none ?? 0 },
+                    { label: "Canteen", value: data?.kpi_canteen ?? 0, onClick: () => applyWorkModeFilter("WFO") },
+                    { label: "None", value: data?.kpi_lunch_none ?? 0, onClick: () => applyWorkModeFilter("WFO") },
                   ]
                 }
               ]}

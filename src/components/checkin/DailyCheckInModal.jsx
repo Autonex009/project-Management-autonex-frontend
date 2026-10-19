@@ -56,20 +56,25 @@ export default function DailyCheckInModal() {
   const [lunchPreference, setLunchPreference] = useState("");
   const [validationErrors, setValidationErrors] = useState({});
 
-  const { isDismissed, isOpenManually, dismiss } = useCheckinStore();
+  const { isDismissed, isOpenManually, dismiss, setModalOpen, setCanLoadDashboard } = useCheckinStore();
 
   useEffect(() => {
     try {
       const userStr = localStorage.getItem("user");
-      setUser(userStr ? JSON.parse(userStr) : null);
+      const parsedUser = userStr ? JSON.parse(userStr) : null;
+      setUser(parsedUser);
+      if (!parsedUser?.employee_id || parsedUser?.must_change_password) {
+        setCanLoadDashboard(true);
+      }
     } catch {
       setUser(null);
+      setCanLoadDashboard(true);
     }
-  }, [location.pathname]);
+  }, [location.pathname, setCanLoadDashboard]);
 
   const hasEmployeeRecord = Boolean(user?.employee_id) && !user?.must_change_password;
 
-  const { data: status, isLoading } = useQuery({
+  const { data: status, isLoading, isError } = useQuery({
     queryKey: ["checkin-today"],
     queryFn: () => checkinApi.getToday(),
     enabled: hasEmployeeRecord,
@@ -96,6 +101,26 @@ export default function DailyCheckInModal() {
 
   const shouldPrompt = hasEmployeeRecord && !isLoading && status && !status.already_checked_in && !isAuthRoute;
   const isOpen = Boolean(shouldPrompt && (!isDismissed || isOpenManually));
+
+  useEffect(() => {
+    setModalOpen(isOpen);
+    return () => setModalOpen(false);
+  }, [isOpen, setModalOpen]);
+
+  useEffect(() => {
+    if (isError || (status && status.already_checked_in) || isDismissed) {
+      setCanLoadDashboard(true);
+    }
+  }, [status, isError, isDismissed, setCanLoadDashboard]);
+
+  // Safety fallback: if modal is not active and checkin settled, don't keep dashboard waiting indefinitely
+  useEffect(() => {
+    if (isOpen) return;
+    const timer = setTimeout(() => {
+      setCanLoadDashboard(true);
+    }, 3500);
+    return () => clearTimeout(timer);
+  }, [isOpen, setCanLoadDashboard]);
 
   const toggleProject = (id) => {
     setSelectedProjects((prev) =>
@@ -178,8 +203,8 @@ export default function DailyCheckInModal() {
   const projectOptions = useMemo(() => status?.project_options || [], [status]);
 
   const { data: allProjects } = useQuery({
-    queryKey: ["all-sub-projects"],
-    queryFn: () => subProjectApi.getAll(),
+    queryKey: ["all-sub-projects-dropdown"],
+    queryFn: () => subProjectApi.getDropdown(),
     enabled: isOpen,
     staleTime: 60000,
   });

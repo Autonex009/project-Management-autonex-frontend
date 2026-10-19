@@ -14,6 +14,9 @@ import {
   AlertTriangle,
   Send,
   Coffee,
+  Star,
+  Plus,
+  Trash2,
 } from "lucide-react";
 import { leaveApi, wfhApi, employeeApi } from "../services/api";
 import { format, parseISO } from "date-fns";
@@ -21,12 +24,16 @@ import toast from "react-hot-toast";
 import Dropdown from "./ui/Dropdown";
 import Button from "./ui/Button";
 import UserAvatar from "./ui/UserAvatar";
+import ConfirmDialog from "./ui/ConfirmDialog";
 import { formatDisplayName } from "../utils/displayName";
 import {
   isValidFloaterDate,
   getWorkingDayCount,
   countNonWorkingDaysInRange,
   isNonWorkingDay,
+  getNonWorkingDayLabel,
+  getFloaterDateLabel,
+  FLOATER_DATES_2026,
   RAZORPAY_NEGATIVE_BALANCE_NOTE,
   recordLeaveApplication,
 } from "../utils/leaveTypes";
@@ -111,18 +118,42 @@ function toYMD(dateStr) {
 }
 
 // ─── Event chip in calendar cells ───────────────────────────────────────────
-function EventChip({ ev }) {
+function EventChip({ ev, isSelf }) {
   const isWfh = ev.kind === "wfh";
   const isRejected = ev.status === "rejected";
-  const label = isWfh
-    ? `🏠 ${formatDisplayName(ev.employee_name)}`
-    : formatDisplayName(ev.employee_name);
+
+  let label = "";
+  if (isSelf) {
+    if (isWfh) {
+      label = "🏠 You (WFH)";
+    } else {
+      const typeLabel = LEAVE_COLORS[ev.leave_type]?.label;
+      label = typeLabel ? `You (${typeLabel})` : "You (Leave)";
+    }
+  } else {
+    label = isWfh
+      ? `🏠 ${formatDisplayName(ev.employee_name)}`
+      : formatDisplayName(ev.employee_name);
+  }
 
   return (
     <div
-      className={`truncate text-[9.5px] font-semibold leading-tight ${isRejected ? "line-through opacity-60 text-slate-500" :
-          isWfh ? "text-purple-700 font-bold" : "text-blue-700 font-bold"
-        }`}
+      title={
+        isSelf
+          ? `Your ${isWfh ? "WFH" : "leave"} request (${ev.status || "approved"})`
+          : formatDisplayName(ev.employee_name)
+      }
+      className={`truncate text-[9.5px] font-semibold leading-tight px-1 py-0.5 rounded ${
+        isRejected
+          ? "line-through opacity-60 text-slate-500"
+          : isWfh
+          ? isSelf
+            ? "text-purple-800 bg-purple-100/90 border border-purple-300 font-bold shadow-2xs"
+            : "text-purple-700 font-bold"
+          : isSelf
+          ? "text-blue-800 bg-blue-100/90 border border-blue-300 font-bold shadow-2xs"
+          : "text-blue-700 font-bold"
+      }`}
     >
       {label}
     </div>
@@ -166,6 +197,30 @@ export default function LeaveCalendar({
 
   const employeeId = user?.employee_id || user?.id;
 
+  const isSelfEvent = (ev) => {
+    if (!ev) return false;
+    if (isSelfView) return true;
+    if (
+      employeeId != null &&
+      (ev.employee_id === employeeId ||
+        String(ev.employee_id) === String(employeeId) ||
+        Number(ev.employee_id) === Number(employeeId))
+    ) {
+      return true;
+    }
+    if (
+      user?.name &&
+      ev.employee_name &&
+      ev.employee_name.toLowerCase().trim() === user.name.toLowerCase().trim()
+    ) {
+      return true;
+    }
+    return false;
+  };
+
+  const [deleteConfirmTarget, setDeleteConfirmTarget] = useState(null);
+  const [showApplyFormWithExisting, setShowApplyFormWithExisting] = useState(false);
+
   // Admin/PM state: active inspected date
   const [selectedDate, setSelectedDate] = useState(todayStr);
   const [attendanceFilter, setAttendanceFilter] = useState("all"); // "all" | "leaves" | "wfh"
@@ -173,8 +228,13 @@ export default function LeaveCalendar({
   // Employee mode state: range selection & apply form
   const [selectedStart, setSelectedStart] = useState(null);
   const [selectedEnd, setSelectedEnd] = useState(null);
+  const [hoverDate, setHoverDate] = useState(null);
   const [leaveType, setLeaveType] = useState("");
   const [reason, setReason] = useState("");
+
+  useEffect(() => {
+    setShowApplyFormWithExisting(false);
+  }, [selectedStart]);
 
   const activeSelectionTheme =
     SELECTION_THEMES[leaveType] || SELECTION_THEMES.default;
@@ -359,6 +419,35 @@ export default function LeaveCalendar({
       toast.error(err?.response?.data?.detail || "Failed to reject WFH"),
   });
 
+  const deleteLeaveMutation = useMutation({
+    mutationFn: (id) => leaveApi.delete(id),
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ["leave-calendar"] });
+      queryClient.invalidateQueries({ queryKey: ["leaves"] });
+      queryClient.invalidateQueries({ queryKey: ["my-leaves"] });
+      queryClient.invalidateQueries({ queryKey: ["leave-balances"] });
+      toast.success("Leave request cancelled successfully");
+      setDeleteConfirmTarget(null);
+    },
+    onError: (err) => {
+      toast.error(err?.response?.data?.detail || "Failed to cancel leave");
+    },
+  });
+
+  const deleteWfhMutation = useMutation({
+    mutationFn: (id) => wfhApi.delete(id),
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ["leave-calendar"] });
+      queryClient.invalidateQueries({ queryKey: ["wfh"] });
+      queryClient.invalidateQueries({ queryKey: ["my-wfh"] });
+      toast.success("WFH request cancelled successfully");
+      setDeleteConfirmTarget(null);
+    },
+    onError: (err) => {
+      toast.error(err?.response?.data?.detail || "Failed to cancel WFH request");
+    },
+  });
+
   const prevMonth = () => {
     if (month === 1) {
       setMonth(12);
@@ -381,10 +470,20 @@ export default function LeaveCalendar({
     const map = {};
     if (!data) return map;
     const leaves = filterEmployeeIds
-      ? (data.leaves || []).filter((l) => filterEmployeeIds.has(l.employee_id))
+      ? (data.leaves || []).filter(
+          (l) =>
+            filterEmployeeIds.has(l.employee_id) ||
+            filterEmployeeIds.has(String(l.employee_id)) ||
+            filterEmployeeIds.has(Number(l.employee_id)),
+        )
       : data.leaves || [];
     const wfhs = filterEmployeeIds
-      ? (data.wfh || []).filter((w) => filterEmployeeIds.has(w.employee_id))
+      ? (data.wfh || []).filter(
+          (w) =>
+            filterEmployeeIds.has(w.employee_id) ||
+            filterEmployeeIds.has(String(w.employee_id)) ||
+            filterEmployeeIds.has(Number(w.employee_id)),
+        )
       : data.wfh || [];
 
     for (const leave of leaves) {
@@ -402,10 +501,17 @@ export default function LeaveCalendar({
     }
     for (const wfh of wfhs) {
       if (wfh.status === "rejected") continue;
-      const key = toYMD(wfh.date || wfh.wfh_date || "");
-      if (!key) continue;
-      if (!map[key]) map[key] = [];
-      map[key].push({ ...wfh, kind: "wfh" });
+      const startKey = toYMD(wfh.date || wfh.wfh_date || "");
+      const endKey = toYMD(wfh.end_date || startKey);
+      if (!startKey) continue;
+      const start = new Date(startKey + "T00:00:00");
+      const end = new Date(endKey + "T00:00:00");
+      for (let d = new Date(start); d <= end; d.setDate(d.getDate() + 1)) {
+        const key = `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, "0")}-${String(d.getDate()).padStart(2, "0")}`;
+        if (isNonWorkingDay(key)) continue;
+        if (!map[key]) map[key] = [];
+        map[key].push({ ...wfh, kind: "wfh" });
+      }
     }
     return map;
   }, [data, filterEmployeeIds]);
@@ -530,25 +636,96 @@ export default function LeaveCalendar({
   const isSelectedToday = selectedDate === todayStr;
 
   // Employee range helper details
+  // Senior UI/UX: Single tap defaults to 1-day leave (effectiveEnd = selectedStart)
+  const effectiveEnd = selectedEnd || selectedStart;
+  const isSingleDay = Boolean(selectedStart) && (!selectedEnd || selectedStart === selectedEnd);
+  const isMultiDay = Boolean(selectedStart && selectedEnd && selectedStart !== selectedEnd);
+
+  const formattedStart = selectedStart
+    ? format(parseISO(selectedStart), "MMM dd, yyyy")
+    : "";
+  const formattedEnd = effectiveEnd
+    ? format(parseISO(effectiveEnd), "MMM dd, yyyy")
+    : "";
+
   const workingDays =
-    selectedStart && selectedEnd
-      ? getWorkingDayCount(selectedStart, selectedEnd)
+    selectedStart
+      ? getWorkingDayCount(selectedStart, effectiveEnd)
       : 0;
   const nonWorkingDays =
-    selectedStart && selectedEnd
-      ? countNonWorkingDaysInRange(selectedStart, selectedEnd)
+    selectedStart
+      ? countNonWorkingDaysInRange(selectedStart, effectiveEnd)
       : 0;
 
   const isFloaterType = leaveType === "floater";
 
+  // Existing user requests on the currently selected date or date range
+  const selfEventsOnSelectedDate = useMemo(() => {
+    if (!selectedStart) return [];
+    const dateKeys = [];
+    if (selectedEnd && selectedStart !== selectedEnd) {
+      const start = new Date(selectedStart + "T00:00:00");
+      const end = new Date(selectedEnd + "T00:00:00");
+      for (let d = new Date(start); d <= end; d.setDate(d.getDate() + 1)) {
+        dateKeys.push(
+          `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, "0")}-${String(d.getDate()).padStart(2, "0")}`,
+        );
+      }
+    } else {
+      dateKeys.push(selectedStart);
+    }
+
+    const seen = new Set();
+    const result = [];
+    for (const dKey of dateKeys) {
+      const evs = eventsByDate[dKey] || [];
+      for (const ev of evs) {
+        if (isSelfEvent(ev)) {
+          const uKey = `${ev.kind}-${ev.id}`;
+          if (!seen.has(uKey)) {
+            seen.add(uKey);
+            const detailed =
+              ev.kind === "wfh"
+                ? detailedWfhMap[ev.id]
+                : detailedLeavesMap[ev.id];
+            result.push({
+              ...ev,
+              ...detailed,
+              kind: ev.kind,
+              id: ev.id,
+              status: ev.status || detailed?.status || "pending",
+              reason: ev.reason || detailed?.reason || "",
+              approved_by_name:
+                ev.approved_by_name || detailed?.approved_by_name || null,
+              remark: ev.remark || detailed?.remark || null,
+            });
+          }
+        }
+      }
+    }
+    return result;
+  }, [
+    selectedStart,
+    selectedEnd,
+    eventsByDate,
+    detailedLeavesMap,
+    detailedWfhMap,
+    isSelfEvent,
+  ]);
+
   // Form errors for employee mode
   let validationError = null;
-  if (selectedStart && selectedEnd) {
+  if (selectedStart) {
     if (workingDays === 0) {
-      validationError =
-        "No working days in this range — weekends and fixed holidays are automatically skipped.";
+      if (isSingleDay) {
+        const nonWorkingReason = getNonWorkingDayLabel(selectedStart) || "non-working day";
+        validationError = `${formattedStart} is a ${nonWorkingReason}. Leaves cannot be requested for non-working days.`;
+      } else {
+        validationError =
+          "No working days in this range — weekends and fixed holidays are automatically skipped.";
+      }
     } else if (isFloaterType) {
-      if (selectedStart !== selectedEnd) {
+      if (!isSingleDay) {
         validationError = "Floater leave must be taken as a single day.";
       } else if (!isValidFloaterDate(selectedStart)) {
         validationError =
@@ -585,7 +762,7 @@ export default function LeaveCalendar({
     if (leaveType === "wfh") {
       createWfhMutation.mutate({
         wfh_date: selectedStart,
-        end_date: selectedEnd,
+        end_date: effectiveEnd,
         reason: reason,
       });
     } else {
@@ -593,7 +770,7 @@ export default function LeaveCalendar({
         employee_id: employeeId,
         leave_type: leaveType,
         start_date: selectedStart,
-        end_date: selectedEnd,
+        end_date: effectiveEnd,
         reason: reason,
         created_at: new Date().toISOString(),
         applied_on: format(new Date(), "yyyy-MM-dd"),
@@ -625,26 +802,28 @@ export default function LeaveCalendar({
         );
       }
 
+      // Range selection logic:
+      // Single tap -> sets selectedStart (effective 1-day selection immediately)
+      // Second tap -> sets selectedEnd to complete range
+      // Third tap -> starts fresh 1-day selection on newly clicked date
       if (!selectedStart || (selectedStart && selectedEnd)) {
         setSelectedStart(dateStr);
         setSelectedEnd(null);
+        setHoverDate(null);
       } else if (selectedStart && !selectedEnd) {
-        if (dateStr < selectedStart) {
+        if (dateStr === selectedStart) {
+          // Double-clicked the same date: lock in as single day
+          setSelectedEnd(dateStr);
+        } else if (dateStr < selectedStart) {
           setSelectedEnd(selectedStart);
           setSelectedStart(dateStr);
         } else {
           setSelectedEnd(dateStr);
         }
+        setHoverDate(null);
       }
     }
   };
-
-  const formattedStart = selectedStart
-    ? format(parseISO(selectedStart), "MMM dd, yyyy")
-    : "";
-  const formattedEnd = selectedEnd
-    ? format(parseISO(selectedEnd), "MMM dd, yyyy")
-    : "";
 
   const isMutatingAnyAction =
     approveLeaveMutation.isPending ||
@@ -724,6 +903,11 @@ export default function LeaveCalendar({
                 <span className={`text-xs font-bold truncate ${isPending ? "text-amber-950" : isRejected ? "text-rose-950 line-through opacity-80" : "text-stone-800"}`}>
                   {formatDisplayName(ev.employee_name)}
                 </span>
+                {isSelfEvent(ev) && (
+                  <span className="px-1.5 py-0.2 rounded text-[9.5px] font-bold bg-blue-100 text-blue-800 border border-blue-200 shadow-2xs">
+                    You
+                  </span>
+                )}
                 {empProfile?.role && (
                   <span className={`text-[10px] font-normal ${isPending ? "text-amber-800/70" : isRejected ? "text-rose-700/70" : "text-stone-400"}`}>
                     · {empProfile.role}
@@ -922,6 +1106,10 @@ export default function LeaveCalendar({
 
         {/* ── Legend ──────────────────────────────────────────────── */}
         <div className="flex flex-wrap items-center gap-x-3.5 gap-y-1.5 px-3 py-1.5 bg-stone-50/80 border-b border-stone-200 shrink-0">
+          <span className="inline-flex items-center gap-1.5 text-[11px] text-blue-700 font-bold">
+            <span className="w-2.5 h-2.5 rounded-sm inline-block bg-blue-600 shadow-2xs" />
+            Selected / Range
+          </span>
           <span className="inline-flex items-center gap-1.5 text-[11px] text-slate-600 font-medium">
             <span className="w-2 h-2 rounded-full inline-block bg-blue-600 shadow-2xs" />
             Leaves
@@ -1006,25 +1194,60 @@ export default function LeaveCalendar({
 
                 // In Employee mode, range selection
                 const isSelectedStart =
-                  !isAdminOrPm && selectedStart && dateStr === selectedStart;
+                  !isAdminOrPm && Boolean(selectedStart) && dateStr === selectedStart;
                 const isSelectedEnd =
-                  !isAdminOrPm && selectedEnd && dateStr === selectedEnd;
+                  !isAdminOrPm && Boolean(selectedEnd) && dateStr === selectedEnd;
+
+                // Active range: strictly between selectedStart and selectedEnd
                 const isSelectedRange =
                   !isAdminOrPm &&
-                  selectedStart &&
-                  selectedEnd &&
+                  Boolean(selectedStart && selectedEnd) &&
                   dateStr > selectedStart &&
                   dateStr < selectedEnd;
 
+                // Hover preview: while picking end date
+                const isHoverPreview =
+                  !isAdminOrPm &&
+                  Boolean(selectedStart && !selectedEnd && hoverDate && hoverDate !== selectedStart) &&
+                  ((hoverDate > selectedStart && dateStr > selectedStart && dateStr <= hoverDate) ||
+                   (hoverDate < selectedStart && dateStr >= hoverDate && dateStr < selectedStart));
+
                 const hasPending = events.some((ev) => ev.status === "pending");
 
-                // Cell background priority
+                // Mutually exclusive visual styles to prevent Tailwind class conflicts
                 let cellBg = "bg-white";
                 let cellBorder = "border-slate-200/90";
                 let numberBg = "bg-transparent";
                 let numberColor = "text-slate-600";
+                let cellExtra = "hover:border-slate-400 hover:shadow-2xs hover:-translate-y-0.5";
 
-                if (isToday) {
+                if (isSelectedAdmin) {
+                  cellBg = "bg-blue-50";
+                  cellBorder = "border-2 border-blue-600 ring-2 ring-blue-500/40";
+                  numberBg = "bg-blue-600 shadow-xs";
+                  numberColor = "text-white font-extrabold";
+                  cellExtra = "shadow-md z-20 -translate-y-0.5";
+                } else if (isSelectedStart || isSelectedEnd) {
+                  cellBg = "bg-blue-600 text-white";
+                  cellBorder = "border-2 border-blue-700 ring-2 ring-blue-400/50";
+                  numberBg = "bg-white shadow-xs";
+                  numberColor = "text-blue-700 font-black";
+                  cellExtra = "shadow-md z-20 -translate-y-0.5";
+                } else if (isSelectedRange) {
+                  cellBg = isWeekend
+                    ? "bg-blue-100/90 border-blue-300"
+                    : "bg-blue-100/95 border-blue-300";
+                  cellBorder = "border-blue-300";
+                  numberBg = "bg-blue-200/70";
+                  numberColor = isWeekend ? "text-red-950 font-bold" : "text-blue-900 font-extrabold";
+                  cellExtra = "z-10 shadow-2xs hover:bg-blue-200/80";
+                } else if (isHoverPreview) {
+                  cellBg = "bg-blue-50/80";
+                  cellBorder = "border-dashed border-blue-300";
+                  numberBg = "bg-blue-100/60";
+                  numberColor = "text-blue-800 font-bold";
+                  cellExtra = "z-10";
+                } else if (isToday) {
                   cellBg = isWeekend
                     ? "bg-red-200/90 hover:bg-red-300/80"
                     : "bg-white";
@@ -1058,14 +1281,15 @@ export default function LeaveCalendar({
                   <div
                     key={dateStr}
                     onClick={() => handleCellClick(dateStr)}
-                    className={`rounded-lg p-1.5 flex flex-col justify-between min-h-0 transition-all cursor-pointer relative select-none border ${cellBg} ${cellBorder} ${isSelectedAdmin
-                      ? "border-2 border-blue-700 ring-2 ring-blue-500/50 bg-blue-100 shadow-[0_4px_14px_rgba(37,99,235,0.28)] z-10 -translate-y-0.5"
-                      : isSelectedStart || isSelectedEnd
-                        ? "border-2 border-blue-700 ring-2 ring-blue-500/50 bg-blue-100 shadow-[0_4px_14px_rgba(37,99,235,0.28)] z-10 -translate-y-0.5"
-                        : isSelectedRange
-                          ? "bg-blue-100/75 border-blue-300"
-                          : "hover:border-slate-400 hover:shadow-2xs hover:-translate-y-0.5"
-                      }`}
+                    onMouseEnter={() => {
+                      if (!isAdminOrPm && selectedStart && !selectedEnd) {
+                        setHoverDate(dateStr);
+                      }
+                    }}
+                    onMouseLeave={() => {
+                      if (hoverDate) setHoverDate(null);
+                    }}
+                    className={`rounded-lg p-1.5 flex flex-col justify-between min-h-0 transition-all cursor-pointer relative select-none border ${cellBg} ${cellBorder} ${cellExtra}`}
                   >
                     {/* Top Row: Holiday text on left, Day number + Pending dot on right */}
                     <div className="flex items-center justify-between gap-1 w-full shrink-0">
@@ -1099,17 +1323,32 @@ export default function LeaveCalendar({
                         </div>
                       ) : (
                         <>
-                          <div className="flex-1" />
+                          <div className="flex-1 min-w-0">
+                            {isSelectedStart && !selectedEnd ? (
+                              <span className="text-[7.5px] font-extrabold uppercase tracking-wider text-blue-100 bg-blue-700/80 px-1 py-0.5 rounded leading-none block w-fit">
+                                Selected
+                              </span>
+                            ) : isSelectedStart ? (
+                              <span className="text-[7.5px] font-extrabold uppercase tracking-wider text-blue-100 bg-blue-700/80 px-1 py-0.5 rounded leading-none block w-fit">
+                                Start
+                              </span>
+                            ) : isSelectedEnd ? (
+                              <span className="text-[7.5px] font-extrabold uppercase tracking-wider text-blue-100 bg-blue-700/80 px-1 py-0.5 rounded leading-none block w-fit">
+                                End
+                              </span>
+                            ) : isSelectedRange && isWeekend ? (
+                              <span className="text-[7.5px] font-bold text-red-600 bg-red-100/90 px-1 py-0.5 rounded leading-none block w-fit">
+                                Weekend
+                              </span>
+                            ) : null}
+                          </div>
 
                           <div className="flex items-center gap-1 shrink-0">
                             {hasPending && (
                               <span className="w-2 h-2 rounded-full bg-amber-500 animate-dot-pulse-amber shrink-0 inline-block" />
                             )}
                             <span
-                              className={`text-[10.5px] font-bold rounded-full w-5 h-5 flex items-center justify-center shrink-0 leading-none ${(isSelectedAdmin || isSelectedStart || isSelectedEnd) && !numberBg.includes("bg-")
-                                ? "bg-blue-600 text-white shadow-xs font-black"
-                                : `${numberBg} ${numberColor}`
-                                }`}
+                              className={`text-[10.5px] font-bold rounded-full w-5 h-5 flex items-center justify-center shrink-0 leading-none ${numberBg} ${numberColor}`}
                             >
                               {day}
                             </span>
@@ -1121,7 +1360,11 @@ export default function LeaveCalendar({
                     {/* Bottom Event Chips */}
                     <div className="flex flex-col gap-0.5 mt-auto min-h-0 overflow-hidden">
                       {events.slice(0, 2).map((ev, ei) => (
-                        <EventChip key={ei} ev={ev} />
+                        <EventChip
+                          key={ei}
+                          ev={ev}
+                          isSelf={isSelfEvent(ev)}
+                        />
                       ))}
                       {events.length > 2 && (
                         <div className="text-[8.5px] font-semibold text-slate-500 bg-slate-100 px-1 py-0.2 rounded text-center border border-slate-200/70 truncate">
@@ -1395,115 +1638,372 @@ export default function LeaveCalendar({
               </p>
             </div>
           ) : (
-            <form
-              onSubmit={handleApplySubmit}
-              className="flex flex-col h-full justify-between gap-3"
-            >
-              <div>
-                <h4 className="text-sm font-bold text-slate-900 pb-2 border-b border-slate-100 mb-2.5">
-                  Apply for Time Off
-                </h4>
+            <div className="flex flex-col h-full min-h-0">
+              {/* Existing user request(s) on selected date or range */}
+              {selfEventsOnSelectedDate.length > 0 && (
+                <div className="shrink-0 mb-3 space-y-2 pb-3 border-b border-stone-200">
+                  <div className="flex items-center justify-between">
+                    <div className="flex items-center gap-1.5">
+                      <Clock className="w-4 h-4 text-amber-600 shrink-0" />
+                      <h4 className="text-xs font-bold text-stone-900 uppercase tracking-wider">
+                        {isSingleDay
+                          ? "Your Request on this Date"
+                          : `Your Requests in Range (${selfEventsOnSelectedDate.length})`}
+                      </h4>
+                    </div>
+                    <button
+                      type="button"
+                      onClick={() => {
+                        setSelectedStart(null);
+                        setSelectedEnd(null);
+                        setHoverDate(null);
+                      }}
+                      className="text-[11px] font-semibold text-slate-400 hover:text-rose-600 transition-colors cursor-pointer"
+                    >
+                      Clear
+                    </button>
+                  </div>
 
-                {/* Date info card */}
-                <div className="bg-slate-50 border border-dashed border-slate-200 rounded-xl p-2.5 mb-2.5">
-                  <p className="text-[10px] font-bold text-slate-500 uppercase tracking-wider mb-0.5">
-                    Selected Period
-                  </p>
-                  <p className="text-xs font-bold text-slate-800">
-                    {selectedStart === selectedEnd
-                      ? formattedStart
-                      : `${formattedStart} — ${formattedEnd}`}
-                  </p>
-                  <p className="text-[11px] text-slate-500 font-medium mt-0.5">
-                    {workingDays} working day{workingDays !== 1 ? "s" : ""}
-                    {nonWorkingDays > 0 && (
-                      <span className="text-slate-400">
-                        {" "}
-                        ({nonWorkingDays} holiday/weekend skipped)
-                      </span>
+                  {selfEventsOnSelectedDate.map((req) => {
+                    const isReqWfh = req.kind === "wfh";
+                    const isReqPending = req.status === "pending";
+                    const isReqApproved = req.status === "approved";
+                    const isReqRejected = req.status === "rejected";
+                    const leaveCfg =
+                      LEAVE_COLORS[req.leave_type] || LEAVE_COLORS.default;
+
+                    return (
+                      <div
+                        key={`${req.kind}-${req.id}`}
+                        className={`p-3 rounded-xl border shadow-2xs space-y-2 transition-all ${
+                          isReqPending
+                            ? "bg-amber-50/80 border-amber-300/80 ring-1 ring-amber-400/20"
+                            : isReqRejected
+                            ? "bg-rose-50/70 border-rose-200"
+                            : isReqWfh
+                            ? "bg-purple-50/60 border-purple-200"
+                            : "bg-blue-50/60 border-blue-200"
+                        }`}
+                      >
+                        <div className="flex items-center justify-between gap-2">
+                          <div className="flex items-center gap-2">
+                            {isReqWfh ? (
+                              <span className="inline-flex items-center gap-1.5 px-2.5 py-1 rounded-lg text-xs font-bold bg-purple-100 text-purple-900 border border-purple-200 shadow-2xs">
+                                <Home className="w-3.5 h-3.5 text-purple-600" />{" "}
+                                Work From Home (WFH)
+                              </span>
+                            ) : (
+                              <span className="inline-flex items-center gap-1.5 px-2.5 py-1 rounded-lg text-xs font-bold bg-blue-100 text-blue-900 border border-blue-200 shadow-2xs">
+                                <Calendar className="w-3.5 h-3.5 text-blue-600" />{" "}
+                                {leaveCfg.label}
+                              </span>
+                            )}
+                          </div>
+
+                          {/* Status Badge */}
+                          {isReqPending ? (
+                            <span className="inline-flex items-center gap-1 px-2.5 py-0.5 rounded-full text-[11px] font-bold bg-amber-200/90 text-amber-950 border border-amber-400 shadow-2xs">
+                              <span className="w-1.5 h-1.5 rounded-full bg-amber-600 animate-dot-pulse-amber inline-block" />
+                              Pending Approval
+                            </span>
+                          ) : isReqApproved ? (
+                            <span className="inline-flex items-center gap-1 px-2.5 py-0.5 rounded-full text-[11px] font-bold bg-emerald-100 text-emerald-900 border border-emerald-300 shadow-2xs">
+                              <CheckCircle2 className="w-3 h-3 text-emerald-600" />{" "}
+                              Approved
+                            </span>
+                          ) : isReqRejected ? (
+                            <span className="inline-flex items-center gap-1 px-2.5 py-0.5 rounded-full text-[11px] font-bold bg-rose-100 text-rose-900 border border-rose-300 shadow-2xs">
+                              <X className="w-3 h-3 text-rose-600" /> Rejected
+                            </span>
+                          ) : null}
+                        </div>
+
+                        {/* Date details */}
+                        <div className="text-xs font-semibold text-stone-700 flex items-center gap-2">
+                          <Calendar className="w-3.5 h-3.5 text-stone-400 shrink-0" />
+                          <span>
+                            {req.start_date &&
+                            req.end_date &&
+                            req.start_date !== req.end_date
+                              ? `${format(parseISO(req.start_date), "MMM d")} – ${format(parseISO(req.end_date), "MMM d, yyyy")}`
+                              : format(
+                                  parseISO(
+                                    req.start_date ||
+                                      req.date ||
+                                      req.wfh_date ||
+                                      selectedStart,
+                                  ),
+                                  "EEEE, MMMM d, yyyy",
+                                )}
+                          </span>
+                        </div>
+
+                        {/* Reason block */}
+                        {req.reason && req.reason.trim() && (
+                          <div className="text-xs text-stone-800 bg-white/95 border border-stone-200/90 rounded-lg p-2.5 leading-relaxed font-medium shadow-2xs">
+                            <span className="text-[10px] font-bold uppercase tracking-wider text-stone-400 block mb-0.5">
+                              Submitted Reason:
+                            </span>
+                            "{req.reason.trim()}"
+                          </div>
+                        )}
+
+                        {/* Approver / Decision Info */}
+                        {isReqApproved && req.approved_by_name && (
+                          <p className="text-[11px] text-stone-500 font-medium text-right">
+                            Approved by{" "}
+                            <span className="font-bold text-stone-700">
+                              {formatDisplayName(req.approved_by_name)}
+                            </span>
+                          </p>
+                        )}
+                        {isReqRejected && req.remark && (
+                          <p className="text-[11px] text-rose-600 font-medium">
+                            Rejection note:{" "}
+                            <span className="italic">"{req.remark}"</span>
+                          </p>
+                        )}
+
+                        {/* Action: Withdraw / Cancel request if pending */}
+                        {isReqPending && (
+                          <div className="pt-1 flex items-center justify-between border-t border-amber-200/60 mt-1">
+                            <span className="text-[10.5px] text-amber-800 font-medium">
+                              Awaiting manager/admin review
+                            </span>
+                            <button
+                              type="button"
+                              onClick={() => setDeleteConfirmTarget(req)}
+                              className="inline-flex items-center gap-1.5 px-2.5 py-1 text-xs font-bold rounded-lg text-rose-700 bg-rose-50 hover:bg-rose-100 border border-rose-300 transition-all cursor-pointer shadow-2xs"
+                              title="Withdraw this request"
+                            >
+                              <Trash2 className="w-3.5 h-3.5" /> Withdraw Request
+                            </button>
+                          </div>
+                        )}
+                      </div>
+                    );
+                  })}
+
+                  {/* Toggle button to show apply form */}
+                  <button
+                    type="button"
+                    onClick={() => setShowApplyFormWithExisting((prev) => !prev)}
+                    className="w-full py-2 px-3 rounded-lg text-xs font-bold flex items-center justify-between bg-stone-50 hover:bg-stone-100 border border-stone-200 text-stone-700 transition-colors cursor-pointer"
+                  >
+                    <span className="flex items-center gap-1.5">
+                      <Plus className="w-3.5 h-3.5 text-blue-600" />
+                      {showApplyFormWithExisting
+                        ? "Hide Application Form"
+                        : "Need to submit another request for this date?"}
+                    </span>
+                    <span className="text-[10.5px] text-blue-600 underline font-semibold">
+                      {showApplyFormWithExisting ? "Collapse" : "Apply"}
+                    </span>
+                  </button>
+                </div>
+              )}
+
+              {/* Apply Form (shown when no existing requests, OR when user expanded the apply toggle) */}
+              {(selfEventsOnSelectedDate.length === 0 ||
+                showApplyFormWithExisting) && (
+                <form
+                  onSubmit={handleApplySubmit}
+                  className="flex flex-col flex-1 min-h-0 justify-between gap-3 overflow-y-auto pr-0.5"
+                >
+                  <div>
+                    <h4 className="text-sm font-bold text-slate-900 pb-2 border-b border-slate-100 mb-2.5">
+                      Apply for Time Off
+                    </h4>
+
+                    {/* Date info card */}
+                    <div className="bg-blue-50/70 border border-blue-200/80 rounded-xl p-3 mb-2.5">
+                      <div className="flex items-center justify-between mb-1">
+                        <span className="text-[10px] font-extrabold text-blue-800 uppercase tracking-wider bg-blue-100 px-2 py-0.5 rounded-md">
+                          {isSingleDay ? "1-Day Leave" : "Date Range"}
+                        </span>
+                        <button
+                          type="button"
+                          onClick={() => {
+                            setSelectedStart(null);
+                            setSelectedEnd(null);
+                            setHoverDate(null);
+                          }}
+                          className="text-[11px] font-semibold text-slate-400 hover:text-rose-600 transition-colors cursor-pointer"
+                        >
+                          Clear
+                        </button>
+                      </div>
+                      <p className="text-xs font-bold text-slate-800">
+                        {isSingleDay
+                          ? formattedStart
+                          : `${formattedStart} — ${formattedEnd}`}
+                      </p>
+                      <p className="text-[11px] text-slate-600 font-medium mt-0.5 flex flex-wrap items-center gap-1.5">
+                        <span className="font-extrabold text-blue-900">
+                          {workingDays} working day{workingDays !== 1 ? "s" : ""}
+                        </span>
+                        {nonWorkingDays > 0 && (
+                          <span className="text-amber-700 font-medium bg-amber-50 px-1.5 py-0.5 rounded border border-amber-200/60 text-[10px]">
+                            ({nonWorkingDays}{" "}
+                            {nonWorkingDays === 1
+                              ? "holiday/weekend"
+                              : "holidays/weekends"}{" "}
+                            skipped)
+                          </span>
+                        )}
+                      </p>
+                      {isSingleDay && !selectedEnd && (
+                        <p className="text-[10.5px] text-blue-600/90 mt-1.5 font-medium">
+                          💡 Tip: Click another date to select a range, or submit
+                          now for 1 day.
+                        </p>
+                      )}
+                    </div>
+
+                    {/* Dropdown Type Select */}
+                    <div className="mb-2.5">
+                      <label className="block text-[11px] font-bold text-slate-700 mb-1">
+                        Leave Type
+                      </label>
+                      <Dropdown
+                        options={[
+                          { value: "", label: "Select leave type..." },
+                          ...LEAVE_TYPES,
+                        ]}
+                        value={leaveType}
+                        onChange={(e) => setLeaveType(e)}
+                      />
+                    </div>
+
+                    {/* Floater dates quick picker */}
+                    {isFloaterType && (
+                      <div className="mb-2.5 rounded-xl border border-amber-200 bg-amber-50/90 p-2.5">
+                        <p className="text-[11px] font-bold text-amber-900 mb-1.5 flex items-center gap-1.5">
+                          <Star className="w-3.5 h-3.5 text-amber-600 fill-amber-500/30" />
+                          Approved 2026 Floater Dates:
+                        </p>
+                        <div className="flex flex-wrap gap-1.5 max-h-28 overflow-y-auto pr-0.5 slick-scrollbar">
+                          {FLOATER_DATES_2026.map((d) => (
+                            <button
+                              key={d.date}
+                              type="button"
+                              onClick={() => {
+                                setSelectedStart(d.date);
+                                setSelectedEnd(d.date);
+                                const [fYear, fMonth] = d.date
+                                  .split("-")
+                                  .map(Number);
+                                if (fYear !== year || fMonth !== month) {
+                                  setYear(fYear);
+                                  setMonth(fMonth);
+                                }
+                              }}
+                              className={`px-2 py-0.5 rounded text-[10px] font-semibold transition-all cursor-pointer ${
+                                selectedStart === d.date
+                                  ? "bg-amber-600 text-white shadow-xs"
+                                  : "bg-white border border-amber-300 text-amber-800 hover:bg-amber-100"
+                              }`}
+                            >
+                              {d.date.slice(5)} — {d.label}
+                            </button>
+                          ))}
+                        </div>
+                      </div>
                     )}
-                  </p>
-                </div>
 
-                {/* Dropdown Type Select */}
-                <div className="mb-2.5">
-                  <label className="block text-[11px] font-bold text-slate-700 mb-1">
-                    Leave Type
-                  </label>
-                  <Dropdown
-                    options={[
-                      { value: "", label: "Select leave type..." },
-                      ...LEAVE_TYPES,
-                    ]}
-                    value={leaveType}
-                    onChange={(e) => setLeaveType(e)}
-                  />
-                </div>
+                    {/* Reason input */}
+                    <div className="mb-2.5">
+                      <label className="block text-[11px] font-bold text-slate-700 mb-1">
+                        Reason
+                      </label>
+                      <textarea
+                        value={reason}
+                        onChange={(e) => setReason(e.target.value)}
+                        placeholder="Enter reason for this request (required)..."
+                        rows={2}
+                        className="w-full p-2 border border-slate-300 rounded-lg text-xs outline-none focus:border-blue-500 resize-none"
+                      />
+                    </div>
 
-                {/* Reason input */}
-                <div className="mb-2.5">
-                  <label className="block text-[11px] font-bold text-slate-700 mb-1">
-                    Reason
-                  </label>
-                  <textarea
-                    value={reason}
-                    onChange={(e) => setReason(e.target.value)}
-                    placeholder="Enter reason for this request (required)..."
-                    rows={2}
-                    className="w-full p-2 border border-slate-300 rounded-lg text-xs outline-none focus:border-blue-500 resize-none"
-                  />
-                </div>
+                    {/* Error alerts */}
+                    {validationError && (
+                      <div className="flex gap-2 p-2.5 bg-red-50 border border-red-200 rounded-lg text-red-700 text-xs font-medium items-start mb-2.5">
+                        <AlertTriangle className="w-4 h-4 shrink-0 mt-0.5" />
+                        <span>{validationError}</span>
+                      </div>
+                    )}
 
-                {/* Error alerts */}
-                {validationError && (
-                  <div className="flex gap-2 p-2.5 bg-red-50 border border-red-200 rounded-lg text-red-700 text-xs font-medium items-start mb-2.5">
-                    <AlertTriangle className="w-4 h-4 shrink-0 mt-0.5" />
-                    <span>{validationError}</span>
+                    {/* Info note */}
+                    {leaveType && leaveType !== "wfh" && !validationError && (
+                      <div className="p-2 bg-blue-50 border border-blue-200 rounded-lg text-blue-800 text-[11px] leading-relaxed mb-2.5">
+                        {RAZORPAY_NEGATIVE_BALANCE_NOTE}
+                      </div>
+                    )}
                   </div>
-                )}
 
-                {/* Info note */}
-                {leaveType && leaveType !== "wfh" && !validationError && (
-                  <div className="p-2 bg-blue-50 border border-blue-200 rounded-lg text-blue-800 text-[11px] leading-relaxed mb-2.5">
-                    {RAZORPAY_NEGATIVE_BALANCE_NOTE}
+                  {/* Submit buttons */}
+                  <div className="flex gap-2 pt-2 border-t border-slate-100">
+                    <button
+                      type="button"
+                      onClick={() => {
+                        setSelectedStart(null);
+                        setSelectedEnd(null);
+                        setLeaveType("");
+                        setReason("");
+                      }}
+                      className="flex-1 py-2 border border-slate-200 rounded-lg text-xs font-bold text-slate-700 hover:bg-slate-50 transition-all cursor-pointer"
+                    >
+                      Cancel
+                    </button>
+                    <Button
+                      type="submit"
+                      disabled={isSubmitDisabled}
+                      isLoading={
+                        createLeaveMutation.isPending ||
+                        createWfhMutation.isPending
+                      }
+                      loadingText="Applying..."
+                      style={{
+                        flex: 2,
+                        background: buttonBg,
+                        color: buttonText,
+                      }}
+                    >
+                      <Send size={13} /> Apply
+                    </Button>
                   </div>
-                )}
-              </div>
-
-              {/* Submit buttons */}
-              <div className="flex gap-2 pt-2 border-t border-slate-100">
-                <button
-                  type="button"
-                  onClick={() => {
-                    setSelectedStart(null);
-                    setSelectedEnd(null);
-                    setLeaveType("");
-                    setReason("");
-                  }}
-                  className="flex-1 py-2 border border-slate-200 rounded-lg text-xs font-bold text-slate-700 hover:bg-slate-50 transition-all cursor-pointer"
-                >
-                  Cancel
-                </button>
-                <Button
-                  type="submit"
-                  disabled={isSubmitDisabled}
-                  isLoading={
-                    createLeaveMutation.isPending || createWfhMutation.isPending
-                  }
-                  loadingText="Applying..."
-                  style={{
-                    flex: 2,
-                    background: buttonBg,
-                    color: buttonText,
-                  }}
-                >
-                  <Send size={13} /> Apply
-                </Button>
-              </div>
-            </form>
+                </form>
+              )}
+            </div>
           )
         )}
       </div>
+
+      {/* Confirm Dialog for Withdrawing/Cancelling Request */}
+      <ConfirmDialog
+        isOpen={deleteConfirmTarget !== null}
+        onClose={() => setDeleteConfirmTarget(null)}
+        onConfirm={() => {
+          if (!deleteConfirmTarget) return;
+          if (deleteConfirmTarget.kind === "wfh") {
+            deleteWfhMutation.mutate(deleteConfirmTarget.id);
+          } else {
+            deleteLeaveMutation.mutate(deleteConfirmTarget.id);
+          }
+        }}
+        title={`Withdraw ${deleteConfirmTarget?.kind === "wfh" ? "WFH" : "Leave"} Request`}
+        message={`Are you sure you want to withdraw your ${
+          deleteConfirmTarget?.kind === "wfh" ? "WFH" : "leave"
+        } request for ${
+          deleteConfirmTarget?.start_date ||
+          deleteConfirmTarget?.wfh_date ||
+          deleteConfirmTarget?.date ||
+          selectedStart
+        }?`}
+        variant="danger"
+        confirmText="Withdraw"
+        isPending={deleteLeaveMutation.isPending || deleteWfhMutation.isPending}
+      />
     </div>
   );
 }
