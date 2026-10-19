@@ -263,13 +263,62 @@ const AllocationsPage = () => {
 
   const bulkCreateMutation = useMutation({
     mutationFn: allocationApi.bulkCreate,
-    onSuccess: (res) => {
-      const { project_id } = res;
-      if (project_id) {
-        updateProjectRowSurgically(project_id);
-        queryClient.invalidateQueries({ queryKey: ["allocations", "project-detail", project_id] });
+    onSuccess: (res, variables) => {
+      const { project_id, row } = res;
+      const targetProjectId = project_id || variables?.project_id;
+
+      // 1. In-Memory Cache Surgery for table row using returned row (0 extra network requests)
+      if (row) {
+        queryClient.setQueriesData({ queryKey: ["allocations-page"], type: "active" }, (old) => {
+          if (!old || !old.items) return old;
+          return {
+            ...old,
+            items: old.items.map((r) => (r.project_id === row.project_id ? row : r)),
+          };
+        });
+      } else if (targetProjectId) {
+        updateProjectRowSurgically(targetProjectId);
       }
-      queryClient.invalidateQueries({ queryKey: ["allocations", "employee-projects"] });
+
+      // 2. In-Memory Cache Surgery for project detail modal
+      if (targetProjectId) {
+        const addedEmpIds = new Set(variables?.employee_ids || []);
+        queryClient.setQueryData(["allocations", "project-detail", targetProjectId], (old) => {
+          if (!old || !old.items) return old;
+          const newlyAddedItems = (employees || [])
+            .filter((e) => addedEmpIds.has(e.id))
+            .map((e) => ({
+              allocation_id: Date.now() + e.id,
+              employee_id: e.id,
+              name: e.name,
+              email: e.email,
+              avatar_url: e.avatar_url,
+              designation: e.designation,
+              role_tags: variables?.role_tags || [],
+              total_daily_hours: variables?.daily_hours || 8,
+              stale: false,
+            }));
+          return {
+            ...old,
+            items: [...old.items, ...newlyAddedItems],
+          };
+        });
+      }
+
+      // 3. In-Memory Cache Surgery for employee-projects mapping
+      if (variables?.employee_ids && targetProjectId) {
+        queryClient.setQueryData(["allocations", "employee-projects"], (oldMap = {}) => {
+          const nextMap = { ...oldMap };
+          variables.employee_ids.forEach((eid) => {
+            const list = nextMap[eid] || [];
+            if (!list.includes(targetProjectId)) {
+              nextMap[eid] = [...list, targetProjectId];
+            }
+          });
+          return nextMap;
+        });
+      }
+
       toast.success("Allocations added successfully!");
     },
     onError: (err) => {
@@ -284,21 +333,48 @@ const AllocationsPage = () => {
 
   const bulkDeleteMutation = useMutation({
     mutationFn: allocationApi.bulkDelete,
-    onSuccess: (res) => {
-      const { project_id, deleted_allocation_ids } = res;
-      if (project_id) {
-        queryClient.setQueryData(["allocations", "project-detail", project_id], (old) => {
+    onSuccess: (res, variables) => {
+      const { project_id, deleted_allocation_ids = [], row } = res;
+      const targetProjectId = project_id || variables?.project_id;
+      const deletedIds = new Set(
+        deleted_allocation_ids.length ? deleted_allocation_ids : (variables?.allocation_ids || [])
+      );
+
+      // 1. In-Memory Cache Surgery for table row using returned row (0 extra network requests)
+      if (row) {
+        queryClient.setQueriesData({ queryKey: ["allocations-page"], type: "active" }, (old) => {
           if (!old || !old.items) return old;
           return {
             ...old,
-            items: old.items.filter((it) => !deleted_allocation_ids.includes(it.allocation_id)),
+            items: old.items.map((r) => (r.project_id === row.project_id ? row : r)),
           };
         });
-        updateProjectRowSurgically(project_id);
+      } else if (targetProjectId) {
+        updateProjectRowSurgically(targetProjectId);
       }
-      queryClient.invalidateQueries({ queryKey: ["allocations", "employee-projects"] });
-      queryClient.invalidateQueries({ queryKey: ["onboarding_pipeline"] });
-      queryClient.invalidateQueries({ queryKey: ["onboarding_newly_onboarded"] });
+
+      // 2. In-Memory Cache Surgery for project detail modal
+      if (targetProjectId) {
+        queryClient.setQueryData(["allocations", "project-detail", targetProjectId], (old) => {
+          if (!old || !old.items) return old;
+          return {
+            ...old,
+            items: old.items.filter((it) => !deletedIds.has(it.allocation_id)),
+          };
+        });
+      }
+
+      // 3. In-Memory Cache Surgery for employee-projects mapping
+      if (targetProjectId) {
+        queryClient.setQueryData(["allocations", "employee-projects"], (oldMap = {}) => {
+          const nextMap = { ...oldMap };
+          Object.keys(nextMap).forEach((eid) => {
+            nextMap[eid] = (nextMap[eid] || []).filter((pid) => pid !== targetProjectId);
+          });
+          return nextMap;
+        });
+      }
+
       toast.success("Allocations removed successfully!");
     },
     onError: (err) => {
@@ -481,38 +557,35 @@ const AllocationsPage = () => {
   };
 
   const performAllocation = () => {
+    if (!selectedProject) return;
+
     const originalItems = (
       projectDetail?.project_id === selectedProject?.id ? projectDetail.items : []
     ).filter((it) => !it.stale);
     const originalEmpIds = new Set(originalItems.map((it) => it.employee_id));
     const selectedEmpIds = new Set(selectedEmployees.map((e) => e.id));
 
-    // 1. Create allocations for newly checked employees
+    // 1. Single atomic bulk create for newly checked employees (1 request, NOT N requests)
     const toCreate = selectedEmployees.filter((emp) => !originalEmpIds.has(emp.id));
-    toCreate.forEach((emp) => {
-      const data = {
-        employee_id: emp.id,
-        sub_project_id: selectedProject.id,
-        total_daily_hours: totalDailyHours,
+    if (toCreate.length > 0) {
+      bulkCreateMutation.mutate({
+        project_id: selectedProject.id,
+        employee_ids: toCreate.map((e) => e.id),
         role_tags: isTeamLead ? [...selectedRoleTags, TEAM_LEAD_TAG] : selectedRoleTags,
-        time_distribution: selectedRoleTags.length > 0 ? timeDistribution : {},
-        weekly_hours_allocated: emp.weekly_availability || 40,
-        weekly_tasks_allocated: 0,
-        productivity_override: 1.0,
-        effective_week: new Date().toISOString().split("T")[0],
-        active_start_date: selectedProject.start_date,
-        active_end_date: selectedProject.end_date,
-        override_flag: emp.currentProjects ? true : false,
-        override_reason: emp.currentProjects ? "PM Override - Dual allocation" : null,
-      };
-      createMutation.mutate(data);
-    });
+        daily_hours: totalDailyHours,
+      });
+    }
 
-    // 2. Delete allocations for unchecked previously allocated employees
+    // 2. Single atomic bulk delete for unchecked previously allocated employees (1 request, NOT N requests)
     const toDelete = originalItems.filter((it) => !selectedEmpIds.has(it.employee_id));
-    toDelete.forEach((it) => {
-      deleteMutation.mutate(it.allocation_id);
-    });
+    if (toDelete.length > 0) {
+      bulkDeleteMutation.mutate({
+        project_id: selectedProject.id,
+        allocation_ids: toDelete.map((it) => it.allocation_id),
+      });
+    }
+
+    closeCreateModal();
   };
 
   const handleEmployeeToggle = (employee) => {
@@ -1298,10 +1371,10 @@ const AllocationsPage = () => {
             <Button
               type="submit"
               size="sm"
-              disabled={!selectedProject || selectedEmployees.length === 0 || createMutation.isPending}
-              isLoading={createMutation.isPending}
+              disabled={!selectedProject || selectedEmployees.length === 0 || bulkCreateMutation.isPending || bulkDeleteMutation.isPending}
+              isLoading={bulkCreateMutation.isPending || bulkDeleteMutation.isPending}
             >
-              {!createMutation.isPending &&
+              {!(bulkCreateMutation.isPending || bulkDeleteMutation.isPending) &&
                 `Allocate ${selectedEmployees.length} Employee${selectedEmployees.length !== 1 ? "s" : ""}`}
             </Button>
           </Modal.Footer>

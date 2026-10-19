@@ -1,6 +1,6 @@
 import React, { useMemo, useState } from "react";
 import { useQuery } from "@tanstack/react-query";
-import { perfEvalApi, employeeApi, subProjectApi } from "../../services/api";
+import { perfEvalApi } from "../../services/api";
 import {
   ChevronDown,
   ChevronUp,
@@ -109,23 +109,8 @@ const PerformanceReviewsPage = () => {
   const [historyMonth, setHistoryMonth] = useState(maxHistoryMonth);
   const [expandedEval, setExpandedEval] = useState(null);
 
-  // Name lookups for the History tab — the dashboard endpoint above pre-joins
-  // employee/project names server-side, but the flat history fetch below doesn't.
-  const { data: employees = [] } = useQuery({
-    queryKey: ["employees"],
-    queryFn: () => employeeApi.getAll(),
-    enabled: tab === "history",
-  });
-  const { data: projectsList = [] } = useQuery({
-    queryKey: ["sub-projects"],
-    queryFn: () => subProjectApi.getAll(),
-    enabled: tab === "history",
-  });
-
-  // One prior cycle at a time — scoped to this PM server-side by the same
-  // list_evals logic the old Active tab used (including the reviewed_by
-  // carve-out, so a past decision doesn't vanish if the employee has since
-  // moved to a project this PM no longer runs).
+  // One prior cycle at a time — scoped to this PM server-side with pre-joined
+  // employee_name, employee_avatar_url, and project_name to eliminate client-side N+1 roundtrips.
   const { data: historyData, isLoading: historyLoading, isError: historyError } = useQuery({
     queryKey: ["perf-evals", "history", historyMonth],
     queryFn: () => perfEvalApi.getAll({ period: historyMonth, limit: 500 }),
@@ -137,10 +122,10 @@ const PerformanceReviewsPage = () => {
     [historyData],
   );
 
-  const empName = (id) =>
-    formatDisplayName(employees.find((e) => e.id === id)?.name) || `Employee #${id}`;
-  const projName = (id) =>
-    projectsList.find((p) => p.id === id)?.name || `Project #${id}`;
+  const empName = (ev) =>
+    formatDisplayName(ev?.employee_name) || `Employee #${ev?.employee_id || ev}`;
+  const projName = (ev) =>
+    ev?.project_name || `Project #${ev?.project_id || ev}`;
 
   const historyColumns = [
     {
@@ -150,12 +135,12 @@ const PerformanceReviewsPage = () => {
       render: (_, ev) => (
         <div className="flex min-w-0 items-center gap-2.5">
           <UserAvatar
-            src={employees.find((e) => e.id === ev.employee_id)?.avatar_url}
-            name={empName(ev.employee_id)}
+            src={ev.employee_avatar_url}
+            name={empName(ev)}
             size="w-8 h-8 text-[13px]"
           />
           <span className="truncate font-medium text-slate-800">
-            {empName(ev.employee_id)}
+            {empName(ev)}
           </span>
         </div>
       ),
@@ -166,7 +151,7 @@ const PerformanceReviewsPage = () => {
       width: "w-[34%]",
       render: (_, ev) => (
         <span className="block truncate text-slate-600">
-          {projName(ev.project_id)}
+          {projName(ev)}
         </span>
       ),
     },
@@ -282,7 +267,7 @@ const PerformanceReviewsPage = () => {
                   {row.status === "submitted" ? (
                     <EvalReviewCard
                       evaluation={row}
-                      personName={empName(row.employee_id)}
+                      personName={empName(row)}
                       reviewerId={user.id}
                     />
                   ) : (
