@@ -112,17 +112,23 @@ const normalizeLeaveType = (type) => {
 };
 
 function calculateTenure(dateStr) {
-  if (!dateStr) return "3 Years 5 Months";
+  if (!dateStr) return "—";
   try {
-    const start = parseISO(dateStr);
+    const cleanDate = String(dateStr).split("T")[0];
+    const start = parseISO(cleanDate);
     const now = new Date();
+
+    if (start > now) return "Not started";
+
     const years = differenceInYears(now, start);
     const months = differenceInMonths(now, start) % 12;
-    if (years === 0 && months === 0) return "1 Month";
-    return `${years > 0 ? `${years} Year${years > 1 ? "s" : ""} ` : ""}${months} Month${months !== 1 ? "s" : ""
-      }`;
+
+    if (years === 0 && months === 0) return "Just joined";
+    if (years === 0) return `${months} Month${months !== 1 ? "s" : ""}`;
+    if (months === 0) return `${years} Year${years !== 1 ? "s" : ""}`;
+    return `${years} Year${years > 1 ? "s" : ""} ${months} Month${months !== 1 ? "s" : ""}`;
   } catch {
-    return "3 Years 5 Months";
+    return "—";
   }
 }
 
@@ -639,11 +645,12 @@ const EmployeeDashboard = () => {
       (isSelf ? account?.avatar_url || localUser.avatar_url : null) ||
       null;
 
-    const rawJoiningDate = employee?.joining_date || employee?.created_at;
+    // ── Line 642: STRICT DOJ (NO created_at fallback) ──
+    const rawJoiningDate = employee?.date_of_joining || null;
     const joiningDate = rawJoiningDate
-      ? format(parseISO(rawJoiningDate), "dd MMM yyyy")
-      : "";
-    const tenure = calculateTenure(rawJoiningDate);
+      ? format(parseISO(String(rawJoiningDate).split("T")[0]), "dd MMM yyyy")
+      : "-";
+    const tenure = rawJoiningDate ? calculateTenure(rawJoiningDate) : "—";
 
     const badge =
       employee?.employee_type ||
@@ -1284,17 +1291,20 @@ const EmployeeDashboard = () => {
     else if (has("monthly_top_2")) monthlyRankBadge = 2;
     else if (has("monthly_top_3")) monthlyRankBadge = 3;
 
-    // Tenure: prefer 6 months over 3 months
-    const has6 = has("tenure_6_months");
-    const has3 = has("tenure_3_months");
+    // Tenure: prefer 6 months over 3 months ONLY if date_of_joining is present
+    const hasDoj = Boolean(employee?.date_of_joining);
+    const has6 = hasDoj && has("tenure_6_months");
+    const has3 = hasDoj && has("tenure_3_months");
     const tenureEarned = has6 || has3;
     const tenureLabel = has6 ? "6 Months" : has3 ? "3 Months" : "Tenure";
     const tenureImage = has6 ? sixMonthsBadge : threeMonthsBadge;
 
-    // Yearly: count how many yearly_milestone badges exist
-    const yearlyCount = currentPeriodList.filter(
-      (b) => b.badge_code === "yearly_milestone"
-    ).length;
+    // Yearly: count how many yearly_milestone badges exist (ONLY if date_of_joining is present)
+    const yearlyCount = hasDoj
+      ? currentPeriodList.filter(
+          (b) => b.badge_code === "yearly_milestone"
+        ).length
+      : 0;
 
     const rawBadges = DISPLAY_SLOTS.map((slot) => {
       const base = BADGE_CONFIG[slot];
@@ -1421,7 +1431,7 @@ const EmployeeDashboard = () => {
       }
       return 0;
     });
-  }, [employeeBadges]);
+  }, [employeeBadges, employee?.date_of_joining]);
 
   const earnedBadgeCount = achievementBadges.filter((b) => b.earned).length;
 
@@ -1574,8 +1584,8 @@ const EmployeeDashboard = () => {
                   <Calendar className="w-3.5 h-3.5 text-stone-400 shrink-0" />
                   <span className="text-stone-500">
                     DOJ:{" "}
-                    <span className="text-stone-700 font-normal">
-                      {display(profile.joiningDate)}
+                    <span className="text-stone-700 font-semibold">
+                      {profile.joiningDate || "-"}
                     </span>
                   </span>
                 </div>

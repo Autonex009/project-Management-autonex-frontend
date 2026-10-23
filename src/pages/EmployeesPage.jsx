@@ -1884,6 +1884,7 @@ const EmployeesPage = () => {
       return;
     }
 
+    const dojVal = formData.get("date_of_joining");
     const ftStartDate = formData.get("converted_to_fulltime_at");
 
     const data = {
@@ -1891,6 +1892,7 @@ const EmployeesPage = () => {
       email: formData.get("email"),
       razorpay_email: formData.get("razorpay_email") || null,
       slack_user_id: formData.get("slack_user_id")?.trim() || null,
+      date_of_joining: dojVal?.trim() || null,
       converted_to_fulltime_at:
         formEmployeeType === "Full-time"
           ? (ftStartDate?.trim() || null)
@@ -2733,7 +2735,7 @@ const EmployeesPage = () => {
             align: "left",
             width: "w-[11%]",
             render: (_, row) => {
-              const dateVal = row.created_at;
+              const dateVal = row.date_of_joining;
               if (!dateVal) {
                 return (
                   <span className="text-[13px] text-slate-400 font-medium">—</span>
@@ -3208,8 +3210,25 @@ const EmployeesPage = () => {
               </div>
             </div>
 
-            {formEmployeeType === "Full-time" && (
-              <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+            <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+              <div>
+                <label className="block text-sm font-medium text-gray-700 mb-1">
+                  Date of Joining (DOJ)
+                </label>
+                <input
+                  type="date"
+                  name="date_of_joining"
+                  defaultValue={
+                    editingEmployee?.date_of_joining
+                      ? String(editingEmployee.date_of_joining).split("T")[0]
+                      : ""
+                  }
+                  className="input"
+                />
+                <p className="text-[11px] text-gray-400 mt-1">Official joining date from joining letter</p>
+              </div>
+
+              {formEmployeeType === "Full-time" && (
                 <div>
                   <label className="block text-sm font-medium text-gray-700 mb-1">
                     Date of Full Time
@@ -3220,16 +3239,14 @@ const EmployeesPage = () => {
                     defaultValue={
                       editingEmployee?.converted_to_fulltime_at
                         ? String(editingEmployee.converted_to_fulltime_at).split("T")[0]
-                        : editingEmployee?.created_at
-                        ? String(editingEmployee.created_at).split("T")[0]
                         : ""
                     }
                     className="input"
                   />
                   <p className="text-[11px] text-gray-400 mt-1">Full-time start date</p>
                 </div>
-              </div>
-            )}
+              )}
+            </div>
 
             <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
               <div>
