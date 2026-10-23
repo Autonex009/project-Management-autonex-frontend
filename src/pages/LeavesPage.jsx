@@ -203,6 +203,7 @@ const LeavesPage = () => {
   const [selectedLeaveType, setSelectedLeaveType] = useState("");
   const [formStartDate, setFormStartDate] = useState("");
   const [formEndDate, setFormEndDate] = useState("");
+  const [isSpecialCase, setIsSpecialCase] = useState(false);
   const [filtersOpen, setFiltersOpen] = useState(false);
   const filtersRef = useRef(null);
 
@@ -465,6 +466,7 @@ const LeavesPage = () => {
       setFormEmployeeId("");
       setFormStartDate("");
       setFormEndDate("");
+      setIsSpecialCase(false);
       toast.success("Leave record created successfully");
     },
     onError: (err) =>
@@ -608,6 +610,7 @@ const LeavesPage = () => {
     );
 
     if (
+      !isSpecialCase &&
       leaveType !== "wfh" &&
       !validateConsecutiveLeaves(startDate, endDate, empLeaves, null, isHalf)
     ) {
@@ -625,6 +628,7 @@ const LeavesPage = () => {
       reason,
       is_half_day: isHalf,
       half_day_slot: isHalf ? leaveType : null,
+      is_special_case: isSpecialCase,
       created_at: new Date().toISOString(),
       applied_on: format(new Date(), "yyyy-MM-dd"),
     };
@@ -1458,6 +1462,7 @@ const LeavesPage = () => {
         isOpen={isModalOpen}
         onClose={() => {
           setIsModalOpen(false);
+          setIsSpecialCase(false);
           setFormEmployeeId("");
         }}
         size="md"
@@ -1569,6 +1574,23 @@ const LeavesPage = () => {
                 className="w-full rounded-xl border border-slate-200 p-3 text-sm resize-none focus:outline-none focus:ring-2 focus:ring-indigo-500 focus:border-transparent"
               />
             </div>
+            {isPrivileged && (
+              <div className="flex items-center gap-2 pt-0.5">
+                <input
+                  type="checkbox"
+                  id="is_special_case"
+                  checked={isSpecialCase}
+                  onChange={(e) => setIsSpecialCase(e.target.checked)}
+                  className="h-4 w-4 rounded border-slate-300 text-indigo-600 focus:ring-indigo-500 cursor-pointer"
+                />
+                <label
+                  htmlFor="is_special_case"
+                  className="text-xs sm:text-sm text-slate-700 font-medium cursor-pointer select-none"
+                >
+                  Special Case (override 5-day consecutive limit)
+                </label>
+              </div>
+            )}
             {(selectedLeaveType === "first_half" ||
               selectedLeaveType === "second_half") && (
                 <div className="rounded-xl border border-indigo-150 bg-indigo-50/50 p-4 text-sm text-indigo-900 space-y-2">
@@ -1609,6 +1631,7 @@ const LeavesPage = () => {
               variant="cancel"
               onClick={() => {
                 setIsModalOpen(false);
+                setIsSpecialCase(false);
                 setSelectedLeaveType("");
                 setFormEmployeeId("");
               }}
