@@ -1,4 +1,4 @@
-import React, { useState } from "react";
+import React, { useState, useMemo } from "react";
 import { CheckCircle, XCircle, Search, UserPlus, Zap, Users, RotateCcw, X, CheckCircle2, HelpCircle, ShieldCheck, Layers, Sparkles, Clock, ArrowRight } from "lucide-react";
 import { useNavigate } from "react-router-dom";
 import PipelineCalendar from "../../components/PipelineCalendar";
@@ -16,6 +16,7 @@ function PoolSidebar({
   searchQuery, onSearchChange,
   tlBuddies, tlProjects, selectedBuddy, selectedProject,
   onBuddyChange, onProjectChange, onAssign, isAssigning,
+  buddyOptions,
 }) {
   const selectedInPool = candidates.filter(c => selectedIds.includes(c.userId));
   const allSelected = candidates.length > 0 && candidates.every(c => selectedIds.includes(c.userId));
@@ -170,10 +171,10 @@ function PoolSidebar({
           Assign to Pipeline
         </div>
         <Dropdown
-          options={tlBuddies.map(emp => ({ value: String(emp.id), label: emp.name }))}
+          options={buddyOptions || (tlBuddies || []).map(emp => ({ value: String(emp.id), label: `${emp.name} (${emp.roleTag || 'TL'})` }))}
           value={selectedBuddy ? String(selectedBuddy) : ""}
           onChange={val => onBuddyChange(val)}
-          placeholder="Select Buddy (Team Lead)…"
+          placeholder="Select Buddy (Team Lead / PM)…"
           searchable={true}
           searchPlaceholder="Search buddy..."
           placement="auto"
@@ -244,7 +245,8 @@ const OnboardingPipelinePage = () => {
       const res = await api.get(`/employees/${selectedBuddy}/active-projects`);
       return res.data;
     },
-    enabled: !!selectedBuddy
+    enabled: !!selectedBuddy,
+    staleTime: 60 * 1000
   });
 
   // ── Mutations ──────────────────────────────────────────────────────────────
@@ -312,7 +314,41 @@ const OnboardingPipelinePage = () => {
     })),
   ];
 
-  const tlBuddies = allEmployees.filter(emp => emp.designation === "Team Lead");
+  // Memoized TL + PM buddy roster — avoids re-filtering on every keystroke
+  const buddies = useMemo(() => {
+    return allEmployees
+      .filter(emp => {
+        if (emp.status === "archived") return false;
+        const d = (emp.designation || "").trim().toLowerCase();
+        return (
+          d === "team lead" ||
+          d === "program manager" ||
+          d === "project manager" ||
+          d === "pm" ||
+          d === "tl"
+        );
+      })
+      .map(emp => {
+        const d = (emp.designation || "").toLowerCase();
+        const isPM = d.includes("manager") || d.includes("pm");
+        return {
+          id: emp.id,
+          name: emp.name,
+          roleTag: isPM ? "PM" : "TL",
+        };
+      })
+      .sort((a, b) => (a.name || "").localeCompare(b.name || ""));
+  }, [allEmployees]);
+
+  const buddyDropdownOptions = useMemo(() => {
+    return buddies.map(b => ({
+      value: String(b.id),
+      label: `${b.name} (${b.roleTag})`,
+    }));
+  }, [buddies]);
+
+  // Backward compatible alias for any child references
+  const tlBuddies = buddies;
 
   // ── Handlers ───────────────────────────────────────────────────────────────
   const toggleCandidateSelection = (id) =>
@@ -400,6 +436,7 @@ const OnboardingPipelinePage = () => {
           onToggle={toggleCandidateSelection}
           searchQuery={poolSearch}
           onSearchChange={setPoolSearch}
+          buddyOptions={buddyDropdownOptions}
           tlBuddies={tlBuddies}
           tlProjects={tlProjects}
           selectedBuddy={selectedBuddy}
@@ -461,7 +498,7 @@ const OnboardingPipelinePage = () => {
                 const steps = [
                   { label: "Assigned", date: assignedDate, desc: "Mentor & project assigned by HR", done: isAssignedDone, color: "bg-indigo-50 border-indigo-200 text-indigo-600" },
                   { label: "Accepted", date: acceptedDate, desc: isAcceptedDone ? "Candidate accepted from portal" : "Pending candidate confirmation", done: isAcceptedDone, color: "bg-teal-50 border-teal-200 text-teal-600" },
-                  { label: "Eval Due", date: evalDueDate, desc: "Day 5 evaluation by Team Lead", done: isEvalDone, color: "bg-amber-50 border-amber-200 text-amber-600" },
+                  { label: "Eval Due", date: evalDueDate, desc: "Day 5 evaluation by Team Lead / PM", done: isEvalDone, color: "bg-amber-50 border-amber-200 text-amber-600" },
                   { label: "Outcome", date: outcomeDate, desc: status === "passed" ? "Passed & allocated" : status === "failed" ? "Failed & notified" : "Pending evaluation", done: isOutcomeDone, color: status === "passed" ? "bg-emerald-50 border-emerald-200 text-emerald-600" : "bg-rose-50 border-rose-200 text-rose-600" },
                 ];
 
@@ -622,7 +659,7 @@ const OnboardingPipelinePage = () => {
                   <span>Assigning Candidates & Starting Training</span>
                 </div>
                 <p className="text-slate-700 mb-2">
-                  To start onboarding, HR selects candidates from the pool, picks a <strong>Buddy (Team Lead)</strong> and their <strong>Target Project</strong>, and clicks <strong>"Start Pipeline"</strong>.
+                  To start onboarding, HR selects candidates from the pool, picks a <strong>Buddy (Team Lead / PM)</strong> and their <strong>Target Project</strong>, and clicks <strong>"Start Pipeline"</strong>.
                 </p>
                 <ul className="list-disc pl-5 space-y-1.5 text-slate-600">
                   <li><strong>Auto-Training Assignment:</strong> The system automatically places the candidates into the <strong>Week 1 Training</strong> project for 8 hours/day as <strong>Trainees</strong>.</li>
@@ -638,7 +675,7 @@ const OnboardingPipelinePage = () => {
                   <span>The 5-Day Training Journey</span>
                 </div>
                 <p className="text-slate-700 mb-2">
-                  Candidates shadow their assigned Team Lead Buddy for 5 business days. The calendar tracks their progress through every milestone (Assigned → Accepted → Evaluation Due).
+                  Candidates shadow their assigned Buddy (Team Lead or PM) for 5 business days. The calendar tracks their progress through every milestone (Assigned → Accepted → Evaluation Due).
                 </p>
                 <div className="bg-white/80 p-2.5 rounded-lg border border-amber-100 text-slate-600">
                   <strong className="text-amber-900 block mb-0.5">What if a candidate needs to be removed from training early?</strong>
@@ -650,7 +687,7 @@ const OnboardingPipelinePage = () => {
               <div className="p-4 rounded-xl border border-emerald-100 bg-emerald-50/40">
                 <div className="flex items-center gap-2 font-bold text-emerald-950 text-sm mb-1.5">
                   <div className="w-6 h-6 rounded-full bg-emerald-600 text-white text-xs font-bold flex items-center justify-center shadow-xs">4</div>
-                  <span>Day 5 Evaluation (Team Lead Decision)</span>
+                  <span>Day 5 Evaluation (Team Lead / PM Decision)</span>
                 </div>
                 <p className="text-slate-700 mb-2">
                   On Day 5, the assigned Buddy submits an evaluation score and notes:
