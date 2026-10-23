@@ -5,12 +5,15 @@ import Button from "../../components/ui/Button";
 import UserAvatar from "../../components/ui/UserAvatar";
 import { authApi, employeeApi, skillsApi } from "../../services/api";
 import {
+  Award,
   BadgeCheck,
   Briefcase,
+  Calendar,
   Check,
   ChevronDown,
   Clock3,
   Hash,
+  Lock,
   Mail,
   Pencil,
   Phone,
@@ -25,6 +28,7 @@ import {
   Building2,
   Save,
 } from "lucide-react";
+import { format, parseISO } from "date-fns";
 
 /* ── Inline Field Item ───────────────────────────────────────────── */
 const CompactField = ({ icon: Icon, label, value, color = "emerald" }) => {
@@ -33,6 +37,7 @@ const CompactField = ({ icon: Icon, label, value, color = "emerald" }) => {
     blue: "bg-blue-50 text-blue-600 border-blue-100",
     violet: "bg-violet-50 text-violet-600 border-violet-100",
     slate: "bg-slate-100 text-slate-600 border-slate-200",
+    amber: "bg-amber-50 text-amber-600 border-amber-100",
   };
 
   return (
@@ -338,6 +343,7 @@ const formatPhoneNumber = (phone) => {
     skills: employee?.skills || account?.skills || localUser.skills || [],
     slackUserId: employee?.slack_user_id || "",
     encordId: employee?.encord_id || "",
+    dateOfJoining: employee?.date_of_joining || "",
     avatarUrl:
       employee?.avatar_url || account?.avatar_url || localUser.avatar_url || "",
   };
@@ -349,6 +355,7 @@ const formatPhoneNumber = (phone) => {
   const [editSkills, setEditSkills] = useState([]);
   const [editSlackId, setEditSlackId] = useState("");
   const [editEncordId, setEditEncordId] = useState("");
+  const [editDateOfJoining, setEditDateOfJoining] = useState("");
   const [saveError, setSaveError] = useState("");
   const [saveSuccess, setSaveSuccess] = useState(false);
 
@@ -358,6 +365,11 @@ const formatPhoneNumber = (phone) => {
     setEditSkills([...(mergedProfile.skills || [])]);
     setEditSlackId(mergedProfile.slackUserId || "");
     setEditEncordId(mergedProfile.encordId || "");
+    setEditDateOfJoining(
+      mergedProfile.dateOfJoining
+        ? String(mergedProfile.dateOfJoining).split("T")[0]
+        : ""
+    );
     setSaveError("");
     setSaveSuccess(false);
     setIsEditing(true);
@@ -366,15 +378,23 @@ const formatPhoneNumber = (phone) => {
   const cancelEdit = () => {
     setIsEditing(false);
     setEditName("");
+    setEditDateOfJoining("");
     setSaveError("");
   };
 
   /* ── Save Profile Mutation ──────────────────────────────────── */
   const saveMutation = useMutation({
     mutationFn: (data) => employeeApi.update(employeeId, data),
-    onSuccess: () => {
-      queryClient.invalidateQueries({ queryKey: ["employee-profile", employeeId] });
-      queryClient.invalidateQueries({ queryKey: ["auth-me"] });
+    onSuccess: (updatedEmployee) => {
+      // In-memory RAM patch: 0ms instant UI update, 0 network refetches
+      queryClient.setQueryData(["employee-profile", employeeId], (old) => ({
+        ...old,
+        ...updatedEmployee,
+      }));
+      queryClient.setQueryData(["auth-me"], (old) => {
+        if (!old) return old;
+        return { ...old, name: updatedEmployee.name || old.name };
+      });
       queryClient.invalidateQueries({ queryKey: ["employees"] });
       setIsEditing(false);
       setSaveError("");
@@ -393,6 +413,7 @@ const formatPhoneNumber = (phone) => {
       skills: editSkills,
       slack_user_id: editSlackId || null,
       encord_id: editEncordId || null,
+      date_of_joining: editDateOfJoining ? editDateOfJoining.trim() : null,
     });
   };
 
@@ -750,6 +771,69 @@ const formatPhoneNumber = (phone) => {
                   ) : (
                     <CompactField icon={Hash} label="Slack Member ID" value={mergedProfile.slackUserId} color="violet" />
                   )}
+
+                  {/* Slot 6: Date of Joining (Editable once by employee; locked to Admin/HR once populated) */}
+                  {isEditing ? (
+                    mergedProfile.dateOfJoining && !["admin", "hr"].includes(mergedProfile.role) ? (
+                      <div className="rounded-xl border border-slate-200 bg-slate-50 p-2.5">
+                        <div className="flex items-center justify-between">
+                          <p className="text-[10px] font-bold uppercase tracking-wider text-slate-500">
+                            Date of Joining
+                          </p>
+                          <span className="flex items-center gap-1 text-[10px] text-slate-400 font-medium">
+                            <Lock className="h-3 w-3" /> Locked
+                          </span>
+                        </div>
+                        <p className="mt-1 text-xs font-semibold text-slate-700">
+                          {format(parseISO(String(mergedProfile.dateOfJoining).split("T")[0]), "dd MMM yyyy")}
+                        </p>
+                        <p className="text-[10px] text-slate-400 mt-0.5">Contact Admin/HR to modify official joining date.</p>
+                      </div>
+                    ) : (
+                      <div className="rounded-xl border-2 border-emerald-400 bg-emerald-50/30 p-2.5">
+                        <div className="flex items-center justify-between">
+                          <p className="text-[10px] font-bold uppercase tracking-wider text-emerald-700">
+                            Date of Joining
+                          </p>
+                          <span 
+                            className="flex items-center gap-1 text-[10px] text-rose-500 font-semibold cursor-help"
+                            title="Add date of joining that is mentioned in your joining letter"
+                          >
+                            <span className="h-3 w-3 rounded-full bg-rose-100 text-rose-600 flex items-center justify-center text-[9px] font-bold">i</span>
+                            Joining Letter
+                          </span>
+                        </div>
+                        <input
+                          type="date"
+                          max={new Date().toISOString().split("T")[0]}
+                          value={editDateOfJoining}
+                          onChange={(e) => setEditDateOfJoining(e.target.value)}
+                          className="mt-1 w-full rounded-lg border border-slate-200 bg-white px-2.5 py-1 text-xs outline-none focus:border-emerald-500"
+                        />
+                      </div>
+                    )
+                  ) : (
+                    <div className="relative group">
+                      <CompactField
+                        icon={Calendar}
+                        label="Date of Joining"
+                        value={
+                          mergedProfile.dateOfJoining
+                            ? format(parseISO(String(mergedProfile.dateOfJoining).split("T")[0]), "dd MMM yyyy")
+                            : "Not set"
+                        }
+                        color="emerald"
+                      />
+                      <div 
+                        className="absolute top-2 right-2 flex items-center"
+                        title="Add date of joining that is mentioned in your joining letter"
+                      >
+                        <span className="h-4 w-4 rounded-full bg-rose-50 border border-rose-300 text-rose-600 hover:bg-rose-100 flex items-center justify-center text-[10px] font-extrabold shadow-xs transition-colors cursor-pointer">
+                          i
+                        </span>
+                      </div>
+                    </div>
+                  )}
                 </div>
               </div>
 
@@ -811,6 +895,32 @@ const formatPhoneNumber = (phone) => {
                     label="Weekly Capacity"
                     value={mergedProfile.weeklyAvailability ? `${mergedProfile.weeklyAvailability} hrs/week` : null}
                   />
+
+                  {/* Slot 7: PM Portal Registered Date (Fixed & Read-Only) */}
+                  <CompactField
+                    icon={ShieldCheck}
+                    label="PM Portal Registered Date"
+                    value={
+                      employee?.created_at
+                        ? format(parseISO(employee.created_at), "dd MMM yyyy")
+                        : "—"
+                    }
+                    color="slate"
+                  />
+
+                  {/* Slot 8: Promoted to Full-Time (Shown strictly for Full-timers) */}
+                  {(employee?.employee_type === "Full-time" || employee?.converted_to_fulltime_at) && (
+                    <CompactField
+                      icon={Award}
+                      label="Promoted to Full-Time"
+                      value={
+                        employee?.converted_to_fulltime_at
+                          ? format(parseISO(employee.converted_to_fulltime_at), "dd MMM yyyy")
+                          : "Direct Hire"
+                      }
+                      color="amber"
+                    />
+                  )}
                 </div>
               </div>
             </div>

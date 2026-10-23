@@ -268,7 +268,7 @@ function DetailedTimeline({ candidate }) {
     {
       label: "Eval Due",
       date: evalDueDate,
-      desc: "Day 5 evaluation by Team Lead",
+      desc: "Day 5 evaluation by Team Lead / PM",
       done: isEvalDone,
       color: "bg-amber-50 border-amber-200 text-amber-600",
     },
@@ -840,4 +840,4 @@ export default function PipelineCalendar({
       )}
     </div>
   );
-}
+}

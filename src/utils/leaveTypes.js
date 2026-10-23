@@ -247,7 +247,8 @@ export function validateConsecutiveLeaves(
     if (
       l.is_half_day ||
       l.leave_type === "first_half" ||
-      l.leave_type === "second_half"
+      l.leave_type === "second_half" ||
+      l.is_special_case
     )
       return;
 
