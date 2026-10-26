@@ -1,8 +1,37 @@
 import { defineConfig } from 'vite'
 import react from '@vitejs/plugin-react'
 
+const appVersion =
+  process.env.RAILWAY_GIT_COMMIT_SHA ||
+  process.env.VITE_APP_VERSION ||
+  String(Date.now());
+
 export default defineConfig(({ isSsrBuild }) => ({
-  plugins: [react()],
+  define: {
+    __APP_VERSION__: JSON.stringify(appVersion),
+  },
+  plugins: [
+    react(),
+    {
+      name: 'generate-version-file',
+      generateBundle() {
+        if (!isSsrBuild) {
+          this.emitFile({
+            type: 'asset',
+            fileName: 'version.json',
+            source: JSON.stringify(
+              {
+                version: appVersion,
+                builtAt: new Date().toISOString(),
+              },
+              null,
+              2
+            ),
+          });
+        }
+      },
+    },
+  ],
   // Note: the dev server port and the /api proxy are now owned by server.js
   // (the Express SSR server), which runs Vite in middleware mode. Vite's own
   // server.proxy no longer applies since Express handles the top-level request.

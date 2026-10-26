@@ -1,6 +1,7 @@
 export const LEAVE_TYPE_OPTIONS = [
   { value: "paid", label: "Paid Leave" },
-  { value: "casual_sick", label: "Casual/Sick Leave" },
+  // TEMPORARILY PAUSED: Sick / Casual leave cannot be applied by anyone
+  // { value: "casual_sick", label: "Casual/Sick Leave" },
   { value: "floater", label: "Floater Leave" },
   { value: "first_half", label: "First Half-day Leave" },
   { value: "second_half", label: "Second Half-day Leave" },

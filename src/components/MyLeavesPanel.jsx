@@ -293,7 +293,8 @@ const MyLeavesPanel = ({
   const balances = useMemo(() => {
     if (serverBalances) {
       const cards = [];
-      const order = ["paid", "casual_sick", "floater"];
+      // TEMPORARILY PAUSED: Sick / Casual leave KPI is hidden (only 2 cards: Paid & Floater)
+      const order = ["paid", "floater"];
       order.forEach((t) => {
         if (serverBalances[t]) {
           cards.push({
@@ -361,7 +362,8 @@ const MyLeavesPanel = ({
         period: "year",
       });
     }
-    ["casual_sick", "floater"].forEach((t) => {
+    // TEMPORARILY PAUSED: Sick / Casual leave KPI is hidden (only 2 cards: Paid & Floater)
+    ["floater"].forEach((t) => {
       const quota = intern && t === "casual_sick" ? 0 : ANNUAL_LEAVE_QUOTA[t];
       cards.push({
         type: t,

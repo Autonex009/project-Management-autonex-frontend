@@ -7,6 +7,7 @@ import ProtectedRoute from "./routes/ProtectedRoute";
 import ErrorBoundary from "./components/ErrorBoundary";
 import ForcePasswordChangeModal from "./components/ForcePasswordChangeModal";
 import DailyCheckInModal from "./components/checkin/DailyCheckInModal";
+import VersionUpdateBanner from "./components/VersionUpdateBanner";
 
 // Layouts
 import AdminLayout from "./layouts/AdminLayout";
@@ -23,7 +24,7 @@ const Dashboard = lazy(() => import("./pages/Dashboard"));
 const AnalyticsDashboard = lazy(() => import("./pages/AnalyticsDashboard"));
 const EmployeesPage = lazy(() => import("./pages/EmployeesPage"));
 const ChangeLogPage = lazy(() => import("./pages/ChangeLogPage"));
-import SubProjectsPage from "./pages/ProjectsPage";
+const SubProjectsPage = lazy(() => import("./pages/ProjectsPage"));
 const AllocationsPage = lazy(() => import("./pages/AllocationsPage"));
 const LeavesPage = lazy(() => import("./pages/LeavesPage"));
 const ProjectsPage = lazy(() => import("./pages/ParentProjectsPage"));
@@ -133,6 +134,39 @@ function App() {
     prevPortal.current = currentPortal;
   }, [location.pathname, queryClient]);
 
+  // Catch Vite chunk hash mismatches on redeployment and auto-reload once cleanly
+  useEffect(() => {
+    // Clear retry flag on fresh successful mount after 10s
+    const timer = setTimeout(() => {
+      sessionStorage.removeItem("chunk_reload_retry");
+    }, 10000);
+
+    const attemptReload = (msg) => {
+      const isChunkError =
+        msg?.includes("Failed to fetch dynamically imported module") ||
+        msg?.includes("Importing a module script failed") ||
+        msg?.includes("error loading dynamically imported module");
+      if (isChunkError) {
+        const hasReloaded = sessionStorage.getItem("chunk_reload_retry");
+        if (!hasReloaded) {
+          sessionStorage.setItem("chunk_reload_retry", "true");
+          window.location.reload();
+        }
+      }
+    };
+
+    const handleError = (e) => attemptReload(e?.message);
+    const handleRejection = (e) => attemptReload(e?.reason?.message || String(e?.reason));
+
+    window.addEventListener("error", handleError);
+    window.addEventListener("unhandledrejection", handleRejection);
+    return () => {
+      clearTimeout(timer);
+      window.removeEventListener("error", handleError);
+      window.removeEventListener("unhandledrejection", handleRejection);
+    };
+  }, []);
+
   return (
     <ErrorBoundary>
       <div suppressHydrationWarning>
@@ -147,6 +181,7 @@ function App() {
           />
           <ForcePasswordChangeModal />
           <DailyCheckInModal />
+          <VersionUpdateBanner />
           <Suspense fallback={null}>
             <Routes>
               {/* Public Auth Routes */}

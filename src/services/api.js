@@ -214,10 +214,16 @@ export const analyticsApi = {
     api.get("/analytics/my-ranks").then((res) => res.data),
   // Employee self-service: the signed-in user's own Encord hours/day (last N days),
   // optionally scoped to their current sub-project (adds a per-day team average).
-  getMyEncordActivity: ({ days = 7, sub_project_id, employee_id } = {}) =>
+  getMyEncordActivity: ({ days = 7, date_from, date_to, sub_project_id, employee_id } = {}) =>
     api
       .get("/analytics/me/encord-activity", {
-        params: { days, ...(sub_project_id ? { sub_project_id } : {}), ...(employee_id ? { employee_id } : {}) },
+        params: {
+          days,
+          ...(date_from ? { date_from } : {}),
+          ...(date_to ? { date_to } : {}),
+          ...(sub_project_id ? { sub_project_id } : {}),
+          ...(employee_id ? { employee_id } : {}),
+        },
       })
       .then((res) => res.data),
   // Manual Encord pull (admin) — optional { date_from, date_to }
@@ -848,6 +854,12 @@ export const companySettingsApi = {
     api.put(`/company-settings/${key}`, data).then((res) => res.data),
   delete: (key) =>
     api.delete(`/company-settings/${key}`).then((res) => res.data),
+};
+
+// === Canteen Menu API ===
+export const canteenMenuApi = {
+  getMenu: () => api.get("/company-settings/canteen-menu").then((res) => res.data),
+  updateMenu: (items) => api.put("/company-settings/canteen-menu", { items }).then((res) => res.data),
 };
 
 // === WiFi Networks API ===
