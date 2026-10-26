@@ -120,7 +120,7 @@ const AdminLayout = () => {
       normalizeLightMode
       chatRole="admin"
       outerBgClass="bg-gray-200/50"
-      contentWrapperClass="max-w-[1600px] mx-auto space-y-5"
+      contentWrapperClass="max-w-[1600px] mx-auto space-y-4"
     />
   );
 };

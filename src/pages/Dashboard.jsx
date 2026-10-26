@@ -21,7 +21,6 @@ import {
 import {
   FolderKanban,
   Users,
-  ChevronRight,
   CalendarDays,
   Home,
 } from "lucide-react";
@@ -203,8 +202,8 @@ const Dashboard = () => {
   });
 
   const { data: paginatedProjectsData, isLoading: projectsLoading, isFetching: projectsFetching } = useQuery({
-    queryKey: ["sub-projects-paginated", projectPage, 5],
-    queryFn: () => subProjectApi.getPaginated({ page: projectPage, limit: 5, is_dashboard: true }),
+    queryKey: ["sub-projects-paginated", projectPage, 6],
+    queryFn: () => subProjectApi.getPaginated({ page: projectPage, limit: 6, is_dashboard: true }),
     placeholderData: keepPreviousData,
     staleTime: 1000 * 60 * 5, // 5 minutes
   });
@@ -410,16 +409,17 @@ const Dashboard = () => {
   // Project sentiment badge (PM-set): GOOD / AVG / Poor.
   const SentimentBadge = ({ sentiment }) => {
     const config = {
-      GOOD: { text: "text-emerald-600 ", bg: "bg-emerald-50 ", label: "Good" },
-      AVG: { text: "text-amber-600 ", bg: "bg-amber-50 ", label: "Avg" },
-      Poor: { text: "text-red-600 ", bg: "bg-red-50 ", label: "Poor" },
+      GOOD: { text: "text-emerald-700", bg: "bg-emerald-50", border: "border-emerald-200/60", dot: "bg-emerald-500", label: "Good" },
+      AVG: { text: "text-amber-700", bg: "bg-amber-50", border: "border-amber-200/60", dot: "bg-amber-500", label: "Avg" },
+      Poor: { text: "text-red-700", bg: "bg-red-50", border: "border-red-200/60", dot: "bg-red-500", label: "Poor" },
     };
     const c = config[sentiment];
-    if (!c) return <span className="text-xs text-slate-400 ">-</span>;
+    if (!c) return <span className="font-mono text-xs text-slate-400">—</span>;
     return (
       <span
-        className={`inline-flex items-center rounded-full px-2.5 py-1 text-xs font-semibold ${c.bg} ${c.text}`}
+        className={`inline-flex items-center gap-1.5 rounded-full px-2.5 py-0.5 text-[11px] font-semibold border ${c.bg} ${c.text} ${c.border}`}
       >
+        <span className={`h-1.5 w-1.5 rounded-full ${c.dot}`} />
         {c.label}
       </span>
     );
@@ -558,18 +558,6 @@ const Dashboard = () => {
 
           <Table
             variant="v1"
-            title="Project Status"
-            count={`${dashboardKpis?.projects?.active || 0} active`}
-            headerAction={
-              <button
-                type="button"
-                onClick={() => goFromKpi(`${routePrefix}/projects`)}
-                className="hidden sm:flex items-center text-[13px] font-medium text-indigo-600 hover:text-indigo-700 transition-colors"
-              >
-                View all
-                <ChevronRight className="w-4 h-4 ml-0.5" />
-              </button>
-            }
             loading={projectsFetching}
             data={projectAnalyses}
             rowClassName={(row) =>
@@ -587,7 +575,7 @@ const Dashboard = () => {
             }}
             totalItems={paginatedProjectsData?.total || 0}
             currentPage={projectPage}
-            pageSize={5}
+            pageSize={6}
             onPageChange={setProjectPage}
             columns={[
               {
@@ -595,11 +583,11 @@ const Dashboard = () => {
                 label: "Project",
                 render: (project) => (
                   <div className="min-w-0">
-                    <div className="truncate font-medium text-slate-800 ">
+                    <div className="truncate text-[13px] font-semibold text-slate-800 transition-colors group-hover:text-indigo-600">
                       {project.name}
                     </div>
-                    <div className="truncate text-xs text-slate-400 ">
-                      {project.client}
+                    <div className="truncate font-mono text-[11px] text-slate-400">
+                      {project.client || "Internal"}
                     </div>
                   </div>
                 ),
@@ -608,10 +596,12 @@ const Dashboard = () => {
                 key: "_hours",
                 label: "Autonex Hrs",
                 align: "center",
-                width: "w-28",
+                width: "w-32",
                 render: (_, row) => (
-                  <span className="font-mono text-sm text-slate-700">
-                    {row.autonexHours != null ? `${row.autonexHours}h` : "—"}
+                  <span className="font-mono text-[13px] font-semibold text-emerald-600 tabular-nums">
+                    {row.autonexHours != null
+                      ? `${Number(row.autonexHours).toLocaleString(undefined, { maximumFractionDigits: 1 })}h`
+                      : "—"}
                   </span>
                 ),
               },
@@ -619,10 +609,10 @@ const Dashboard = () => {
                 key: "_ann",
                 label: "Annotators",
                 align: "center",
-                width: "w-24",
+                width: "w-28",
                 render: (_, row) => (
-                  <span className="text-slate-700">
-                    {row.annotators ?? "—"}
+                  <span className="inline-flex min-w-[28px] items-center justify-center rounded-md bg-slate-100/80 px-2 py-0.5 font-mono text-[11px] font-medium text-slate-700">
+                    {row.annotators ?? 0}
                   </span>
                 ),
               },
@@ -630,10 +620,10 @@ const Dashboard = () => {
                 key: "_rev",
                 label: "Reviewers",
                 align: "center",
-                width: "w-24",
+                width: "w-28",
                 render: (_, row) => (
-                  <span className="text-slate-700">
-                    {row.reviewers ?? "—"}
+                  <span className="inline-flex min-w-[28px] items-center justify-center rounded-md bg-slate-100/80 px-2 py-0.5 font-mono text-[11px] font-medium text-slate-700">
+                    {row.reviewers ?? 0}
                   </span>
                 ),
               },
@@ -662,7 +652,7 @@ const Dashboard = () => {
           onOpenProject={(projectId) =>
             goFromKpi(`${routePrefix}/analytics/${projectId}`)
           }
-          onViewAllUsers={() => goFromKpi(employeesRoute)}
+          onViewAllUsers={() => goFromKpi(`${routePrefix}/leaderboard`)}
           onOpenUser={(employeeId) => 
             goFromKpi(`${employeesRoute}/${employeeId}`)
           }

@@ -230,7 +230,7 @@ export default function AppShellLayout({
           </div>
         </header>
 
-        <main className="flex-1 overflow-auto px-4 pt-3 pb-4 sm:px-6 sm:pt-4 sm:pb-6 relative">
+        <main className="flex-1 overflow-auto px-4 pt-3 pb-3 sm:px-6 sm:pt-3 sm:pb-3 relative">
           <div className={contentWrapperClass}>
             <Outlet />
           </div>

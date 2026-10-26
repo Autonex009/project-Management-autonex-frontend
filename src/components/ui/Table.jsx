@@ -1,4 +1,4 @@
-import React from "react";
+import React, { useRef } from "react";
 import { Edit, Trash2 } from "lucide-react";
 
 const shimmer =
@@ -29,6 +29,10 @@ export const Table = ({
   renderExpandedRow,
   allowOverflow = false, // let row popovers/menus escape the card instead of being clipped
   tableLayout = "fixed", // "fixed" or "auto"
+  showFillerRows = false, // maintain consistent table height with empty filler rows
+  scrollToTopOnPageChange = false, // scroll container to top when page changes
+  cellPadding, // optional custom cell padding override
+  rowHeight, // optional custom row height override
 }) => {
   const serverSide = totalItems != null;
   const itemCount = serverSide ? totalItems : data?.length || 0;
@@ -53,6 +57,8 @@ export const Table = ({
       : isUntitled
         ? "px-4 py-1.5"
         : "px-4 py-2";
+  const effectiveCellPad = cellPadding || cellPad;
+  const effectiveRowHeight = rowHeight || (isV1 ? "h-[48px]" : "h-[52px]");
   const headPad = isCompact
     ? "px-4 py-2"
     : isV1
@@ -74,12 +80,33 @@ export const Table = ({
 
   const context = { onEdit, onDelete };
 
+  const containerRef = useRef(null);
+
+
+  const scrollToTop = () => {
+    if (!scrollToTopOnPageChange) return;
+    const scrollTarget = containerRef.current?.closest("main") || window;
+    if (scrollTarget && typeof scrollTarget.scrollTo === "function") {
+      scrollTarget.scrollTo({ top: 0, behavior: "smooth" });
+    } else if (containerRef.current?.scrollIntoView) {
+      containerRef.current.scrollIntoView({ behavior: "smooth", block: "start" });
+    }
+  };
+
+  const handlePageChange = (newPage) => {
+    if (newPage === currentPage) return;
+    onPageChange?.(newPage);
+    if (scrollToTopOnPageChange) {
+      scrollToTop();
+    }
+  };
+
   const outerClass = isBorderless
     ? `${className}`
     : `bg-white rounded-2xl border border-slate-200/60 shadow-[0_1px_3px_rgba(0,0,0,0.04)] ${className}`;
 
   return (
-    <div className={outerClass}>
+    <div ref={containerRef} className={outerClass}>
       {(title || headerAction) && (
         <div className="flex items-center justify-between gap-2 px-4 py-3 border-b border-slate-100 lg:px-5 lg:py-3.5">
           <div className="flex min-w-0 items-center gap-2">
@@ -126,9 +153,9 @@ export const Table = ({
           <tbody className="divide-y divide-slate-100 ">
             {loading ? (
               Array.from({ length: skeletonRows || pageSize }).map((_, i) => (
-                <tr key={i} className="bg-white h-[52px]">
+                <tr key={i} className={`bg-white ${effectiveRowHeight}`}>
                   {columns.map((col) => (
-                    <td key={col.key} className={cellPad}>
+                    <td key={col.key} className={effectiveCellPad}>
                       {col.key === "name" || col.key === "employee" || col.key === "user" || col.key === "actor" ? (
                         <div className="flex items-center gap-3">
                           <div className={`w-9 h-9 rounded-full flex-shrink-0 ${shimmer}`} />
@@ -171,20 +198,21 @@ export const Table = ({
                   const rowBg =
                     isStriped && idx % 2 !== 0 ? "bg-slate-50/50 " : "bg-white ";
                   const extraClass = rowClassName ? rowClassName(row, idx) : "";
-                  const isLast = idx === paginatedData.length - 1 && paginatedData.length === pageSize;
+                  const hasPagination = (totalPages > 1 || (serverSide && loading)) && Boolean(onPageChange);
+                  const isLast = !hasPagination && !showFillerRows && idx === paginatedData.length - 1;
                   return (
                     <React.Fragment key={getRowId(row) ?? idx}>
                       <tr
                         onClick={
                           onRowClick ? () => onRowClick(row, idx) : undefined
                         }
-                        className={`${rowBg} h-[52px] hover:bg-slate-50 transition-colors ${onRowClick ? "cursor-pointer" : ""
+                        className={`${rowBg} ${effectiveRowHeight} hover:bg-slate-50 transition-colors ${onRowClick ? "cursor-pointer" : ""
                           } ${extraClass}`}
                       >
                         {columns.map((col, cIdx) => (
                           <td
                             key={col.key}
-                            className={`${cellPad} ${cellText} align-middle whitespace-nowrap ${isLast && cIdx === 0
+                            className={`${effectiveCellPad} ${cellText} align-middle whitespace-nowrap ${isLast && cIdx === 0
                               ? "rounded-bl-2xl"
                               : isLast && cIdx === columns.length - 1
                                 ? "rounded-br-2xl"
@@ -216,11 +244,11 @@ export const Table = ({
                   );
                 })}
                 {/* Filler rows to maintain a consistent table height across all pages */}
-                {paginatedData.length > 0 && paginatedData.length < pageSize && (
+                {showFillerRows && paginatedData.length > 0 && paginatedData.length < pageSize && (
                   Array.from({ length: pageSize - paginatedData.length }).map((_, fIdx) => (
-                    <tr key={`filler-${fIdx}`} className="h-[52px]">
+                    <tr key={`filler-${fIdx}`} className={effectiveRowHeight}>
                       {columns.map((col) => (
-                        <td key={col.key} className={`${cellPad} ${cellText} align-middle whitespace-nowrap text-transparent pointer-events-none select-none`}>
+                        <td key={col.key} className={`${effectiveCellPad} ${cellText} align-middle whitespace-nowrap text-transparent pointer-events-none select-none`}>
                           &nbsp;
                         </td>
                       ))}
@@ -234,16 +262,16 @@ export const Table = ({
       </div>
 
       {(totalPages > 1 || (serverSide && loading)) && onPageChange && (
-        <div className="flex items-center justify-between px-4 py-2.5 border-t border-slate-100 rounded-b-2xl">
+        <div className="flex items-center justify-between px-4 py-3 border-t border-slate-100 rounded-b-2xl lg:px-5">
           <p className="text-[13px] text-slate-500 ">
             Showing {paginatedData.length === 0 ? 0 : startIndex + 1}–
             {Math.min(startIndex + pageSize, itemCount)} of {itemCount} items
           </p>
           <div className="flex items-center gap-2">
             <button
-              onClick={() => onPageChange(Math.max(1, currentPage - 1))}
+              onClick={() => handlePageChange(Math.max(1, currentPage - 1))}
               disabled={currentPage === 1}
-              className="h-8 px-3 text-[13px] font-medium rounded-lg border border-slate-200 text-slate-600 hover:bg-slate-50 disabled:opacity-40 disabled:cursor-not-allowed transition-colors shrink-0"
+              className={`h-8 px-3 text-[12px] font-medium rounded-lg border border-slate-200 text-slate-600 hover:bg-slate-50 hover:text-slate-900 disabled:opacity-40 disabled:cursor-not-allowed transition-colors shadow-sm shrink-0`}
             >
               Previous
             </button>
@@ -269,9 +297,9 @@ export const Table = ({
                   ) : (
                     <button
                       key={p}
-                      onClick={() => onPageChange(p)}
-                      className={`h-8 min-w-8 px-2 text-[13px] rounded-lg border transition-colors ${currentPage === p
-                        ? "bg-indigo-600 border-indigo-600 text-white font-medium"
+                      onClick={() => handlePageChange(p)}
+                      className={`h-8 min-w-8 px-2 text-[12px] rounded-lg border transition-colors shadow-sm ${currentPage === p
+                        ? "bg-indigo-600 border-indigo-600 text-white font-semibold"
                         : "border-slate-200 text-slate-600 hover:bg-slate-50 "
                         }`}
                     >
@@ -282,10 +310,10 @@ export const Table = ({
             </div>
             <button
               onClick={() =>
-                onPageChange(Math.min(totalPages, currentPage + 1))
+                handlePageChange(Math.min(totalPages, currentPage + 1))
               }
               disabled={currentPage === totalPages}
-              className="h-8 px-3 text-[13px] font-medium rounded-lg border border-slate-200 text-slate-600 hover:bg-slate-50 disabled:opacity-40 disabled:cursor-not-allowed transition-colors shrink-0"
+              className={`h-8 px-3 text-[12px] font-medium rounded-lg border border-slate-200 text-slate-600 hover:bg-slate-50 hover:text-slate-900 disabled:opacity-40 disabled:cursor-not-allowed transition-colors shadow-sm shrink-0`}
             >
               Next
             </button>

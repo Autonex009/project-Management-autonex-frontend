@@ -1,11 +1,9 @@
 import React, { useMemo, useState } from "react";
-import { Clock, ArrowUpRight, BarChart3 } from "lucide-react";
-import Button from "../ui/Button";
+import { ArrowUpRight, ChevronDown } from "lucide-react";
 import { formatDisplayName } from "../../utils/displayName";
 
 // "Most active" panel, laid out like the reference account card: a header bar with
-// tabs, an inset hero block (headline figure + sparkline), a share-of-total meter,
-// a ranked list, and a footer action bar.
+// tabs, an inset hero block (headline figure + sparkline), and a ranked list.
 //
 // Two tabs read the same month of Encord time data — Users and Projects — so the
 // hero figure (total platform hours) is shared and only the leaderboard changes.
@@ -37,8 +35,6 @@ const monthLabel = (iso) => {
 const fmtHours = (h) =>
   Number(h || 0).toLocaleString(undefined, { maximumFractionDigits: 1 });
 
-const TICKS = 48;
-
 /**
  * Single-series sparkline as inline SVG — no chart library, so it renders
  * identically on the server and needs no ResponsiveContainer.
@@ -47,7 +43,7 @@ const TICKS = 48;
  * the amber ramp carries magnitude only, and the axis labels stay in muted ink
  * rather than the series colour.
  */
-const Sparkline = ({ data, onHoverPoint }) => {
+const Sparkline = ({ data }) => {
   const W = 220;
   const H = 56;
   const pts = data.filter((d) => d && d.date);
@@ -89,7 +85,6 @@ const Sparkline = ({ data, onHoverPoint }) => {
         className="h-[48px] w-full overflow-visible"
         role="img"
         aria-label="Daily platform hours over the last 30 days"
-        onMouseLeave={() => onHoverPoint?.(null)}
       >
         <defs>
           <linearGradient id="sparkFill" x1="0" y1="0" x2="0" y2="1">
@@ -119,8 +114,9 @@ const Sparkline = ({ data, onHoverPoint }) => {
             width={W / pts.length}
             height={H}
             fill="transparent"
-            onMouseEnter={() => onHoverPoint?.(pts[i])}
-          />
+          >
+            <title>{`${fmtHours(pts[i]?.hours)}h on ${String(pts[i]?.date).slice(0, 10)}`}</title>
+          </rect>
         ))}
       </svg>
       <div className="mt-1 flex justify-between font-mono text-[9px] uppercase tracking-wider text-slate-400">
@@ -128,23 +124,6 @@ const Sparkline = ({ data, onHoverPoint }) => {
           <span key={n}>{monthLabel(pts[i]?.date)}</span>
         ))}
       </div>
-    </div>
-  );
-};
-
-// Share-of-total meter drawn as discrete ticks, matching the reference card. The
-// ticks flex so the meter fills whatever width the card has instead of
-// overflowing it at a fixed 3px each.
-const TickMeter = ({ pct }) => {
-  const filled = Math.round((Math.min(Math.max(pct, 0), 100) / 100) * TICKS);
-  return (
-    <div className="flex w-full items-center gap-[2px]" aria-hidden="true">
-      {Array.from({ length: TICKS }, (_, i) => (
-        <span
-          key={i}
-          className={`h-3 min-w-[2px] flex-1 rounded-sm ${i < filled ? "bg-orange-500" : "bg-slate-200"}`}
-        />
-      ))}
     </div>
   );
 };
@@ -163,7 +142,7 @@ const MostActivePanel = ({
   onOpenUser,
 }) => {
   const [tab, setTab] = useState("users");
-  const [hovered, setHovered] = useState(null);
+  const [isCollapsed, setIsCollapsed] = useState(true);
 
   const totalHours = Number(overview?.autonex_total_hours || 0);
   const topUsers = overview?.top_users || [];
@@ -185,12 +164,6 @@ const MostActivePanel = ({
         hours: Number(p.hours || 0),
         onClick: p.project_id ? () => onOpenProject?.(p.project_id) : undefined,
       }));
-
-  const leader = rows[0];
-  // Share of the month's platform hours held by the leader — the headline figure
-  // and the meter therefore always describe the same denominator.
-  const leaderPct =
-    totalHours > 0 && leader ? (leader.hours / totalHours) * 100 : 0;
 
   return (
     // Same shell as the Project Status card next to it — white, so the two read
@@ -276,133 +249,97 @@ const MostActivePanel = ({
               </span>
             </p>
           </div>
-          <Sparkline data={daily} onHoverPoint={setHovered} />
-        </div>
-
-        {/* Two lines' worth of height, always. The hover readout is one line and
-            the leader sentence is two, so swapping between them used to resize
-            this block and shove the whole Top users list up and down. Fixed
-            height + line-clamp-2 means the text changes and nothing else moves. */}
-        <p className="mt-2.5 line-clamp-2 h-9 text-[12px] leading-[18px] text-slate-500">
-          {hovered ? (
-            <>
-              <span className="font-semibold text-slate-800 tabular-nums">
-                {fmtHours(hovered.hours)}h
-              </span>{" "}
-              logged on {String(hovered.date).slice(0, 10)}
-            </>
-          ) : leader ? (
-            <>
-              <span className="font-semibold text-slate-800">
-                {formatDisplayName(leader.name)}
-              </span>{" "}
-              leads with {fmtHours(leader.hours)}h of the month&apos;s{" "}
-              {fmtHours(totalHours)}h.
-            </>
-          ) : (
-            "No Encord activity recorded this month yet."
-          )}
-        </p>
-
-        <div className="mt-1.5">
-          <TickMeter pct={leaderPct} />
-          <div className="mt-1.5 flex flex-wrap items-center justify-between gap-x-2 font-mono text-[10px] uppercase tracking-wider">
-            <span className="font-semibold text-orange-600 tabular-nums">
-              {leaderPct.toFixed(1)}% top share
-            </span>
-            <span className="text-slate-400">
-              total: {fmtHours(totalHours)}h
-            </span>
-          </div>
+          <Sparkline data={daily} />
         </div>
       </div>
 
       {/* Ranked list. Sized by its rows — the card as a whole scrolls if the
           window can't fit it, so this band doesn't need to flex or clip. */}
-      <div className="flex flex-col px-2 pt-2">
-        <div className="flex shrink-0 items-center justify-between gap-2 px-2 pb-1">
-          <h4 className="text-[13px] font-semibold text-slate-900">
-            {isUsers ? "Top users" : "Top projects"}
-          </h4>
+      <div className="flex flex-col px-2 pb-2.5 pt-2">
+        <div className="flex shrink-0 items-center justify-between gap-2 px-2 pb-1.5">
           <button
             type="button"
-            onClick={isUsers ? onViewAllUsers : onViewAnalytics}
-            className="rounded-full border border-slate-200 bg-white px-2.5 py-0.5 font-mono text-[10px] text-slate-500 transition-colors hover:border-slate-300 hover:text-slate-700"
+            onClick={() => setIsCollapsed((prev) => !prev)}
+            className="group flex items-center gap-1.5 text-left focus:outline-none"
+            title={isCollapsed ? "Expand list" : "Collapse list"}
           >
-            View all
+            <h4 className="text-[13px] font-semibold text-slate-900 transition-colors group-hover:text-blue-600">
+              {isUsers ? "Top users" : "Top projects"}
+            </h4>
+            <ChevronDown
+              className={`h-3.5 w-3.5 text-slate-400 transition-transform duration-200 group-hover:text-slate-600 ${
+                isCollapsed ? "-rotate-90" : ""
+              }`}
+            />
           </button>
+
+          <div className="flex items-center gap-1.5">
+            <button
+              type="button"
+              onClick={() => setIsCollapsed((prev) => !prev)}
+              className="inline-flex items-center gap-1 rounded-lg border border-slate-200/80 bg-white px-2 py-0.5 text-[11px] font-medium text-slate-600 shadow-sm transition-all hover:bg-slate-50 hover:text-slate-900"
+              title={isCollapsed ? "Expand top list" : "Collapse top list"}
+            >
+              <span>{isCollapsed ? "Show" : "Collapse"}</span>
+            </button>
+            <button
+              type="button"
+              onClick={isUsers ? onViewAllUsers : onViewAnalytics}
+              className="group inline-flex items-center gap-1 rounded-lg border border-blue-200/80 bg-blue-50/70 px-2.5 py-0.5 text-[11px] font-semibold text-blue-700 shadow-sm transition-all hover:border-blue-300 hover:bg-blue-100/80 hover:text-blue-800 active:scale-95"
+            >
+              <span>View all</span>
+              <ArrowUpRight className="h-3.5 w-3.5 text-blue-500 transition-transform duration-150 group-hover:translate-x-0.5 group-hover:-translate-y-0.5 group-hover:text-blue-700" />
+            </button>
+          </div>
         </div>
 
-        {rows.length === 0 ? (
-          <p className="px-2 py-6 text-center text-[12px] text-slate-400">
-            No activity yet
-          </p>
-        ) : (
-          <ul>
-            {rows.map((row, idx) => {
-              const share = totalHours > 0 ? (row.hours / totalHours) * 100 : 0;
-              return (
-                <li key={row.id ?? idx}>
-                  <button
-                    type="button"
-                    onClick={row.onClick}
-                    disabled={!row.onClick}
-                    className={`flex w-full items-center gap-2.5 rounded-lg px-2 py-1.5 text-left transition-colors ${
-                      // slate, not white: the card itself is white now, so a white
-                      // hover was invisible.
-                      row.onClick ? "hover:bg-slate-50" : "cursor-default"
-                    }`}
-                  >
-                    <span className="flex h-7 w-7 shrink-0 items-center justify-center rounded-full bg-slate-100 font-mono text-[11px] font-bold text-slate-500">
-                      {idx + 1}
-                    </span>
-                    <span className="min-w-0 flex-1">
-                      <span className="block truncate text-[13px] font-medium text-slate-800">
-                        {formatDisplayName(row.name)}
+        {!isCollapsed && (
+          rows.length === 0 ? (
+            <p className="px-2 py-6 text-center text-[12px] text-slate-400">
+              No activity yet
+            </p>
+          ) : (
+            <ul>
+              {rows.map((row, idx) => {
+                const share = totalHours > 0 ? (row.hours / totalHours) * 100 : 0;
+                return (
+                  <li key={row.id ?? idx}>
+                    <button
+                      type="button"
+                      onClick={row.onClick}
+                      disabled={!row.onClick}
+                      className={`flex w-full items-center gap-2.5 rounded-lg px-2 py-1.5 text-left transition-colors ${
+                        // slate, not white: the card itself is white now, so a white
+                        // hover was invisible.
+                        row.onClick ? "hover:bg-slate-50" : "cursor-default"
+                      }`}
+                    >
+                      <span className="flex h-7 w-7 shrink-0 items-center justify-center rounded-full bg-slate-100 font-mono text-[11px] font-bold text-slate-500">
+                        {idx + 1}
                       </span>
-                      <span className="block truncate font-mono text-[10px] text-slate-400">
-                        {row.sub}
+                      <span className="min-w-0 flex-1">
+                        <span className="block truncate text-[13px] font-medium text-slate-800">
+                          {formatDisplayName(row.name)}
+                        </span>
+                        <span className="block truncate font-mono text-[10px] text-slate-400">
+                          {row.sub}
+                        </span>
                       </span>
-                    </span>
-                    <span className="shrink-0 text-right">
-                      <span className="block text-[13px] font-semibold text-emerald-600 tabular-nums">
-                        {fmtHours(row.hours)}h
+                      <span className="shrink-0 text-right">
+                        <span className="block text-[13px] font-semibold text-emerald-600 tabular-nums">
+                          {fmtHours(row.hours)}h
+                        </span>
+                        <span className="block font-mono text-[10px] text-slate-400 tabular-nums">
+                          {share.toFixed(1)}%
+                        </span>
                       </span>
-                      <span className="block font-mono text-[10px] text-slate-400 tabular-nums">
-                        {share.toFixed(1)}%
-                      </span>
-                    </span>
-                  </button>
-                </li>
-              );
-            })}
-          </ul>
+                    </button>
+                  </li>
+                );
+              })}
+            </ul>
+          )
         )}
-      </div>
-
-      {/* Footer action bar */}
-      <div className="mt-2 flex shrink-0 flex-wrap items-center justify-between gap-2 border-t border-slate-200/70 px-3 py-2">
-        <span className="inline-flex items-center gap-1 font-mono text-[10px] uppercase tracking-wider text-slate-400">
-          <Clock className="h-3 w-3" />
-          Encord time
-        </span>
-        {/* Shared Button, so these match every other action in the app instead of
-            being two one-off styles — primary indigo for the CTA, secondary for
-            the side action. */}
-        <div className="flex items-center gap-1.5">
-          <Button variant="secondary" size="sm" onClick={onViewAnalytics}>
-            <BarChart3 className="h-3.5 w-3.5" />
-            Analytics
-          </Button>
-          <Button
-            variant="primary"
-            size="sm"
-            onClick={isUsers ? onViewAllUsers : onViewAnalytics}
-          >
-            View details
-            <ArrowUpRight className="h-3.5 w-3.5" />
-          </Button>
-        </div>
       </div>
     </div>
   );
