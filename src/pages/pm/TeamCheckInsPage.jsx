@@ -79,7 +79,7 @@ const TeamCheckInsPage = () => {
   const [activeTab, setActiveTab] = useState("today");
   const [selectedIds, setSelectedIds] = useState(new Set());
   const [isSentimentModalOpen, setIsSentimentModalOpen] = useState(false);
-  const limit = 20;
+  const limit = 10;
 
   const { data, isLoading, isError } = useQuery({
     queryKey: [
@@ -252,11 +252,11 @@ const TeamCheckInsPage = () => {
           <UserAvatar src={row.avatar_url} name={row.name} size="w-8 h-8 text-[13px]" />
           <div className="min-w-0 flex items-center gap-2">
             <div>
-              <p className="truncate font-medium text-slate-800">
+              <p className="truncate font-medium text-slate-800 leading-tight">
                 {formatDisplayName(row.name)}
               </p>
               {row.designation && (
-                <p className="truncate text-xs text-slate-400">{row.designation}</p>
+                <p className="truncate text-xs text-slate-400 leading-tight mt-0.5">{row.designation}</p>
               )}
             </div>
             {!row.is_officially_allocated && row.checked_in && (
@@ -352,15 +352,15 @@ const TeamCheckInsPage = () => {
   return (
     <div className="space-y-4">
       {/* Tabs */}
-      <div className="flex border-b border-slate-200 mb-4">
+      <div className="flex border-b border-slate-200 -mt-0.5 mb-4">
         <button
-          className={`px-4 py-2 font-medium text-sm border-b-2 ${activeTab === 'today' ? 'border-indigo-500 text-indigo-600' : 'border-transparent text-slate-500 hover:text-slate-700'}`}
+          className={`px-4 py-1.5 font-medium text-sm border-b-2 ${activeTab === 'today' ? 'border-indigo-500 text-indigo-600' : 'border-transparent text-slate-500 hover:text-slate-700'}`}
           onClick={() => setActiveTab('today')}
         >
           Today's Roster
         </button>
         <button
-          className={`px-4 py-2 font-medium text-sm border-b-2 ${activeTab === 'history' ? 'border-indigo-500 text-indigo-600' : 'border-transparent text-slate-500 hover:text-slate-700'}`}
+          className={`px-4 py-1.5 font-medium text-sm border-b-2 ${activeTab === 'history' ? 'border-indigo-500 text-indigo-600' : 'border-transparent text-slate-500 hover:text-slate-700'}`}
           onClick={() => setActiveTab('history')}
         >
           Historical Matrix
@@ -641,6 +641,8 @@ const TeamCheckInsPage = () => {
               currentPage={page}
               totalItems={totalCount}
               onPageChange={setPage}
+              cellPadding="px-4 py-2"
+              rowHeight="h-[50px]"
               emptyState={{
                 title: "No one found",
                 description: "No employees match your search or allocation criteria.",

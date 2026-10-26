@@ -865,10 +865,16 @@ const EmployeeDashboard = () => {
   const allEmployeeProjects = useMemo(() => {
     return allocations
       .map((alloc) => {
-        const project = projects.find((p) => p.id === alloc.sub_project_id);
-        const isActive = project?.project_status === "active";
+        const subProjectId = alloc.sub_project_id || alloc.project_id;
+        const project = projects.find((p) => p.id === subProjectId);
+        const isActive = alloc.is_active !== undefined
+          ? (alloc.is_active && (project ? project.project_status === "active" : true))
+          : project?.project_status === "active";
         return {
           id: alloc.id,
+          allocation_id: alloc.id,
+          sub_project_id: subProjectId,
+          project_id: subProjectId,
           name: alloc.project_name || alloc.sub_project_name || project?.name || "Project",
           role:
             (alloc.role_tags || []).join(", ") || profile.jobTitle || "Developer",
@@ -895,7 +901,12 @@ const EmployeeDashboard = () => {
     () => differenceInCalendarDays(new Date(), startOfMonth(new Date())) + 1,
     []
   );
-  const currentSubProjectId = activeProjects[0]?.id;
+  const startOfCurrentMonth = useMemo(() => format(startOfMonth(new Date()), "yyyy-MM-dd"), []);
+  const todayDateStr = useMemo(() => format(new Date(), "yyyy-MM-dd"), []);
+  const currentSubProjectId =
+    activeProjects[0]?.sub_project_id ||
+    allEmployeeProjects[0]?.sub_project_id ||
+    allocations[0]?.sub_project_id;
 
   const { data: encordActivity } = useQuery({
     queryKey: [
@@ -907,6 +918,8 @@ const EmployeeDashboard = () => {
     queryFn: () =>
       analyticsApi.getMyEncordActivity({
         days: daysElapsedInMonth,
+        date_from: startOfCurrentMonth,
+        date_to: todayDateStr,
         sub_project_id: currentSubProjectId,
         employee_id: employeeId,
       }),
@@ -1615,6 +1628,8 @@ const EmployeeDashboard = () => {
                     quota: leavesAndWfhStats.paidQuota,
                     tabKey: "paid",
                   },
+                  // TEMPORARILY PAUSED: Sick leave quick stat is hidden from dashboard
+                  /*
                   {
                     icon: <HeartPulse className="w-3 h-3 text-amber-600" />,
                     label: "Sick",
@@ -1626,6 +1641,7 @@ const EmployeeDashboard = () => {
                       : leavesAndWfhStats.casualQuota,
                     tabKey: "casual_sick",
                   },
+                  */
                   {
                     icon: <Star className="w-3 h-3 text-amber-500 fill-amber-500/20" />,
                     label: "Floater",
@@ -3130,10 +3146,12 @@ const EmployeeDashboard = () => {
                 {
                   key: "casual_sick",
                   label: "Sick / Casual",
+                  isPaused: true,
+                  tooltip: "Sick / Casual leave is temporarily paused. Viewing historical records only.",
                   count: modalLeavesList.filter(
                     (l) => normalizeLeaveType(l.leave_type) === "casual_sick"
                   ).length,
-                  icon: <HeartPulse className="w-3.5 h-3.5" />,
+                  icon: <HeartPulse className="w-3.5 h-3.5 text-amber-600" />,
                 },
               
                   {
@@ -3148,16 +3166,26 @@ const EmployeeDashboard = () => {
                 <button
                   key={tab.key}
                   onClick={() => setAttendanceModalTab(tab.key)}
+                  title={tab.tooltip || `View ${tab.label} records`}
                   className={`flex items-center gap-2 px-3 py-2 text-xs font-semibold rounded-t-xl border-b-2 transition-all cursor-pointer ${attendanceModalTab === tab.key
                     ? "border-indigo-600 text-indigo-700 bg-white shadow-xs"
+                    : tab.isPaused
+                    ? "border-transparent text-amber-700 hover:text-amber-800 bg-amber-50/60 hover:bg-amber-100/60"
                     : "border-transparent text-stone-500 hover:text-stone-700 hover:bg-stone-100/50"
                     }`}
                 >
                   {tab.icon}
-                  {tab.label}
+                  <span>{tab.label}</span>
+                  {tab.isPaused && (
+                    <span className="px-1.5 py-0.5 text-[9px] font-bold uppercase tracking-wider rounded-md bg-amber-100 text-amber-800 border border-amber-300/80">
+                      Paused
+                    </span>
+                  )}
                   <span
                     className={`px-1.5 py-0.5 text-[10px] font-bold rounded-full ${attendanceModalTab === tab.key
                       ? "bg-indigo-100 text-indigo-700"
+                      : tab.isPaused
+                      ? "bg-amber-100 text-amber-800"
                       : "bg-stone-100 text-stone-600"
                       }`}
                   >
@@ -3221,6 +3249,17 @@ const EmployeeDashboard = () => {
                 attendanceModalTab === "casual_sick" ||
                 attendanceModalTab === "floater") && (
                   <div>
+                    {attendanceModalTab === "casual_sick" && (
+                      <div className="mb-3.5 p-3 rounded-xl bg-amber-50/80 border border-amber-200/90 flex items-start gap-2.5 text-xs text-amber-900 shadow-2xs">
+                        <HeartPulse className="w-4 h-4 text-amber-600 shrink-0 mt-0.5" />
+                        <div>
+                          <span className="font-bold">Sick / Casual Leave is Temporarily Paused</span>
+                          <p className="text-amber-800 text-[11px] mt-0.5">
+                            New sick leave applications are temporarily disabled. Your past approved and rejected sick leave records for {format(modalSelectedMonth, "MMMM yyyy")} are preserved below.
+                          </p>
+                        </div>
+                      </div>
+                    )}
                     {modalLeavesList.filter(
                       (l) =>
                         normalizeLeaveType(l.leave_type) === attendanceModalTab
@@ -3228,7 +3267,9 @@ const EmployeeDashboard = () => {
                       <div className="text-center py-10 text-stone-400">
                         <Calendar className="w-8 h-8 mx-auto mb-2 opacity-40 text-stone-400" />
                         <p className="text-xs font-medium">
-                          No {attendanceModalTab === "paid" ? "Paid" : attendanceModalTab === "casual_sick" ? "Sick/Casual" : "Floater"} leave records found for {format(modalSelectedMonth, "MMMM yyyy")}.
+                          {attendanceModalTab === "casual_sick"
+                            ? `No historical Sick/Casual leave records found for ${format(modalSelectedMonth, "MMMM yyyy")}.`
+                            : `No ${attendanceModalTab === "paid" ? "Paid" : "Floater"} leave records found for ${format(modalSelectedMonth, "MMMM yyyy")}.`}
                         </p>
                       </div>
                     ) : (
