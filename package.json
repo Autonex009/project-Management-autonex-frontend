@@ -6,6 +6,7 @@
   "scripts": {
     "dev": "node server.js",
     "build": "vite build --outDir dist/client && vite build --ssr src/entry-server.jsx --outDir dist/server",
+    "start": "node server.js",
     "serve": "node server.js --prod",
     "preview": "vite preview"
   },

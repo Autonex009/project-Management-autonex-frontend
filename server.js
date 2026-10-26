@@ -16,10 +16,28 @@ const __dirname = path.dirname(fileURLToPath(import.meta.url));
 // keeps `npm run serve` cross-platform (PowerShell/cmd cannot set NODE_ENV=x inline).
 const isProd = process.env.NODE_ENV === 'production' || process.argv.includes('--prod');
 const PORT = process.env.PORT || 3000;
-const PROXY_TARGET = process.env.VITE_PROXY_TARGET || 'http://localhost:8000';
+const PROXY_TARGET = process.env.VITE_PROXY_TARGET || process.env.BACKEND_URL || process.env.API_URL || 'http://localhost:8000';
 
 async function main() {
   const app = express();
+
+  // Version check endpoint: never cache so clients detect new Railway deployments
+  app.get('/version.json', (req, res) => {
+    res.setHeader('Content-Type', 'application/json');
+    res.setHeader('Cache-Control', 'no-cache, no-store, must-revalidate');
+    res.setHeader('Pragma', 'no-cache');
+    res.setHeader('Expires', '0');
+    try {
+      const versionPath = path.resolve(__dirname, 'dist/client/version.json');
+      if (fs.existsSync(versionPath)) {
+        return res.sendFile(versionPath);
+      }
+    } catch {}
+    res.json({
+      version: process.env.RAILWAY_GIT_COMMIT_SHA || process.env.VITE_APP_VERSION || 'dev',
+      builtAt: new Date().toISOString(),
+    });
+  });
 
   // Proxy /api to the backend in both modes (mirrors the old vite.config proxy).
   // pathFilter keeps the middleware mounted at root so the full "/api/..." path
@@ -45,6 +63,7 @@ async function main() {
     app.use(vite.middlewares);
   } else {
     const { default: sirv } = await import('sirv');
+    app.use('/assets', sirv(path.resolve(__dirname, 'dist/client/assets'), { maxAge: 31536000, immutable: true }));
     app.use(sirv(path.resolve(__dirname, 'dist/client'), { extensions: [] }));
     ({ render } = await import('./dist/server/entry-server.js'));
     template = fs.readFileSync(
@@ -96,8 +115,12 @@ async function main() {
     }
   });
 
-  app.listen(PORT, () => {
-    console.log(`SSR server running at http://localhost:${PORT} (${isProd ? 'production' : 'development'})`);
+  const server = app.listen(PORT, '0.0.0.0', () => {
+    console.log(`SSR server running at http://0.0.0.0:${PORT} (${isProd ? 'production' : 'development'})`);
+  });
+
+  process.on('SIGTERM', () => {
+    server.close(() => process.exit(0));
   });
 }
 
