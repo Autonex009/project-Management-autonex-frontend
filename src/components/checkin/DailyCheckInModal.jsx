@@ -8,7 +8,7 @@ import {
 import toast from "react-hot-toast";
 import Modal from "../ui/Modal";
 import Button from "../ui/Button";
-import { checkinApi, subProjectApi } from "../../services/api";
+import { checkinApi, subProjectApi, canteenMenuApi } from "../../services/api";
 import { MultiSelect } from "../ui/MultiSelect";
 import useCheckinStore from "../../store/useCheckinStore";
 
@@ -55,6 +55,15 @@ export default function DailyCheckInModal() {
   const [officeFloor, setOfficeFloor] = useState("");
   const [lunchPreference, setLunchPreference] = useState("");
   const [validationErrors, setValidationErrors] = useState({});
+
+  const getIstHour = () => {
+    return parseInt(
+      new Date().toLocaleTimeString('en-US', { timeZone: 'Asia/Kolkata', hour12: false, hour: 'numeric' }),
+      10
+    );
+  };
+  const [isCanteenClosed, setIsCanteenClosed] = useState(getIstHour() >= 11);
+  const [selectedCanteenItem, setSelectedCanteenItem] = useState(null);
 
   const { isDismissed, isOpenManually, dismiss, setModalOpen, setCanLoadDashboard } = useCheckinStore();
 
@@ -107,6 +116,36 @@ export default function DailyCheckInModal() {
     return () => setModalOpen(false);
   }, [isOpen, setModalOpen]);
 
+  // Refresh cutoff state whenever modal becomes visible
+  useEffect(() => {
+    if (isOpen) {
+      setIsCanteenClosed(getIstHour() >= 11);
+    }
+  }, [isOpen]);
+
+  // Law 1: Fetch menu only when modal is open, WFO, and before 11:00 AM
+  const { data: canteenMenu = [], isLoading: isCanteenMenuLoading } = useQuery({
+    queryKey: ["canteenMenu"],
+    queryFn: () => canteenMenuApi.getMenu(),
+    enabled: isOpen && workMode === "WFO" && !isCanteenClosed,
+    staleTime: 5 * 60 * 1000,
+  });
+
+  // Auto-default to 'none' (No Lunch Plan) when opening at or after 11:00 AM
+  useEffect(() => {
+    if (isCanteenClosed && workMode === "WFO") {
+      setLunchPreference("none");
+      setSelectedCanteenItem(null);
+    }
+  }, [isCanteenClosed, workMode]);
+
+  // Auto-select first item when menu loads and none selected (before 11 AM)
+  useEffect(() => {
+    if (!isCanteenClosed && canteenMenu.length > 0 && !selectedCanteenItem) {
+      setSelectedCanteenItem(canteenMenu[0]);
+    }
+  }, [canteenMenu, isCanteenClosed, selectedCanteenItem]);
+
   useEffect(() => {
     if (isError || (status && status.already_checked_in) || isDismissed) {
       setCanLoadDashboard(true);
@@ -146,6 +185,8 @@ export default function DailyCheckInModal() {
       }
       if (!lunchPreference) {
         errors.lunchPreference = "Please select your lunch preference";
+      } else if (lunchPreference === "canteen" && !isCanteenClosed && !selectedCanteenItem && canteenMenu.length > 0) {
+        errors.lunchPreference = "Please select a meal option from today's menu";
       }
     }
 
@@ -161,34 +202,31 @@ export default function DailyCheckInModal() {
         mood,
         office_floor: workMode === "WFO" ? officeFloor : null,
         lunch_preference: workMode === "WFO" ? lunchPreference : null,
-        tiffin_type: null,
+        tiffin_type: (workMode === "WFO" && lunchPreference === "canteen")
+          ? selectedCanteenItem?.name || "Standard Canteen Meal"
+          : null,
       }),
     onSuccess: () => {
-      // Calculate the current hour in IST
-      const istHour = parseInt(
-        new Date().toLocaleTimeString('en-US', { timeZone: 'Asia/Kolkata', hour12: false, hour: 'numeric' }),
-        10
-      );
-      // If it is 12 PM or later, and they ordered food from the office
-      if (istHour >= 11 && workMode === "WFO" && lunchPreference === "canteen") {
-        toast("The list is already finalized and sent. Please contact Ashish Jadhav to confirm.", {
-          duration: 6000,
-          icon: "⚠️",
-          style: { maxWidth: 500 }
-        });
-      } else {
-        toast.success("✓ Checked in — have a great day!", {
-          duration: 3000,
-          icon: "👋",
-        });
-      }
+      toast.success("✓ Checked in — have a great day!", {
+        duration: 3000,
+        icon: "👋",
+      });
       queryClient.invalidateQueries({ queryKey: ["checkin-today"] });
       dismiss();
     },
     onError: (err) => {
+      const detail = err?.response?.data?.detail;
+      // Graceful recovery for the 10:59 AM in-flight submission race condition
+      if (typeof detail === "string" && detail.includes("11:00 AM IST")) {
+        setIsCanteenClosed(true);
+        setLunchPreference("none");
+        setSelectedCanteenItem(null);
+        toast.error("11:00 AM cutoff reached. 'No Lunch Plan' has been selected for your check-in. Please submit again.");
+        return;
+      }
       const msg =
         err?.response?.data?.detail?.[0]?.msg ||
-        err?.response?.data?.detail ||
+        detail ||
         "Couldn't submit your check-in. Please try again.";
       toast.error(typeof msg === "string" ? msg : "Couldn't submit your check-in.");
     },
@@ -312,43 +350,147 @@ export default function DailyCheckInModal() {
             {/* Lunch Preference Selection */}
             <section className="space-y-3 pt-2 border-t border-slate-100">
               <SectionHeader title="What's your lunch plan?" required icon={ChefHat} />
+              
               <div className="space-y-2">
-                {LUNCH_PREFERENCES.map((pref) => (
+                {/* Option 1: Canteen (6th Floor) */}
+                <div
+                  className={`w-full rounded-xl border-2 transition-all duration-150 ${
+                    isCanteenClosed
+                      ? "border-slate-200 bg-slate-50/80 opacity-90 cursor-not-allowed"
+                      : lunchPreference === "canteen"
+                      ? "border-indigo-400 bg-indigo-50/40"
+                      : "border-slate-200 bg-white hover:border-slate-300"
+                  }`}
+                >
                   <button
-                    key={pref.value}
                     type="button"
+                    disabled={isCanteenClosed}
                     onClick={() => {
-                      setLunchPreference(pref.value);
-                      setValidationErrors((prev) => ({ ...prev, lunchPreference: "" }));
+                      if (!isCanteenClosed) {
+                        setLunchPreference("canteen");
+                        setValidationErrors((prev) => ({ ...prev, lunchPreference: "" }));
+                      }
                     }}
-                    className={`w-full group relative overflow-hidden rounded-xl border-2 p-3 transition-all duration-150 text-left ${lunchPreference === pref.value
-                        ? "border-indigo-400 bg-indigo-50/70"
-                        : "border-slate-200 bg-white hover:border-slate-300"
-                      }`}
+                    className="w-full p-3 text-left flex items-start gap-3"
                   >
-                    <div className="flex items-center gap-3 relative z-10">
-                      <input
-                        type="radio"
-                        name="lunch_preference"
-                        checked={lunchPreference === pref.value}
-                        onChange={() => { }}
-                        className="w-4 h-4 cursor-pointer accent-indigo-600"
-                      />
-                      <div className="flex-1">
-                        <div className={`font-medium ${lunchPreference === pref.value
-                            ? "text-indigo-900"
-                            : "text-slate-900"
-                          }`}>
-                          {pref.label}
-                        </div>
-                        <div className="text-xs text-slate-500 mt-0.5">
-                          {pref.desc}
-                        </div>
+                    <input
+                      type="radio"
+                      name="lunch_preference"
+                      disabled={isCanteenClosed}
+                      checked={lunchPreference === "canteen"}
+                      onChange={() => {}}
+                      className="w-4 h-4 mt-0.5 accent-indigo-600 disabled:opacity-50"
+                    />
+                    <div className="flex-1">
+                      <div className="flex items-center justify-between">
+                        <span className={`font-semibold text-sm ${lunchPreference === "canteen" ? "text-indigo-900" : "text-slate-800"}`}>
+                          Canteen (6th Floor)
+                        </span>
+                        {isCanteenClosed ? (
+                          <span className="inline-flex items-center gap-1 text-[11px] font-semibold px-2 py-0.5 rounded-full bg-slate-200 text-slate-700">
+                            ⏰ Booking Closed (11:00 AM)
+                          </span>
+                        ) : (
+                          <span className="text-[11px] font-semibold px-2 py-0.5 rounded-full bg-emerald-50 text-emerald-700 border border-emerald-200">
+                            Open for booking
+                          </span>
+                        )}
                       </div>
+                      <p className="text-xs text-slate-500 mt-0.5">
+                        {isCanteenClosed
+                          ? "Canteen order submissions close at 11:00 AM daily."
+                          : "Choose from today's prepared menu options."}
+                      </p>
                     </div>
                   </button>
-                ))}
+
+                  {/* Sub-UI: If it is >= 11:00 AM, show in-place professional alert banner */}
+                  {isCanteenClosed && (
+                    <div className="mx-3 mb-3 p-3 rounded-lg bg-amber-50/90 border border-amber-200/80 flex items-start gap-2.5">
+                      <AlertCircle className="w-4 h-4 text-amber-600 shrink-0 mt-0.5" />
+                      <div className="text-xs text-amber-800 leading-relaxed">
+                        <span className="font-semibold block mb-0.5">Lunch Booking Finalized</span>
+                        Canteen meal booking closes daily at <strong>11:00 AM IST</strong>. Today's order list has already been finalized and sent to the caterer. <strong>"No Lunch Plan"</strong> has been automatically selected for your check-in.
+                      </div>
+                    </div>
+                  )}
+
+                  {/* Sub-UI: If < 11:00 AM and Canteen selected, show Menu Options */}
+                  {!isCanteenClosed && lunchPreference === "canteen" && (
+                    <div className="mx-3 mb-3 p-3 rounded-xl bg-white border border-indigo-100 shadow-2xs space-y-2">
+                      <label className="text-xs font-semibold uppercase tracking-wider text-indigo-950 block">
+                        Select Today's Meal Option:
+                      </label>
+                      {isCanteenMenuLoading ? (
+                        <p className="text-xs text-slate-400 py-1">Loading today's menu options...</p>
+                      ) : canteenMenu.length === 0 ? (
+                        <p className="text-xs text-slate-400 py-1">Standard meal will be served today.</p>
+                      ) : (
+                        <div className="grid grid-cols-1 sm:grid-cols-2 gap-2">
+                          {canteenMenu.map((item) => {
+                            const isSelected = selectedCanteenItem?.id === item.id;
+                            return (
+                              <button
+                                key={item.id}
+                                type="button"
+                                onClick={() => {
+                                  setSelectedCanteenItem(item);
+                                  setValidationErrors((prev) => ({ ...prev, lunchPreference: "" }));
+                                }}
+                                className={`p-2.5 rounded-lg border text-left transition-all flex items-center justify-between ${
+                                  isSelected
+                                    ? "border-indigo-500 bg-indigo-50/80 ring-1 ring-indigo-400"
+                                    : "border-slate-200 bg-slate-50/50 hover:bg-slate-100/70"
+                                }`}
+                              >
+                                <div className="flex items-center gap-2">
+                                  <span className="text-xs">{item.is_veg ? "🟢" : "🔴"}</span>
+                                  <span className="text-xs font-semibold text-slate-800">{item.name}</span>
+                                </div>
+                                <span className={`text-[11px] font-bold px-1.5 py-0.5 rounded ${
+                                  item.extra_charge === 0
+                                    ? "bg-emerald-100 text-emerald-800"
+                                    : "bg-amber-100 text-amber-800"
+                                }`}>
+                                  {item.extra_charge === 0 ? "Free" : `+₹${item.extra_charge}`}
+                                </span>
+                              </button>
+                            );
+                          })}
+                        </div>
+                      )}
+                    </div>
+                  )}
+                </div>
+
+                {/* Option 2: No Lunch Plan */}
+                <button
+                  type="button"
+                  onClick={() => {
+                    setLunchPreference("none");
+                    setSelectedCanteenItem(null);
+                    setValidationErrors((prev) => ({ ...prev, lunchPreference: "" }));
+                  }}
+                  className={`w-full rounded-xl border-2 p-3 transition-all duration-150 text-left flex items-start gap-3 ${
+                    lunchPreference === "none"
+                      ? "border-indigo-400 bg-indigo-50/40"
+                      : "border-slate-200 bg-white hover:border-slate-300"
+                  }`}
+                >
+                  <input
+                    type="radio"
+                    name="lunch_preference"
+                    checked={lunchPreference === "none"}
+                    onChange={() => {}}
+                    className="w-4 h-4 mt-0.5 accent-indigo-600"
+                  />
+                  <div>
+                    <div className="font-semibold text-sm text-slate-800">No Lunch Plan</div>
+                    <p className="text-xs text-slate-500 mt-0.5">I'll arrange my own meal today</p>
+                  </div>
+                </button>
               </div>
+
               {validationErrors.lunchPreference && (
                 <div className="flex items-center gap-2 text-red-600 text-sm mt-2">
                   <AlertCircle className="w-4 h-4" />
