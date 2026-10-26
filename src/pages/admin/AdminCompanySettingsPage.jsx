@@ -11,10 +11,11 @@ import {
   Building2,
   MapPin,
   Sparkles,
+  Utensils,
 } from "lucide-react";
 import Button from "../../components/ui/Button";
 import ConfirmDialog from "../../components/ui/ConfirmDialog";
-import { wifiNetworksApi, companySettingsApi } from "../../services/api";
+import { wifiNetworksApi, companySettingsApi, canteenMenuApi } from "../../services/api";
 import toast from "react-hot-toast";
 
 const AdminCompanySettingsPage = () => {
@@ -57,6 +58,76 @@ const AdminCompanySettingsPage = () => {
       });
     }
   }, [settingsData]);
+
+  // --- Canteen Menu State & Logic ---
+  const { data: canteenMenuData = [], isLoading: canteenMenuLoading } = useQuery({
+    queryKey: ["canteenMenu"],
+    queryFn: () => canteenMenuApi.getMenu(),
+    staleTime: 5 * 60 * 1000,
+  });
+
+  const [menuItems, setMenuItems] = useState([]);
+
+  useEffect(() => {
+    if (canteenMenuData && canteenMenuData.length > 0) {
+      setMenuItems(canteenMenuData);
+    } else {
+      setMenuItems([
+        { id: "item-1", name: "Veg Thali", is_veg: true, extra_charge: 0 },
+      ]);
+    }
+  }, [canteenMenuData]);
+
+  const saveMenuMutation = useMutation({
+    mutationFn: (items) => canteenMenuApi.updateMenu(items),
+    onSuccess: (savedItems) => {
+      // Pure RAM Cache Surgery (Law 3: Zero-Network Follow-Up)
+      queryClient.setQueryData(["canteenMenu"], savedItems);
+      toast.success("Canteen lunch menu saved successfully!");
+    },
+    onError: (err) => {
+      const msg = err?.response?.data?.detail || "Failed to save canteen menu. Please try again.";
+      toast.error(typeof msg === "string" ? msg : "Failed to save canteen menu.");
+    },
+  });
+
+  const handleAddMenuItem = () => {
+    const uniqueId = `item-${Date.now()}-${Math.random().toString(36).substring(2, 6)}`;
+    setMenuItems((prev) => [
+      ...prev,
+      { id: uniqueId, name: "", is_veg: true, extra_charge: 0 },
+    ]);
+  };
+
+  const handleRemoveMenuItem = (index) => {
+    setMenuItems((prev) => prev.filter((_, i) => i !== index));
+  };
+
+  const handleUpdateMenuItem = (index, field, value) => {
+    setMenuItems((prev) => {
+      const next = [...prev];
+      next[index] = { ...next[index], [field]: value };
+      return next;
+    });
+  };
+
+  const handleSaveMenu = () => {
+    if (menuItems.length === 0) {
+      toast.error("Please add at least one menu item.");
+      return;
+    }
+    for (let i = 0; i < menuItems.length; i++) {
+      if (!menuItems[i].name.trim()) {
+        toast.error(`Item #${i + 1} name cannot be empty.`);
+        return;
+      }
+      if (menuItems[i].extra_charge < 0) {
+        toast.error(`Item #${i + 1} extra charge cannot be negative.`);
+        return;
+      }
+    }
+    saveMenuMutation.mutate(menuItems);
+  };
 
   const loading = networksLoading || settingsLoading;
 
@@ -438,6 +509,134 @@ const AdminCompanySettingsPage = () => {
                   </div>
                 </div>
               ))
+            )}
+          </div>
+        </div>
+
+        {/* Daily Canteen Lunch Menu Management Card */}
+        <div className="bg-white border border-stone-200 rounded-2xl shadow-sm overflow-hidden">
+          <div className="bg-stone-50/50 border-b border-stone-200 px-6 py-4 flex items-center justify-between">
+            <div className="flex items-center gap-3">
+              <div className="p-2.5 rounded-xl bg-amber-50 text-amber-700 border border-amber-200">
+                <Utensils className="w-5 h-5" />
+              </div>
+              <div>
+                <h2 className="text-base font-display font-bold text-stone-800">Daily Canteen Lunch Menu</h2>
+                <p className="text-xs text-stone-500 mt-0.5">
+                  Manage today's meal options, dietary categories, and extra charges shown to employees during check-in.
+                </p>
+              </div>
+            </div>
+            <div className="flex items-center gap-2">
+              <Button
+                variant="secondary"
+                size="sm"
+                onClick={handleAddMenuItem}
+                className="flex items-center gap-1.5"
+              >
+                <Plus className="w-4 h-4" />
+                Add Item
+              </Button>
+              <Button
+                variant="primary"
+                size="sm"
+                onClick={handleSaveMenu}
+                isLoading={saveMenuMutation.isPending}
+                className="flex items-center gap-1.5"
+              >
+                <Save className="w-4 h-4" />
+                Save Menu
+              </Button>
+            </div>
+          </div>
+
+          <div className="p-6">
+            {menuItems.length === 0 ? (
+              <div className="text-center py-8 text-stone-400 text-sm">
+                No menu items configured. Click "+ Add Item" to create one.
+              </div>
+            ) : (
+              <div className="overflow-x-auto">
+                <table className="w-full text-left border-collapse">
+                  <thead>
+                    <tr className="border-b border-stone-200 text-xs font-semibold text-stone-500 uppercase tracking-wider">
+                      <th className="py-2.5 px-3 w-16">Sr.</th>
+                      <th className="py-2.5 px-3 min-w-[240px]">Menu Option</th>
+                      <th className="py-2.5 px-3 w-44">Dietary Type</th>
+                      <th className="py-2.5 px-3 w-40">Extra Charge (₹)</th>
+                      <th className="py-2.5 px-3 w-16 text-center">Action</th>
+                    </tr>
+                  </thead>
+                  <tbody className="divide-y divide-stone-100 text-sm">
+                    {menuItems.map((item, index) => (
+                      <tr key={item.id} className="hover:bg-stone-50/70 transition-colors">
+                        <td className="py-3 px-3 font-semibold text-stone-500">
+                          {index + 1}.
+                        </td>
+                        <td className="py-3 px-3">
+                          <input
+                            type="text"
+                            value={item.name}
+                            onChange={(e) => handleUpdateMenuItem(index, "name", e.target.value)}
+                            placeholder="e.g. Veg Thali, Pav Bhaji, Egg Biryani..."
+                            className="w-full px-3 py-1.5 rounded-lg border border-stone-200 text-sm font-medium text-stone-800 focus:outline-none focus:ring-2 focus:ring-indigo-500/20 focus:border-indigo-500"
+                          />
+                        </td>
+                        <td className="py-3 px-3">
+                          <div className="inline-flex rounded-lg border border-stone-200 p-0.5 bg-stone-100">
+                            <button
+                              type="button"
+                              onClick={() => handleUpdateMenuItem(index, "is_veg", true)}
+                              className={`px-3 py-1 rounded-md text-xs font-semibold transition-all ${
+                                item.is_veg
+                                  ? "bg-white text-emerald-700 shadow-xs border border-emerald-200"
+                                  : "text-stone-500 hover:text-stone-800"
+                              }`}
+                            >
+                              🟢 Veg
+                            </button>
+                            <button
+                              type="button"
+                              onClick={() => handleUpdateMenuItem(index, "is_veg", false)}
+                              className={`px-3 py-1 rounded-md text-xs font-semibold transition-all ${
+                                !item.is_veg
+                                  ? "bg-white text-rose-700 shadow-xs border border-rose-200"
+                                  : "text-stone-500 hover:text-stone-800"
+                              }`}
+                            >
+                              🔴 Non-Veg
+                            </button>
+                          </div>
+                        </td>
+                        <td className="py-3 px-3">
+                          <div className="relative">
+                            <span className="absolute inset-y-0 left-0 flex items-center pl-2.5 text-xs text-stone-400 font-semibold">
+                              ₹
+                            </span>
+                            <input
+                              type="number"
+                              min="0"
+                              value={item.extra_charge}
+                              onChange={(e) => handleUpdateMenuItem(index, "extra_charge", Math.max(0, parseFloat(e.target.value) || 0))}
+                              className="w-full pl-7 pr-3 py-1.5 rounded-lg border border-stone-200 text-sm font-semibold text-stone-800 focus:outline-none focus:ring-2 focus:ring-indigo-500/20 focus:border-indigo-500"
+                            />
+                          </div>
+                        </td>
+                        <td className="py-3 px-3 text-center">
+                          <button
+                            type="button"
+                            onClick={() => handleRemoveMenuItem(index)}
+                            className="p-1.5 rounded-lg text-stone-400 hover:text-rose-600 hover:bg-rose-50 transition-colors"
+                            title="Remove item"
+                          >
+                            <Trash2 className="w-4 h-4" />
+                          </button>
+                        </td>
+                      </tr>
+                    ))}
+                  </tbody>
+                </table>
+              </div>
             )}
           </div>
         </div>
