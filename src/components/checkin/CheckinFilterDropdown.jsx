@@ -194,6 +194,7 @@ const CheckinFilterDropdown = ({
                   { value: "9_10", label: "9:00 – 10:00 AM" },
                   { value: "10_11", label: "10:00 – 11:00 AM" },
                   { value: "11_12", label: "11:00 – 12:00 PM" },
+                  { value: "after_11", label: "After 11:00 AM" },
                   { value: "custom", label: "Custom range" },
                 ]}
               />

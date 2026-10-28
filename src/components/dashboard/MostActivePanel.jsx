@@ -134,6 +134,8 @@ const TABS = [
 ];
 
 const MostActivePanel = ({
+  title = "Encord Activity",
+  className = "",
   overview,
   daily = [],
   onViewAnalytics,
@@ -175,12 +177,12 @@ const MostActivePanel = ({
     // window less the layout's chrome: 8+8 panel margin, 2 border, 48 header,
     // 16+24 main padding = 106px, taken as 7rem for slack), so a short window
     // scrolls the card internally instead of clipping it.
-    <div className="flex flex-col overflow-hidden rounded-2xl border border-slate-200/60 bg-white shadow-[0_1px_3px_rgba(0,0,0,0.04)] lg:max-h-[calc(100vh-7rem)] lg:overflow-y-auto">
+    <div className={`flex flex-col overflow-hidden rounded-2xl border border-stone-200 bg-white shadow-[0_1px_4px_rgba(28,25,23,0.06)] ${className}`}>
       {/* Header bar */}
       <div className="flex shrink-0 flex-wrap items-center justify-between gap-2 px-4 pb-2 pt-3">
         <div className="flex min-w-0 items-baseline gap-1.5">
           <h3 className="text-[13px] font-semibold text-slate-900">
-            Most active
+            {title}
           </h3>
           <span className="truncate font-mono text-[11px] text-slate-400">
             / this month
@@ -211,7 +213,7 @@ const MostActivePanel = ({
           rather than the viewport, so the figure responds to the width it
           actually has — the dashboard column is narrower than the window. */}
       <div
-        className="mx-2 shrink-0 rounded-xl border border-slate-200/60 bg-white p-3"
+        className="mx-2 shrink-0 rounded-xl border border-stone-200 bg-white p-3"
         style={{ containerType: "inline-size" }}
       >
         {/* Figure and sparkline stay side by side at every width; when space runs

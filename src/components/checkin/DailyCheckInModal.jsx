@@ -208,6 +208,7 @@ export default function DailyCheckInModal() {
       }),
     onSuccess: () => {
       toast.success("✓ Checked in — have a great day!", {
+        id: "checkin-toast",
         duration: 3000,
         icon: "👋",
       });
@@ -216,19 +217,28 @@ export default function DailyCheckInModal() {
     },
     onError: (err) => {
       const detail = err?.response?.data?.detail;
+      // Clear alert for office Wi-Fi restriction block
+      if (typeof detail === "string" && detail.includes("Office Wi-Fi")) {
+        toast.error(detail, { id: "checkin-toast", duration: 6000, icon: "📶" });
+        return;
+      }
       // Graceful recovery for the 10:59 AM in-flight submission race condition
       if (typeof detail === "string" && detail.includes("11:00 AM IST")) {
         setIsCanteenClosed(true);
         setLunchPreference("none");
         setSelectedCanteenItem(null);
-        toast.error("11:00 AM cutoff reached. 'No Lunch Plan' has been selected for your check-in. Please submit again.");
+        toast.error("11:00 AM cutoff reached. 'No Lunch Plan' has been selected for your check-in. Please submit again.", {
+          id: "checkin-toast",
+        });
         return;
       }
       const msg =
         err?.response?.data?.detail?.[0]?.msg ||
         detail ||
         "Couldn't submit your check-in. Please try again.";
-      toast.error(typeof msg === "string" ? msg : "Couldn't submit your check-in.");
+      toast.error(typeof msg === "string" ? msg : "Couldn't submit your check-in.", {
+        id: "checkin-toast",
+      });
     },
   });
 

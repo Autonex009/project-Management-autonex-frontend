@@ -44,6 +44,8 @@ const StatCard = ({
   // breathe — a card with a `delta`/`hint`/`label` still stacks those underneath.
   inline = false,
   onClick,
+  className = "",
+  style = {},
 }) => {
   const iconTone = ICON_TONES[tone] || ICON_TONES.slate;
 
@@ -187,6 +189,7 @@ const StatCard = ({
   return (
     <div
       ref={cardRef}
+      style={style}
       onClick={handleCardClick}
       onMouseEnter={() => setHovered(true)}
       onMouseLeave={() => {
@@ -203,8 +206,8 @@ const StatCard = ({
       role={interactive ? "button" : undefined}
       tabIndex={interactive ? 0 : undefined}
       aria-expanded={hasBreakdown ? open : undefined}
-      className={`group relative rounded-xl border bg-white flex flex-col h-full ${inline ? "px-3.5 py-3" : compact ? "px-3 py-2.5" : "p-3"} shadow-[0_1px_2px_rgba(0,0,0,0.03)] transition-colors focus:outline-none focus-visible:ring-2 focus-visible:ring-indigo-500/40 ${pinned ? "border-slate-300" : "border-slate-200 hover:border-slate-300"
-        } ${interactive ? "cursor-pointer" : ""}`}
+      className={`group relative rounded-xl border bg-white flex flex-col h-full ${inline ? "px-3.5 py-3" : compact ? "px-3 py-2.5" : "p-3"} shadow-[0_1px_2px_rgba(0,0,0,0.03)] transition-colors focus:outline-none focus-visible:ring-2 focus-visible:ring-indigo-500/40 ${pinned ? "border-stone-300" : "border-stone-200 hover:border-stone-300"
+        } ${interactive ? "cursor-pointer" : ""} ${className}`}
     >
       {inline ? (
         // Icon left, number over its caption on the right — the whole card is one

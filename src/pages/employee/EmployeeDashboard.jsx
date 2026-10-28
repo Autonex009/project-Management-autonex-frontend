@@ -1485,6 +1485,56 @@ const EmployeeDashboard = () => {
   const complaintsCount = openComplaints.length;
   const warningsCount = openWarnings.length;
 
+  const leaveStatCards = useMemo(
+    () => [
+      {
+        icon: <Home className="w-3 h-3 text-indigo-600" />,
+        label: "WFH",
+        remaining: leavesAndWfhStats.wfhRemaining,
+        quota: leavesAndWfhStats.wfhQuota,
+        tabKey: "wfh",
+      },
+      {
+        icon: <Calendar className="w-3 h-3 text-indigo-600" />,
+        label: "Paid",
+        remaining: leavesAndWfhStats.paidRemaining,
+        quota: leavesAndWfhStats.paidQuota,
+        tabKey: "paid",
+      },
+      // TEMPORARILY PAUSED: Sick leave quick stat is hidden from dashboard
+      /*
+      {
+        icon: <HeartPulse className="w-3 h-3 text-amber-600" />,
+        label: "Sick",
+        remaining: leavesAndWfhStats.isInternOrContractor
+          ? "—"
+          : leavesAndWfhStats.casualRemaining,
+        quota: leavesAndWfhStats.isInternOrContractor
+          ? "—"
+          : leavesAndWfhStats.casualQuota,
+        tabKey: "casual_sick",
+      },
+      */
+      {
+        icon: <Star className="w-3 h-3 text-amber-500 fill-amber-500/20" />,
+        label: "Floater",
+        remaining: leavesAndWfhStats.floaterRemaining,
+        quota: leavesAndWfhStats.floaterQuota,
+        tabKey: "floater",
+      },
+    ],
+    [leavesAndWfhStats]
+  );
+
+  const leaveGridColsClass =
+    leaveStatCards.length === 3
+      ? "grid-cols-3"
+      : leaveStatCards.length === 2
+      ? "grid-cols-2"
+      : leaveStatCards.length === 1
+      ? "grid-cols-1"
+      : "grid-cols-4";
+
   return (
     <div
       className="w-full h-full text-stone-800 font-sans flex flex-col gap-2 sm:gap-3"
@@ -1612,49 +1662,13 @@ const EmployeeDashboard = () => {
                 </h3>
               </div>
 
-              <div className="grid grid-cols-4 gap-1.5 pt-0.5">
-                {[
-                  {
-                    icon: <Home className="w-3 h-3 text-indigo-600" />,
-                    label: "WFH",
-                    remaining: leavesAndWfhStats.wfhRemaining,
-                    quota: leavesAndWfhStats.wfhQuota,
-                    tabKey: "wfh",
-                  },
-                  {
-                    icon: <Calendar className="w-3 h-3 text-indigo-600" />,
-                    label: "Paid",
-                    remaining: leavesAndWfhStats.paidRemaining,
-                    quota: leavesAndWfhStats.paidQuota,
-                    tabKey: "paid",
-                  },
-                  // TEMPORARILY PAUSED: Sick leave quick stat is hidden from dashboard
-                  /*
-                  {
-                    icon: <HeartPulse className="w-3 h-3 text-amber-600" />,
-                    label: "Sick",
-                    remaining: leavesAndWfhStats.isInternOrContractor
-                      ? "—"
-                      : leavesAndWfhStats.casualRemaining,
-                    quota: leavesAndWfhStats.isInternOrContractor
-                      ? "—"
-                      : leavesAndWfhStats.casualQuota,
-                    tabKey: "casual_sick",
-                  },
-                  */
-                  {
-                    icon: <Star className="w-3 h-3 text-amber-500 fill-amber-500/20" />,
-                    label: "Floater",
-                    remaining: leavesAndWfhStats.floaterRemaining,
-                    quota: leavesAndWfhStats.floaterQuota,
-                    tabKey: "floater",
-                  },
-                ].map(({ icon, label, remaining, quota, tabKey }) => (
+              <div className={`grid ${leaveGridColsClass} gap-2 pt-0.5`}>
+                {leaveStatCards.map(({ icon, label, remaining, quota, tabKey }) => (
                   <div
                     key={label}
                     onClick={() => handleOpenAttendanceModal(tabKey)}
                     title={`Click to view ${label} records`}
-                    className="flex flex-col items-center gap-0.5 border border-stone-200/90 rounded-xl pt-2 pb-1.5 px-1 bg-white shadow-2xs hover:shadow-xs hover:border-stone-300 transition-all cursor-pointer select-none"
+                    className="flex flex-col items-center gap-0.5 border border-stone-200/90 rounded-xl pt-2 pb-1.5 px-2 bg-white shadow-2xs hover:shadow-xs hover:border-stone-300 transition-all cursor-pointer select-none"
                   >
                     <div
                       className={`w-6 h-6 rounded-full flex items-center justify-center shrink-0 ${
@@ -1672,7 +1686,7 @@ const EmployeeDashboard = () => {
                           </span>
                         )}
                       </div>
-                      <span className="text-[8.5px] font-bold text-stone-400 mt-0.5 block uppercase tracking-wider truncate">
+                      <span className="text-[9px] font-bold text-stone-400 mt-0.5 block uppercase tracking-wider truncate">
                         {label}
                       </span>
                     </div>

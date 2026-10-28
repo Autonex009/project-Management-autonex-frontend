@@ -12,6 +12,9 @@ import {
   MapPin,
   Sparkles,
   Utensils,
+  ShieldCheck,
+  Globe,
+  Radio,
 } from "lucide-react";
 import Button from "../../components/ui/Button";
 import ConfirmDialog from "../../components/ui/ConfirmDialog";
@@ -27,6 +30,12 @@ const AdminCompanySettingsPage = () => {
     google_maps_link: "",
     company_perks: "",
   });
+
+  // Office Wi-Fi / IP Restriction State
+  const [checkinIpList, setCheckinIpList] = useState("");
+  const [isIpRestrictionEnabled, setIsIpRestrictionEnabled] = useState(true);
+  const [detectingIp, setDetectingIp] = useState(false);
+  const [detectedIp, setDetectedIp] = useState(null);
 
   const { data: networks = [], isLoading: networksLoading } = useQuery({
     queryKey: ["wifiNetworks"],
@@ -56,6 +65,9 @@ const AdminCompanySettingsPage = () => {
         google_maps_link: settingsMap.google_maps_link || "",
         company_perks: settingsMap.company_perks || "",
       });
+      setCheckinIpList(settingsMap.checkin_ip_list || "");
+      const toggleVal = (settingsMap.checkin_ip_restriction_enabled || "true").toLowerCase();
+      setIsIpRestrictionEnabled(toggleVal !== "false" && toggleVal !== "0" && toggleVal !== "off");
     }
   }, [settingsData]);
 
@@ -192,6 +204,64 @@ const AdminCompanySettingsPage = () => {
     saveGeneralMutation.mutate(generalSettings);
   };
   const savingGeneral = saveGeneralMutation.isPending;
+
+  // --- Office Wi-Fi / IP Restriction Logic ---
+  const saveIpSettingsMutation = useMutation({
+    mutationFn: async ({ ipList, isEnabled }) => {
+      const user = JSON.parse(localStorage.getItem("user") || "{}");
+      await companySettingsApi.upsert("checkin_ip_list", {
+        value: ipList,
+        updated_by: user.id,
+      });
+      await companySettingsApi.upsert("checkin_ip_restriction_enabled", {
+        value: isEnabled ? "true" : "false",
+        updated_by: user.id,
+      });
+    },
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ["companySettings"] });
+      toast.success("Office Wi-Fi & IP restriction settings saved!");
+    },
+    onError: (err) => {
+      const msg = err?.response?.data?.detail || "Failed to save IP settings";
+      toast.error(typeof msg === "string" ? msg : "Failed to save IP settings");
+    },
+  });
+
+  const handleSaveIpSettings = (e) => {
+    e?.preventDefault();
+    saveIpSettingsMutation.mutate({
+      ipList: checkinIpList,
+      isEnabled: isIpRestrictionEnabled,
+    });
+  };
+
+  const handleDetectMyIp = async () => {
+    try {
+      setDetectingIp(true);
+      const res = await companySettingsApi.getMyIp();
+      if (res?.ip) {
+        setDetectedIp(res.ip);
+        toast.success(`Detected current IP: ${res.ip}`);
+      }
+    } catch (err) {
+      toast.error("Failed to detect current public IP.");
+    } finally {
+      setDetectingIp(false);
+    }
+  };
+
+  const handleAddDetectedIp = () => {
+    if (!detectedIp) return;
+    const currentList = checkinIpList.trim();
+    if (currentList.includes(detectedIp)) {
+      toast("This IP is already in the whitelist.", { icon: "ℹ️" });
+      return;
+    }
+    const updated = currentList ? `${currentList}\n${detectedIp}` : detectedIp;
+    setCheckinIpList(updated);
+    toast.success(`Added ${detectedIp} to the whitelist.`);
+  };
 
   // --- WiFi Logic ---
   const openAddForm = () => {
@@ -510,6 +580,134 @@ const AdminCompanySettingsPage = () => {
                 </div>
               ))
             )}
+          </div>
+        </div>
+
+        {/* Office Wi-Fi / IP Restriction Card */}
+        <div className="bg-white border border-stone-200 rounded-2xl shadow-sm overflow-hidden">
+          <div className="bg-stone-50/50 border-b border-stone-200 px-6 py-4 flex flex-col sm:flex-row sm:items-center justify-between gap-4">
+            <div className="flex items-center gap-3">
+              <div className="p-2.5 rounded-xl bg-blue-50 text-blue-700 border border-blue-200">
+                <ShieldCheck className="w-5 h-5" />
+              </div>
+              <div>
+                <div className="flex items-center gap-2">
+                  <h2 className="text-base font-display font-bold text-stone-800">
+                    Office Wi-Fi & Check-in IP Whitelist (WFO Only)
+                  </h2>
+                  <span
+                    className={`inline-flex items-center gap-1 px-2.5 py-0.5 rounded-full text-xs font-semibold ${
+                      isIpRestrictionEnabled
+                        ? "bg-emerald-50 text-emerald-700 border border-emerald-200"
+                        : "bg-amber-50 text-amber-700 border border-amber-200"
+                    }`}
+                  >
+                    <span
+                      className={`w-1.5 h-1.5 rounded-full ${
+                        isIpRestrictionEnabled ? "bg-emerald-500 animate-pulse" : "bg-amber-500"
+                      }`}
+                    />
+                    {isIpRestrictionEnabled ? "Enforced" : "Emergency Mode: OFF"}
+                  </span>
+                </div>
+                <p className="text-xs text-stone-500 mt-0.5">
+                  Restricts Work From Office (WFO) check-ins strictly to authorized office Wi-Fi / public IPs.
+                </p>
+              </div>
+            </div>
+            <div className="flex items-center gap-2">
+              <Button
+                type="button"
+                variant="primary"
+                size="sm"
+                onClick={handleSaveIpSettings}
+                disabled={saveIpSettingsMutation.isPending}
+                isLoading={saveIpSettingsMutation.isPending}
+                className="flex items-center gap-1.5"
+              >
+                {!saveIpSettingsMutation.isPending && <Save className="w-4 h-4" />}
+                Save IP Policy
+              </Button>
+            </div>
+          </div>
+
+          <div className="p-6 space-y-6">
+            {/* Emergency Toggle Section */}
+            <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4 p-4 rounded-xl bg-stone-50 border border-stone-200">
+              <div className="space-y-1">
+                <div className="flex items-center gap-2">
+                  <Radio className={`w-4 h-4 ${isIpRestrictionEnabled ? "text-emerald-600" : "text-amber-500"}`} />
+                  <span className="text-sm font-bold text-stone-800">
+                    Master IP Restriction Toggle
+                  </span>
+                </div>
+                <p className="text-xs text-stone-500 max-w-xl">
+                  Turn <span className="font-semibold text-rose-600">OFF</span> during office Wi-Fi or ISP outages to allow all employees to check in for WFO from any network. Turn <span className="font-semibold text-emerald-600">ON</span> for normal operations.
+                </p>
+              </div>
+              <button
+                type="button"
+                role="switch"
+                aria-checked={isIpRestrictionEnabled}
+                onClick={() => setIsIpRestrictionEnabled(!isIpRestrictionEnabled)}
+                className={`relative inline-flex h-6 w-11 flex-shrink-0 cursor-pointer rounded-full border-2 border-transparent transition-colors duration-200 ease-in-out focus:outline-none focus:ring-2 focus:ring-blue-500 focus:ring-offset-2 ${
+                  isIpRestrictionEnabled ? "bg-emerald-600" : "bg-stone-300"
+                }`}
+              >
+                <span
+                  className={`pointer-events-none inline-block h-5 w-5 transform rounded-full bg-white shadow ring-0 transition duration-200 ease-in-out ${
+                    isIpRestrictionEnabled ? "translate-x-5" : "translate-x-0"
+                  }`}
+                />
+              </button>
+            </div>
+
+            {/* IP Whitelist & Detection Section */}
+            <div>
+              <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-2 mb-2">
+                <label className="flex items-center gap-1.5 text-xs font-semibold text-stone-700">
+                  <Globe className="w-3.5 h-3.5 text-blue-500" />
+                  Allowed Office Public IPs & Subnets (One per line or comma-separated)
+                </label>
+                <div className="flex items-center gap-2">
+                  <button
+                    type="button"
+                    onClick={handleDetectMyIp}
+                    disabled={detectingIp}
+                    className="inline-flex items-center gap-1.5 px-2.5 py-1 text-xs font-medium text-stone-600 bg-white border border-stone-200 rounded-lg hover:bg-stone-50 transition-all shadow-2xs"
+                  >
+                    {detectingIp ? <Loader2 className="w-3 h-3 animate-spin" /> : <Radio className="w-3 h-3 text-blue-500" />}
+                    Detect My Current IP
+                  </button>
+                  {detectedIp && (
+                    <button
+                      type="button"
+                      onClick={handleAddDetectedIp}
+                      className="inline-flex items-center gap-1 px-2.5 py-1 text-xs font-semibold text-blue-700 bg-blue-50 border border-blue-200 rounded-lg hover:bg-blue-100 transition-all"
+                    >
+                      <Plus className="w-3 h-3" />
+                      Add ({detectedIp})
+                    </button>
+                  )}
+                </div>
+              </div>
+
+              <textarea
+                value={checkinIpList}
+                onChange={(e) => setCheckinIpList(e.target.value)}
+                placeholder="e.g.&#10;103.54.189.22&#10;103.54.189.0/28"
+                rows={5}
+                className="w-full px-4 py-3 bg-stone-50 border border-stone-200 rounded-xl text-sm font-mono text-stone-800 focus:bg-white focus:ring-2 focus:ring-blue-100 focus:border-blue-400 outline-none transition-all placeholder:text-stone-400"
+              />
+              <div className="flex items-center justify-between mt-2 text-xs text-stone-500">
+                <span>Supports individual IPv4 addresses or CIDR blocks (e.g. <code>103.54.189.22</code>).</span>
+                {checkinIpList.trim() && (
+                  <span className="text-stone-400 font-mono">
+                    {checkinIpList.split(/[\n,]/).filter((s) => s.trim()).length} IP(s) configured
+                  </span>
+                )}
+              </div>
+            </div>
           </div>
         </div>
 
