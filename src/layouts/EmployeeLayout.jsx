@@ -78,6 +78,13 @@ const EmployeeLayout = () => {
 
   const prefix = isPm ? "/pm" : "/employee";
 
+  const userEmail = (account?.email || user?.email || "").toLowerCase();
+  const canManageCanteen = Boolean(
+    account?.can_manage_canteen_menu ||
+    user?.can_manage_canteen_menu ||
+    userEmail === "jadhavashish061@gmail.com"
+  );
+
   const navItems = isPm
     ? [
         { to: `${prefix}/dashboard`, label: "Dashboard" },
@@ -93,6 +100,7 @@ const EmployeeLayout = () => {
         { to: `${prefix}/guidelines`, label: "Guidelines" },
         { to: `${prefix}/onboarding`, label: "My Onboarding" },
         { to: `${prefix}/onboarding-mentor`, label: "Mentorship" },
+        ...(canManageCanteen ? [{ to: `${prefix}/lunch-menu`, label: "Lunch Menu" }] : []),
       ]
     : [
         { to: `${prefix}/dashboard`, label: "Dashboard" },
@@ -104,6 +112,7 @@ const EmployeeLayout = () => {
         { to: `${prefix}/referrals`, label: "Referrals" },
         { to: `${prefix}/company-info`, label: "Company Info" },
         { to: `${prefix}/onboarding`, label: "Onboarding" },
+        ...(canManageCanteen ? [{ to: `${prefix}/lunch-menu`, label: "Lunch Menu" }] : []),
       ];
 
   const resolveCrumb = (pathname) => {

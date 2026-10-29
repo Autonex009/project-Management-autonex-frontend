@@ -1,5 +1,6 @@
 import React, { useState, useRef, useEffect } from "react";
 import { Link } from "react-router-dom";
+import toast from "react-hot-toast";
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
 import Button from "../../components/ui/Button";
 import UserAvatar from "../../components/ui/UserAvatar";
@@ -10,6 +11,7 @@ import {
   Briefcase,
   Calendar,
   Check,
+  CreditCard,
   ChevronDown,
   Clock3,
   Hash,
@@ -31,7 +33,17 @@ import {
 import { format, parseISO } from "date-fns";
 
 /* ── Inline Field Item ───────────────────────────────────────────── */
-const CompactField = ({ icon: Icon, label, value, color = "emerald" }) => {
+const CompactField = ({
+  icon: Icon,
+  label,
+  value,
+  color = "emerald",
+  onClick,
+  editable = false,
+  isLocked = false,
+  lockReason,
+  className = "",
+}) => {
   const colors = {
     emerald: "bg-emerald-50 text-emerald-600 border-emerald-100",
     blue: "bg-blue-50 text-blue-600 border-blue-100",
@@ -40,25 +52,56 @@ const CompactField = ({ icon: Icon, label, value, color = "emerald" }) => {
     amber: "bg-amber-50 text-amber-600 border-amber-100",
   };
 
+  const isClickable = (editable || isLocked) && typeof onClick === "function";
+
   return (
-    <div className="flex items-center gap-3 rounded-xl border border-slate-200/80 bg-slate-50/50 p-3 transition-all hover:bg-white hover:border-slate-300 hover:shadow-xs">
+    <div
+      onClick={isClickable ? onClick : undefined}
+      title={isLocked ? lockReason : editable ? `Click to edit ${label}` : undefined}
+      className={`group relative flex items-center gap-3 rounded-xl border border-slate-200/80 bg-slate-50/50 p-3 transition-all ${
+        editable
+          ? "cursor-pointer hover:bg-emerald-50/20 hover:border-emerald-300 hover:shadow-xs"
+          : isLocked
+          ? "cursor-pointer hover:border-amber-200 hover:bg-amber-50/20"
+          : "hover:bg-white hover:border-slate-300 hover:shadow-xs"
+      } ${className}`}
+    >
       <div className={`rounded-lg border p-2 shrink-0 ${colors[color] || colors.emerald}`}>
         <Icon className="h-4 w-4" />
       </div>
       <div className="min-w-0 flex-1">
-        <p className="text-[10px] font-bold uppercase tracking-wider text-slate-400">
+        <p className="text-[10px] font-bold uppercase tracking-wider text-slate-400 group-hover:text-slate-600 transition-colors">
           {label}
         </p>
         <p className="break-all text-xs font-semibold text-slate-800">
           {value || "—"}
         </p>
       </div>
+
+      {editable && (
+        <span className="opacity-0 group-hover:opacity-100 transition-opacity flex items-center gap-1 text-[10px] font-bold text-emerald-600 bg-emerald-50/80 border border-emerald-200/70 rounded-md px-1.5 py-0.5 shrink-0 shadow-2xs">
+          <Pencil className="h-2.5 w-2.5" />
+          <span>Edit</span>
+        </span>
+      )}
     </div>
   );
 };
 
 /* ── Editable Email Inline Card ─────────────────────────────────── */
-const EmailCard = ({ value, isEditing, onRequestOTP, onVerifyOTP, isRequesting, isVerifying, error, onDismissError }) => {
+const EmailCard = ({
+  value,
+  isEditing,
+  onRequestOTP,
+  onVerifyOTP,
+  isRequesting,
+  isVerifying,
+  error,
+  onDismissError,
+  editable = false,
+  onStartEdit,
+  inputRef,
+}) => {
   const [step, setStep] = useState(1); // 1 = Request, 2 = Verify
   const [draft, setDraft] = useState("");
   const [otp, setOtp] = useState("");
@@ -127,7 +170,15 @@ const EmailCard = ({ value, isEditing, onRequestOTP, onVerifyOTP, isRequesting, 
   };
 
   if (!isEditing) {
-    return <CompactField icon={Mail} label="Login Email" value={value} />;
+    return (
+      <CompactField
+        icon={Mail}
+        label="Login Email"
+        value={value}
+        editable={editable}
+        onClick={onStartEdit}
+      />
+    );
   }
 
   return (
@@ -146,6 +197,7 @@ const EmailCard = ({ value, isEditing, onRequestOTP, onVerifyOTP, isRequesting, 
       {step === 1 ? (
         <form onSubmit={handleRequest} className="flex items-center gap-1.5">
           <input
+            ref={inputRef}
             type="email"
             value={draft}
             onChange={(e) => setDraft(e.target.value)}
@@ -343,10 +395,15 @@ const formatPhoneNumber = (phone) => {
     skills: employee?.skills || account?.skills || localUser.skills || [],
     slackUserId: employee?.slack_user_id || "",
     encordId: employee?.encord_id || "",
+    razorpayEmail: employee?.razorpay_email || account?.razorpay_email || "",
     dateOfJoining: employee?.date_of_joining || "",
     avatarUrl:
       employee?.avatar_url || account?.avatar_url || localUser.avatar_url || "",
   };
+
+  const isDojLocked = Boolean(
+    mergedProfile.dateOfJoining && !["admin", "hr"].includes(mergedProfile.role)
+  );
 
   /* ── Edit Form State ────────────────────────────────────────── */
   const [isEditing, setIsEditing] = useState(false);
@@ -355,31 +412,68 @@ const formatPhoneNumber = (phone) => {
   const [editSkills, setEditSkills] = useState([]);
   const [editSlackId, setEditSlackId] = useState("");
   const [editEncordId, setEditEncordId] = useState("");
+  const [editRazorpayEmail, setEditRazorpayEmail] = useState("");
   const [editDateOfJoining, setEditDateOfJoining] = useState("");
-  const [saveError, setSaveError] = useState("");
-  const [saveSuccess, setSaveSuccess] = useState(false);
 
-  const enterEditMode = () => {
+  /* ── Field Focus Management for Single-Click Edit ──────────── */
+  const [focusField, setFocusField] = useState(null);
+  const nameInputRef = useRef(null);
+  const emailInputRef = useRef(null);
+  const phoneInputRef = useRef(null);
+  const encordInputRef = useRef(null);
+  const razorpayInputRef = useRef(null);
+  const slackInputRef = useRef(null);
+  const dojInputRef = useRef(null);
+
+  useEffect(() => {
+    if (isEditing && focusField) {
+      const timer = setTimeout(() => {
+        const fieldMap = {
+          name: nameInputRef,
+          email: emailInputRef,
+          phone: phoneInputRef,
+          encordId: encordInputRef,
+          razorpayEmail: razorpayInputRef,
+          slackId: slackInputRef,
+          dateOfJoining: dojInputRef,
+        };
+        const ref = fieldMap[focusField];
+        if (ref && ref.current) {
+          ref.current.focus();
+          if (typeof ref.current.select === "function" && ref.current.type !== "date") {
+            ref.current.select();
+          }
+        }
+        setFocusField(null);
+      }, 60);
+      return () => clearTimeout(timer);
+    }
+  }, [isEditing, focusField]);
+
+  const enterEditMode = (fieldToFocus = null) => {
     setEditName(mergedProfile.name || "");
     setEditPhone(mergedProfile.phone || "");
     setEditSkills([...(mergedProfile.skills || [])]);
     setEditSlackId(mergedProfile.slackUserId || "");
     setEditEncordId(mergedProfile.encordId || "");
+    setEditRazorpayEmail(mergedProfile.razorpayEmail || "");
     setEditDateOfJoining(
       mergedProfile.dateOfJoining
         ? String(mergedProfile.dateOfJoining).split("T")[0]
         : ""
     );
-    setSaveError("");
-    setSaveSuccess(false);
     setIsEditing(true);
+    if (fieldToFocus) {
+      setFocusField(fieldToFocus);
+    }
   };
 
   const cancelEdit = () => {
     setIsEditing(false);
+    setFocusField(null);
     setEditName("");
+    setEditRazorpayEmail("");
     setEditDateOfJoining("");
-    setSaveError("");
   };
 
   /* ── Save Profile Mutation ──────────────────────────────────── */
@@ -393,28 +487,42 @@ const formatPhoneNumber = (phone) => {
       }));
       queryClient.setQueryData(["auth-me"], (old) => {
         if (!old) return old;
-        return { ...old, name: updatedEmployee.name || old.name };
+        return {
+          ...old,
+          name: updatedEmployee.name || old.name,
+          razorpay_email:
+            updatedEmployee.razorpay_email !== undefined
+              ? updatedEmployee.razorpay_email
+              : old.razorpay_email,
+        };
       });
       queryClient.invalidateQueries({ queryKey: ["employees"] });
       setIsEditing(false);
-      setSaveError("");
-      setSaveSuccess(true);
-      setTimeout(() => setSaveSuccess(false), 3000);
+      toast.success("Profile details saved successfully!");
     },
     onError: (err) => {
-      setSaveError(err?.response?.data?.detail || "Failed to save changes.");
+      const errorMsg = err?.response?.data?.detail || "Failed to save changes.";
+      toast.error(errorMsg);
     },
   });
 
   const handleSave = () => {
-    saveMutation.mutate({
+    const payload = {
       name: editName.trim() || undefined,
       phone: editPhone || null,
       skills: editSkills,
       slack_user_id: editSlackId || null,
       encord_id: editEncordId || null,
-      date_of_joining: editDateOfJoining ? editDateOfJoining.trim() : null,
-    });
+      razorpay_email: editRazorpayEmail?.trim() ? editRazorpayEmail.trim().toLowerCase() : null,
+    };
+
+    // If Date of Joining is NOT locked and was entered, include it
+    // If it IS locked, omitting it avoids triggering the backend's "Date of joining is locked" rejection
+    if (!isDojLocked && editDateOfJoining?.trim()) {
+      payload.date_of_joining = editDateOfJoining.trim();
+    }
+
+    saveMutation.mutate(payload);
   };
 
   /* ── Email Change Mutation ──────────────────────────────────── */
@@ -424,9 +532,12 @@ const formatPhoneNumber = (phone) => {
     mutationFn: (newEmail) => employeeApi.requestEmailChange(employeeId, newEmail),
     onSuccess: () => {
       setEmailError("");
+      toast.success("Verification OTP sent to your new email!");
     },
     onError: (err) => {
-      setEmailError(err?.response?.data?.detail || "Could not send OTP.");
+      const msg = err?.response?.data?.detail || "Could not send OTP.";
+      setEmailError(msg);
+      toast.error(msg);
     },
   });
 
@@ -436,9 +547,12 @@ const formatPhoneNumber = (phone) => {
       queryClient.invalidateQueries({ queryKey: ["auth-me"] });
       queryClient.invalidateQueries({ queryKey: ["employee-profile", employeeId] });
       setEmailError("");
+      toast.success("Login email verified and updated!");
     },
     onError: (err) => {
-      setEmailError(err?.response?.data?.detail || "Invalid or expired OTP.");
+      const msg = err?.response?.data?.detail || "Invalid or expired OTP.";
+      setEmailError(msg);
+      toast.error(msg);
     },
   });
 
@@ -454,29 +568,42 @@ const formatPhoneNumber = (phone) => {
   const fileInputRef = useRef(null);
   const [avatarError, setAvatarError] = useState("");
 
-  const onAvatarSuccess = () => {
+  const onAvatarSuccess = (msg) => {
     queryClient.invalidateQueries({ queryKey: ["employee-profile", employeeId] });
     queryClient.invalidateQueries({ queryKey: ["auth-me"] });
     queryClient.invalidateQueries({ queryKey: ["employees"] });
     setAvatarError("");
+    toast.success(typeof msg === "string" ? msg : "Profile photo updated!");
   };
 
   const uploadAvatarMutation = useMutation({
     mutationFn: (formData) => employeeApi.uploadAvatar(employeeId, formData),
-    onSuccess: onAvatarSuccess,
-    onError: (err) => setAvatarError(err?.response?.data?.detail || "Upload failed."),
+    onSuccess: () => onAvatarSuccess("Profile photo uploaded!"),
+    onError: (err) => {
+      const msg = err?.response?.data?.detail || "Upload failed.";
+      setAvatarError(msg);
+      toast.error(msg);
+    },
   });
 
   const slackAvatarMutation = useMutation({
     mutationFn: () => employeeApi.setAvatarFromSlack(employeeId),
-    onSuccess: onAvatarSuccess,
-    onError: (err) => setAvatarError(err?.response?.data?.detail || "Slack sync failed."),
+    onSuccess: () => onAvatarSuccess("Synced profile photo from Slack!"),
+    onError: (err) => {
+      const msg = err?.response?.data?.detail || "Slack sync failed.";
+      setAvatarError(msg);
+      toast.error(msg);
+    },
   });
 
   const deleteAvatarMutation = useMutation({
     mutationFn: () => employeeApi.deleteAvatar(employeeId),
-    onSuccess: onAvatarSuccess,
-    onError: (err) => setAvatarError(err?.response?.data?.detail || "Delete failed."),
+    onSuccess: () => onAvatarSuccess("Profile photo removed!"),
+    onError: (err) => {
+      const msg = err?.response?.data?.detail || "Delete failed.";
+      setAvatarError(msg);
+      toast.error(msg);
+    },
   });
 
   const handleAvatarFile = (e) => {
@@ -484,6 +611,7 @@ const formatPhoneNumber = (phone) => {
     if (!file) return;
     if (file.size > 5 * 1024 * 1024) {
       setAvatarError("Max size 5 MB.");
+      toast.error("Max avatar file size is 5 MB.");
       return;
     }
     const formData = new FormData();
@@ -506,18 +634,6 @@ const formatPhoneNumber = (phone) => {
         </div>
       ) : (
         <>
-          {/* Notifications / Alerts */}
-          {saveSuccess && (
-            <div className="flex items-center gap-2 rounded-xl border border-emerald-200 bg-emerald-50 px-4 py-2.5 text-xs font-semibold text-emerald-800 shadow-xs">
-              <Check className="h-4 w-4 text-emerald-600 shrink-0" /> Details saved successfully!
-            </div>
-          )}
-          {saveError && (
-            <div className="flex items-center gap-2 rounded-xl border border-rose-200 bg-rose-50 px-4 py-2.5 text-xs font-semibold text-rose-800 shadow-xs">
-              <X className="h-4 w-4 text-rose-600 shrink-0" /> {saveError}
-            </div>
-          )}
-
           {/* ════════════════════════════════════════════════════════
              TOP HERO BANNER & PROFILE CARD HEADER
              ════════════════════════════════════════════════════════ */}
@@ -715,7 +831,30 @@ const formatPhoneNumber = (phone) => {
                 </div>
 
                 <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
-                  <CompactField icon={UserRound} label="Full Name" value={isEditing ? editName : mergedProfile.name} />
+                  {/* Slot 1: Full Name */}
+                  {isEditing ? (
+                    <div className="rounded-xl border-2 border-emerald-400 bg-emerald-50/30 p-2.5">
+                      <p className="text-[10px] font-bold uppercase tracking-wider text-emerald-700">Full Name</p>
+                      <input
+                        ref={nameInputRef}
+                        type="text"
+                        value={editName}
+                        onChange={(e) => setEditName(e.target.value)}
+                        placeholder="Full Name"
+                        className="mt-1 w-full rounded-lg border border-slate-200 bg-white px-2.5 py-1 text-xs outline-none focus:border-emerald-500"
+                      />
+                    </div>
+                  ) : (
+                    <CompactField
+                      icon={UserRound}
+                      label="Full Name"
+                      value={mergedProfile.name}
+                      editable={!!employeeId}
+                      onClick={() => employeeId && enterEditMode("name")}
+                    />
+                  )}
+
+                  {/* Slot 2: Login Email */}
                   <EmailCard
                     value={mergedProfile.email}
                     isEditing={isEditing}
@@ -725,12 +864,17 @@ const formatPhoneNumber = (phone) => {
                     isVerifying={verifyEmailChangeMutation.isPending}
                     error={emailError}
                     onDismissError={() => setEmailError("")}
+                    editable={!!employeeId}
+                    onStartEdit={() => employeeId && enterEditMode("email")}
+                    inputRef={emailInputRef}
                   />
 
+                  {/* Slot 3: Phone Number */}
                   {isEditing ? (
                     <div className="rounded-xl border-2 border-emerald-400 bg-emerald-50/30 p-2.5">
                       <p className="text-[10px] font-bold uppercase tracking-wider text-emerald-700">Phone</p>
                       <input
+                        ref={phoneInputRef}
                         type="text"
                         value={editPhone}
                         onChange={(e) => setEditPhone(e.target.value)}
@@ -739,13 +883,21 @@ const formatPhoneNumber = (phone) => {
                       />
                     </div>
                   ) : (
-                    <CompactField icon={Phone} label="Phone Number" value={mergedProfile.phone} />
+                    <CompactField
+                      icon={Phone}
+                      label="Phone Number"
+                      value={mergedProfile.phone}
+                      editable={!!employeeId}
+                      onClick={() => employeeId && enterEditMode("phone")}
+                    />
                   )}
 
+                  {/* Slot 4: Encord ID */}
                   {isEditing ? (
                     <div className="rounded-xl border-2 border-emerald-400 bg-emerald-50/30 p-2.5">
                       <p className="text-[10px] font-bold uppercase tracking-wider text-emerald-700">Encord ID</p>
                       <input
+                        ref={encordInputRef}
                         type="text"
                         value={editEncordId}
                         onChange={(e) => setEditEncordId(e.target.value)}
@@ -754,13 +906,45 @@ const formatPhoneNumber = (phone) => {
                       />
                     </div>
                   ) : (
-                    <CompactField icon={Mail} label="Encord ID" value={mergedProfile.encordId} />
+                    <CompactField
+                      icon={Mail}
+                      label="Encord ID"
+                      value={mergedProfile.encordId}
+                      editable={!!employeeId}
+                      onClick={() => employeeId && enterEditMode("encordId")}
+                    />
                   )}
 
+                  {/* Slot 5: Razorpay Email */}
+                  {isEditing ? (
+                    <div className="rounded-xl border-2 border-emerald-400 bg-emerald-50/30 p-2.5">
+                      <p className="text-[10px] font-bold uppercase tracking-wider text-emerald-700">Razorpay Email</p>
+                      <input
+                        ref={razorpayInputRef}
+                        type="email"
+                        value={editRazorpayEmail}
+                        onChange={(e) => setEditRazorpayEmail(e.target.value)}
+                        placeholder="john.razorpay@example.com"
+                        className="mt-1 w-full rounded-lg border border-slate-200 bg-white px-2.5 py-1 text-xs outline-none focus:border-emerald-500"
+                      />
+                    </div>
+                  ) : (
+                    <CompactField
+                      icon={CreditCard}
+                      label="Razorpay Email"
+                      value={mergedProfile.razorpayEmail}
+                      color="blue"
+                      editable={!!employeeId}
+                      onClick={() => employeeId && enterEditMode("razorpayEmail")}
+                    />
+                  )}
+
+                  {/* Slot 6: Slack Member ID */}
                   {isEditing ? (
                     <div className="rounded-xl border-2 border-emerald-400 bg-emerald-50/30 p-2.5">
                       <p className="text-[10px] font-bold uppercase tracking-wider text-emerald-700">Slack ID</p>
                       <input
+                        ref={slackInputRef}
                         type="text"
                         value={editSlackId}
                         onChange={(e) => setEditSlackId(e.target.value)}
@@ -769,13 +953,20 @@ const formatPhoneNumber = (phone) => {
                       />
                     </div>
                   ) : (
-                    <CompactField icon={Hash} label="Slack Member ID" value={mergedProfile.slackUserId} color="violet" />
+                    <CompactField
+                      icon={Hash}
+                      label="Slack Member ID"
+                      value={mergedProfile.slackUserId}
+                      color="violet"
+                      editable={!!employeeId}
+                      onClick={() => employeeId && enterEditMode("slackId")}
+                    />
                   )}
 
-                  {/* Slot 6: Date of Joining (Editable once by employee; locked to Admin/HR once populated) */}
+                  {/* Slot 7: Date of Joining (Editable once by employee; locked to Admin/HR once populated) */}
                   {isEditing ? (
-                    mergedProfile.dateOfJoining && !["admin", "hr"].includes(mergedProfile.role) ? (
-                      <div className="rounded-xl border border-slate-200 bg-slate-50 p-2.5">
+                    isDojLocked ? (
+                      <div className="sm:col-span-2 rounded-xl border border-slate-200 bg-slate-50 p-2.5">
                         <div className="flex items-center justify-between">
                           <p className="text-[10px] font-bold uppercase tracking-wider text-slate-500">
                             Date of Joining
@@ -790,7 +981,7 @@ const formatPhoneNumber = (phone) => {
                         <p className="text-[10px] text-slate-400 mt-0.5">Contact Admin/HR to modify official joining date.</p>
                       </div>
                     ) : (
-                      <div className="rounded-xl border-2 border-emerald-400 bg-emerald-50/30 p-2.5">
+                      <div className="sm:col-span-2 rounded-xl border-2 border-emerald-400 bg-emerald-50/30 p-2.5">
                         <div className="flex items-center justify-between">
                           <p className="text-[10px] font-bold uppercase tracking-wider text-emerald-700">
                             Date of Joining
@@ -804,6 +995,7 @@ const formatPhoneNumber = (phone) => {
                           </span>
                         </div>
                         <input
+                          ref={dojInputRef}
                           type="date"
                           max={new Date().toISOString().split("T")[0]}
                           value={editDateOfJoining}
@@ -813,7 +1005,7 @@ const formatPhoneNumber = (phone) => {
                       </div>
                     )
                   ) : (
-                    <div className="relative group">
+                    <div className="relative group sm:col-span-2">
                       <CompactField
                         icon={Calendar}
                         label="Date of Joining"
@@ -823,14 +1015,39 @@ const formatPhoneNumber = (phone) => {
                             : "Not set"
                         }
                         color="emerald"
+                        editable={!isDojLocked && !!employeeId}
+                        isLocked={isDojLocked}
+                        lockReason="Official joining date is locked. Contact Admin or HR to modify."
+                        onClick={() => {
+                          if (!employeeId) return;
+                          if (isDojLocked) {
+                            toast.error("Official joining date is locked. Contact Admin or HR to modify.", { id: "doj-locked" });
+                          } else {
+                            enterEditMode("dateOfJoining");
+                          }
+                        }}
                       />
                       <div 
-                        className="absolute top-2 right-2 flex items-center"
-                        title="Add date of joining that is mentioned in your joining letter"
+                        className="absolute top-3 right-3 flex items-center gap-1.5"
+                        onClick={(e) => e.stopPropagation()}
                       >
-                        <span className="h-4 w-4 rounded-full bg-rose-50 border border-rose-300 text-rose-600 hover:bg-rose-100 flex items-center justify-center text-[10px] font-extrabold shadow-xs transition-colors cursor-pointer">
-                          i
-                        </span>
+                        {isDojLocked ? (
+                          <span
+                            className="flex items-center gap-1 text-[10px] font-semibold text-slate-400 bg-slate-100 border border-slate-200 px-2 py-0.5 rounded-md"
+                            title="Official joining date is locked. Contact Admin or HR to modify."
+                          >
+                            <Lock className="h-3 w-3 text-slate-400" />
+                            Locked
+                          </span>
+                        ) : (
+                          <span 
+                            className="h-4 w-4 rounded-full bg-rose-50 border border-rose-300 text-rose-600 hover:bg-rose-100 flex items-center justify-center text-[10px] font-extrabold shadow-xs transition-colors cursor-pointer"
+                            title="Add date of joining that is mentioned in your joining letter"
+                            onClick={() => toast("Add date of joining that is mentioned in your joining letter", { icon: "ℹ️", id: "doj-info" })}
+                          >
+                            i
+                          </span>
+                        )}
                       </div>
                     </div>
                   )}

@@ -1,5 +1,5 @@
 import { useQuery, keepPreviousData } from "@tanstack/react-query";
-import { useMemo, useState } from "react";
+import { useMemo, useState, useRef, useEffect } from "react";
 import { useNavigate } from "react-router-dom";
 import {
   subProjectApi,
@@ -195,6 +195,33 @@ const workforceSections = (workforce, breakdownRows) => [
 const Dashboard = () => {
   const navigate = useNavigate();
   const [projectPage, setProjectPage] = useState(1);
+  const [kpiCardHeight, setKpiCardHeight] = useState(null);
+  const kpiCardRef = useRef(null);
+
+  useEffect(() => {
+    if (!kpiCardRef.current) return;
+    const updateSize = () => {
+      if (kpiCardRef.current) {
+        setKpiCardHeight(kpiCardRef.current.offsetHeight);
+      }
+    };
+    updateSize();
+    const observer = new ResizeObserver(updateSize);
+    observer.observe(kpiCardRef.current);
+    return () => observer.disconnect();
+  }, []);
+
+  // Disable main container scroll while on dashboard as requested
+  useEffect(() => {
+    const main = document.querySelector("main");
+    if (main) {
+      const prevOverflow = main.style.overflow;
+      main.style.overflow = "hidden";
+      return () => {
+        main.style.overflow = prevOverflow;
+      };
+    }
+  }, []);
 
   const { data: dashboardKpis } = useQuery({
     queryKey: ["dashboard-kpis"],
@@ -426,19 +453,20 @@ const Dashboard = () => {
   };
 
   return (
-    <div className="space-y-4">
+    <div className="space-y-4 overflow-hidden">
       {/* Page Header */}
 
-      {/* ===== KPI cards (compact, 2/3) + Most active (1/3) =====
-          items-start keeps the short KPI row from stretching to the taller panel. */}
-      <div className="grid grid-cols-1 items-start gap-4 lg:grid-cols-3">
+      {/* ===== KPI cards (compact, 2/3) + Most active (1/3) ===== */}
+      <div className="grid grid-cols-1 items-stretch gap-3 lg:grid-cols-3">
         {/* Left column: compact KPI row stacked above Project Status, so the table
             fills the space alongside the much taller Most active panel. */}
         <div className="space-y-4 lg:col-span-2">
-          <div className="grid grid-cols-1 gap-3 sm:grid-cols-3">
-            <StatCard
-              compact
-              title="Total Employees"
+          <div className="grid grid-cols-1 gap-2 sm:grid-cols-3">
+            <div ref={kpiCardRef} className="h-full" style={{ width: "calc(100% - 15px)", maxWidth: "calc(100% - 15px)" }}>
+              <StatCard
+                compact
+                className="w-full"
+                title="Total Employees"
               label="On roster"
               value={dashboardKpis?.employees?.total || 0}
               icon={Users}
@@ -482,8 +510,14 @@ const Dashboard = () => {
               breakdownFooter={`${workforce.onRoster.length} on roster · excludes archived`}
               onClick={() => goFromKpi(employeesRoute)}
             />
+            </div>
             <StatCard
               compact
+              style={{
+                width: "calc(100% - 15px)",
+                maxWidth: "calc(100% - 15px)",
+                transform: "translateX(-15px)",
+              }}
               title="Total Projects"
               label="All projects"
               value={totalProjects}
@@ -502,11 +536,16 @@ const Dashboard = () => {
                 },
                 { label: "Vendor", sections: [{ rows: projectsByVendor }] },
               ]}
-              breakdownFooter={`${totalProjects} projects · includes archived`}
-              onClick={() => goFromKpi(`${routePrefix}/sub-projects`)}
+                breakdownFooter={`${totalProjects} projects · includes archived`}
+                onClick={() => goFromKpi(`${routePrefix}/sub-projects`)}
             />
             {/* Leave + WFH share one slot, split across the card's height. */}
             <SplitStatCard
+              style={{
+                width: "calc(100% - 15px)",
+                maxWidth: "calc(100% - 15px)",
+                transform: "translateX(-30px)",
+              }}
               halves={[
                 {
                   key: "leave",
@@ -644,19 +683,52 @@ const Dashboard = () => {
           />
         </div>
 
-        {/* Most active — Encord time this month, Users / Projects behind tabs */}
-        <MostActivePanel
-          overview={autonexOverview}
-          daily={autonexDaily}
-          onViewAnalytics={() => goFromKpi(`${routePrefix}/analytics`)}
-          onOpenProject={(projectId) =>
-            goFromKpi(`${routePrefix}/analytics/${projectId}`)
-          }
-          onViewAllUsers={() => goFromKpi(`${routePrefix}/leaderboard`)}
-          onOpenUser={(employeeId) => 
-            goFromKpi(`${employeesRoute}/${employeeId}`)
-          }
-        />
+        {/* Right column: 4th KPI slot + Encord Activity + Lower slot */}
+        <div className="flex flex-col gap-4 lg:col-span-1 min-w-0">
+          <div className="grid grid-cols-3 gap-2 shrink-0">
+            {/* 4th KPI: identical border, body color, width, and height; no dummy data */}
+            <div
+              style={{
+                height: kpiCardHeight ? `${kpiCardHeight}px` : undefined,
+                width: "calc(100% - 15px)",
+                maxWidth: "calc(100% - 15px)",
+                transform: "translateX(-45px)",
+              }}
+              className="col-span-2 rounded-xl border border-stone-200 hover:border-stone-300 bg-white shadow-[0_1px_2px_rgba(0,0,0,0.03)] transition-colors min-h-[126px]"
+            />
+
+            {/* 5th unique KPI: two stacked rounded rectangular cards */}
+            <div
+              style={{
+                height: kpiCardHeight ? `${kpiCardHeight}px` : undefined,
+                width: "calc(100% + 60px)",
+                transform: "translateX(-60px)",
+              }}
+              className="col-span-1 flex flex-col gap-2 min-h-[126px]"
+            >
+              <div className="flex-1 rounded-xl border border-stone-200 hover:border-stone-300 bg-white shadow-[0_1px_2px_rgba(0,0,0,0.03)] transition-colors" />
+              <div className="flex-1 rounded-xl border border-stone-200 hover:border-stone-300 bg-white shadow-[0_1px_2px_rgba(0,0,0,0.03)] transition-colors" />
+            </div>
+          </div>
+
+          <MostActivePanel
+            title="Encord Activity"
+            className="shrink-0"
+            overview={autonexOverview}
+            daily={autonexDaily}
+            onViewAnalytics={() => goFromKpi(`${routePrefix}/analytics`)}
+            onOpenProject={(projectId) =>
+              goFromKpi(`${routePrefix}/analytics/${projectId}`)
+            }
+            onViewAllUsers={() => goFromKpi(`${routePrefix}/leaderboard`)}
+            onOpenUser={(employeeId) => 
+              goFromKpi(`${employeesRoute}/${employeeId}`)
+            }
+          />
+
+          {/* Div below Encord Activity acquiring remaining space */}
+          <div className="flex-1 rounded-2xl border border-stone-200 bg-white shadow-[0_1px_4px_rgba(28,25,23,0.06)] min-h-[140px]" />
+        </div>
       </div>
     </div>
   );

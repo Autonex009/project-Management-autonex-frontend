@@ -103,7 +103,7 @@ export const Table = ({
 
   const outerClass = isBorderless
     ? `${className}`
-    : `bg-white rounded-2xl border border-slate-200/60 shadow-[0_1px_3px_rgba(0,0,0,0.04)] ${className}`;
+    : `bg-white rounded-2xl border border-stone-200 shadow-[0_1px_4px_rgba(28,25,23,0.06)] ${className}`;
 
   return (
     <div ref={containerRef} className={outerClass}>
