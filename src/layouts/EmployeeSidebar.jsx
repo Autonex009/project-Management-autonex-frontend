@@ -20,6 +20,7 @@ import {
   Trophy,
   ListChecks,
   Utensils,
+  User,
 } from "lucide-react";
 
 const rowBase =
@@ -125,6 +126,11 @@ const EmployeeSidebar = ({
         label: "Mentorship",
         icon: GraduationCap,
       },
+      {
+        to: `${prefix}/profile`,
+        label: "Profile",
+        icon: User,
+      },
     ]
     : [
       {
@@ -148,6 +154,11 @@ const EmployeeSidebar = ({
         to: `${prefix}/onboarding`,
         label: "Onboarding",
         icon: GraduationCap,
+      },
+      {
+        to: `${prefix}/profile`,
+        label: "Profile",
+        icon: User,
       },
       ...(canManageCanteen
         ? [
