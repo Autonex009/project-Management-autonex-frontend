@@ -90,28 +90,35 @@ const EmployeeLayout = () => {
         { to: `${prefix}/dashboard`, label: "Dashboard" },
         { to: `${prefix}/projects`, label: "Organizations" },
         { to: `${prefix}/sub-projects`, label: "Projects" },
+        { to: `${prefix}/analytics`, label: "Analytics" },
         { to: `${prefix}/allocations`, label: "Allocations" },
         { to: `${prefix}/my-team`, label: "My Team" },
+        { to: `${prefix}/team-checkins`, label: "Team Check-ins" },
         { to: `${prefix}/performance`, label: "Performance" },
         { to: `${prefix}/self-evaluation`, label: "Self Evaluation" },
+        { to: `${prefix}/leaderboard`, label: "Leaderboard" },
         { to: `${prefix}/leaves`, label: "Team Leaves" },
         { to: `${prefix}/my-leaves`, label: "My Leaves" },
         { to: `${prefix}/side-projects`, label: "Side Projects" },
         { to: `${prefix}/guidelines`, label: "Guidelines" },
+        { to: `${prefix}/referrals`, label: "Referrals" },
         { to: `${prefix}/onboarding`, label: "My Onboarding" },
         { to: `${prefix}/onboarding-mentor`, label: "Mentorship" },
+        { to: `${prefix}/profile`, label: "Profile" },
         ...(canManageCanteen ? [{ to: `${prefix}/lunch-menu`, label: "Lunch Menu" }] : []),
       ]
     : [
         { to: `${prefix}/dashboard`, label: "Dashboard" },
         { to: `${prefix}/projects`, label: "My Projects" },
         { to: `${prefix}/self-evaluation`, label: "Self Evaluation" },
+        { to: `${prefix}/leaderboard`, label: "Leaderboard" },
         { to: `${prefix}/leaves`, label: "Leaves" },
         { to: `${prefix}/side-projects`, label: "Side Projects" },
         { to: `${prefix}/guidelines`, label: "Guidelines" },
         { to: `${prefix}/referrals`, label: "Referrals" },
         { to: `${prefix}/company-info`, label: "Company Info" },
         { to: `${prefix}/onboarding`, label: "Onboarding" },
+        { to: `${prefix}/profile`, label: "Profile" },
         ...(canManageCanteen ? [{ to: `${prefix}/lunch-menu`, label: "Lunch Menu" }] : []),
       ];
 
@@ -120,6 +127,8 @@ const EmployeeLayout = () => {
       return { name: "Analytics", key: "pm-analytics-detail", isDetail: true };
     if (pathname.startsWith("/pm/my-team/"))
       return { name: "Employee", key: "pm-myteam-detail", isDetail: true };
+    if (pathname.endsWith("/profile"))
+      return { name: "Profile", key: `${prefix}/profile` };
     const item = navItems.find((n) => n.to === pathname);
     if (item) return { name: item.label, key: pathname };
     if (/\/onboarding\/[^/]+$/.test(pathname))
