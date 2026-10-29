@@ -757,7 +757,7 @@ const MyLeavesPanel = ({
       {activeTab === "My Leaves" && (
         <>
           {/* Leave balances */}
-          <div className="grid grid-cols-1 sm:grid-cols-3 gap-3">
+          <div className={`grid grid-cols-1 ${balances.length === 2 ? "sm:grid-cols-2" : "sm:grid-cols-3"} gap-3`}>
             {balances.map(({ type, quota, used, remaining, period }) => (
               <StatCard
                 key={type}

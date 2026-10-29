@@ -438,7 +438,7 @@ const TeamCheckInsPage = () => {
                       value: data?.kpi_late ?? 0,
                       dot: "bg-rose-500",
                       tone: "text-rose-600",
-                      onClick: () => applyTimeFilter("11_12"),
+                      onClick: () => applyTimeFilter("after_11"),
                     },
                   ]}
                 />
@@ -461,7 +461,7 @@ const TeamCheckInsPage = () => {
                 {
                   title: "Timing",
                   rows: [
-                    { label: "Late (After 11 AM)", value: data?.kpi_late ?? 0, onClick: () => applyTimeFilter("11_12") },
+                    { label: "Late (After 11 AM)", value: data?.kpi_late ?? 0, onClick: () => applyTimeFilter("after_11") },
                   ]
                 }
               ]}

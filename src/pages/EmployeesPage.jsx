@@ -975,6 +975,7 @@ const TIME_OPTIONS = [
   { value: "9_10", label: "9:00 – 10:00 AM" },
   { value: "10_11", label: "10:00 – 11:00 AM" },
   { value: "11_12", label: "11:00 – 12:00 PM" },
+  { value: "after_11", label: "After 11:00 AM" },
   { value: "custom", label: "Custom range" },
 ];
 
@@ -1890,7 +1891,7 @@ const EmployeesPage = () => {
     const data = {
       name: formData.get("name"),
       email: formData.get("email"),
-      razorpay_email: formData.get("razorpay_email") || null,
+      razorpay_email: formData.get("razorpay_email")?.trim() ? formData.get("razorpay_email").trim().toLowerCase() : null,
       slack_user_id: formData.get("slack_user_id")?.trim() || null,
       date_of_joining: dojVal?.trim() || null,
       converted_to_fulltime_at:
@@ -2418,6 +2419,7 @@ const EmployeesPage = () => {
                 if (t === "9_10") return "9-10 AM";
                 if (t === "10_11") return "10-11 AM";
                 if (t === "11_12") return "11-12 PM";
+                if (t === "after_11" || t === "late") return "After 11 AM";
                 if (t === "custom") return `Custom (${customTimeFrom || 'start'} - ${customTimeTo || 'end'})`;
                 return t;
               }).join(", ")}

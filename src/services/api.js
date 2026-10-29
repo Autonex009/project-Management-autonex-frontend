@@ -854,6 +854,7 @@ export const companySettingsApi = {
     api.put(`/company-settings/${key}`, data).then((res) => res.data),
   delete: (key) =>
     api.delete(`/company-settings/${key}`).then((res) => res.data),
+  getMyIp: () => api.get("/company-settings/my-ip").then((res) => res.data),
 };
 
 // === Canteen Menu API ===

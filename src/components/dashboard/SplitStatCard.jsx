@@ -30,13 +30,14 @@ const ICON_TONES = {
  *   onSelectPerson,          // (person) -> open the page filtered to them
  * }]
  */
-const SplitStatCard = ({ halves = [] }) => {
+const SplitStatCard = ({ halves = [], className = "", style = {} }) => {
   const [openKey, setOpenKey] = useState(null);
   // Tab choice is remembered per half, so switching halves doesn't reset it.
   const [tabByHalf, setTabByHalf] = useState({});
 
   return (
-    <div className="relative flex flex-col divide-y divide-slate-100 rounded-xl border border-slate-200 bg-white shadow-[0_1px_2px_rgba(0,0,0,0.03)]">
+    <div style={style}
+      className={`relative flex flex-col h-full divide-y divide-slate-100 rounded-xl border border-stone-200 hover:border-stone-300 bg-white shadow-[0_1px_2px_rgba(0,0,0,0.03)] transition-colors ${className}`}>
       {halves.map((half) => {
         const iconTone = ICON_TONES[half.tone] || ICON_TONES.slate;
         const isOpen = openKey === half.key;

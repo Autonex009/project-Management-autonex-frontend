@@ -19,6 +19,7 @@ import {
   BarChart3,
   Trophy,
   ListChecks,
+  Utensils,
 } from "lucide-react";
 
 const rowBase =
@@ -82,6 +83,13 @@ const EmployeeSidebar = ({
   const portalLabel = isPm ? "PM Portal" : "Employee Portal";
   const theme = isPm ? accentTheme.pm : accentTheme.employee;
 
+  const userEmail = (account?.email || user?.email || "").toLowerCase();
+  const canManageCanteen = Boolean(
+    account?.can_manage_canteen_menu ||
+    user?.can_manage_canteen_menu ||
+    userEmail === "jadhavashish061@gmail.com"
+  );
+
   const navItems = isPm
     ? [
       {
@@ -141,6 +149,15 @@ const EmployeeSidebar = ({
         label: "Onboarding",
         icon: GraduationCap,
       },
+      ...(canManageCanteen
+        ? [
+            {
+              to: `${prefix}/lunch-menu`,
+              label: "Lunch Menu",
+              icon: Utensils,
+            },
+          ]
+        : []),
     ];
 
   const avatarUrl = account?.avatar_url || user?.avatar_url || "";

@@ -2,12 +2,11 @@
 import React, { Suspense, lazy, useState, useEffect, useRef } from "react";
 import { Routes, Route, Navigate, useLocation } from "react-router-dom";
 import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
-import { Toaster } from "react-hot-toast";
-import ProtectedRoute from "./routes/ProtectedRoute";
+import StackedToaster from "./components/ui/Toast";
+import ProtectedRoute, { useAuth } from "./routes/ProtectedRoute";
 import ErrorBoundary from "./components/ErrorBoundary";
 import ForcePasswordChangeModal from "./components/ForcePasswordChangeModal";
 import DailyCheckInModal from "./components/checkin/DailyCheckInModal";
-import VersionUpdateBanner from "./components/VersionUpdateBanner";
 
 // Layouts
 import AdminLayout from "./layouts/AdminLayout";
@@ -73,6 +72,9 @@ const EmployeeReferralsPage = lazy(
   () => import("./pages/employee/EmployeeReferralsPage"),
 );
 const CompanyInfoPage = lazy(() => import("./pages/employee/CompanyInfoPage"));
+const EmployeeCanteenMenuPage = lazy(
+  () => import("./pages/employee/EmployeeCanteenMenuPage"),
+);
 const OnboardingDashboard = lazy(
   () => import("./pages/employee/OnboardingDashboard"),
 );
@@ -96,6 +98,19 @@ const HRDashboard = lazy(() => import("./pages/hr/HRDashboard"));
 const OnboardingPipelinePage = lazy(() => import("./pages/hr/OnboardingPipelinePage"));
 const CandidateConfirmationPage = lazy(() => import("./pages/hr/CandidateConfirmationPage"));
 // const AdminAnalyticsPage = lazy(() => import('./pages/admin/AdminAnalyticsPage'));
+
+const CanteenManagerRoute = ({ children }) => {
+  const { user } = useAuth();
+  const email = (user?.email || "").toLowerCase();
+  const isCanteenManager = Boolean(
+    user?.can_manage_canteen_menu ||
+    email === "jadhavashish061@gmail.com"
+  );
+  if (!isCanteenManager) {
+    return <Navigate to="/employee/dashboard" replace />;
+  }
+  return children;
+};
 
 function App() {
   // Per-request QueryClient: created once per component-tree mount. On the
@@ -171,17 +186,9 @@ function App() {
     <ErrorBoundary>
       <div suppressHydrationWarning>
         <QueryClientProvider client={queryClient}>
-          <Toaster
-            position="top-right"
-            containerStyle={{ zIndex: 100000 }}
-            toastOptions={{
-              duration: 4000,
-              style: { background: "#333", color: "#fff" },
-            }}
-          />
+          <StackedToaster />
           <ForcePasswordChangeModal />
           <DailyCheckInModal />
-          <VersionUpdateBanner />
           <Suspense fallback={null}>
             <Routes>
               {/* Public Auth Routes */}
@@ -294,6 +301,14 @@ function App() {
                 <Route path="company-info" element={<CompanyInfoPage />} />
                 <Route path="onboarding" element={<OnboardingDashboard />} />
                 <Route path="onboarding/:moduleId" element={<ModuleView />} />
+                <Route
+                  path="lunch-menu"
+                  element={
+                    <CanteenManagerRoute>
+                      <EmployeeCanteenMenuPage />
+                    </CanteenManagerRoute>
+                  }
+                />
                 <Route path="profile" element={<ProfilePage />} />
               </Route>
 
@@ -332,6 +347,14 @@ function App() {
                 <Route path="onboarding" element={<OnboardingDashboard />} />
                 <Route path="onboarding/:moduleId" element={<ModuleView />} />
                 <Route path="onboarding-mentor" element={<PMMentorshipPage />} />
+                <Route
+                  path="lunch-menu"
+                  element={
+                    <CanteenManagerRoute>
+                      <EmployeeCanteenMenuPage />
+                    </CanteenManagerRoute>
+                  }
+                />
                 <Route
                   path="newly-onboarded"
                   element={<Navigate to="/pm/onboarding-mentor" replace />}
