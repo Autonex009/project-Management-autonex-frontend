@@ -3110,14 +3110,18 @@ const EmployeeDashboard = () => {
                   >
                     <ChevronLeft className="w-3.5 h-3.5" />
                   </button>
-                  <span className="text-center flex-1 text-[11px] font-bold tracking-wide uppercase text-stone-700 select-none truncate">
+                  <span
+                    onClick={() => setModalSelectedMonth(new Date())}
+                    className="text-center flex-1 text-[11px] font-bold tracking-wide uppercase text-stone-700 select-none truncate cursor-pointer hover:text-blue-600 transition-colors"
+                    title="Click to return to current month"
+                  >
                     {format(modalSelectedMonth, "MMM yyyy")}
                   </span>
                   <button
                     disabled={
-                      modalSelectedMonth.getFullYear() > new Date().getFullYear() ||
-                      (modalSelectedMonth.getFullYear() === new Date().getFullYear() &&
-                        modalSelectedMonth.getMonth() >= new Date().getMonth())
+                      modalSelectedMonth.getFullYear() > new Date().getFullYear() + 1 ||
+                      (modalSelectedMonth.getFullYear() === new Date().getFullYear() + 1 &&
+                        modalSelectedMonth.getMonth() >= 11)
                     }
                     onClick={() =>
                       setModalSelectedMonth(

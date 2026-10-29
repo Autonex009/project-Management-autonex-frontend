@@ -736,7 +736,8 @@ export default function LeaveCalendar({
 
   const LEAVE_TYPES = [
     { value: "paid", label: "Paid Leave", color: "#2563eb" },
-    { value: "casual_sick", label: "Casual/Sick Leave", color: "#10b981" },
+    // TEMPORARILY PAUSED: Sick / Casual leave cannot be applied by anyone
+    // { value: "casual_sick", label: "Casual/Sick Leave", color: "#10b981" },
     { value: "floater", label: "Floater Leave", color: "#f59e0b" },
     { value: "wfh", label: "Work From Home (WFH)", color: "#8b5cf6" },
   ];
