@@ -8,7 +8,11 @@ import ChatWidget from "../components/chat/ChatWidget";
 import { useQuery } from "@tanstack/react-query";
 import { checkinApi } from "../services/api";
 import useCheckinStore from "../store/useCheckinStore";
-import { CalendarCheck } from "lucide-react";
+import { CalendarCheck, LogOut, CheckCircle2 } from "lucide-react";
+import { useMutation, useQueryClient } from "@tanstack/react-query";
+import toast from "react-hot-toast";
+import Button from "../components/ui/Button";
+import ConfirmDialog from "../components/ui/ConfirmDialog";
 
 const MIN_WIDTH = 200;
 const MAX_WIDTH = 400;
@@ -53,6 +57,51 @@ export default function AppShellLayout({
     })(),
     staleTime: 60000, // 1 minute
   });
+
+  const queryClient = useQueryClient();
+  const [showCheckoutConfirm, setShowCheckoutConfirm] = useState(false);
+
+  const checkoutMutation = useMutation({
+    mutationFn: () => checkinApi.checkOut({}),
+    onSuccess: (updatedCheckin) => {
+      toast.success("Checked out successfully! Shift logged for weekly compensation.", {
+        id: "checkout-toast",
+        icon: "🚪",
+      });
+      setShowCheckoutConfirm(false);
+      // Zero-Network Cache Surgery: patch client RAM cache immediately
+      queryClient.setQueryData(["checkin-today"], (old) => {
+        if (!old) return old;
+        return {
+          ...old,
+          checkin: updatedCheckin,
+        };
+      });
+      queryClient.invalidateQueries({ queryKey: ["weekly-compensation"] });
+    },
+    onError: (err) => {
+      const msg = err?.response?.data?.detail || "Failed to check out. Please try again.";
+      toast.error(typeof msg === "string" ? msg : "Check-out failed", { id: "checkout-toast" });
+    },
+  });
+
+  const formatDuration = (inTime, outTime) => {
+    if (!inTime || !outTime) return "";
+    const diffMs = new Date(outTime).getTime() - new Date(inTime).getTime();
+    if (diffMs <= 0) return "0h 00m";
+    const totalMin = Math.floor(diffMs / 60000);
+    const hours = Math.floor(totalMin / 60);
+    const mins = totalMin % 60;
+    return `${hours}h ${String(mins).padStart(2, "0")}m`;
+  };
+
+  const formatTime = (dateStr) => {
+    if (!dateStr) return "";
+    return new Date(dateStr).toLocaleTimeString("en-US", {
+      hour: "2-digit",
+      minute: "2-digit",
+    });
+  };
 
   useEffect(() => {
     const savedCollapsed = localStorage.getItem(`${storageKeyPrefix}-sidebar-collapsed`);
@@ -225,6 +274,34 @@ export default function AppShellLayout({
                 <span className="hidden sm:inline">Pending Check-in</span>
               </button>
             )}
+            {/* Weekend / Holiday Shift Check-Out (Pillar 1) */}
+            {checkinStatus && checkinStatus.already_checked_in && checkinStatus.is_weekend_or_holiday && (
+              <>
+                {!checkinStatus.checkin?.checked_out_at ? (
+                  <Button
+                    size="sm"
+                    variant="warning"
+                    onClick={() => setShowCheckoutConfirm(true)}
+                    className="!py-1.5 !px-2.5 text-xs font-semibold flex items-center gap-1.5 shadow-sm"
+                    title="Check out from today's weekend/holiday shift"
+                  >
+                    <LogOut className="w-3.5 h-3.5" />
+                    <span>Check Out</span>
+                  </Button>
+                ) : (
+                  <div
+                    className="flex items-center gap-1.5 text-xs font-medium text-emerald-700 bg-emerald-50 px-2.5 py-1.5 rounded-lg border border-emerald-200 shadow-sm"
+                    title={`Checked out at ${formatTime(checkinStatus.checkin.checked_out_at)}`}
+                  >
+                    <CheckCircle2 className="w-3.5 h-3.5 text-emerald-600" />
+                    <span className="hidden sm:inline">
+                      Checked Out ({formatDuration(checkinStatus.checkin.checked_in_at, checkinStatus.checkin.checked_out_at)})
+                    </span>
+                    <span className="sm:hidden">Checked Out</span>
+                  </div>
+                )}
+              </>
+            )}
             <PortalSwitcher />
             <NotificationBell />
           </div>
@@ -242,6 +319,19 @@ export default function AppShellLayout({
       ) : (
         <ChatWidget />
       )}
+
+      {/* Weekend Check-Out Confirmation Dialog */}
+      <ConfirmDialog
+        isOpen={showCheckoutConfirm}
+        onClose={() => setShowCheckoutConfirm(false)}
+        onConfirm={() => checkoutMutation.mutate()}
+        title="Confirm Shift Check-Out"
+        message="Are you sure you want to check out from today's weekend/holiday shift?"
+        details="This will record your check-out time and automatically calculate your payable shift hours for weekly compensation."
+        confirmText="Check Out Now"
+        variant="warning"
+        isPending={checkoutMutation.isPending}
+      />
     </div>
   );
 }

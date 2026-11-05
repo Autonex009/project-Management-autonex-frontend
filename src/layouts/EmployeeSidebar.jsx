@@ -5,6 +5,7 @@ import {
   FolderKanban,
   Calendar,
   CalendarCheck,
+  CalendarCheck2,
   Rocket,
   LogOut,
   FileText,
@@ -104,6 +105,7 @@ const EmployeeSidebar = ({
       { to: `${prefix}/allocations`, label: "Allocations", icon: UserCog },
       { to: `${prefix}/my-team`, label: "My Team", icon: Users },
       { to: `${prefix}/team-checkins`, label: "Team Check-ins", icon: ListChecks },
+      { to: `${prefix}/weekly-compensation`, label: "Weekly Comp", icon: CalendarCheck2 },
       { to: `${prefix}/performance`, label: "Performance", icon: TrendingUp },
       {
         to: `${prefix}/self-evaluation`,

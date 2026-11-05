@@ -1,6 +1,6 @@
 import { useState, useMemo, useEffect, useRef } from "react";
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
-import { payrollApi } from "../services/api";
+import { payrollApi, weeklyCompensationApi } from "../services/api";
 import Button from "../components/ui/Button";
 import toast from "react-hot-toast";
 import {
@@ -22,6 +22,7 @@ import {
   Sparkles,
   Minus,
   ChevronDown,
+  CalendarCheck2,
 } from "lucide-react";
 import { usePayrollStore } from "../store/usePayrollStore";
 import SearchBar from "../components/ui/SearchBar";
@@ -92,6 +93,7 @@ const getColumns = ({
   setAdditionalPayments,
   setReviewModal,
   locked,
+  setWeeklyCompModal,
 }) => [
   {
     key: "employee",
@@ -288,6 +290,36 @@ const getColumns = ({
   },
 
   {
+    key: "weekly_compensation",
+    label: "Weekly Comp",
+    align: "right",
+    render: (_, row) => {
+      const amount = Number(row.weekly_compensation || 0);
+      if (amount <= 0) return <span className="text-slate-300 text-xs">—</span>;
+      return (
+        <button
+          type="button"
+          onClick={(e) => {
+            e.stopPropagation();
+            setWeeklyCompModal({
+              employeeId: row.employee_id,
+              employeeName: row.employee_name,
+              amount,
+            });
+          }}
+          className="group inline-flex items-center gap-1 font-semibold text-indigo-600 hover:text-indigo-800 cursor-pointer transition-colors"
+          title="Click to view itemized weekend & holiday shifts"
+        >
+          <span>+{fmtCurrency(amount)}</span>
+          <span className="text-[10px] font-medium bg-indigo-50 text-indigo-700 px-1 py-0.2 rounded border border-indigo-200 group-hover:bg-indigo-100">
+            Shifts
+          </span>
+        </button>
+      );
+    },
+  },
+
+  {
     key: "final",
     label: "Final Salary",
     align: "right",
@@ -318,6 +350,142 @@ const getColumns = ({
       ),
   },
 ];
+
+function WeeklyCompBreakdownModal({ employee, month, onClose }) {
+  const { data: monthSummary, isLoading } = useQuery({
+    queryKey: ["weekly-compensation", month, employee?.employeeId],
+    queryFn: () =>
+      weeklyCompensationApi.getRecords({
+        month,
+        employee_id: employee?.employeeId,
+      }),
+    enabled: Boolean(employee?.employeeId && month),
+    staleTime: 60000,
+  });
+
+  const records = useMemo(() => {
+    if (Array.isArray(monthSummary)) return monthSummary;
+    if (Array.isArray(monthSummary?.records)) return monthSummary.records;
+    return [];
+  }, [monthSummary]);
+
+  const formatSeconds = (totalSeconds) => {
+    if (totalSeconds === null || totalSeconds === undefined) return "—";
+    const hours = Math.floor(totalSeconds / 3600);
+    const minutes = Math.floor((totalSeconds % 3600) / 60);
+    return `${hours}h ${String(minutes).padStart(2, "0")}m`;
+  };
+
+  const formatDate = (dStr) => {
+    try {
+      const d = new Date(dStr);
+      return d.toLocaleDateString("en-US", {
+        day: "2-digit",
+        month: "short",
+        year: "numeric",
+        weekday: "short",
+      });
+    } catch {
+      return dStr;
+    }
+  };
+
+  return (
+    <Modal isOpen={Boolean(employee)} onClose={onClose} size="lg">
+      <Modal.Header onClose={onClose}>
+        <div className="flex items-center gap-2">
+          <CalendarCheck2 className="w-5 h-5 text-indigo-600" />
+          <h2 className="text-base font-semibold text-slate-900">
+            Weekly Compensation Shifts
+          </h2>
+        </div>
+        <p className="text-xs text-slate-500 mt-1">
+          {employee?.employeeName} &bull; {month} &bull; Total:{" "}
+          <strong className="text-indigo-600">
+            ₹{employee?.amount?.toLocaleString("en-IN")}
+          </strong>
+        </p>
+      </Modal.Header>
+
+      <Modal.Body className="!p-0">
+        {isLoading ? (
+          <div className="p-8 text-center text-xs text-slate-500">
+            Loading shift breakdown...
+          </div>
+        ) : records.length === 0 ? (
+          <div className="p-8 text-center text-xs text-slate-500">
+            No approved weekend shifts found for this employee in {month}.
+          </div>
+        ) : (
+          <div className="overflow-x-auto">
+            <table className="w-full text-left border-collapse text-xs">
+              <thead>
+                <tr className="border-b border-slate-100 bg-slate-50 text-[11px] font-semibold text-slate-500 uppercase tracking-wider">
+                  <th className="py-2.5 px-4">Shift Date</th>
+                  <th className="py-2.5 px-4">Portal Time</th>
+                  <th className="py-2.5 px-4">Encord Time</th>
+                  <th className="py-2.5 px-4">Final Time</th>
+                  <th className="py-2.5 px-4">Rate</th>
+                  <th className="py-2.5 px-4 text-right">Payout</th>
+                  <th className="py-2.5 px-4 text-center">Status</th>
+                </tr>
+              </thead>
+              <tbody className="divide-y divide-slate-100">
+                {records.map((r) => (
+                  <tr key={r.id} className="hover:bg-slate-50/60">
+                    <td className="py-2.5 px-4 font-medium text-slate-800 whitespace-nowrap">
+                      {formatDate(r.work_date)}
+                    </td>
+                    <td className="py-2.5 px-4 text-slate-600 whitespace-nowrap">
+                      {formatSeconds(r.portal_duration_seconds)}
+                    </td>
+                    <td className="py-2.5 px-4 text-slate-600 whitespace-nowrap">
+                      {r.encord_duration_seconds > 0
+                        ? formatSeconds(r.encord_duration_seconds)
+                        : "—"}
+                    </td>
+                    <td className="py-2.5 px-4 font-semibold text-slate-800 whitespace-nowrap">
+                      {(r.final_duration_seconds / 3600).toFixed(1)}h
+                    </td>
+                    <td className="py-2.5 px-4 text-slate-500 whitespace-nowrap">
+                      ₹{parseFloat(r.hourly_rate).toFixed(0)}/hr
+                    </td>
+                    <td className="py-2.5 px-4 font-bold text-slate-900 text-right whitespace-nowrap">
+                      ₹{parseFloat(r.effective_payout).toLocaleString("en-IN")}
+                    </td>
+                    <td className="py-2.5 px-4 text-center whitespace-nowrap">
+                      <span
+                        className={`inline-flex items-center px-2 py-0.5 rounded-full text-[10px] font-semibold ${
+                          r.status === "payroll_locked"
+                            ? "bg-purple-50 text-purple-700 border border-purple-200"
+                            : r.status === "approved"
+                            ? "bg-emerald-50 text-emerald-700 border border-emerald-200"
+                            : "bg-amber-50 text-amber-700 border border-amber-200"
+                        }`}
+                      >
+                        {r.status === "payroll_locked"
+                          ? "Locked"
+                          : r.status === "approved"
+                          ? "Approved"
+                          : "Pending"}
+                      </span>
+                    </td>
+                  </tr>
+                ))}
+              </tbody>
+            </table>
+          </div>
+        )}
+      </Modal.Body>
+
+      <Modal.Footer>
+        <Button variant="secondary" size="sm" onClick={onClose}>
+          Close
+        </Button>
+      </Modal.Footer>
+    </Modal>
+  );
+}
 
 const PayrollPage = () => {
   const queryClient = useQueryClient();
@@ -367,6 +535,7 @@ const PayrollPage = () => {
 
   // Which employee's leave modal is open
   const [reviewModal, setReviewModal] = useState(null); // employee row object
+  const [weeklyCompModal, setWeeklyCompModal] = useState(null);
 
   // Discarding a run deletes its adjustments, so it sits behind a typed confirm.
   const [confirmDiscard, setConfirmDiscard] = useState(false);
@@ -642,6 +811,7 @@ const PayrollPage = () => {
         additionalPayments,
         setAdditionalPayments,
         setReviewModal,
+        setWeeklyCompModal,
         locked: isFinalized,
       }),
     [bonuses, additionalPayments, isFinalized],
@@ -1318,6 +1488,15 @@ const PayrollPage = () => {
             </Button>
           </Modal.Footer>
         </Modal>
+      )}
+
+      {/* Weekly Compensation Shifts Breakdown Modal */}
+      {weeklyCompModal && (
+        <WeeklyCompBreakdownModal
+          employee={weeklyCompModal}
+          month={month}
+          onClose={() => setWeeklyCompModal(null)}
+        />
       )}
     </div>
   );
