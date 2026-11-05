@@ -213,6 +213,9 @@ export default function DailyCheckInModal() {
         icon: "👋",
       });
       queryClient.invalidateQueries({ queryKey: ["checkin-today"] });
+      queryClient.invalidateQueries({ queryKey: ["checkin-pulse"] });
+      queryClient.invalidateQueries({ queryKey: ["checkins-admin-today"] });
+      queryClient.invalidateQueries({ queryKey: ["checkins-team-today"] });
       dismiss();
     },
     onError: (err) => {

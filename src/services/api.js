@@ -946,6 +946,43 @@ export const checkinApi = {
     const p = typeof params === "object" ? params : { target_date: params };
     return api.get("/checkins/admin/sentiment-analytics", { params: p }).then((res) => res.data);
   },
+  getPulseOverview: (params) => api.get("/checkins/pulse/overview", { params }).then((res) => res.data),
+  getPulseTiming: (params) => api.get("/checkins/pulse/timing", { params }).then((res) => res.data),
+  getPulseAttention: (params) => api.get("/checkins/pulse/attention", { params }).then((res) => res.data),
+  nudgeEmployee: (data) => api.post("/checkins/pulse/nudge", data).then((res) => res.data),
+};
+
+export const weeklyCompensationApi = {
+  getRecords: (params) =>
+    api.get("/weekly-compensation", { params }).then((res) => res.data),
+  adjustTime: (id, data) => {
+    const payload = {
+      final_hours: data.final_hours !== undefined ? data.final_hours : data.final_duration_hours,
+      final_duration_hours: data.final_hours !== undefined ? data.final_hours : data.final_duration_hours,
+      final_duration_seconds: data.final_duration_seconds,
+      edit_note: data.edit_note || data.note,
+      note: data.note || data.edit_note,
+    };
+    return api.patch(`/weekly-compensation/${id}/adjust-time`, payload).then((res) => res.data);
+  },
+  overridePayout: (id, data) => {
+    const payload = {
+      override_payout: data.override_payout,
+      edit_note: data.edit_note || data.note,
+      note: data.note || data.edit_note,
+    };
+    return api.patch(`/weekly-compensation/${id}/payout`, payload).then((res) => res.data);
+  },
+  approve: (id) =>
+    api.post(`/weekly-compensation/${id}/approve`).then((res) => res.data),
+  reject: (id) =>
+    api.post(`/weekly-compensation/${id}/reject`).then((res) => res.data),
+  bulkApprove: (record_ids) => {
+    const ids = Array.isArray(record_ids) ? record_ids : Array.from(record_ids || []);
+    return api.post("/weekly-compensation/bulk-approve", { ids, record_ids: ids }).then((res) => res.data);
+  },
+  getRecordById: (id) =>
+    api.get(`/weekly-compensation/${id}`).then((res) => res.data),
 };
 
 export default api;

@@ -142,10 +142,13 @@ export const isTeamLeadDesignation = (designation) =>
  * Being a lead confers a manager's powers over that project. What it does not confer is
  * rank over other leads on it — see backend `app/services/project_scope.py`.
  */
-export const isTeamLeadAllocation = (allocation, employee) =>
-  isTeamLeadDesignation(employee?.designation) ||
-  (Array.isArray(allocation?.role_tags) &&
-    allocation.role_tags.some((tag) => isTeamLeadDesignation(tag)));
+export const isTeamLeadAllocation = (allocation, employee) => {
+  const tags = allocation?.role_tags;
+  if (Array.isArray(tags) && tags.length > 0) {
+    return tags.some((tag) => isTeamLeadDesignation(tag));
+  }
+  return isTeamLeadDesignation(employee?.designation);
+};
 
 // ── Request tiers ───────────────────────────────────────────────────
 // Mirrors ADMIN_ONLY_SUBJECT_DESIGNATIONS / PM_ONLY_SUBJECT_DESIGNATIONS in
