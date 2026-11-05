@@ -29,6 +29,7 @@ import Button from "../components/ui/Button";
 import StatCard from "../components/dashboard/StatCard";
 import SplitStatCard from "../components/dashboard/SplitStatCard";
 import MostActivePanel from "../components/dashboard/MostActivePanel";
+import CheckinPulseWidget from "../components/dashboard/CheckinPulseWidget";
 import MetricDots from "../components/ui/MetricDots";
 
 // The three engagement buckets, colour-matched to the dots on the Employees page
@@ -211,17 +212,7 @@ const Dashboard = () => {
     return () => observer.disconnect();
   }, []);
 
-  // Disable main container scroll while on dashboard as requested
-  useEffect(() => {
-    const main = document.querySelector("main");
-    if (main) {
-      const prevOverflow = main.style.overflow;
-      main.style.overflow = "hidden";
-      return () => {
-        main.style.overflow = prevOverflow;
-      };
-    }
-  }, []);
+  // Dashboard page scroll enabled
 
   const { data: dashboardKpis } = useQuery({
     queryKey: ["dashboard-kpis"],
@@ -453,7 +444,7 @@ const Dashboard = () => {
   };
 
   return (
-    <div className="space-y-4 overflow-hidden">
+    <div className="space-y-4 pb-12">
       {/* Page Header */}
 
       {/* ===== KPI cards (compact, 2/3) + Most active (1/3) ===== */}
@@ -726,8 +717,8 @@ const Dashboard = () => {
             }
           />
 
-          {/* Div below Encord Activity acquiring remaining space */}
-          <div className="flex-1 rounded-2xl border border-stone-200 bg-white shadow-[0_1px_4px_rgba(28,25,23,0.06)] min-h-[140px]" />
+          {/* Check-in Pulse Widget (Overview, Timing, Attention) */}
+          <CheckinPulseWidget className="flex-1" />
         </div>
       </div>
     </div>
@@ -735,3 +726,4 @@ const Dashboard = () => {
 };
 
 export default Dashboard;
+
