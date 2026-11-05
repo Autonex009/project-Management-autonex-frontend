@@ -588,7 +588,7 @@ export default function DatePicker({
 
       {/* Trigger Button */}
       {customTrigger ? (
-        <div onClick={handleToggleOpen} className="inline-block cursor-pointer">
+        <div onClick={handleToggleOpen} className="w-full cursor-pointer">
           {customTrigger({ isOpen, displayValue })}
         </div>
       ) : (

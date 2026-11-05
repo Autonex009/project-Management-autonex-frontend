@@ -68,6 +68,9 @@ const SignupRequestsPage = lazy(() => import("./pages/SignupRequestsPage"));
 const EmployeeSignupPage = lazy(() => import("./pages/EmployeeSignupPage"));
 const ReferralsPage = lazy(() => import("./pages/ReferralsPage"));
 const PayrollTabs = lazy(() => import("./pages/PayrollTabs"));
+const WeeklyCompensationPage = lazy(
+  () => import("./pages/WeeklyCompensationPage"),
+);
 const EmployeeReferralsPage = lazy(
   () => import("./pages/employee/EmployeeReferralsPage"),
 );
@@ -235,6 +238,10 @@ function App() {
                 <Route path="performance" element={<AdminPerformancePage />} />
                 <Route path="signup-requests" element={<SignupRequestsPage />} />
                 <Route path="payroll" element={<PayrollTabs />} />
+                <Route
+                  path="weekly-compensation"
+                  element={<WeeklyCompensationPage />}
+                />
                 <Route path="referrals" element={<ReferralsPage />} />
                 <Route path="guidelines" element={<GuidelinesPage />} />
                 <Route path="modules" element={<AdminModulesList />} />
@@ -266,6 +273,10 @@ function App() {
                 <Route path="employees" element={<EmployeesPage />} />
                 <Route path="leaves" element={<LeavesPage />} />
                 <Route path="performance" element={<AdminPerformancePage />} />
+                <Route
+                  path="weekly-compensation"
+                  element={<WeeklyCompensationPage />}
+                />
                 <Route path="activity-log" element={<ChangeLogPage />} />
                 <Route path="profile" element={<ProfilePage />} />
               </Route>
@@ -337,6 +348,10 @@ function App() {
                 <Route path="my-team" element={<MyTeamPage />} />
                 <Route path="my-team/:id" element={<EmployeeDashboard />} />
                 <Route path="team-checkins" element={<TeamCheckInsPage />} />
+                <Route
+                  path="weekly-compensation"
+                  element={<WeeklyCompensationPage />}
+                />
                 <Route path="performance" element={<PerformanceReviewsPage />} />
                 <Route path="self-evaluation" element={<SelfEvaluationPage />} />
                 <Route path="leaves" element={<LeavesPage />} />

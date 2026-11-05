@@ -62,7 +62,7 @@ export default function ConfirmDialog({
             <p className="text-sm leading-relaxed text-slate-600">{message}</p>
           )}
 
-          {details && details.length > 0 && (
+          {Array.isArray(details) && details.length > 0 && (
             <dl className="mt-4 space-y-2 rounded-xl bg-slate-50 p-4">
               {details.map((row) => (
                 <div
@@ -78,6 +78,12 @@ export default function ConfirmDialog({
                 </div>
               ))}
             </dl>
+          )}
+
+          {typeof details === "string" && details.trim().length > 0 && (
+            <p className="mt-3 text-xs leading-relaxed text-slate-500 bg-slate-50 p-3 rounded-xl border border-slate-100">
+              {details}
+            </p>
           )}
 
           {/* Footer Actions */}
