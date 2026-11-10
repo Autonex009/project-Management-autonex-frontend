@@ -430,8 +430,8 @@ const EmployeeDashboard = () => {
   const userRole = localStorage.getItem("role") || localUser.role || "employee";
   const isAdmin = userRole === "admin";
   const isAdminOrHr = userRole === "admin" || userRole === "hr";
-  const employeeId = params.id || localUser.employee_id || localUser.id || 1;
-  const isSelf = !params.id || String(params.id) === String(localUser.employee_id || localUser.id);
+  const employeeId = params.id || localUser.employee_id || 1;
+  const isSelf = !params.id || String(params.id) === String(localUser.employee_id);
   const isPortalView = location.pathname.startsWith("/admin") || location.pathname.startsWith("/pm");
   const showBackButton = isPortalView && (!!params.id || !isSelf);
 
@@ -471,7 +471,7 @@ const EmployeeDashboard = () => {
     enabled: canLoadDashboard,
   });
 
-  const loggedInEmpId = Number(localUser.employee_id || localUser.id || account?.employee_id);
+  const loggedInEmpId = Number(localUser.employee_id || account?.employee_id);
   const isTeamLeadOrPm = userRole === "pm" || userRole === "team_lead";
 
   const canViewNotes = isAdminOrHr || isTeamLeadOrPm || isSelf;

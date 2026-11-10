@@ -221,7 +221,7 @@ const MyLeavesPanel = ({
 }) => {
   const queryClient = useQueryClient();
   const user = JSON.parse(localStorage.getItem("user") || "{}");
-  const employeeId = user.employee_id || user.id;
+  const employeeId = user.employee_id;
 
   const [activeTab, setActiveTab] = useState("Calendar");
   const [showLeaveForm, setShowLeaveForm] = useState(false);
@@ -388,7 +388,8 @@ const MyLeavesPanel = ({
       recordLeaveApplication({ ...variables, ...data });
       queryClient.invalidateQueries({ queryKey: ["my-leaves"] });
       queryClient.invalidateQueries({ queryKey: ["leave-balances"] });
-      queryClient.invalidateQueries(["leave-calendar"]);
+      queryClient.invalidateQueries({ queryKey: ["leave-calendar"] });
+      queryClient.invalidateQueries({ queryKey: ["dashboard-kpis"] });
       setShowLeaveForm(false);
       setLeaveForm({
         leave_type: "paid",
@@ -418,7 +419,8 @@ const MyLeavesPanel = ({
     mutationFn: (data) => wfhApi.create({ ...data, employee_id: employeeId }),
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ["my-wfh"] });
-      queryClient.invalidateQueries(["leave-calendar"]);
+      queryClient.invalidateQueries({ queryKey: ["leave-calendar"] });
+      queryClient.invalidateQueries({ queryKey: ["dashboard-kpis"] });
       setShowWfhForm(false);
       setWfhForm({ wfh_date: "", end_date: "", reason: "" });
       toast.success("WFH request submitted successfully");
@@ -435,7 +437,8 @@ const MyLeavesPanel = ({
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ["my-leaves"] });
       queryClient.invalidateQueries({ queryKey: ["leave-balances"] });
-      queryClient.invalidateQueries(["leave-calendar"]);
+      queryClient.invalidateQueries({ queryKey: ["leave-calendar"] });
+      queryClient.invalidateQueries({ queryKey: ["dashboard-kpis"] });
       setEditingLeave(null);
       toast.success("Leave request updated");
     },
@@ -448,7 +451,8 @@ const MyLeavesPanel = ({
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ["my-leaves"] });
       queryClient.invalidateQueries({ queryKey: ["leave-balances"] });
-      queryClient.invalidateQueries(["leave-calendar"]);
+      queryClient.invalidateQueries({ queryKey: ["leave-calendar"] });
+      queryClient.invalidateQueries({ queryKey: ["dashboard-kpis"] });
       toast.success("Leave request deleted");
     },
     onError: (err) =>
@@ -460,7 +464,8 @@ const MyLeavesPanel = ({
       wfhApi.update(id, { ...data, employee_id: employeeId }),
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ["my-wfh"] });
-      queryClient.invalidateQueries(["leave-calendar"]);
+      queryClient.invalidateQueries({ queryKey: ["leave-calendar"] });
+      queryClient.invalidateQueries({ queryKey: ["dashboard-kpis"] });
       setEditingWfh(null);
       toast.success("WFH request updated");
     },
@@ -474,7 +479,8 @@ const MyLeavesPanel = ({
     mutationFn: (id) => wfhApi.delete(id),
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ["my-wfh"] });
-      queryClient.invalidateQueries(["leave-calendar"]);
+      queryClient.invalidateQueries({ queryKey: ["leave-calendar"] });
+      queryClient.invalidateQueries({ queryKey: ["dashboard-kpis"] });
       toast.success("WFH request deleted");
     },
     onError: (err) =>
@@ -696,10 +702,8 @@ const MyLeavesPanel = ({
       }
     };
     addId(employeeId);
-    addId(user?.employee_id);
-    addId(user?.id);
     return s.size > 0 ? s : null;
-  }, [employeeId, user?.employee_id, user?.id]);
+  }, [employeeId]);
 
   return (
     <div className="space-y-3">
