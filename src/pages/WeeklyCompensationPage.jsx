@@ -14,6 +14,7 @@ import {
   Square,
   RotateCcw,
   Calendar as CalendarIcon,
+  Check,
   X,
   ChevronDown,
   Search,
@@ -21,6 +22,7 @@ import {
 import toast from "react-hot-toast";
 
 import { weeklyCompensationApi, subProjectApi } from "../services/api";
+import { formatDisplayName } from "../utils/displayName";
 import StatCard from "../components/dashboard/StatCard";
 import Dropdown from "../components/ui/Dropdown";
 import Button from "../components/ui/Button";
@@ -52,6 +54,20 @@ const formatDateWithDay = (dateStr) => {
     return `${month} ${day}, ${dayName}`;
   } catch {
     return dateStr;
+  }
+};
+
+// Split date into month+day and weekday for clean tabular hierarchy
+const splitDateWithDay = (dateStr) => {
+  if (!dateStr) return { date: "—", day: "" };
+  try {
+    const d = new Date(dateStr);
+    const dayName = d.toLocaleDateString("en-US", { weekday: "short" });
+    const month = d.toLocaleDateString("en-US", { month: "short" });
+    const day = d.getDate();
+    return { date: `${month} ${day}`, day: dayName };
+  } catch {
+    return { date: dateStr, day: "" };
   }
 };
 
@@ -229,10 +245,13 @@ export default function WeeklyCompensationPage() {
   // Aggregate Metrics for KPI Cards
   const metrics = useMemo(() => {
     const totalShifts = monthSummary?.total_records ?? records.length;
-    let totalSeconds = 0;
-    records.forEach((r) => {
-      totalSeconds += r.final_duration_seconds || 0;
-    });
+    let totalSeconds = monthSummary?.total_payable_seconds;
+    if (totalSeconds === undefined || totalSeconds === null) {
+      totalSeconds = 0;
+      records.forEach((r) => {
+        totalSeconds += r.final_duration_seconds || 0;
+      });
+    }
 
     const pendingCount = monthSummary?.pending_count ?? records.filter((r) => r.status === "pending").length;
     const totalPayoutVal = monthSummary?.total_effective_payout ?? 0;
@@ -414,7 +433,7 @@ export default function WeeklyCompensationPage() {
           )}
         </button>
       ),
-      width: "w-10",
+      width: "w-[3.5%]",
       align: "center",
       render: (_, record) => {
         const isSelected = selectedIds.has(record.id);
@@ -448,65 +467,75 @@ export default function WeeklyCompensationPage() {
     {
       key: "employee",
       label: "Employee",
-      width: "w-[18%]",
-      render: (_, record) => (
-        <div className="flex items-center gap-2">
-          <UserAvatar
-            src={record.avatar_url || record.employee_avatar_url}
-            name={record.employee_name}
-            size="sm"
-          />
-          <div className="min-w-0">
-            <p className="font-semibold text-slate-800 leading-tight truncate text-[12.5px]">
-              {record.employee_name || `Employee #${record.employee_id}`}
-            </p>
-            {record.employee_designation && (
-              <p className="text-[11px] text-slate-400 leading-tight truncate mt-0.5">
-                {record.employee_designation}
+      width: "w-[16%]",
+      render: (_, record) => {
+        const shortName = formatDisplayName(record.employee_name) || `Employee #${record.employee_id}`;
+        return (
+          <div className="flex items-center gap-2.5 min-w-0 py-0.5">
+            <UserAvatar
+              src={record.avatar_url || record.employee_avatar_url}
+              name={record.employee_name}
+              size="sm"
+            />
+            <div className="min-w-0 flex-1">
+              <p
+                className="font-semibold text-slate-800 leading-snug text-[13px] truncate"
+                title={record.employee_name}
+              >
+                {shortName}
               </p>
-            )}
+              {record.employee_designation && (
+                <p className="text-[11px] text-slate-400 font-medium leading-none truncate mt-0.5">
+                  {record.employee_designation}
+                </p>
+              )}
+            </div>
           </div>
-        </div>
-      ),
+        );
+      },
     },
     {
       key: "project",
       label: "Project",
-      width: "w-[14%]",
+      width: "w-[12%]",
       render: (_, record) =>
         record.project_name ? (
           <span
-            className="inline-block rounded-md border border-slate-200 bg-slate-50 px-2 py-0.5 text-[11px] font-medium text-slate-700 truncate max-w-[140px]"
+            className="inline-flex items-center rounded-md border border-slate-200/90 bg-slate-50 px-2 py-0.5 text-[11px] font-medium text-slate-700 truncate max-w-[140px] shadow-2xs"
             title={record.project_name}
           >
             {record.project_name}
           </span>
         ) : (
-          <span className="text-[12px] text-slate-400 font-medium">—</span>
+          <span className="text-[12px] text-slate-300 font-mono">—</span>
         ),
     },
     {
       key: "date",
       label: "Date & Day",
-      width: "w-[12%]",
-      render: (_, record) => (
-        <span className="font-medium text-slate-700 text-[12px] whitespace-nowrap">
-          {formatDateWithDay(record.work_date)}
-        </span>
-      ),
+      width: "w-[9%]",
+      render: (_, record) => {
+        const { date, day } = splitDateWithDay(record.work_date);
+        return (
+          <div className="text-[12px] whitespace-nowrap leading-tight">
+            <span className="font-semibold text-slate-800">{date}</span>
+            {day && <span className="text-slate-400 text-[11px] font-normal ml-1.5">{day}</span>}
+          </div>
+        );
+      },
     },
     {
       key: "portal_time",
       label: "Check In – Out",
-      width: "w-[11%]",
+      width: "w-[10%]",
       render: (_, record) =>
         record.portal_duration_seconds !== null ? (
-          <span className="font-medium text-slate-700 text-[12px]">
+          <span className="font-medium text-slate-700 text-[12px] font-mono tabular-nums">
             {formatSeconds(record.portal_duration_seconds)}
           </span>
         ) : (
-          <span className="inline-flex items-center gap-1 text-[10.5px] font-medium text-amber-700 bg-amber-50 px-1.5 py-0.5 rounded border border-amber-200">
-            <AlertCircle className="w-3 h-3" />
+          <span className="inline-flex items-center gap-1 text-[10.5px] font-semibold text-amber-700 bg-amber-50 px-1.5 py-0.5 rounded border border-amber-200/80">
+            <AlertCircle className="w-3 h-3 text-amber-600 shrink-0" />
             Missed Out
           </span>
         ),
@@ -514,32 +543,27 @@ export default function WeeklyCompensationPage() {
     {
       key: "encord_time",
       label: "Encord Time",
-      width: "w-[10%]",
+      width: "w-[9%]",
       render: (_, record) =>
         record.encord_duration_seconds > 0 ? (
-          <span className="font-medium text-slate-700 text-[12px]">
+          <span className="font-medium text-slate-700 text-[12px] font-mono tabular-nums">
             {formatSeconds(record.encord_duration_seconds)}
           </span>
         ) : (
-          <span className="text-slate-400 text-[12px]">—</span>
+          <span className="text-slate-300 text-[12px] font-mono">—</span>
         ),
     },
     {
       key: "final_time",
       label: "Final Time",
-      width: "w-[10%]",
+      width: "w-[8%]",
       render: (_, record) => {
         const isLocked = record.is_locked || isPayrollFinalized;
         return (
-          <div className="flex items-center gap-1.5 text-[12px]">
-            <span className="font-semibold text-slate-800">
+          <div className="flex items-center gap-1 text-[12px]">
+            <span className="font-semibold text-slate-800 font-mono tabular-nums">
               {(record.final_duration_seconds / 3600).toFixed(1)}h
             </span>
-            {record.portal_duration_seconds === null && (
-              <span className="text-[9.5px] text-indigo-600 bg-indigo-50 px-1 rounded font-medium">
-                (Encord)
-              </span>
-            )}
             {!isLocked && (
               <button
                 type="button"
@@ -550,7 +574,7 @@ export default function WeeklyCompensationPage() {
                   setAdjustNote(record.edit_note || "");
                   setAdjustError("");
                 }}
-                className="text-slate-400 hover:text-indigo-600 p-0.5 rounded transition-colors"
+                className="text-slate-400 hover:text-indigo-600 p-0.5 rounded transition-colors cursor-pointer"
                 title="Adjust final payable duration"
               >
                 <Edit2 className="w-3 h-3" />
@@ -562,23 +586,19 @@ export default function WeeklyCompensationPage() {
     },
     {
       key: "effective_payout",
-      label: "Effective Payout",
-      width: "w-[12%]",
+      label: "Payout",
+      width: "w-[9%]",
       render: (_, record) => {
         const isLocked = record.is_locked || isPayrollFinalized;
+
         return (
           <div className="flex items-center gap-1 text-[12px]">
-            <span className="font-bold text-slate-900 text-[12.5px]">
+            <span className="font-bold text-slate-900 text-[13px] font-mono tabular-nums tracking-tight">
               ₹{parseFloat(record.effective_payout).toLocaleString("en-IN", {
                 minimumFractionDigits: 0,
                 maximumFractionDigits: 2,
               })}
             </span>
-            {record.override_payout !== null && (
-              <span className="text-[9.5px] text-amber-700 bg-amber-50 px-1 rounded font-medium border border-amber-200">
-                Overridden
-              </span>
-            )}
             {!isLocked && (
               <button
                 type="button"
@@ -589,7 +609,7 @@ export default function WeeklyCompensationPage() {
                   setPayoutNote(record.edit_note || "");
                   setPayoutError("");
                 }}
-                className="text-slate-400 hover:text-indigo-600 p-0.5 rounded transition-colors"
+                className="text-slate-400 hover:text-indigo-600 p-0.5 rounded transition-colors cursor-pointer"
                 title="Override payout amount"
               >
                 <Edit2 className="w-3 h-3" />
@@ -602,7 +622,7 @@ export default function WeeklyCompensationPage() {
     {
       key: "audit_note",
       label: "Audit Note",
-      width: "w-[8%]",
+      width: "w-[6%]",
       align: "center",
       render: (_, record) =>
         record.edit_note ? (
@@ -624,7 +644,7 @@ export default function WeeklyCompensationPage() {
     {
       key: "status",
       label: "Status",
-      width: "w-[12%]",
+      width: "w-[8.5%]",
       align: "center",
       render: (_, record) => {
         const isFinalizedApproved =
@@ -633,72 +653,85 @@ export default function WeeklyCompensationPage() {
 
         if (isFinalizedApproved) {
           return (
-            <span
-              className="inline-flex items-center gap-1 text-[11px] font-semibold text-emerald-800 bg-emerald-50 px-2 py-0.5 rounded-full border border-emerald-200 shadow-xs"
-              title="Approved & Finalized in Payroll"
-            >
-              <CheckCircle className="w-3 h-3 text-emerald-600" />
-              <span>Approved</span>
-              <Lock className="w-2.5 h-2.5 text-emerald-700 ml-0.5" />
-            </span>
+            <div className="flex justify-center">
+              <span
+                className="inline-flex items-center gap-1 text-[11px] font-semibold text-emerald-800 bg-emerald-50 px-2.5 py-0.5 rounded-full border border-emerald-300/80 shadow-xs whitespace-nowrap"
+                title="Approved & Finalized in Payroll"
+              >
+                <CheckCircle className="w-3 h-3 text-emerald-600 shrink-0" />
+                <span>Approved</span>
+                <Lock className="w-2.5 h-2.5 text-emerald-700 ml-0.5 shrink-0" />
+              </span>
+            </div>
           );
         }
         if (record.status === "approved") {
           return (
-            <span className="inline-flex items-center gap-1 text-[11px] font-semibold text-emerald-700 bg-emerald-50 px-2 py-0.5 rounded-full border border-emerald-200">
-              <CheckCircle className="w-3 h-3 text-emerald-600" />
-              Approved
-            </span>
+            <div className="flex justify-center">
+              <span className="inline-flex items-center gap-1 text-[11px] font-semibold text-emerald-700 bg-emerald-50 px-2.5 py-0.5 rounded-full border border-emerald-200 whitespace-nowrap">
+                <CheckCircle className="w-3 h-3 text-emerald-600 shrink-0" />
+                Approved
+              </span>
+            </div>
           );
         }
         if (record.status === "rejected") {
           return (
-            <span className="inline-flex items-center gap-1 text-[11px] font-semibold text-rose-700 bg-rose-50 px-2 py-0.5 rounded-full border border-rose-200">
-              <XCircle className="w-3 h-3 text-rose-600" />
-              Rejected
-            </span>
+            <div className="flex justify-center">
+              <span className="inline-flex items-center gap-1 text-[11px] font-semibold text-rose-700 bg-rose-50 px-2.5 py-0.5 rounded-full border border-rose-200 whitespace-nowrap">
+                <XCircle className="w-3 h-3 text-rose-600 shrink-0" />
+                Rejected
+              </span>
+            </div>
           );
         }
         return (
-          <span className="inline-flex items-center gap-1 text-[11px] font-semibold text-amber-700 bg-amber-50 px-2 py-0.5 rounded-full border border-amber-200">
-            <Clock className="w-3 h-3 text-amber-500" />
-            Pending
-          </span>
+          <div className="flex justify-center">
+            <span className="inline-flex items-center gap-1 text-[11px] font-semibold text-amber-700 bg-amber-50 px-2.5 py-0.5 rounded-full border border-amber-200 whitespace-nowrap">
+              <Clock className="w-3 h-3 text-amber-500 shrink-0" />
+              Pending
+            </span>
+          </div>
         );
       },
     },
     {
       key: "actions",
       label: "Actions",
-      width: "w-[10%]",
+      width: "w-[9%]",
       align: "right",
       render: (_, record) => {
         const isLocked = record.is_locked || isPayrollFinalized;
         if (isLocked) {
-          return <span className="text-xs text-slate-300 select-none pr-1.5">—</span>;
+          return <span className="text-xs text-slate-300 select-none pr-2">—</span>;
         }
         return (
-          <div className="flex items-center justify-end gap-1">
+          <div className="flex items-center justify-end gap-1.5 pr-1">
             {record.status !== "approved" && (
-              <Button
-                size="sm"
-                variant="ghost"
+              <button
+                type="button"
                 onClick={() => approveMutation.mutate(record.id)}
-                isLoading={approveMutation.isPending && approveMutation.variables === record.id}
-                className="!py-0.5 !px-2 text-xs font-semibold text-emerald-600 hover:text-emerald-700 hover:bg-emerald-50"
+                disabled={approveMutation.isPending && approveMutation.variables === record.id}
+                title="Approve shift"
+                className="w-7 h-7 flex items-center justify-center rounded-lg text-emerald-600 hover:text-emerald-700 hover:bg-emerald-50 border border-emerald-200/60 active:scale-95 transition-all cursor-pointer disabled:opacity-50"
               >
-                Approve
-              </Button>
+                {approveMutation.isPending && approveMutation.variables === record.id ? (
+                  <span className="w-3 h-3 border-2 border-emerald-600 border-t-transparent rounded-full animate-spin" />
+                ) : (
+                  <Check className="w-3.5 h-3.5 stroke-[2.5]" />
+                )}
+              </button>
             )}
             {record.status !== "rejected" && (
-              <Button
-                size="sm"
-                variant="ghost"
+              <button
+                type="button"
                 onClick={() => setConfirmRejectRecord(record)}
-                className="!py-0.5 !px-2 text-xs font-semibold text-rose-600 hover:text-rose-700 hover:bg-rose-50"
+                disabled={rejectMutation.isPending}
+                title="Reject shift"
+                className="w-7 h-7 flex items-center justify-center rounded-lg text-rose-500 hover:text-rose-700 hover:bg-rose-50 border border-rose-200/60 active:scale-95 transition-all cursor-pointer disabled:opacity-50"
               >
-                Reject
-              </Button>
+                <X className="w-3.5 h-3.5 stroke-[2.5]" />
+              </button>
             )}
           </div>
         );
@@ -708,34 +741,48 @@ export default function WeeklyCompensationPage() {
 
   return (
     <div className="space-y-3.5">
-      {/* ── Tabs (Current Month vs History) ── */}
+      {/* ── Tabs (Current Month vs History) & Policy Pill ── */}
       <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3 border-b border-slate-200 -mt-1 pb-1">
-        <div className="flex gap-1">
-          {TABS.map((tab) => {
-            const isActive = activeTab === tab.key;
-            return (
-              <button
-                key={tab.key}
-                onClick={() => {
-                  setActiveTab(tab.key);
-                  setSelectedIds(new Set());
-                  setProjectFilter("all");
-                  setStatusFilter("all");
-                  setDateRange({ startDate: "", endDate: "" });
-                  setSearchQuery("");
-                  setPage(1);
-                }}
-                className={`inline-flex items-center gap-2 px-3.5 py-2.5 text-xs font-semibold border-b-2 -mb-px transition-colors ${
-                  isActive
-                    ? "border-indigo-600 text-indigo-700"
-                    : "border-transparent text-slate-400 hover:text-slate-600"
-                }`}
-              >
-                <tab.icon className="w-3.5 h-3.5" />
-                {tab.label}
-              </button>
-            );
-          })}
+        <div className="flex items-center gap-3">
+          <div className="flex gap-1">
+            {TABS.map((tab) => {
+              const isActive = activeTab === tab.key;
+              return (
+                <button
+                  key={tab.key}
+                  onClick={() => {
+                    setActiveTab(tab.key);
+                    setSelectedIds(new Set());
+                    setProjectFilter("all");
+                    setStatusFilter("all");
+                    setDateRange({ startDate: "", endDate: "" });
+                    setSearchQuery("");
+                    setPage(1);
+                  }}
+                  className={`inline-flex items-center gap-2 px-3.5 py-2.5 text-xs font-semibold border-b-2 -mb-px transition-colors ${
+                    isActive
+                      ? "border-indigo-600 text-indigo-700"
+                      : "border-transparent text-slate-400 hover:text-slate-600"
+                  }`}
+                >
+                  <tab.icon className="w-3.5 h-3.5" />
+                  {tab.label}
+                </button>
+              );
+            })}
+          </div>
+
+          {/* Policy Information Pill */}
+          <div className="hidden lg:inline-flex items-center gap-2 px-3 py-1 rounded-full bg-slate-100/80 border border-slate-200/70 text-[11px] text-slate-600 font-medium select-none shadow-2xs">
+            <span className="w-1.5 h-1.5 rounded-full bg-emerald-500 animate-pulse" />
+            <span className="font-semibold text-slate-800">Policy:</span>
+            <span className="font-mono text-slate-700">₹166.67/hr</span>
+            <span className="text-slate-300">·</span>
+            <span>₹1,000 for 6 hrs</span>
+            <span className="text-[10px] text-indigo-700 bg-indigo-50/80 px-1.5 py-0.2 rounded border border-indigo-200/60 font-semibold">
+              Auto-cap: ₹1,000 max
+            </span>
+          </div>
         </div>
 
         {/* History Tab Month Dropdown */}
@@ -997,8 +1044,6 @@ export default function WeeklyCompensationPage() {
           currentPage={page}
           totalItems={totalFilteredRecords}
           onPageChange={(p) => setPage(p)}
-          cellPadding="px-3.5 py-2"
-          rowHeight="h-[48px]"
           rowClassName={(record) => (selectedIds.has(record.id) ? "!bg-indigo-50/35" : "")}
           emptyState={{
             title: "No shifts found",
@@ -1048,8 +1093,32 @@ export default function WeeklyCompensationPage() {
               max="16"
               value={adjustHours}
               onChange={(e) => setAdjustHours(e.target.value)}
-              placeholder="e.g. 7.5"
+              placeholder="e.g. 6.0"
             />
+
+            {/* Live Policy Calculation Preview */}
+            {Boolean(adjustHours) && (
+              <div className="flex items-center justify-between p-3 bg-indigo-50/60 rounded-xl border border-indigo-100 text-xs">
+                <div>
+                  <span className="text-slate-500 font-medium">Auto-Calculated Payout:</span>
+                  <p className="text-[13px] font-bold text-indigo-950 font-mono mt-0.5">
+                    ₹{Math.min(1000, Math.round((parseFloat(adjustHours) || 0) * 166.67 * 100) / 100).toLocaleString("en-IN", {
+                      minimumFractionDigits: 0,
+                      maximumFractionDigits: 2,
+                    })}
+                    {(parseFloat(adjustHours) || 0) >= 6 && (
+                      <span className="ml-1.5 text-[10px] text-indigo-700 font-semibold bg-indigo-100 px-1.5 py-0.2 rounded border border-indigo-200/60">
+                        Capped at Max ₹1,000
+                      </span>
+                    )}
+                  </p>
+                </div>
+                <div className="text-right text-[11px] text-slate-500">
+                  <span className="font-semibold text-slate-700">₹166.67/hr</span>
+                  <p className="text-slate-400">Policy: ₹1,000 for 6 hrs</p>
+                </div>
+              </div>
+            )}
 
             <div>
               <label className="block text-sm font-medium text-slate-700 mb-1.5">
@@ -1119,14 +1188,18 @@ export default function WeeklyCompensationPage() {
           </Modal.Header>
 
           <Modal.Body className="space-y-4">
-            <div className="p-3 bg-slate-50 rounded-xl text-xs space-y-1">
+            <div className="p-3 bg-slate-50 rounded-xl text-xs space-y-1.5 border border-slate-200/60">
               <div className="flex justify-between">
-                <span className="text-slate-400">Calculated Payout:</span>
-                <span className="font-semibold text-slate-700">₹{payoutRecord.calculated_payout}</span>
+                <span className="text-slate-500">Auto-Calculated Payout:</span>
+                <span className="font-semibold text-slate-800 font-mono">₹{payoutRecord.calculated_payout}</span>
               </div>
               <div className="flex justify-between">
-                <span className="text-slate-400">Hourly Rate:</span>
-                <span className="font-semibold text-slate-700">₹{payoutRecord.hourly_rate}/hr</span>
+                <span className="text-slate-500">Policy Standard:</span>
+                <span className="font-semibold text-slate-800">₹166.67/hr (Auto-capped at ₹1,000 for 6 hrs)</span>
+              </div>
+              <div className="flex justify-between pt-1 border-t border-slate-200/60 text-[11px] text-indigo-700">
+                <span>Manager Discretion:</span>
+                <span className="font-medium">Can enter any custom amount (including &gt; ₹1,000)</span>
               </div>
             </div>
 
@@ -1137,7 +1210,7 @@ export default function WeeklyCompensationPage() {
               min="0"
               value={overrideAmount}
               onChange={(e) => setOverrideAmount(e.target.value)}
-              placeholder="e.g. 1000"
+              placeholder="e.g. 1000 or custom amount"
             />
 
             <div>
