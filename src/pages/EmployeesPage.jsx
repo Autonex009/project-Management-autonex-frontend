@@ -1762,8 +1762,9 @@ const EmployeesPage = () => {
   const createMutation = useMutation({
     mutationFn: employeeApi.create,
     onSuccess: (res) => {
-      queryClient.invalidateQueries(["employees"]);
-      queryClient.invalidateQueries(["skills"]); // Refresh skills in case new ones were added
+      queryClient.invalidateQueries({ queryKey: ["employees"] });
+      queryClient.invalidateQueries({ queryKey: ["skills"] }); // Refresh skills in case new ones were added
+      queryClient.invalidateQueries({ queryKey: ["dashboard-kpis"] });
       setIsModalOpen(false);
       if (res && res.temp_password) {
         setNewlyCreatedCredentials({
@@ -1788,10 +1789,13 @@ const EmployeesPage = () => {
       return res;
     },
     onSuccess: (res, variables) => {
-      queryClient.invalidateQueries(["employees"]);
-      queryClient.invalidateQueries(["all-employees-kpis"]);
-      queryClient.invalidateQueries(["allocations"]);
-      queryClient.invalidateQueries(["skills"]);
+      queryClient.invalidateQueries({ queryKey: ["employees"] });
+      queryClient.invalidateQueries({ queryKey: ["all-employees-kpis"] });
+      queryClient.invalidateQueries({ queryKey: ["allocations"] });
+      queryClient.invalidateQueries({ queryKey: ["skills"] });
+      queryClient.invalidateQueries({ queryKey: ["dashboard-kpis"] });
+      queryClient.invalidateQueries({ queryKey: ["leave-balances"] });
+      queryClient.invalidateQueries({ queryKey: ["employee-profile"] });
       setIsModalOpen(false);
       setEditingEmployee(null);
 
@@ -1817,9 +1821,10 @@ const EmployeesPage = () => {
       return res;
     },
     onSuccess: (_, id) => {
-      queryClient.invalidateQueries(["employees"]);
-      queryClient.invalidateQueries(["all-employees-kpis"]);
-      queryClient.invalidateQueries(["allocations"]);
+      queryClient.invalidateQueries({ queryKey: ["employees"] });
+      queryClient.invalidateQueries({ queryKey: ["all-employees-kpis"] });
+      queryClient.invalidateQueries({ queryKey: ["allocations"] });
+      queryClient.invalidateQueries({ queryKey: ["dashboard-kpis"] });
       toast.success("Employee archived and projects unassigned");
     },
     onError: (err) => {
@@ -1830,9 +1835,10 @@ const EmployeesPage = () => {
   const restoreMutation = useMutation({
     mutationFn: employeeApi.restore,
     onSuccess: (_, id) => {
-      queryClient.invalidateQueries(["employees"]);
-      queryClient.invalidateQueries(["all-employees-kpis"]);
-      queryClient.invalidateQueries(["allocations"]);
+      queryClient.invalidateQueries({ queryKey: ["employees"] });
+      queryClient.invalidateQueries({ queryKey: ["all-employees-kpis"] });
+      queryClient.invalidateQueries({ queryKey: ["allocations"] });
+      queryClient.invalidateQueries({ queryKey: ["dashboard-kpis"] });
       toast.success("Employee restored successfully");
     },
     onError: (err) => {
@@ -1844,8 +1850,11 @@ const EmployeesPage = () => {
     mutationFn: ({ id, converted_by }) =>
       employeeApi.convertToFulltime(id, { converted_by }),
     onSuccess: (emp) => {
-      queryClient.invalidateQueries(["employees"]);
-      queryClient.invalidateQueries(["all-employees-kpis"]);
+      queryClient.invalidateQueries({ queryKey: ["employees"] });
+      queryClient.invalidateQueries({ queryKey: ["all-employees-kpis"] });
+      queryClient.invalidateQueries({ queryKey: ["dashboard-kpis"] });
+      queryClient.invalidateQueries({ queryKey: ["leave-balances"] });
+      queryClient.invalidateQueries({ queryKey: ["employee-profile"] });
       toast.success(
         `${formatDisplayName(emp?.name) || emp?.name || "Employee"} converted to Full-time`,
       );
