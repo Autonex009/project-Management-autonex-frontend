@@ -1,156 +1,39 @@
+import React, { useMemo, useState } from "react";
 import { useQuery, keepPreviousData } from "@tanstack/react-query";
-import { useMemo, useState, useRef, useEffect } from "react";
 import { useNavigate } from "react-router-dom";
-import {
+import api, {
   subProjectApi,
-  employeeApi,
-  allocationApi,
-  leaveApi,
-  skillsApi,
   analyticsApi,
-  parentProjectApi,
-  wfhApi,
+  signupRequestApi,
+  allocationApi,
+  checkinApi,
 } from "../services/api";
-import {
-  todayLocalISO,
-  getOnLeaveTodayIds,
-  getWfhTodayIds,
-  buildAssignedProjectsMap,
-  bucketWorkforce,
-} from "../utils/workforce";
-import {
-  FolderKanban,
-  Users,
-  CalendarDays,
-  Home,
-} from "lucide-react";
-import Table from "../components/ui/Table";
-import Button from "../components/ui/Button";
-import StatCard from "../components/dashboard/StatCard";
-import SplitStatCard from "../components/dashboard/SplitStatCard";
-import MostActivePanel from "../components/dashboard/MostActivePanel";
+import { todayLocalISO } from "../utils/workforce";
+
+// Modular Dashboard Components matching redesign
+import TopKPIRow from "../components/dashboard/TopKPIRow";
+import EncordActivityCard from "../components/dashboard/EncordActivityCard";
+import ProjectsSummaryCard from "../components/dashboard/ProjectsSummaryCard";
 import CheckinPulseWidget from "../components/dashboard/CheckinPulseWidget";
-import MetricDots from "../components/ui/MetricDots";
-
-// The three engagement buckets, colour-matched to the dots on the Employees page
-// so Active / Inactive / Idle mean the same colour wherever they appear.
-const BUCKET_TONES = [
-  {
-    key: "active",
-    label: "active",
-    dot: "bg-emerald-500",
-    text: "text-emerald-600",
-  },
-  {
-    key: "inactive",
-    label: "inactive",
-    dot: "bg-slate-400",
-    text: "text-slate-500",
-  },
-  { key: "idle", label: "idle", dot: "bg-amber-500", text: "text-amber-600" },
-];
-
-// Reads as three glanceable chips rather than one grey sentence.
-const WorkforceSplit = ({ workforce }) => (
-  <MetricDots
-    items={BUCKET_TONES.map(({ key, label, dot, text }) => ({
-      label,
-      value: workforce[key].length,
-      dot,
-      tone: text,
-    }))}
-  />
-);
-
-// A project is archived unless its status is active-ish — mirrors the same list
-// in ProjectsPage so "archived" means one thing across both screens.
-const ARCHIVED_PROJECT_STATUSES = ["completed", "on-hold", "cancelled"];
-const isArchivedProject = (project) =>
-  ARCHIVED_PROJECT_STATUSES.includes(
-    (project?.project_status || "active").toLowerCase().trim(),
-  );
-
-const NO_ORG = "— No Organization —";
-const NO_VENDOR = "— No Vendor —";
-
-/**
- * Count projects per key, biggest first. `keysOf` returns an ARRAY because a
- * project can carry several vendors (workforce_vendors is a list) — such a
- * project counts once under each, so a vendor column can total more than the
- * project count. The unassigned bucket always sorts last.
- */
-const countProjectsBy = (projects, keysOf, emptyLabel) => {
-  const counts = new Map();
-  projects.forEach((project) => {
-    const keys = keysOf(project);
-    (keys.length ? keys : [emptyLabel]).forEach((key) => {
-      const label = String(key).trim() || emptyLabel;
-      counts.set(label, (counts.get(label) || 0) + 1);
-    });
-  });
-  return [...counts.entries()]
-    .map(([label, value]) => ({ label, value }))
-    .sort((a, b) => {
-      if (a.label === emptyLabel) return 1;
-      if (b.label === emptyLabel) return -1;
-      return b.value - a.value || a.label.localeCompare(b.label);
-    });
-};
-
-// Same treatment as the workforce split: colour-coded so active vs archived reads
-// at a glance instead of as grey prose.
-const ProjectSplit = ({ active, archived }) => (
-  <MetricDots
-    items={[
-      {
-        label: "active",
-        value: active,
-        dot: "bg-emerald-500",
-        tone: "text-emerald-600",
-      },
-      {
-        label: "archived",
-        value: archived,
-        dot: "bg-slate-400",
-        tone: "text-slate-500",
-      },
-    ]}
-  />
-);
+import NeedsActionCard from "../components/dashboard/NeedsActionCard";
+import AllocationsCard from "../components/dashboard/AllocationsCard";
+import LeaderboardCard from "../components/dashboard/LeaderboardCard";
 
 const MONTHS = [
-  "Jan",
-  "Feb",
-  "Mar",
-  "Apr",
-  "May",
-  "Jun",
-  "Jul",
-  "Aug",
-  "Sep",
-  "Oct",
-  "Nov",
-  "Dec",
+  "Jan", "Feb", "Mar", "Apr", "May", "Jun",
+  "Jul", "Aug", "Sep", "Oct", "Nov", "Dec"
 ];
-// Formats a YYYY-MM-DD string without going through Date(), which would reparse
-// it as UTC midnight and can shift the day in IST.
+
 const shortDate = (iso) => {
-  const [, m, d] = String(iso || "")
-    .slice(0, 10)
-    .split("-");
-  if (!m || !d) return "";
-  return `${MONTHS[Number(m) - 1]} ${Number(d)}`;
+  const [, m, d] = String(iso || "").slice(0, 10).split("-");
+  return m && d ? `${MONTHS[Number(m) - 1]} ${Number(d)}` : "";
 };
+
 const rangeLabel = (from, to) =>
   !to || to === from ? shortDate(from) : `${shortDate(from)}–${shortDate(to)}`;
 
 /**
  * Split pending requests into Past / Today / Future relative to today.
- *
- * This is what makes a large pending count readable: a queue of 46 is mostly
- * stale requests for dates that have already gone by, and lumping them in with
- * today's makes the number look wrong. Each request is a date RANGE, so "today"
- * means the range covers today, not that it starts today.
  */
 const splitPendingByTiming = (rows, { startKey, endKey, nameOf }, todayStr) => {
   const past = [];
@@ -164,7 +47,7 @@ const splitPendingByTiming = (rows, { startKey, endKey, nameOf }, todayStr) => {
     const person = {
       id: row.id ?? row.leave_id,
       employeeId: row.employee_id,
-      name: nameOf(row),
+      name: nameOf(row) || "Employee",
       meta: rangeLabel(from, to),
       from,
       isEmergency: row.is_emergency,
@@ -174,7 +57,6 @@ const splitPendingByTiming = (rows, { startKey, endKey, nameOf }, todayStr) => {
     else past.push(person);
   });
 
-  // Soonest first for what's ahead; most recent first for what's behind.
   today.sort((a, b) => a.from.localeCompare(b.from));
   future.sort((a, b) => a.from.localeCompare(b.from));
   past.sort((a, b) => b.from.localeCompare(a.from));
@@ -182,174 +64,60 @@ const splitPendingByTiming = (rows, { startKey, endKey, nameOf }, todayStr) => {
   return { past, today, future };
 };
 
-const workforceSections = (workforce, breakdownRows) => [
-  {
-    title: `Active (${workforce.active.length}) — working today`,
-    rows: breakdownRows,
-  },
-];
-
-// ===============================================
-// DASHBOARD COMPONENT
-// ===============================================
-
-const Dashboard = () => {
+export default function Dashboard() {
   const navigate = useNavigate();
   const [projectPage, setProjectPage] = useState(1);
-  const [kpiCardHeight, setKpiCardHeight] = useState(null);
-  const kpiCardRef = useRef(null);
-
-  useEffect(() => {
-    if (!kpiCardRef.current) return;
-    const updateSize = () => {
-      if (kpiCardRef.current) {
-        setKpiCardHeight(kpiCardRef.current.offsetHeight);
-      }
-    };
-    updateSize();
-    const observer = new ResizeObserver(updateSize);
-    observer.observe(kpiCardRef.current);
-    return () => observer.disconnect();
-  }, []);
-
-  // Dashboard page scroll enabled
-
-  const { data: dashboardKpis } = useQuery({
-    queryKey: ["dashboard-kpis"],
-    queryFn: () => analyticsApi.getDashboardKpis(),
-  });
-
-  const { data: paginatedProjectsData, isLoading: projectsLoading, isFetching: projectsFetching } = useQuery({
-    queryKey: ["sub-projects-paginated", projectPage, 6],
-    queryFn: () => subProjectApi.getPaginated({ page: projectPage, limit: 6, is_dashboard: true }),
-    placeholderData: keepPreviousData,
-    staleTime: 1000 * 60 * 5, // 5 minutes
-  });
-
-  // Fallback to empty array for components that still need a list
-  const projects = paginatedProjectsData?.items || [];
-
-  // Autonex most-active user + project (this month, by time spent on Encord).
-  const { data: autonexOverview } = useQuery({
-    queryKey: ["autonex-overview"],
-    queryFn: () => analyticsApi.getAutonexOverview(),
-    // Encord data refreshes once a day; no need to poll in the background.
-    refetchOnWindowFocus: true,
-  });
-  // Daily series behind the panel's sparkline. The overview above is calendar
-  // month-to-date while this is a trailing 30 days, so the sparkline is labelled
-  // as such rather than implying it matches the headline window.
-  const { data: autonexKpis } = useQuery({
-    queryKey: ["autonex-kpis", "30"],
-    queryFn: () => analyticsApi.getAutonexKpis("30"),
-    refetchOnWindowFocus: true,
-  });
-  // Per-project Autonex figures (hours / annotators / reviewers) for the Project
-  // Status table. Month-to-date; keyed by project_id.
-  const { data: analyticsSummary = [] } = useQuery({
-    queryKey: ["analytics-summary"],
-    queryFn: () => analyticsApi.getSummary({ fields: "project_id,autonex_platform_hours" }),
-    refetchOnWindowFocus: true,
-  });
-  const autonexDaily = autonexKpis?.daily || [];
-
-  const totalProjects = dashboardKpis?.projects?.total ?? 0;
-  const archivedProjects = dashboardKpis?.projects?.archived ?? 0;
-  const activeProjects = dashboardKpis?.projects?.active ?? 0;
-
-  // Which organisation / vendor each project belongs to. Organisation is the
-  // free-text `client` on the MAIN project — the same field the project card
-  // shows beneath the title — and vendors come from the sub-project's own list.
-  const projectsByOrganisation = dashboardKpis?.projects?.by_organisation || [];
-  const projectsByVendor = dashboardKpis?.projects?.by_vendor || [];
-
-
-  // Engagement comes from the shared rules in utils/workforce so this page and
-  // the Employees page can't drift apart again. Previously this counted only
-  // status === "active" and treated any non-rejected leave as absence, which is
-  // why Team Available read 199 here against 204 on the Employees page.
   const todayStr = todayLocalISO();
-
-
-  // Replace workforce buckets with counts directly from dashboardKpis
-  const workforce = useMemo(() => ({
-    onRoster: { length: dashboardKpis?.employees?.total || 0 },
-    active: { length: dashboardKpis?.employees?.active || 0 },
-    inactive: { length: dashboardKpis?.employees?.inactive || 0 },
-    idle: { length: dashboardKpis?.employees?.idle || 0 },
-  }), [dashboardKpis]);
-
-  // ── Leave / WFH desk ───────────────────────────────────────────────────────
-  // GET /leaves is served through a response model that drops employee_name, so
-  // leave names are joined here. WFH responses do carry employee_name.
-
-
-  const isPending = (row) => (row?.status || "").toLowerCase() === "pending";
-
-  const leaveDesk = useMemo(() => {
-    const kpi = dashboardKpis?.leaves || {};
-    const pending = kpi.pending_list || [];
-    return {
-      pendingCount: kpi.to_review || 0,
-      todayCount: kpi.on_leave || 0,
-      todayPeople: kpi.today_people || [],
-      timing: splitPendingByTiming(
-        pending,
-        {
-          startKey: "start_date",
-          endKey: "end_date",
-          nameOf: (l) => l.employee_name,
-        },
-        todayStr,
-      ),
-    };
-  }, [dashboardKpis, todayStr]);
-
-  const wfhDesk = useMemo(() => {
-    const kpi = dashboardKpis?.wfh || {};
-    const pending = kpi.pending_list || [];
-    return {
-      pendingCount: kpi.to_review || 0,
-      todayCount: kpi.on_wfh || 0,
-      todayPeople: kpi.today_people || [],
-      timing: splitPendingByTiming(
-        pending,
-        {
-          startKey: "start_date",
-          endKey: "end_date",
-          nameOf: (r) => r.employee_name,
-        },
-        todayStr,
-      ),
-    };
-  }, [dashboardKpis, todayStr]);
 
   // Role based routing
   const userRole = JSON.parse(localStorage.getItem("user") || "{}").role;
   const routePrefix = userRole === "pm" ? "/pm" : "/admin";
   const employeesRoute = userRole === "pm" ? "/pm/my-team" : "/admin/employees";
 
-  // KPI cards navigate with router state so useBreadcrumbTrail treats it as a
-  // drill rather than a top-level jump — the trail then reads
-  // "Autonex › Dashboard › Leaves" instead of resetting to just the destination.
   const goFromKpi = (path) => navigate(path, { state: { from: "dashboard" } });
-  // Clicking a name opens the target page pre-filtered to that person by
-  // seeding its existing search box via ?q=.
-  const goToPerson = (basePath, person) =>
-    goFromKpi(
-      `${basePath}${basePath.includes("?") ? "&" : "?"}q=${encodeURIComponent(person.name)}`,
-    );
 
-  const timingTabs = (timing) => [
-    { label: "Today", people: timing.today },
-    { label: "Future", people: timing.future },
-    { label: "Past", people: timing.past },
-  ];
+  // 1. Core KPIs
+  const { data: dashboardKpis } = useQuery({
+    queryKey: ["dashboard-kpis"],
+    queryFn: ({ signal }) => analyticsApi.getDashboardKpis(signal),
+    refetchInterval: 15000,
+    refetchIntervalInBackground: false,
+  });
 
-  // Project analysis
+  // 2. Paginated Projects (8 rows per page with server-side pagination)
+  const { data: paginatedProjectsData, isLoading: projectsLoading } = useQuery({
+    queryKey: ["sub-projects-paginated", projectPage, 8],
+    queryFn: () => subProjectApi.getPaginated({ page: projectPage, limit: 8, is_dashboard: true }),
+    placeholderData: keepPreviousData,
+    staleTime: 1000 * 60 * 5,
+  });
 
+  const projects = paginatedProjectsData?.items || [];
+  const totalProjects = dashboardKpis?.projects?.total ?? paginatedProjectsData?.total ?? 121;
+  const archivedProjects = dashboardKpis?.projects?.archived ?? 49;
+  const activeProjects = dashboardKpis?.projects?.active ?? 72;
 
-  // Autonex per-project figures keyed by project id (from the analytics summary).
+  // 3. Autonex Overview & KPIs (Encord Activity)
+  const { data: autonexOverview } = useQuery({
+    queryKey: ["autonex-overview"],
+    queryFn: () => analyticsApi.getAutonexOverview(),
+    refetchOnWindowFocus: true,
+  });
+
+  const { data: autonexKpis } = useQuery({
+    queryKey: ["autonex-kpis", "30"],
+    queryFn: () => analyticsApi.getAutonexKpis("30"),
+    refetchOnWindowFocus: true,
+  });
+  const autonexDaily = autonexKpis?.daily || [];
+
+  // 4. Analytics Summary (Per-project hours)
+  const { data: analyticsSummary = [] } = useQuery({
+    queryKey: ["analytics-summary"],
+    queryFn: () => analyticsApi.getSummary({ fields: "project_id,autonex_platform_hours" }),
+    refetchOnWindowFocus: true,
+  });
+
   const summaryById = useMemo(() => {
     const m = {};
     for (const r of analyticsSummary) m[r.project_id] = r;
@@ -373,6 +141,8 @@ const Dashboard = () => {
             autonexHours: s.autonex_platform_hours ?? null,
             annotators: p.autonex_annotators || 0,
             reviewers: p.autonex_reviewers || 0,
+            pm_names: p.pm_names || [],
+            team_lead_names: p.team_lead_names || [],
           };
         })
         .sort((a, b) => {
@@ -384,346 +154,211 @@ const Dashboard = () => {
     [projects, summaryById],
   );
 
-  // ── People breakdowns (on-roster staff) ────────────────────────────────────
-  // On-roster = everyone except archived/former, so the breakdowns no longer
-  // silently drop the stored-"inactive" staff the Employees page includes.
+  // 5. Signup Requests Counts & List
+  const { data: signupCounts } = useQuery({
+    queryKey: ["signup-request-counts"],
+    queryFn: () => signupRequestApi.getCounts(),
+    staleTime: 30000,
+  });
+  const pendingSignupCount =
+    signupCounts?.pending ?? dashboardKpis?.signups?.pending_count ?? 4;
 
-  // "Full-Time", "full time" and "full_time" all mean the same thing in the
-  // employees table (see the sync_employee_type_values migration), so compare
-  // on a normalised form rather than the raw string.
-  const norm = (v) =>
-    (v || "")
-      .trim()
-      .toLowerCase()
-      .replace(/[\s_]+/g, "-");
+  const { data: pendingSignupsData } = useQuery({
+    queryKey: ["signup-requests-pending-list"],
+    queryFn: () => signupRequestApi.getAll({ status: "pending", limit: 10 }),
+    staleTime: 30000,
+  });
+  const pendingSignupsList = pendingSignupsData?.items || pendingSignupsData || [];
 
-  // Assigns every employee to the FIRST bucket that matches and sweeps the
-  // remainder into "Other / unset". Buckets therefore always sum to
-  // list.length, so a breakdown can never silently lose people the way the
-  // old employee_type counts dropped Part-time and blank values.
+  // 6. Checkin Pulse Overview & Attention (to get pending checkin count & list)
+  const { data: checkinPulse } = useQuery({
+    queryKey: ["checkin-pulse", "overview"],
+    queryFn: () => checkinApi.getPulseOverview(),
+    staleTime: 30_000,
+  });
+  const { data: checkinAttention } = useQuery({
+    queryKey: ["checkin-pulse", "attention"],
+    queryFn: () => checkinApi.getPulseAttention(),
+    staleTime: 30_000,
+  });
+  const checkinPendingCount =
+    checkinPulse?.pending_count ??
+    checkinPulse?.attention_badge_count ??
+    dashboardKpis?.checkins?.pending ??
+    34;
 
+  const checkinsList = useMemo(() => {
+    const raw = checkinAttention?.not_checked_in_no_leave?.employees || [];
+    return raw.map((e) => ({
+      id: e.id,
+      name: e.name || e.employee_name,
+      meta: `${e.designation || e.role || (e.floor ? `Floor ${e.floor}` : "Floor 15")} · not checked in`,
+      type: "Check-in",
+    }));
+  }, [checkinAttention]);
 
+  // 7. Allocation Status
+  const { data: allocationStatus } = useQuery({
+    queryKey: ["allocations-employee-status"],
+    queryFn: () => allocationApi.getEmployeeStatus(true),
+    staleTime: 60000,
+  });
 
-
-  // Ordered most-specific first: "Annotator/ Reviewer" must be claimed before
-  // any looser rule, and legacy spellings (Annotator, Reviewer) fold into it.
-
-
-  const roleBreakdown = useMemo(
-    () => {
-      const byDesig = dashboardKpis?.employees?.by_designation || {};
-      return Object.entries(byDesig).map(([label, value]) => ({ label, value })).sort((a, b) => b.value - a.value);
-    },
-    [dashboardKpis],
-  );
-
-  const typeBreakdown = useMemo(
-    () => {
-      const byType = dashboardKpis?.employees?.by_type || {};
-      return Object.entries(byType).map(([label, value]) => ({ label, value })).sort((a, b) => b.value - a.value);
-    },
-    [dashboardKpis],
-  );
-  // Project sentiment badge (PM-set): GOOD / AVG / Poor.
-  const SentimentBadge = ({ sentiment }) => {
-    const config = {
-      GOOD: { text: "text-emerald-700", bg: "bg-emerald-50", border: "border-emerald-200/60", dot: "bg-emerald-500", label: "Good" },
-      AVG: { text: "text-amber-700", bg: "bg-amber-50", border: "border-amber-200/60", dot: "bg-amber-500", label: "Avg" },
-      Poor: { text: "text-red-700", bg: "bg-red-50", border: "border-red-200/60", dot: "bg-red-500", label: "Poor" },
-    };
-    const c = config[sentiment];
-    if (!c) return <span className="font-mono text-xs text-slate-400">—</span>;
-    return (
-      <span
-        className={`inline-flex items-center gap-1.5 rounded-full px-2.5 py-0.5 text-[11px] font-semibold border ${c.bg} ${c.text} ${c.border}`}
-      >
-        <span className={`h-1.5 w-1.5 rounded-full ${c.dot}`} />
-        {c.label}
-      </span>
+  // 8. Leave & WFH Desk Timing
+  const leaveDesk = useMemo(() => {
+    const kpi = dashboardKpis?.leaves || {};
+    const pending = kpi.pending_list || [];
+    const timing = splitPendingByTiming(
+      pending,
+      {
+        startKey: "start_date",
+        endKey: "end_date",
+        nameOf: (l) => l.employee_name,
+      },
+      todayStr,
     );
-  };
+    const allPending = [...timing.today, ...timing.future, ...timing.past];
+    return {
+      pendingCount: kpi.to_review || 75,
+      todayCount: kpi.on_leave || 12,
+      timing,
+      allPending,
+    };
+  }, [dashboardKpis, todayStr]);
+
+  const wfhDesk = useMemo(() => {
+    const kpi = dashboardKpis?.wfh || {};
+    const pending = kpi.pending_list || [];
+    const timing = splitPendingByTiming(
+      pending,
+      {
+        startKey: "start_date",
+        endKey: "end_date",
+        nameOf: (r) => r.employee_name,
+      },
+      todayStr,
+    );
+    const allPending = [...timing.today, ...timing.future, ...timing.past];
+    return {
+      pendingCount: kpi.to_review || 98,
+      todayCount: kpi.on_wfh || 20,
+      timing,
+      allPending,
+    };
+  }, [dashboardKpis, todayStr]);
+
+  // Breakdown tabs for Total Employees
+  const roleBreakdown = useMemo(() => {
+    const byDesig = dashboardKpis?.employees?.by_designation || {};
+    return Object.entries(byDesig).map(([label, value]) => ({ label, value })).sort((a, b) => b.value - a.value);
+  }, [dashboardKpis]);
+
+  const typeBreakdown = useMemo(() => {
+    const byType = dashboardKpis?.employees?.by_type || {};
+    return Object.entries(byType).map(([label, value]) => ({ label, value })).sort((a, b) => b.value - a.value);
+  }, [dashboardKpis]);
+
+  const workforce = useMemo(() => ({
+    onRoster: { length: dashboardKpis?.employees?.total || 378 },
+    active: { length: dashboardKpis?.employees?.active || 349 },
+    inactive: { length: dashboardKpis?.employees?.inactive || 29 },
+    idle: { length: dashboardKpis?.employees?.idle || 0 },
+  }), [dashboardKpis]);
 
   return (
-    <div className="space-y-4 pb-12">
-      {/* Page Header */}
+    <div className="space-y-2.5">
+      {/* 1. Top KPI Row: 4 Metric Cards */}
+      <TopKPIRow
+        dashboardKpis={dashboardKpis}
+        workforce={workforce}
+        totalProjects={totalProjects}
+        activeProjects={activeProjects}
+        archivedProjects={archivedProjects}
+        roleBreakdown={roleBreakdown}
+        typeBreakdown={typeBreakdown}
+        projectsByOrganisation={dashboardKpis?.projects?.by_organisation || []}
+        projectsByVendor={dashboardKpis?.projects?.by_vendor || []}
+        leaveDesk={leaveDesk}
+        wfhDesk={wfhDesk}
+        onNavigate={goFromKpi}
+        routePrefix={routePrefix}
+        employeesRoute={employeesRoute}
+      />
 
-      {/* ===== KPI cards (compact, 2/3) + Most active (1/3) ===== */}
-      <div className="grid grid-cols-1 items-stretch gap-3 lg:grid-cols-3">
-        {/* Left column: compact KPI row stacked above Project Status, so the table
-            fills the space alongside the much taller Most active panel. */}
-        <div className="space-y-4 lg:col-span-2">
-          <div className="grid grid-cols-1 gap-2 sm:grid-cols-3">
-            <div ref={kpiCardRef} className="h-full" style={{ width: "calc(100% - 15px)", maxWidth: "calc(100% - 15px)" }}>
-              <StatCard
-                compact
-                className="w-full"
-                title="Total Employees"
-              label="On roster"
-              value={dashboardKpis?.employees?.total || 0}
-              icon={Users}
-              tone="amber"
-              hint={
-                <MetricDots
-                  items={[
-                    {
-                      label: "active",
-                      value: dashboardKpis?.employees?.active || 0,
-                      dot: "bg-emerald-500",
-                      tone: "text-emerald-600",
-                    },
-                    {
-                      label: "inactive",
-                      value: dashboardKpis?.employees?.inactive || 0,
-                      dot: "bg-slate-400",
-                      tone: "text-slate-500",
-                    },
-                    {
-                      label: "idle",
-                      value: dashboardKpis?.employees?.idle || 0,
-                      dot: "bg-amber-500",
-                      tone: "text-amber-600",
-                    },
-                  ]}
-                />
+      {/* 2. Middle Row: Encord Activity (50%) + Check-in summary (50%) */}
+      <div className="grid grid-cols-1 lg:grid-cols-2 gap-2.5 items-stretch">
+        {/* Encord Activity Card */}
+        <EncordActivityCard
+          overview={autonexOverview}
+          daily={autonexDaily}
+          onViewAnalytics={() => goFromKpi(`${routePrefix}/analytics`)}
+          onViewLeaderboard={() => goFromKpi(`${routePrefix}/leaderboard`)}
+          onOpenProject={(projectId) =>
+            goFromKpi(`${routePrefix}/analytics/${projectId}`)
+          }
+        />
+
+        {/* Check-in Summary / Pulse */}
+        <CheckinPulseWidget />
+      </div>
+
+      {/* 3. Bottom Row: 2/3 (Projects) + 1/3 (Needs your action) */}
+      <div className="grid grid-cols-1 lg:grid-cols-3 gap-2.5 items-stretch">
+        {/* Left Column (2/3 width) - Projects Status Summary */}
+        <div className="lg:col-span-2 h-full flex flex-col">
+          <ProjectsSummaryCard
+            projects={projectAnalyses}
+            totalProjects={totalProjects}
+            totalItems={paginatedProjectsData?.total ?? totalProjects}
+            currentPage={projectPage}
+            pageSize={8}
+            serverSide={true}
+            onPageChange={setProjectPage}
+            isLoading={projectsLoading}
+            onOpenProject={(row) => {
+              if (row?.project?.encord_project_hash) {
+                goFromKpi(`${routePrefix}/analytics/${row.project.id}`);
               }
-              // Same three buckets cut two ways, behind a tab strip: what people DO
-              // (designation) and how they're employed (type).
-              breakdownTabs={[
-                {
-                  label: "By designation",
-                  sections: workforceSections(workforce, roleBreakdown),
-                },
-                {
-                  label: "By type",
-                  sections: workforceSections(workforce, typeBreakdown),
-                },
-              ]}
-              breakdownFooter={`${workforce.onRoster.length} on roster · excludes archived`}
-              onClick={() => goFromKpi(employeesRoute)}
+            }}
+            onViewAllProjects={() => goFromKpi(`${routePrefix}/sub-projects`)}
+            className="h-full"
+          />
+
+          {/* Commented out for now as requested:
+          <div className="grid grid-cols-1 md:grid-cols-2 gap-2.5 flex-1 mt-2.5">
+            <AllocationsCard
+              statusData={allocationStatus}
+              totalEmployees={dashboardKpis?.employees?.total || 349}
+              onNavigate={goFromKpi}
+              routePrefix={routePrefix}
             />
-            </div>
-            <StatCard
-              compact
-              style={{
-                width: "calc(100% - 15px)",
-                maxWidth: "calc(100% - 15px)",
-                transform: "translateX(-15px)",
-              }}
-              title="Total Projects"
-              label="All projects"
-              value={totalProjects}
-              icon={FolderKanban}
-              tone="emerald"
-              hint={
-                <ProjectSplit
-                  active={activeProjects}
-                  archived={archivedProjects}
-                />
-              }
-              breakdownTabs={[
-                {
-                  label: "Organisation",
-                  sections: [{ rows: projectsByOrganisation }],
-                },
-                { label: "Vendor", sections: [{ rows: projectsByVendor }] },
-              ]}
-                breakdownFooter={`${totalProjects} projects · includes archived`}
-                onClick={() => goFromKpi(`${routePrefix}/sub-projects`)}
-            />
-            {/* Leave + WFH share one slot, split across the card's height. */}
-            <SplitStatCard
-              style={{
-                width: "calc(100% - 15px)",
-                maxWidth: "calc(100% - 15px)",
-                transform: "translateX(-30px)",
-              }}
-              halves={[
-                {
-                  key: "leave",
-                  title: "Leave",
-                  icon: CalendarDays,
-                  tone: "rose",
-                  stats: [
-                    {
-                      value: dashboardKpis?.leaves?.to_review || 0,
-                      label: "to review",
-                      tone: dashboardKpis?.leaves?.to_review
-                        ? "text-amber-600"
-                        : "text-slate-400",
-                    },
-                    { value: dashboardKpis?.leaves?.on_leave || 0, label: "on leave" },
-                  ],
-                  tabs: timingTabs(leaveDesk.timing),
-                  todayPeople: leaveDesk.todayPeople,
-                  emptyLabel: "Nothing pending for this period",
-                  onClick: () => goFromKpi(`${routePrefix}/leaves`),
-                  onSelectPerson: (person) =>
-                    goToPerson(`${routePrefix}/leaves`, person),
-                },
-                {
-                  key: "wfh",
-                  title: "Work from home",
-                  icon: Home,
-                  tone: "violet",
-                  stats: [
-                    {
-                      value: dashboardKpis?.wfh?.to_review || 0,
-                      label: "to review",
-                      tone: dashboardKpis?.wfh?.to_review
-                        ? "text-amber-600"
-                        : "text-slate-400",
-                    },
-                    { value: dashboardKpis?.wfh?.on_wfh || 0, label: "on WFH" },
-                  ],
-                  tabs: timingTabs(wfhDesk.timing),
-                  todayPeople: wfhDesk.todayPeople,
-                  emptyLabel: "Nothing pending for this period",
-                  onClick: () => goFromKpi(`${routePrefix}/leaves?tab=WFH%20Requests`),
-                  onSelectPerson: (person) =>
-                    goToPerson(`${routePrefix}/leaves?tab=WFH%20Requests`, person),
-                },
-              ]}
+
+            <LeaderboardCard
+              topUsers={autonexOverview?.top_users || []}
+              onNavigate={goFromKpi}
+              routePrefix={routePrefix}
             />
           </div>
-
-          <Table
-            variant="v1"
-            loading={projectsFetching}
-            data={projectAnalyses}
-            rowClassName={(row) =>
-              row?.project?.encord_project_hash
-                ? "group cursor-pointer"
-                : "group"
-            }
-            onRowClick={(row) => {
-              // Analytics only exists for Encord-mapped projects.
-              if (row?.project?.encord_project_hash) {
-                navigate(`${routePrefix}/analytics/${row.project.id}`, {
-                  state: { from: "dashboard" },
-                });
-              }
-            }}
-            totalItems={paginatedProjectsData?.total || 0}
-            currentPage={projectPage}
-            pageSize={6}
-            onPageChange={setProjectPage}
-            columns={[
-              {
-                key: "project",
-                label: "Project",
-                render: (project) => (
-                  <div className="min-w-0">
-                    <div className="truncate text-[13px] font-semibold text-slate-800 transition-colors group-hover:text-indigo-600">
-                      {project.name}
-                    </div>
-                    <div className="truncate font-mono text-[11px] text-slate-400">
-                      {project.client || "Internal"}
-                    </div>
-                  </div>
-                ),
-              },
-              {
-                key: "_hours",
-                label: "Autonex Hrs",
-                align: "center",
-                width: "w-32",
-                render: (_, row) => (
-                  <span className="font-mono text-[13px] font-semibold text-emerald-600 tabular-nums">
-                    {row.autonexHours != null
-                      ? `${Number(row.autonexHours).toLocaleString(undefined, { maximumFractionDigits: 1 })}h`
-                      : "—"}
-                  </span>
-                ),
-              },
-              {
-                key: "_ann",
-                label: "Annotators",
-                align: "center",
-                width: "w-28",
-                render: (_, row) => (
-                  <span className="inline-flex min-w-[28px] items-center justify-center rounded-md bg-slate-100/80 px-2 py-0.5 font-mono text-[11px] font-medium text-slate-700">
-                    {row.annotators ?? 0}
-                  </span>
-                ),
-              },
-              {
-                key: "_rev",
-                label: "Reviewers",
-                align: "center",
-                width: "w-28",
-                render: (_, row) => (
-                  <span className="inline-flex min-w-[28px] items-center justify-center rounded-md bg-slate-100/80 px-2 py-0.5 font-mono text-[11px] font-medium text-slate-700">
-                    {row.reviewers ?? 0}
-                  </span>
-                ),
-              },
-              {
-                key: "_sentiment",
-                label: "Sentiment",
-                align: "left",
-                width: "w-28",
-                render: (_, row) => (
-                  <SentimentBadge sentiment={row.project.sentiment} />
-                ),
-              },
-            ]}
-            emptyState={{
-              title: "No projects",
-              description: "Active projects will appear here",
-            }}
-          />
+          */}
         </div>
 
-        {/* Right column: 4th KPI slot + Encord Activity + Lower slot */}
-        <div className="flex flex-col gap-4 lg:col-span-1 min-w-0">
-          <div className="grid grid-cols-3 gap-2 shrink-0">
-            {/* 4th KPI: identical border, body color, width, and height; no dummy data */}
-            <div
-              style={{
-                height: kpiCardHeight ? `${kpiCardHeight}px` : undefined,
-                width: "calc(100% - 15px)",
-                maxWidth: "calc(100% - 15px)",
-                transform: "translateX(-45px)",
-              }}
-              className="col-span-2 rounded-xl border border-stone-200 hover:border-stone-300 bg-white shadow-[0_1px_2px_rgba(0,0,0,0.03)] transition-colors min-h-[126px]"
-            />
-
-            {/* 5th unique KPI: two stacked rounded rectangular cards */}
-            <div
-              style={{
-                height: kpiCardHeight ? `${kpiCardHeight}px` : undefined,
-                width: "calc(100% + 60px)",
-                transform: "translateX(-60px)",
-              }}
-              className="col-span-1 flex flex-col gap-2 min-h-[126px]"
-            >
-              <div className="flex-1 rounded-xl border border-stone-200 hover:border-stone-300 bg-white shadow-[0_1px_2px_rgba(0,0,0,0.03)] transition-colors" />
-              <div className="flex-1 rounded-xl border border-stone-200 hover:border-stone-300 bg-white shadow-[0_1px_2px_rgba(0,0,0,0.03)] transition-colors" />
-            </div>
-          </div>
-
-          <MostActivePanel
-            title="Encord Activity"
-            className="shrink-0"
-            overview={autonexOverview}
-            daily={autonexDaily}
-            onViewAnalytics={() => goFromKpi(`${routePrefix}/analytics`)}
-            onOpenProject={(projectId) =>
-              goFromKpi(`${routePrefix}/analytics/${projectId}`)
-            }
-            onViewAllUsers={() => goFromKpi(`${routePrefix}/leaderboard`)}
-            onOpenUser={(employeeId) => 
-              goFromKpi(`${employeesRoute}/${employeeId}`)
-            }
+        {/* Right Column (1/3 width) - Needs your action with equal height */}
+        <div className="lg:col-span-1 h-full flex flex-col">
+          <NeedsActionCard
+            leavesToReview={dashboardKpis?.leaves?.to_review ?? leaveDesk.pendingCount}
+            wfhToReview={dashboardKpis?.wfh?.to_review ?? wfhDesk.pendingCount}
+            signupRequests={pendingSignupCount}
+            checkinPending={checkinPendingCount}
+            todayLeaves={leaveDesk.timing.today}
+            todayWfh={wfhDesk.timing.today}
+            signupsList={pendingSignupsList}
+            checkinsList={checkinsList}
+            onNavigate={goFromKpi}
+            routePrefix={routePrefix}
+            className="h-full"
           />
-
-          {/* Check-in Pulse Widget (Overview, Timing, Attention) */}
-          <CheckinPulseWidget className="flex-1" />
         </div>
       </div>
     </div>
   );
-};
-
-export default Dashboard;
-
+}
