@@ -47,9 +47,6 @@ const EmployeeLogin = () => {
   const loginMutation = useMutation({
     mutationFn: (creds) => authApi.login({ ...creds, portal: "employee" }),
     onSuccess: (data) => {
-      if (data.token) {
-        localStorage.setItem("token", data.token);
-      }
       localStorage.setItem("user", JSON.stringify(data.user));
       localStorage.setItem("role", data.user.role);
       localStorage.removeItem("employee-sidebar-width");

@@ -4,6 +4,16 @@ import { BrowserRouter } from "react-router-dom";
 import App from "./App";
 import "./index.css";
 import "@fontsource/plus-jakarta-sans";
+import { onlineManager, focusManager } from "@tanstack/react-query";
+
+// Global network resilience & tab visibility listeners for TanStack Query
+if (typeof window !== "undefined") {
+  window.addEventListener("online", () => onlineManager.setOnline(true));
+  window.addEventListener("offline", () => onlineManager.setOnline(false));
+  window.addEventListener("visibilitychange", () => {
+    focusManager.setFocused(document.visibilityState === "visible");
+  });
+}
 
 // Vite's canonical dynamic chunk failure handler:
 // If a user has a tab open across a Railway redeployment, an old JS chunk hash no longer

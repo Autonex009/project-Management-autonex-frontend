@@ -18,12 +18,12 @@ const api = axios.create({
 api.interceptors.request.use(
   (config) => {
     if (typeof window !== "undefined") {
-      const token = localStorage.getItem("token");
-      if (token) {
-        config.headers.Authorization = `Bearer ${token}`;
-      }
       if (window.location.pathname.startsWith('/pm')) {
-        config.headers['X-Role-View'] = 'pm';
+        if (config.headers?.set) {
+          config.headers.set("X-Role-View", "pm");
+        } else {
+          config.headers["X-Role-View"] = "pm";
+        }
       }
     }
     return config;
@@ -36,12 +36,12 @@ api.interceptors.request.use(
 let isRefreshing = false;
 let failedQueue = [];
 
-const processQueue = (error, token = null) => {
-  failedQueue.forEach(prom => {
+const processQueue = (error) => {
+  failedQueue.forEach((prom) => {
     if (error) {
       prom.reject(error);
     } else {
-      prom.resolve(token);
+      prom.resolve();
     }
   });
   failedQueue = [];
@@ -54,49 +54,44 @@ api.interceptors.response.use(
   async (error) => {
     const originalRequest = error.config;
 
+    if (!originalRequest) {
+      return Promise.reject(error);
+    }
+
     // Ignore 401s from login or refresh endpoints to avoid infinite loops
-    if (originalRequest.url === '/auth/login' || originalRequest.url === '/auth/refresh') {
+    const reqUrl = originalRequest.url || "";
+    if (reqUrl.includes('/auth/login') || reqUrl.includes('/auth/refresh')) {
       return Promise.reject(error);
     }
 
     if (error.response && error.response.status === 401 && !originalRequest._retry) {
       if (isRefreshing) {
-        try {
-          // Suspend this request until the refresh is complete
-          await new Promise((resolve, reject) => {
-            failedQueue.push({ resolve, reject });
-          });
-          return await api(originalRequest);
-        } catch (err) {
-          return Promise.reject(err);
-        }
+        return new Promise((resolve, reject) => {
+          failedQueue.push({ resolve, reject });
+        })
+          .then(() => {
+            originalRequest._retry = true;
+            return api(originalRequest);
+          })
+          .catch((err) => Promise.reject(err));
       }
 
       originalRequest._retry = true;
       isRefreshing = true;
 
       try {
-        const token = typeof window !== "undefined" ? localStorage.getItem("token") : null;
-        const refreshHeaders = token ? { Authorization: `Bearer ${token}` } : {};
-        const { data } = await axios.post(
+        // Pure HttpOnly cookie refresh: browser sends refresh_token cookie and receives fresh access_token cookie
+        await axios.post(
           `${apiBaseUrl}/auth/refresh`,
           {},
-          { withCredentials: true, headers: refreshHeaders }
+          { withCredentials: true }
         );
 
-        if (data?.token && typeof window !== "undefined") {
-          localStorage.setItem("token", data.token);
-        }
-
-        processQueue(null, data.token);
-        if (data?.token) {
-          originalRequest.headers.Authorization = `Bearer ${data.token}`;
-        }
+        processQueue(null);
         return api(originalRequest);
       } catch (err) {
-        processQueue(err, null);
+        processQueue(err);
         if (typeof window !== "undefined") {
-          localStorage.removeItem("token");
           localStorage.removeItem("role");
           localStorage.removeItem("user");
 
@@ -177,8 +172,10 @@ export const recommendationsApi = {
 export const analyticsApi = {
   getPmTeamSummary: (pmId) =>
     api.get(`/analytics/pm/${pmId}/team-summary`).then((res) => res.data),
-  getDashboardKpis: () =>
-    api.get("/analytics/dashboard-kpis").then((res) => res.data),
+  getDashboardKpis: (options = {}) => {
+    const config = options instanceof AbortSignal ? { signal: options } : options;
+    return api.get("/analytics/dashboard-kpis", config).then((res) => res.data);
+  },
   getProjectAnalytics: (mainProjectId, params) =>
     api
       .get(`/analytics/project/${mainProjectId}`, { params })
@@ -859,7 +856,10 @@ export const companySettingsApi = {
 
 // === Canteen Menu API ===
 export const canteenMenuApi = {
-  getMenu: () => api.get("/company-settings/canteen-menu").then((res) => res.data),
+  getMenu: (options = {}) => {
+    const config = options instanceof AbortSignal ? { signal: options } : options;
+    return api.get("/company-settings/canteen-menu", config).then((res) => res.data);
+  },
   updateMenu: (items) => api.put("/company-settings/canteen-menu", { items }).then((res) => res.data),
 };
 
@@ -894,7 +894,10 @@ export const badgesApi = {
 };
 
 export const checkinApi = {
-  getToday: () => api.get("/checkins/today").then((res) => res.data),
+  getToday: (options = {}) => {
+    const config = options instanceof AbortSignal ? { signal: options } : options;
+    return api.get("/checkins/today", config).then((res) => res.data);
+  },
   submit: (data) => api.post("/checkins", data).then((res) => res.data),
   checkOut: (data) => api.post("/checkins/checkout", data).then((res) => res.data),
   // getTeamToday: (params) => api.get("/checkins/team-today", { params }).then((res) => res.data),
