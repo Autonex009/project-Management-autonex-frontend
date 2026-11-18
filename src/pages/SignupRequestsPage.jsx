@@ -117,9 +117,10 @@ const SignupRequestsPage = () => {
   const approveMutation = useMutation({
     mutationFn: (id) => signupRequestApi.approve(id, user.id),
     onSuccess: (data) => {
-      queryClient.invalidateQueries(["signup-requests"]);
-      queryClient.invalidateQueries(["signup-requests-counts"]);
-      queryClient.invalidateQueries(["employees"]);
+      queryClient.invalidateQueries({ queryKey: ["signup-requests"] });
+      queryClient.invalidateQueries({ queryKey: ["signup-requests-counts"] });
+      queryClient.invalidateQueries({ queryKey: ["employees"] });
+      queryClient.invalidateQueries({ queryKey: ["dashboard-kpis"] });
       toast.success(data.message || "Account created and credentials emailed");
     },
     onError: (err) =>
@@ -129,8 +130,9 @@ const SignupRequestsPage = () => {
   const updateMutation = useMutation({
     mutationFn: ({ id, data }) => signupRequestApi.update(id, data),
     onSuccess: () => {
-      queryClient.invalidateQueries(["signup-requests"]);
-      queryClient.invalidateQueries(["signup-requests-counts"]);
+      queryClient.invalidateQueries({ queryKey: ["signup-requests"] });
+      queryClient.invalidateQueries({ queryKey: ["signup-requests-counts"] });
+      queryClient.invalidateQueries({ queryKey: ["dashboard-kpis"] });
       toast.success("Employment type updated");
     },
     onError: (err) =>
@@ -143,8 +145,9 @@ const SignupRequestsPage = () => {
     mutationFn: ({ id, reason }) =>
       signupRequestApi.reject(id, user.id, reason),
     onSuccess: () => {
-      queryClient.invalidateQueries(["signup-requests"]);
-      queryClient.invalidateQueries(["signup-requests-counts"]);
+      queryClient.invalidateQueries({ queryKey: ["signup-requests"] });
+      queryClient.invalidateQueries({ queryKey: ["signup-requests-counts"] });
+      queryClient.invalidateQueries({ queryKey: ["dashboard-kpis"] });
       setRejectModal(null);
       setRejectReason("");
       toast.success("Request rejected and applicant notified");
@@ -156,8 +159,9 @@ const SignupRequestsPage = () => {
   const undoRejectMutation = useMutation({
     mutationFn: (id) => signupRequestApi.undoReject(id, user.id),
     onSuccess: () => {
-      queryClient.invalidateQueries(["signup-requests"]);
-      queryClient.invalidateQueries(["signup-requests-counts"]);
+      queryClient.invalidateQueries({ queryKey: ["signup-requests"] });
+      queryClient.invalidateQueries({ queryKey: ["signup-requests-counts"] });
+      queryClient.invalidateQueries({ queryKey: ["dashboard-kpis"] });
       toast.success("Rejection undone — request is pending again");
     },
     onError: (err) =>
@@ -168,8 +172,9 @@ const SignupRequestsPage = () => {
     mutationFn: ({ id, reason }) =>
       signupRequestApi.undoApprove(id, user.id, reason),
     onSuccess: () => {
-      queryClient.invalidateQueries(["signup-requests"]);
-      queryClient.invalidateQueries(["signup-requests-counts"]);
+      queryClient.invalidateQueries({ queryKey: ["signup-requests"] });
+      queryClient.invalidateQueries({ queryKey: ["signup-requests-counts"] });
+      queryClient.invalidateQueries({ queryKey: ["dashboard-kpis"] });
       setRejectModal(null);
       setRejectReason("");
       toast.success("Approval undone — request is pending again");

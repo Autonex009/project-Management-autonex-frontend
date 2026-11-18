@@ -1,5 +1,5 @@
 import { Outlet } from "react-router-dom";
-import { Menu, PanelLeft } from "lucide-react";
+import { Menu, PanelLeft, Sparkle } from "lucide-react";
 import { useState, useEffect, useRef } from "react";
 import NotificationBell from "../components/NotificationBell";
 import PortalSwitcher from "../components/PortalSwitcher";
@@ -303,6 +303,18 @@ export default function AppShellLayout({
               </>
             )}
             <PortalSwitcher />
+            {/* Ask AI button matching image copy 10.png */}
+            <button
+              type="button"
+              onClick={() => {
+                window.dispatchEvent(new CustomEvent("open-chat-widget"));
+              }}
+              className="h-8 flex items-center gap-1.5 rounded-xl border border-slate-200 bg-white px-2.5 shadow-2xs hover:bg-slate-50 transition-colors cursor-pointer"
+              title="Ask Autonex AI"
+            >
+              <Sparkle className="h-3.5 w-3.5 text-blue-600" />
+              <span className="text-[12px] font-semibold text-slate-800">Ask AI</span>
+            </button>
             <NotificationBell />
           </div>
         </header>

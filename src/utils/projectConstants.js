@@ -25,13 +25,29 @@ export const STATUS_CONFIG = {
     label: "On Hold",
     style: "bg-amber-50 text-amber-700 border border-amber-200",
   },
+  "on_hold": {
+    label: "On Hold",
+    style: "bg-amber-50 text-amber-700 border border-amber-200",
+  },
   cancelled: {
     label: "Cancelled",
     style: "bg-red-50 text-red-700 border border-red-200",
   },
+  archived: {
+    label: "Archived",
+    style: "bg-slate-100 text-slate-700 border border-slate-200",
+  },
 };
 
-export const ARCHIVED_STATUSES = ["completed", "on-hold", "cancelled"];
+export const ARCHIVED_STATUSES = [
+  "completed",
+  "on-hold",
+  "on_hold",
+  "cancelled",
+  "archived",
+  "poc_rejected",
+  "poc_completed",
+];
 
 export const isArchivedStatus = (statusRaw) =>
   ARCHIVED_STATUSES.includes((statusRaw || "active").toLowerCase().trim());

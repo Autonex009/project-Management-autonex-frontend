@@ -113,6 +113,13 @@ const ChatWidget = ({ role: roleProp }) => {
     }
   }, [isOpen]);
 
+  // Open chat from external triggers (e.g. Ask AI button in header)
+  useEffect(() => {
+    const handleOpen = () => setIsOpen(true);
+    window.addEventListener("open-chat-widget", handleOpen);
+    return () => window.removeEventListener("open-chat-widget", handleOpen);
+  }, []);
+
   // Hide pulse after first open
   useEffect(() => {
     if (isOpen) setShowPulse(false);
@@ -333,44 +340,7 @@ const ChatWidget = ({ role: roleProp }) => {
 
   return (
     <>
-      {/* Floating chat button — icon only, and draggable. */}
-      {!isOpen && (
-        <button
-          onPointerDown={startDrag}
-          onClick={handleFabClick}
-          id="chat-widget-trigger"
-          title="Ask Autonex AI"
-          aria-label="Ask Autonex AI"
-          className={`fixed z-50 group touch-none ${fabPos ? "" : "bottom-6 right-6"} ${
-            dragging ? "cursor-grabbing" : "cursor-grab"
-          }`}
-          style={
-            fabPos ? { left: fabPos.x, top: fabPos.y, bottom: "auto", right: "auto" } : undefined
-          }
-        >
-          <div className="relative">
-            {showPulse && !dragging && (
-              <div
-                className={`absolute -inset-1 bg-gradient-to-r ${theme.fabPulse} rounded-full opacity-30 blur-lg animate-pulse`}
-              />
-            )}
-            <div
-              className={`relative flex h-14 w-14 items-center justify-center rounded-full bg-gradient-to-r ${theme.fab} text-white shadow-xl ${theme.fabShadow} transition-transform duration-300 ${
-                dragging ? "scale-105" : "hover:scale-105 active:scale-95"
-              }`}
-            >
-              <img
-                src={botIcon}
-                alt=""
-                draggable={false}
-                className="h-7 w-7 select-none brightness-0 invert"
-              />
-            </div>
-          </div>
-        </button>
-      )}
-
-      {/* Chat Panel */}
+      {/* Chat Panel - Opened via header Ask AI button */}
       {isOpen && (
         <div
           className="fixed bottom-6 right-6 z-50 flex flex-col w-[420px] h-[600px] max-h-[80vh] rounded-3xl shadow-2xl shadow-slate-400/30 border border-slate-200/80 overflow-hidden"

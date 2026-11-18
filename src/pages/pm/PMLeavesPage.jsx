@@ -246,6 +246,7 @@ const PMLeavesPage = () => {
         if (!old || !old.items) return old;
         return { ...old, items: old.items.map(lv => lv.leave_id === res.leave_id ? { ...lv, status: res.status, razorpay_applied: res.razorpay_applied, approved_by_name: user.name } : lv) };
       });
+      queryClient.invalidateQueries({ queryKey: ["dashboard-kpis"] });
       setRemarkModal(null);
       setRemark("");
       toast.success("Leave approved");
@@ -262,6 +263,7 @@ const PMLeavesPage = () => {
         if (!old || !old.items) return old;
         return { ...old, items: old.items.map(lv => lv.leave_id === res.leave_id ? { ...lv, status: res.status, razorpay_applied: res.razorpay_applied, approved_by_name: user.name } : lv) };
       });
+      queryClient.invalidateQueries({ queryKey: ["dashboard-kpis"] });
       toast.success("Leave rejected");
     },
     onError: (err) =>
@@ -276,6 +278,7 @@ const PMLeavesPage = () => {
         if (!old || !old.items) return old;
         return { ...old, items: old.items.map(lv => lv.leave_id === res.leave_id ? { ...lv, status: res.status, razorpay_applied: false, approved_by_name: null } : lv) };
       });
+      queryClient.invalidateQueries({ queryKey: ["dashboard-kpis"] });
       toast.success("Leave approval undone");
     },
     onError: (err) =>
@@ -290,6 +293,7 @@ const PMLeavesPage = () => {
         if (!old || !old.items) return old;
         return { ...old, items: old.items.map(lv => lv.leave_id === res.leave_id ? { ...lv, status: res.status, razorpay_applied: false, approved_by_name: null } : lv) };
       });
+      queryClient.invalidateQueries({ queryKey: ["dashboard-kpis"] });
       toast.success("Leave rejection undone");
     },
     onError: (err) =>
@@ -301,6 +305,7 @@ const PMLeavesPage = () => {
     onSuccess: (res, variables) => {
       recordLeaveApplication({ ...variables, id: res?.id || res?.leave_id });
       queryClient.invalidateQueries({ queryKey: ["leaves"] });
+      queryClient.invalidateQueries({ queryKey: ["dashboard-kpis"] });
       setIsModalOpen(false);
       setSelectedLeaveType("");
       setFormEmployeeId("");
@@ -318,6 +323,7 @@ const PMLeavesPage = () => {
     mutationFn: leaveApi.delete,
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ["leaves"] });
+      queryClient.invalidateQueries({ queryKey: ["dashboard-kpis"] });
       toast.success("Leave deleted");
     },
     onError: (err) =>
@@ -333,6 +339,7 @@ const PMLeavesPage = () => {
         if (!old || !old.items) return old;
         return { ...old, items: old.items.map(w => w.id === res.wfh_id || w.id === res.id ? { ...w, status: res.status, approved_by_name: user.name } : w) };
       });
+      queryClient.invalidateQueries({ queryKey: ["dashboard-kpis"] });
       setWfhRemarkModal(null);
       setWfhRemark("");
       toast.success("WFH approved");
@@ -349,6 +356,7 @@ const PMLeavesPage = () => {
         if (!old || !old.items) return old;
         return { ...old, items: old.items.map(w => w.id === res.wfh_id || w.id === res.id ? { ...w, status: res.status, approved_by_name: user.name } : w) };
       });
+      queryClient.invalidateQueries({ queryKey: ["dashboard-kpis"] });
       toast.success("WFH rejected");
     },
     onError: (err) =>
@@ -363,6 +371,7 @@ const PMLeavesPage = () => {
         if (!old || !old.items) return old;
         return { ...old, items: old.items.map(w => w.id === res.wfh_id || w.id === res.id ? { ...w, status: res.status, approved_by_name: null } : w) };
       });
+      queryClient.invalidateQueries({ queryKey: ["dashboard-kpis"] });
       toast.success("WFH approval undone");
     },
     onError: (err) =>
@@ -377,6 +386,7 @@ const PMLeavesPage = () => {
         if (!old || !old.items) return old;
         return { ...old, items: old.items.map(w => w.id === res.wfh_id || w.id === res.id ? { ...w, status: res.status, approved_by_name: null } : w) };
       });
+      queryClient.invalidateQueries({ queryKey: ["dashboard-kpis"] });
       toast.success("WFH rejection undone");
     },
     onError: (err) =>
@@ -387,6 +397,7 @@ const PMLeavesPage = () => {
     mutationFn: wfhApi.delete,
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ["wfh"] });
+      queryClient.invalidateQueries({ queryKey: ["dashboard-kpis"] });
       toast.success("WFH request deleted");
     },
     onError: (err) =>

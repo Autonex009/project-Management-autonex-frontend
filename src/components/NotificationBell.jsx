@@ -228,15 +228,9 @@ const NotificationBell = () => {
             return next;
           })
         }
-        // Fixed 36px hit area so the badge sits INSIDE the button: hung off the
-        // corner it could be clipped by any ancestor that scrolls or hides
-        // overflow, and it left the icon nothing to breathe against.
-        className={`relative grid h-9 w-9 place-items-center rounded-xl transition-colors duration-150 hover:bg-slate-100 hover:text-slate-800 ${
-          open
-            ? "bg-slate-100 text-slate-900 ring-1 ring-slate-200"
-            : unreadCount > 0
-              ? "text-slate-700"
-              : "text-slate-500"
+        // Styled button matching image copy 10.png
+        className={`relative flex h-8 w-8 items-center justify-center rounded-xl border border-slate-200 bg-white text-slate-700 shadow-2xs transition-colors hover:bg-slate-50 hover:text-slate-900 cursor-pointer ${
+          open ? "ring-2 ring-indigo-500/20 bg-slate-50" : ""
         }`}
         aria-label={
           unreadCount > 0
@@ -245,13 +239,13 @@ const NotificationBell = () => {
         }
         aria-expanded={open}
       >
-        <Bell className="h-5 w-5" />
+        <Bell className="h-4 w-4 text-slate-700" />
         {unreadCount > 0 && (
           <span
             aria-hidden="true"
-            className="pointer-events-none absolute right-[3px] top-[3px] flex h-[14px] min-w-[14px] items-center justify-center rounded-full bg-rose-500 px-1 text-[8px] font-medium leading-[0] tracking-normal text-white ring-[1.5px] ring-white"
+            className="pointer-events-none absolute -top-1.5 -right-1.5 flex h-4 min-w-[17px] items-center justify-center rounded-full bg-rose-600 px-1 text-[9px] font-bold leading-none text-white ring-2 ring-white shadow-xs"
           >
-            <span className="mt-[1px] block">{unreadCount > 9 ? '9+' : unreadCount}</span>
+            <span>{unreadCount > 9 ? "9+" : unreadCount}</span>
           </span>
         )}
       </button>

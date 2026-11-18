@@ -8,9 +8,9 @@ export default function TimingTab() {
   const { data, isLoading } = useQuery({
     queryKey: ["checkin-pulse", "timing"],
     queryFn: () => checkinApi.getPulseTiming(),
-    staleTime: 5_000,
-    refetchInterval: 30_000,
-    refetchOnWindowFocus: true,
+    staleTime: 30_000,
+    refetchInterval: 45_000,
+    refetchOnWindowFocus: false,
   });
 
   if (isLoading && !data) {

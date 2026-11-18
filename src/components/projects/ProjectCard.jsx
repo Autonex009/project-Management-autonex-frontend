@@ -2,6 +2,8 @@ import React, { useState } from "react";
 import {
   Edit,
   Trash2,
+  Archive,
+  RotateCcw,
   Users,
   UserCheck,
   Check,
@@ -158,6 +160,9 @@ const ProjectCard = ({
   onCloseDocs,
   onAdvanced,
   onDelete,
+  onArchive,
+  onRestore,
+  isArchivedView = false,
 }) => {
   const typeText =
     project.project_types && Object.keys(project.project_types).length
@@ -629,6 +634,31 @@ const ProjectCard = ({
                 >
                   Edit <Edit className="h-3.5 w-3.5" />
                 </button>
+              )}
+              {isArchivedView || isArchivedStatus(project.project_status) ? (
+                onRestore && (
+                  <button
+                    type="button"
+                    onClick={onRestore}
+                    title="Restore"
+                    aria-label="Restore"
+                    className="inline-flex items-center gap-1.5 rounded-lg px-2.5 py-1.5 text-xs font-medium text-slate-500 hover:bg-emerald-50 hover:text-emerald-600 transition-colors"
+                  >
+                    Restore <RotateCcw className="h-3.5 w-3.5" />
+                  </button>
+                )
+              ) : (
+                onArchive && (
+                  <button
+                    type="button"
+                    onClick={onArchive}
+                    title="Archive"
+                    aria-label="Archive"
+                    className="inline-flex items-center gap-1.5 rounded-lg px-2.5 py-1.5 text-xs font-medium text-slate-500 hover:bg-amber-50 hover:text-amber-600 transition-colors"
+                  >
+                    Archive <Archive className="h-3.5 w-3.5" />
+                  </button>
+                )
               )}
               {onDelete && (
                 <button
