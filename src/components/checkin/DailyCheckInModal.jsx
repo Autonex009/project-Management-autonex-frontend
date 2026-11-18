@@ -11,6 +11,7 @@ import Button from "../ui/Button";
 import { checkinApi, subProjectApi, canteenMenuApi } from "../../services/api";
 import { MultiSelect } from "../ui/MultiSelect";
 import useCheckinStore from "../../store/useCheckinStore";
+import { todayLocalISO } from "../../utils/workforce";
 
 const MOODS = [
   { value: "great", label: "Great", icon: Zap, tone: "text-emerald-600 bg-emerald-50 border-emerald-200" },
@@ -48,6 +49,7 @@ const SectionHeader = ({ title, required = false, icon: Icon }) => (
 export default function DailyCheckInModal() {
   const queryClient = useQueryClient();
   const location = useLocation();
+  const todayStr = todayLocalISO();
   const [user, setUser] = useState(null);
   const [workMode, setWorkMode] = useState("WFO");
   const [selectedProjects, setSelectedProjects] = useState([]);
@@ -84,10 +86,11 @@ export default function DailyCheckInModal() {
   const hasEmployeeRecord = Boolean(user?.employee_id) && !user?.must_change_password;
 
   const { data: status, isLoading, isError } = useQuery({
-    queryKey: ["checkin-today"],
-    queryFn: () => checkinApi.getToday(),
+    queryKey: ["checkin-today", todayStr],
+    queryFn: ({ signal }) => checkinApi.getToday(signal),
     enabled: hasEmployeeRecord,
     staleTime: 0,
+    refetchOnWindowFocus: true,
   });
 
   useEffect(() => {
@@ -125,10 +128,11 @@ export default function DailyCheckInModal() {
 
   // Law 1: Fetch menu only when modal is open, WFO, and before 11:00 AM
   const { data: canteenMenu = [], isLoading: isCanteenMenuLoading } = useQuery({
-    queryKey: ["canteenMenu"],
-    queryFn: () => canteenMenuApi.getMenu(),
+    queryKey: ["canteenMenu", todayStr],
+    queryFn: ({ signal }) => canteenMenuApi.getMenu(signal),
     enabled: isOpen && workMode === "WFO" && !isCanteenClosed,
-    staleTime: 5 * 60 * 1000,
+    staleTime: 0,
+    refetchOnMount: "always",
   });
 
   // Auto-default to 'none' (No Lunch Plan) when opening at or after 11:00 AM
@@ -139,10 +143,13 @@ export default function DailyCheckInModal() {
     }
   }, [isCanteenClosed, workMode]);
 
-  // Auto-select first item when menu loads and none selected (before 11 AM)
+  // Auto-select or re-validate item when menu loads and updates (before 11 AM)
   useEffect(() => {
-    if (!isCanteenClosed && canteenMenu.length > 0 && !selectedCanteenItem) {
-      setSelectedCanteenItem(canteenMenu[0]);
+    if (!isCanteenClosed && canteenMenu.length > 0) {
+      const stillValid = canteenMenu.some((item) => item.id === selectedCanteenItem?.id);
+      if (!selectedCanteenItem || !stillValid) {
+        setSelectedCanteenItem(canteenMenu[0]);
+      }
     }
   }, [canteenMenu, isCanteenClosed, selectedCanteenItem]);
 
