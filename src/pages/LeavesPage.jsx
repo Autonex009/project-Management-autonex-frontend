@@ -363,6 +363,7 @@ const LeavesPage = () => {
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ["wfh-page"] });
       queryClient.invalidateQueries({ queryKey: ["wfh"] });
+      queryClient.invalidateQueries({ queryKey: ["dashboard-kpis"] });
       setIsWfhModalOpen(false);
       setWfhFormEmployeeId("");
       setWfhFormDate("");
@@ -399,6 +400,23 @@ const LeavesPage = () => {
   // ── Mutations (unchanged) ────────────────────────────────────────────────
   const approveMutation = useMutation({
     mutationFn: ({ id, remark }) => leaveApi.approve(id, user.id, remark),
+    onMutate: async () => {
+      await queryClient.cancelQueries({ queryKey: ["dashboard-kpis"] });
+      const previousKpis = queryClient.getQueryData(["dashboard-kpis"]);
+
+      queryClient.setQueryData(["dashboard-kpis"], (old) => {
+        if (!old?.leaves) return old;
+        return {
+          ...old,
+          leaves: {
+            ...old.leaves,
+            to_review: Math.max(0, (old.leaves.to_review || 1) - 1),
+          },
+        };
+      });
+
+      return { previousKpis };
+    },
     onSuccess: (res) => {
       queryClient.setQueryData(["leaves"], (old) => old?.map(lv => lv.leave_id === res.leave_id ? { ...lv, status: res.status, razorpay_applied: res.razorpay_applied, approved_by_name: user.name } : lv));
       queryClient.setQueriesData({ queryKey: ["leaves-page"] }, (old) => {
@@ -409,12 +427,36 @@ const LeavesPage = () => {
       setRemark("");
       toast.success("Leave approved");
     },
-    onError: (err) =>
-      toast.error(err.response?.data?.detail || "Failed to approve leave"),
+    onError: (err, variables, context) => {
+      if (context?.previousKpis) {
+        queryClient.setQueryData(["dashboard-kpis"], context.previousKpis);
+      }
+      toast.error(err.response?.data?.detail || "Failed to approve leave");
+    },
+    onSettled: () => {
+      queryClient.invalidateQueries({ queryKey: ["dashboard-kpis"] });
+    },
   });
 
   const rejectMutation = useMutation({
     mutationFn: (id) => leaveApi.reject(id, user.id),
+    onMutate: async () => {
+      await queryClient.cancelQueries({ queryKey: ["dashboard-kpis"] });
+      const previousKpis = queryClient.getQueryData(["dashboard-kpis"]);
+
+      queryClient.setQueryData(["dashboard-kpis"], (old) => {
+        if (!old?.leaves) return old;
+        return {
+          ...old,
+          leaves: {
+            ...old.leaves,
+            to_review: Math.max(0, (old.leaves.to_review || 1) - 1),
+          },
+        };
+      });
+
+      return { previousKpis };
+    },
     onSuccess: (res) => {
       queryClient.setQueryData(["leaves"], (old) => old?.map(lv => lv.leave_id === res.leave_id ? { ...lv, status: res.status, razorpay_applied: res.razorpay_applied, approved_by_name: user.name } : lv));
       queryClient.setQueriesData({ queryKey: ["leaves-page"] }, (old) => {
@@ -423,8 +465,15 @@ const LeavesPage = () => {
       });
       toast.success("Leave rejected");
     },
-    onError: (err) =>
-      toast.error(err.response?.data?.detail || "Failed to reject leave"),
+    onError: (err, variables, context) => {
+      if (context?.previousKpis) {
+        queryClient.setQueryData(["dashboard-kpis"], context.previousKpis);
+      }
+      toast.error(err.response?.data?.detail || "Failed to reject leave");
+    },
+    onSettled: () => {
+      queryClient.invalidateQueries({ queryKey: ["dashboard-kpis"] });
+    },
   });
 
   const undoApproveMutation = useMutation({
@@ -435,6 +484,7 @@ const LeavesPage = () => {
         if (!old || !old.items) return old;
         return { ...old, items: old.items.map(lv => lv.leave_id === res.leave_id ? { ...lv, status: res.status, razorpay_applied: false, approved_by_name: null } : lv) };
       });
+      queryClient.invalidateQueries({ queryKey: ["dashboard-kpis"] });
       toast.success("Leave approval undone");
     },
     onError: (err) =>
@@ -449,6 +499,7 @@ const LeavesPage = () => {
         if (!old || !old.items) return old;
         return { ...old, items: old.items.map(lv => lv.leave_id === res.leave_id ? { ...lv, status: res.status, razorpay_applied: false, approved_by_name: null } : lv) };
       });
+      queryClient.invalidateQueries({ queryKey: ["dashboard-kpis"] });
       toast.success("Leave rejection undone");
     },
     onError: (err) =>
@@ -461,6 +512,7 @@ const LeavesPage = () => {
       recordLeaveApplication({ ...variables, id: res?.id || res?.leave_id });
       queryClient.invalidateQueries({ queryKey: ["leaves-page"] });
       queryClient.invalidateQueries({ queryKey: ["leaves"] });
+      queryClient.invalidateQueries({ queryKey: ["dashboard-kpis"] });
       setIsModalOpen(false);
       setSelectedLeaveType("");
       setFormEmployeeId("");
@@ -480,6 +532,7 @@ const LeavesPage = () => {
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ["leaves-page"] });
       queryClient.invalidateQueries({ queryKey: ["leaves"] });
+      queryClient.invalidateQueries({ queryKey: ["dashboard-kpis"] });
       toast.success("Leave deleted");
     },
     onError: (err) =>
@@ -492,6 +545,7 @@ const LeavesPage = () => {
       queryClient.invalidateQueries({ queryKey: ["wfh-page"] });
       queryClient.invalidateQueries({ queryKey: ["wfh"] });
       queryClient.invalidateQueries({ queryKey: ["leave-calendar"] });
+      queryClient.invalidateQueries({ queryKey: ["dashboard-kpis"] });
       setWfhRemarkModal(null);
       setWfhRemark("");
       toast.success("WFH approved");
@@ -505,6 +559,7 @@ const LeavesPage = () => {
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ["wfh-page"] });
       queryClient.invalidateQueries({ queryKey: ["wfh"] });
+      queryClient.invalidateQueries({ queryKey: ["dashboard-kpis"] });
       toast.success("WFH rejected");
     },
     onError: (err) =>
@@ -517,6 +572,7 @@ const LeavesPage = () => {
       queryClient.invalidateQueries({ queryKey: ["wfh-page"] });
       queryClient.invalidateQueries({ queryKey: ["wfh"] });
       queryClient.invalidateQueries({ queryKey: ["leave-calendar"] });
+      queryClient.invalidateQueries({ queryKey: ["dashboard-kpis"] });
       toast.success("WFH approval undone");
     },
     onError: (err) =>
@@ -528,6 +584,7 @@ const LeavesPage = () => {
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ["wfh-page"] });
       queryClient.invalidateQueries({ queryKey: ["wfh"] });
+      queryClient.invalidateQueries({ queryKey: ["dashboard-kpis"] });
       toast.success("WFH rejection undone");
     },
     onError: (err) =>
@@ -539,6 +596,7 @@ const LeavesPage = () => {
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ["wfh-page"] });
       queryClient.invalidateQueries({ queryKey: ["wfh"] });
+      queryClient.invalidateQueries({ queryKey: ["dashboard-kpis"] });
       toast.success("WFH request deleted");
     },
   });
