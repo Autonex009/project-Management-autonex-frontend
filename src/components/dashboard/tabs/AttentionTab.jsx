@@ -1,6 +1,7 @@
 import React, { useState } from "react";
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
 import { checkinApi } from "../../../services/api";
+import { formatDisplayName } from "../../../utils/displayName";
 import toast from "react-hot-toast";
 
 export default function AttentionTab() {
@@ -12,9 +13,9 @@ export default function AttentionTab() {
   const { data, isLoading } = useQuery({
     queryKey: ["checkin-pulse", "attention"],
     queryFn: () => checkinApi.getPulseAttention(),
-    staleTime: 5_000,
-    refetchInterval: 30_000,
-    refetchOnWindowFocus: true,
+    staleTime: 30_000,
+    refetchInterval: 45_000,
+    refetchOnWindowFocus: false,
   });
 
   const nudgeMutation = useMutation({
@@ -22,7 +23,6 @@ export default function AttentionTab() {
     onSuccess: (res, empId) => {
       setNudgedEmpIds((prev) => new Set(prev).add(empId));
       toast.success(res?.message || "Check-in reminder sent via Slack!");
-      queryClient.invalidateQueries({ queryKey: ["checkin-pulse", "attention"] });
     },
     onError: (err) => {
       const msg = err?.response?.data?.detail || err?.message || "Failed to send nudge reminder";
@@ -40,7 +40,6 @@ export default function AttentionTab() {
         return next;
       });
       toast.success(res?.message || "Check-in reminders sent!");
-      queryClient.invalidateQueries({ queryKey: ["checkin-pulse", "attention"] });
     },
     onError: (err) => {
       const msg = err?.response?.data?.detail || err?.message || "Failed to send bulk nudges";
@@ -75,12 +74,12 @@ export default function AttentionTab() {
 
   return (
     <div className="space-y-2 text-slate-800">
-      {/* Sub-Tab Navigation Switcher (Encord Activity Pill Style) */}
-      <div className="flex items-center gap-1 rounded-lg bg-slate-100 p-0.5 ring-1 ring-inset ring-slate-200/60 text-[11px] font-semibold">
+      {/* Sub-Tab Navigation Switcher (Compact w-fit style) */}
+      <div className="inline-flex items-center gap-1 rounded-lg bg-slate-100 p-0.5 ring-1 ring-inset ring-slate-200/60 text-[11px] font-semibold w-fit">
         <button
           type="button"
           onClick={() => setSubTab("unaccounted")}
-          className={`flex-1 flex items-center justify-center gap-1 py-1 rounded-md transition-all ${
+          className={`flex items-center justify-center gap-1.5 px-2.5 py-1 rounded-md transition-all whitespace-nowrap cursor-pointer ${
             subTab === "unaccounted"
               ? "bg-white text-slate-900 shadow-[0_1px_2px_rgba(0,0,0,0.06)]"
               : "text-slate-500 hover:text-slate-800"
@@ -97,7 +96,7 @@ export default function AttentionTab() {
         <button
           type="button"
           onClick={() => setSubTab("consecutive")}
-          className={`flex-1 flex items-center justify-center gap-1 py-1 rounded-md transition-all ${
+          className={`flex items-center justify-center gap-1.5 px-2.5 py-1 rounded-md transition-all whitespace-nowrap cursor-pointer ${
             subTab === "consecutive"
               ? "bg-white text-slate-900 shadow-[0_1px_2px_rgba(0,0,0,0.06)]"
               : "text-slate-500 hover:text-slate-800"
@@ -114,7 +113,7 @@ export default function AttentionTab() {
         <button
           type="button"
           onClick={() => setSubTab("habitual")}
-          className={`flex-1 flex items-center justify-center gap-1 py-1 rounded-md transition-all ${
+          className={`flex items-center justify-center gap-1.5 px-2.5 py-1 rounded-md transition-all whitespace-nowrap cursor-pointer ${
             subTab === "habitual"
               ? "bg-white text-slate-900 shadow-[0_1px_2px_rgba(0,0,0,0.06)]"
               : "text-slate-500 hover:text-slate-800"
@@ -204,8 +203,8 @@ export default function AttentionTab() {
                         {emp.initials}
                       </div>
                       <div className="min-w-0">
-                        <div className="text-[12px] font-semibold text-slate-800 truncate">
-                          {emp.name}
+                        <div className="text-[12px] font-semibold text-slate-800 truncate" title={emp.name}>
+                          {formatDisplayName(emp.name)}
                         </div>
                         <div className="text-[10px] text-slate-400 truncate">
                           {emp.designation} · PM: {emp.pm_name}
@@ -302,8 +301,8 @@ export default function AttentionTab() {
                     {emp.initials}
                   </div>
                   <div className="min-w-0">
-                    <div className="text-[12px] font-semibold text-slate-900 truncate">
-                      {emp.name}
+                    <div className="text-[12px] font-semibold text-slate-900 truncate" title={emp.name}>
+                      {formatDisplayName(emp.name)}
                     </div>
                     <div className="text-[10px] text-slate-400 truncate">
                       {emp.designation} · Last seen {emp.last_seen}
@@ -355,8 +354,8 @@ export default function AttentionTab() {
                     {emp.initials}
                   </div>
                   <div className="min-w-0">
-                    <div className="text-[12px] font-semibold text-slate-800 truncate">
-                      {emp.name}
+                    <div className="text-[12px] font-semibold text-slate-800 truncate" title={emp.name}>
+                      {formatDisplayName(emp.name)}
                     </div>
                     <div className="text-[10px] text-slate-400 truncate">
                       {emp.designation} · {emp.note}

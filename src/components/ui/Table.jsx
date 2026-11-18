@@ -47,36 +47,43 @@ export const Table = ({
   const isStriped = variant === "striped";
   const isBorderless = variant === "borderless";
   const isV1 = variant === "v1"; // compact card table w/ header (dashboard)
+  const isDashboard = variant === "dashboard" || isV1;
   const isUntitled = variant === "untitled"; // full-page Untitled-UI table (Employees etc.)
-  const airy = isV1 || isUntitled; // shared airy Untitled-UI styling
+  const airy = isV1 || isUntitled || isDashboard; // shared airy Untitled-UI styling
 
-  const cellPad = isCompact
-    ? "px-4 py-2"
-    : isV1
-      ? "px-5 py-3"
+  const cellPad = isDashboard
+    ? "px-3 py-1.5"
+    : isCompact
+      ? "px-4 py-2"
       : isUntitled
         ? "px-4 py-1.5"
         : "px-4 py-2";
   const effectiveCellPad = cellPadding || cellPad;
-  const effectiveRowHeight = rowHeight || (isV1 ? "h-[48px]" : "h-[52px]");
-  const headPad = isCompact
-    ? "px-4 py-2"
-    : isV1
-      ? "px-5 py-2.5"
-      : isUntitled
-        ? "px-4 py-2"
-        : "px-4 py-2";
-  const headTextSize = isCompact
-    ? "text-[11px]"
+  const effectiveRowHeight = rowHeight || (isDashboard ? "h-[38px]" : isV1 ? "h-[48px]" : "h-[52px]");
+  const headPad = isDashboard
+    ? "px-3 py-2"
+    : isCompact
+      ? "px-4 py-2"
+      : isV1
+        ? "px-5 py-2.5"
+        : isUntitled
+          ? "px-4 py-2"
+          : "px-4 py-2";
+  const headTextSize = isDashboard
+    ? "text-[10.5px]"
+    : isCompact
+      ? "text-[11px]"
+      : airy
+        ? "text-xs"
+        : "text-[11px]";
+  const cellText = isDashboard ? "text-[12px]" : airy ? "text-[13px]" : "text-sm";
+  const headCase = isDashboard
+    ? "uppercase tracking-wider text-slate-400 "
     : airy
-      ? "text-xs"
-      : "text-[11px]";
-  const cellText = airy ? "text-[13px]" : "text-sm";
-  const headCase = airy
-    ? "normal-case tracking-normal text-slate-600 "
-    : "uppercase tracking-wider text-slate-700 ";
-  const headWeight = airy ? "font-semibold" : "font-bold";
-  const theadBg = airy ? "bg-slate-50 " : "bg-slate-50/80 ";
+      ? "normal-case tracking-normal text-slate-600 "
+      : "uppercase tracking-wider text-slate-700 ";
+  const headWeight = isDashboard ? "font-semibold" : airy ? "font-semibold" : "font-bold";
+  const theadBg = isDashboard ? "bg-white" : airy ? "bg-slate-50 " : "bg-slate-50/80 ";
 
   const context = { onEdit, onDelete };
 
@@ -103,14 +110,20 @@ export const Table = ({
 
   const outerClass = isBorderless
     ? `${className}`
-    : `bg-white rounded-2xl border border-stone-200 shadow-[0_1px_4px_rgba(28,25,23,0.06)] ${className}`;
+    : `bg-white rounded-2xl border border-stone-200 shadow-[0_1px_3px_rgba(28,25,23,0.05)] ${isDashboard ? "flex flex-col justify-between" : ""} ${className}`;
 
   return (
     <div ref={containerRef} className={outerClass}>
       {(title || headerAction) && (
-        <div className="flex items-center justify-between gap-2 px-4 py-3 border-b border-slate-100 lg:px-5 lg:py-3.5">
+        <div className={`flex items-center justify-between gap-2 ${
+          isDashboard ? "px-5 pt-3.5 pb-2 shrink-0" : "border-b border-stone-100 px-4 py-3 lg:px-5 lg:py-3.5"
+        }`}>
           <div className="flex min-w-0 items-center gap-2">
-            {title && <h3 className="truncate text-[13px] font-semibold text-slate-800">{title}</h3>}
+            {typeof title === "string" ? (
+              <h3 className="truncate text-[13px] font-semibold text-slate-800">{title}</h3>
+            ) : (
+              title
+            )}
             {count != null && (
               <span className="shrink-0 rounded-full border border-slate-200 px-2 py-0.5 text-[10px] font-medium text-slate-500">
                 {count}
@@ -123,26 +136,29 @@ export const Table = ({
           {title && headerAction && <div className="shrink-0 flex items-center whitespace-nowrap">{headerAction}</div>}
         </div>
       )}
-      <div className="overflow-visible">
+      <div className={`overflow-visible ${isDashboard ? "flex-1 pb-2" : ""}`}>
         <table className={`w-full border-separate border-spacing-0 ${tableLayout === "auto" ? "table-auto" : "table-fixed"}`}>
           <thead
-            className={`${theadBg} ${allowOverflow && !title ? "rounded-t-2xl" : ""} border-b border-slate-100 `}
+            className={`${theadBg} ${allowOverflow && !title ? "rounded-t-2xl" : ""}`}
           >
-            <tr className="h-[36px]">
+            <tr className={isDashboard ? "h-[32px]" : "h-[36px]"}>
               {columns.map((col, cIdx) => (
                 <th
                   key={col.key}
-                  className={`${headPad} ${headTextSize} ${headWeight} ${headCase} whitespace-nowrap ${cIdx === 0
-                    ? "rounded-tl-2xl"
-                    : cIdx === columns.length - 1
-                      ? "rounded-tr-2xl"
-                      : ""
-                    } ${col.align === "center"
-                      ? "text-center"
-                      : col.align === "right"
-                        ? "text-right"
-                        : "text-left"
-                    } ${col.width ? (col.width.startsWith("w-") ? col.width : `w-${col.width}`) : ""} ${col.sticky === "right" ? `sticky ${col.stickyOffset || "right-0"} bg-slate-50/80 shadow-[-8px_0_8px_-8px_rgba(0,0,0,0.1)]` : ""}`}
+                  className={`${headPad} ${headTextSize} ${headWeight} ${headCase} whitespace-nowrap ${
+                    isBorderless ? "" : "border-b border-slate-100"
+                  } ${
+                    cIdx === 0
+                      ? isDashboard ? "pl-5 rounded-tl-2xl" : "rounded-tl-2xl"
+                      : cIdx === columns.length - 1
+                        ? isDashboard ? "pr-5 rounded-tr-2xl" : "rounded-tr-2xl"
+                        : ""
+                  } ${col.align === "center"
+                    ? "text-center"
+                    : col.align === "right"
+                      ? "text-right"
+                      : "text-left"
+                  } ${col.width ? (col.width.startsWith("w-") ? col.width : `w-${col.width}`) : ""} ${col.sticky === "right" ? `sticky ${col.stickyOffset || "right-0"} bg-slate-50/80 shadow-[-8px_0_8px_-8px_rgba(0,0,0,0.1)]` : ""}`}
                 >
                   {col.label}
                 </th>
@@ -180,12 +196,12 @@ export const Table = ({
               ))
             ) : paginatedData.length === 0 ? (
               <tr>
-                <td colSpan={columns.length} className="px-5 py-16 text-center">
+                <td colSpan={columns.length} className={isDashboard ? "px-4 py-8 text-center" : "px-5 py-16 text-center"}>
                   <div className="text-slate-400 ">
-                    <p className="text-lg font-medium mb-1">
+                    <p className={isDashboard ? "text-sm font-medium mb-0.5" : "text-lg font-medium mb-1"}>
                       {emptyState?.title || "No data found"}
                     </p>
-                    <p className="text-sm">
+                    <p className={isDashboard ? "text-xs" : "text-sm"}>
                       {emptyState?.description ||
                         "Try adjusting your search query"}
                     </p>
@@ -206,13 +222,15 @@ export const Table = ({
                         onClick={
                           onRowClick ? () => onRowClick(row, idx) : undefined
                         }
-                        className={`${rowBg} ${effectiveRowHeight} hover:bg-slate-50 transition-colors ${onRowClick ? "cursor-pointer" : ""
+                        className={`${rowBg} ${effectiveRowHeight} ${isDashboard ? "hover:bg-slate-50/70" : "hover:bg-slate-50"} transition-colors ${onRowClick ? "cursor-pointer group" : ""
                           } ${extraClass}`}
                       >
                         {columns.map((col, cIdx) => (
                           <td
                             key={col.key}
-                            className={`${effectiveCellPad} ${cellText} align-middle whitespace-nowrap ${isLast && cIdx === 0
+                            className={`${effectiveCellPad} ${cellText} align-middle whitespace-nowrap ${
+                              !isLast && !isBorderless ? "border-b border-slate-100" : ""
+                            } ${cIdx === 0 && isDashboard ? "pl-5" : ""} ${cIdx === columns.length - 1 && isDashboard ? "pr-5" : ""} ${isLast && cIdx === 0
                               ? "rounded-bl-2xl"
                               : isLast && cIdx === columns.length - 1
                                 ? "rounded-br-2xl"
@@ -262,20 +280,22 @@ export const Table = ({
       </div>
 
       {(totalPages > 1 || (serverSide && loading)) && onPageChange && (
-        <div className="flex items-center justify-between px-4 py-3 border-t border-slate-100 rounded-b-2xl lg:px-5">
-          <p className="text-[13px] text-slate-500 ">
+        <div className={`flex items-center justify-between border-t border-slate-100 rounded-b-2xl shrink-0 ${
+          isDashboard ? "px-4 py-2" : "px-4 py-3 lg:px-5"
+        }`}>
+          <p className={isDashboard ? "font-mono text-[11px] text-slate-500" : "text-[13px] text-slate-500"}>
             Showing {paginatedData.length === 0 ? 0 : startIndex + 1}–
             {Math.min(startIndex + pageSize, itemCount)} of {itemCount} items
           </p>
-          <div className="flex items-center gap-2">
+          <div className="flex items-center gap-1.5">
             <button
               onClick={() => handlePageChange(Math.max(1, currentPage - 1))}
               disabled={currentPage === 1}
-              className={`h-8 px-3 text-[12px] font-medium rounded-lg border border-slate-200 text-slate-600 hover:bg-slate-50 hover:text-slate-900 disabled:opacity-40 disabled:cursor-not-allowed transition-colors shadow-sm shrink-0`}
+              className={isDashboard ? "h-7 px-2.5 text-[11px] font-medium rounded-lg border border-slate-200 text-slate-600 hover:bg-slate-50 hover:text-slate-900 disabled:opacity-40 disabled:cursor-not-allowed transition-colors shadow-2xs shrink-0 cursor-pointer" : "h-8 px-3 text-[12px] font-medium rounded-lg border border-slate-200 text-slate-600 hover:bg-slate-50 hover:text-slate-900 disabled:opacity-40 disabled:cursor-not-allowed transition-colors shadow-sm shrink-0"}
             >
               Previous
             </button>
-            <div className="flex items-center justify-center gap-1 w-[260px] shrink-0">
+            <div className={`flex items-center justify-center gap-1 ${isDashboard ? "w-auto min-w-[100px]" : "w-[260px]"} shrink-0`}>
               {Array.from({ length: totalPages }, (_, i) => i + 1)
                 .filter(
                   (p) =>
@@ -290,7 +310,7 @@ export const Table = ({
                   p === "..." ? (
                     <span
                       key={`ellipsis-${idx}`}
-                      className="px-1 text-slate-400 text-[13px] text-center"
+                      className="px-1 text-slate-400 text-[11px] text-center"
                     >
                       ...
                     </span>
@@ -298,10 +318,15 @@ export const Table = ({
                     <button
                       key={p}
                       onClick={() => handlePageChange(p)}
-                      className={`h-8 min-w-8 px-2 text-[12px] rounded-lg border transition-colors shadow-sm ${currentPage === p
-                        ? "bg-indigo-600 border-indigo-600 text-white font-semibold"
-                        : "border-slate-200 text-slate-600 hover:bg-slate-50 "
-                        }`}
+                      className={isDashboard ? `h-7 min-w-7 px-2 text-[11px] rounded-lg border transition-colors shadow-2xs cursor-pointer ${
+                        currentPage === p
+                          ? "bg-blue-600 border-blue-600 text-white font-semibold"
+                          : "border-slate-200 text-slate-600 hover:bg-slate-50"
+                      }` : `h-8 min-w-8 px-2 text-[12px] rounded-lg border transition-colors shadow-sm ${
+                        currentPage === p
+                          ? "bg-indigo-600 border-indigo-600 text-white font-semibold"
+                          : "border-slate-200 text-slate-600 hover:bg-slate-50"
+                      }`}
                     >
                       {p}
                     </button>
@@ -313,7 +338,7 @@ export const Table = ({
                 handlePageChange(Math.min(totalPages, currentPage + 1))
               }
               disabled={currentPage === totalPages}
-              className={`h-8 px-3 text-[12px] font-medium rounded-lg border border-slate-200 text-slate-600 hover:bg-slate-50 hover:text-slate-900 disabled:opacity-40 disabled:cursor-not-allowed transition-colors shadow-sm shrink-0`}
+              className={isDashboard ? "h-7 px-2.5 text-[11px] font-medium rounded-lg border border-slate-200 text-slate-600 hover:bg-slate-50 hover:text-slate-900 disabled:opacity-40 disabled:cursor-not-allowed transition-colors shadow-2xs shrink-0 cursor-pointer" : "h-8 px-3 text-[12px] font-medium rounded-lg border border-slate-200 text-slate-600 hover:bg-slate-50 hover:text-slate-900 disabled:opacity-40 disabled:cursor-not-allowed transition-colors shadow-sm shrink-0"}
             >
               Next
             </button>

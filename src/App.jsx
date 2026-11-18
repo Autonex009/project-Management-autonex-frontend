@@ -125,9 +125,10 @@ function App() {
       new QueryClient({
         defaultOptions: {
           queries: {
-            refetchOnWindowFocus: false,
+            refetchOnWindowFocus: true,
+            refetchOnReconnect: true,
             retry: 1,
-            staleTime: 1000 * 60 * 5, // Cache data for 5 minutes globally
+            staleTime: 1000 * 30, // 30 seconds default freshness (down from 5 minutes)
           },
         },
       }),
@@ -151,6 +152,23 @@ function App() {
     }
     prevPortal.current = currentPortal;
   }, [location.pathname, queryClient]);
+
+  // Handle silent token expiration / 401 Unauthorized across all background queries
+  useEffect(() => {
+    const handleUnauthorized = () => {
+      queryClient.clear();
+      const portal = location.pathname.split("/")[1];
+      if (portal === "admin") {
+        window.location.href = "/login/admin";
+      } else if (portal === "pm") {
+        window.location.href = "/login/pm";
+      } else {
+        window.location.href = "/login/employee";
+      }
+    };
+    window.addEventListener("auth:unauthorized", handleUnauthorized);
+    return () => window.removeEventListener("auth:unauthorized", handleUnauthorized);
+  }, [queryClient, location.pathname]);
 
   // Catch Vite chunk hash mismatches on redeployment and auto-reload once cleanly
   useEffect(() => {

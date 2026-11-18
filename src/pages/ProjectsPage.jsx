@@ -473,6 +473,98 @@ const ProjectsPage = () => {
       toast.error(err.response?.data?.detail || "Failed to delete project"),
   });
 
+  // Zero-Network Cache Surgery Archive Mutation
+  const archiveMutation = useMutation({
+    mutationFn: ({ id, status }) =>
+      subProjectApi.update(id, { project_status: status }),
+    onSuccess: (updatedProject, variables) => {
+      // 1. Surgically update KPI tab counts in RAM
+      queryClient.setQueryData(["sub-projects", "kpi"], (oldKpi) => {
+        if (!oldKpi?.tab_counts) return oldKpi;
+        const sourceTab = projectView;
+        return {
+          ...oldKpi,
+          tab_counts: {
+            ...oldKpi.tab_counts,
+            [sourceTab]: Math.max(0, (oldKpi.tab_counts[sourceTab] || 0) - 1),
+            archived: (oldKpi.tab_counts.archived || 0) + 1,
+          },
+        };
+      });
+
+      // 2. Surgically prune project from active list in RAM
+      queryClient.setQueriesData(
+        { queryKey: ["sub-projects", "paginated"] },
+        (oldData) => {
+          if (!oldData?.items) return oldData;
+          return {
+            ...oldData,
+            total: Math.max(0, (oldData.total || 0) - 1),
+            items: oldData.items.filter((item) => item.id !== variables.id),
+          };
+        }
+      );
+
+      // 3. Mark Archived tab as stale without immediate refetch (Zero-Network!)
+      queryClient.invalidateQueries({
+        queryKey: ["sub-projects", "paginated", { project_view: "archived" }],
+        refetchType: "none",
+      });
+
+      toast.success(`Project archived as ${variables.status}`);
+      setArchiveModalProject(null);
+    },
+    onError: (err) =>
+      toast.error(err.response?.data?.detail || "Failed to archive project"),
+  });
+
+  // Zero-Network Cache Surgery Restore Mutation
+  const restoreMutation = useMutation({
+    mutationFn: ({ id, status = "in progress" }) =>
+      subProjectApi.update(id, { project_status: status }),
+    onSuccess: (updatedProject, variables) => {
+      const isDev = isDeveloperProject(updatedProject?.project_types);
+      const targetTab = isDev ? "development" : "active";
+
+      // 1. Surgically update KPI tab counts in RAM
+      queryClient.setQueryData(["sub-projects", "kpi"], (oldKpi) => {
+        if (!oldKpi?.tab_counts) return oldKpi;
+        return {
+          ...oldKpi,
+          tab_counts: {
+            ...oldKpi.tab_counts,
+            archived: Math.max(0, (oldKpi.tab_counts.archived || 0) - 1),
+            [targetTab]: (oldKpi.tab_counts[targetTab] || 0) + 1,
+          },
+        };
+      });
+
+      // 2. Surgically prune project from archived list in RAM
+      queryClient.setQueriesData(
+        { queryKey: ["sub-projects", "paginated"] },
+        (oldData) => {
+          if (!oldData?.items) return oldData;
+          return {
+            ...oldData,
+            total: Math.max(0, (oldData.total || 0) - 1),
+            items: oldData.items.filter((item) => item.id !== variables.id),
+          };
+        }
+      );
+
+      // 3. Mark target tab as stale without immediate refetch (Zero-Network!)
+      queryClient.invalidateQueries({
+        queryKey: ["sub-projects", "paginated", { project_view: targetTab }],
+        refetchType: "none",
+      });
+
+      toast.success("Project restored to active operations");
+      setRestoreConfirmProject(null);
+    },
+    onError: (err) =>
+      toast.error(err.response?.data?.detail || "Failed to restore project"),
+  });
+
   const setScrollPosition = useScrollStore((state) => state.setScrollPosition);
 
   useEffect(() => {
@@ -987,6 +1079,9 @@ const ProjectsPage = () => {
   };
 
   const [deleteConfirm, setDeleteConfirm] = useState(null);
+  const [archiveModalProject, setArchiveModalProject] = useState(null);
+  const [archiveStatusSelection, setArchiveStatusSelection] = useState("completed");
+  const [restoreConfirmProject, setRestoreConfirmProject] = useState(null);
   const [highlightId, setHighlightId] = useState(null);
 
   const PAGE_SIZE = 12;
@@ -1323,7 +1418,11 @@ const ProjectsPage = () => {
               value={projectMetrics.activeProjects}
               icon={UserCheck}
               tone="emerald"
-              hint="currently active"
+              hint={
+                tabCounts.development > 0
+                  ? `(${tabCounts.development} development project${tabCounts.development !== 1 ? "s" : ""})`
+                  : "currently active"
+              }
             />
             <StatCard
               title="Overburdened"
@@ -1845,9 +1944,12 @@ const ProjectsPage = () => {
                     }
                     onCloseDocs={() => setDocsOpenId(null)}
                     onAdvanced={() => openProjectModal(project)}
-                    onDelete={() =>
-                      setDeleteConfirm({ id: project.id, name: project.name })
-                    }
+                    isArchivedView={projectView === "archived"}
+                    onArchive={() => {
+                      setArchiveStatusSelection("completed");
+                      setArchiveModalProject(project);
+                    }}
+                    onRestore={() => setRestoreConfirmProject(project)}
                   />
                 );
               })}
@@ -2654,6 +2756,107 @@ const ProjectsPage = () => {
         title="Delete Project"
         message={`Are you sure you want to delete "${deleteConfirm?.name}"? This action cannot be undone.`}
         isPending={deleteMutation.isPending}
+      />
+
+      {/* Archive Project Modal */}
+      {archiveModalProject && (
+        <Modal.Compact
+          isOpen={true}
+          onClose={() => setArchiveModalProject(null)}
+          size="md"
+          title={`Archive "${archiveModalProject.name}"`}
+        >
+          <div className="p-4 space-y-4">
+            <p className="text-xs text-slate-500">
+              Archiving this project will release all worker allocations (annotators, reviewers) back to company availability. The assigned Project Manager and Team Lead will remain attached for reference.
+            </p>
+            <div>
+              <label className="block text-xs font-semibold text-slate-700 uppercase tracking-wide mb-2">
+                Select Final Status
+              </label>
+              <div className="grid grid-cols-1 gap-2">
+                {[
+                  {
+                    value: "completed",
+                    label: "Completed",
+                    desc: "Project delivery has successfully finished.",
+                  },
+                  {
+                    value: "on-hold",
+                    label: "On Hold",
+                    desc: "Project is temporarily paused by client.",
+                  },
+                  {
+                    value: "cancelled",
+                    label: "Cancelled",
+                    desc: "Project trial was rejected or cancelled.",
+                  },
+                ].map((st) => (
+                  <label
+                    key={st.value}
+                    className={`flex items-start gap-3 p-3 rounded-lg border cursor-pointer transition-all ${
+                      archiveStatusSelection === st.value
+                        ? "border-indigo-600 bg-indigo-50/40 ring-1 ring-indigo-600"
+                        : "border-slate-200 hover:border-slate-300 bg-white"
+                    }`}
+                  >
+                    <input
+                      type="radio"
+                      name="archiveStatus"
+                      value={st.value}
+                      checked={archiveStatusSelection === st.value}
+                      onChange={() => setArchiveStatusSelection(st.value)}
+                      className="mt-0.5 text-indigo-600 focus:ring-indigo-500"
+                    />
+                    <div>
+                      <span className="text-sm font-semibold text-slate-800">
+                        {st.label}
+                      </span>
+                      <p className="text-xs text-slate-500">{st.desc}</p>
+                    </div>
+                  </label>
+                ))}
+              </div>
+            </div>
+          </div>
+          <Modal.Compact.Footer>
+            <button
+              type="button"
+              onClick={() => setArchiveModalProject(null)}
+              className="px-3 py-1.5 text-xs font-medium text-slate-600 hover:bg-slate-100 rounded-lg transition-colors"
+            >
+              Cancel
+            </button>
+            <button
+              type="button"
+              disabled={archiveMutation.isPending}
+              onClick={() => {
+                archiveMutation.mutate({
+                  id: archiveModalProject.id,
+                  status: archiveStatusSelection,
+                });
+              }}
+              className="px-3.5 py-1.5 text-xs font-semibold text-white bg-indigo-600 hover:bg-indigo-700 disabled:opacity-50 rounded-lg transition-colors flex items-center gap-1.5"
+            >
+              {archiveMutation.isPending ? "Archiving..." : "Archive Project"}
+            </button>
+          </Modal.Compact.Footer>
+        </Modal.Compact>
+      )}
+
+      {/* Restore Project Confirm Dialog */}
+      <ConfirmDialog
+        isOpen={restoreConfirmProject !== null}
+        onClose={() => setRestoreConfirmProject(null)}
+        onConfirm={() => {
+          restoreMutation.mutate({
+            id: restoreConfirmProject.id,
+            status: "in progress",
+          });
+        }}
+        title="Restore Project"
+        message={`Are you sure you want to restore "${restoreConfirmProject?.name}" back to active operations? It will be moved to the Active tab with status "In Progress".`}
+        isPending={restoreMutation.isPending}
       />
     </div>
   );

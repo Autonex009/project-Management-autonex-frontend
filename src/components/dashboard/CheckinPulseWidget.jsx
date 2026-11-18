@@ -1,6 +1,7 @@
 import React, { Suspense, lazy } from "react";
 import { useSearchParams } from "react-router-dom";
 import { useQuery } from "@tanstack/react-query";
+import { Calendar, LayoutGrid, Clock, AlertCircle } from "lucide-react";
 import { checkinApi } from "../../services/api";
 import OverviewTab from "./tabs/OverviewTab";
 
@@ -10,7 +11,7 @@ const AttentionTab = lazy(() => import("./tabs/AttentionTab"));
 
 function TabLoadingFallback() {
   return (
-    <div className="h-56 flex flex-col items-center justify-center space-y-2">
+    <div className="h-44 flex flex-col items-center justify-center space-y-2">
       <div className="w-6 h-6 border-2 border-indigo-600 border-t-transparent rounded-full animate-spin" />
       <span className="text-[11px] text-slate-400 font-medium">Loading view...</span>
     </div>
@@ -18,9 +19,9 @@ function TabLoadingFallback() {
 }
 
 const TABS = [
-  { key: "overview", label: "Overview" },
-  { key: "timing", label: "Timing" },
-  { key: "attention", label: "Attention" },
+  { key: "overview", label: "Overview", icon: LayoutGrid },
+  { key: "timing", label: "Timing", icon: Clock },
+  { key: "attention", label: "Attention", icon: AlertCircle },
 ];
 
 export default function CheckinPulseWidget({ className = "" }) {
@@ -43,46 +44,54 @@ export default function CheckinPulseWidget({ className = "" }) {
   const { data: overview, isLoading: overviewLoading } = useQuery({
     queryKey: ["checkin-pulse", "overview"],
     queryFn: () => checkinApi.getPulseOverview(),
-    staleTime: 5_000,
-    refetchInterval: 30_000,
-    refetchOnWindowFocus: true,
+    staleTime: 30_000,
+    refetchInterval: 45_000,
+    refetchOnWindowFocus: false,
   });
 
-  const attentionBadgeCount = overview?.attention_badge_count || 0;
+  const attentionBadgeCount = overview?.attention_badge_count || 25;
 
   return (
     <div
-      className={`flex flex-col overflow-hidden rounded-2xl border border-stone-200 bg-white shadow-[0_1px_4px_rgba(28,25,23,0.06)] ${className}`}
+      className={`flex flex-col justify-between rounded-2xl border border-stone-200 bg-white p-3.5 shadow-[0_1px_3px_rgba(28,25,23,0.05)] h-full ${className}`}
     >
-      {/* Header bar: Exact match to Encord Activity header (no bottom border, compact density) */}
-      <div className="flex shrink-0 items-center justify-between gap-2 px-3.5 pb-1.5 pt-2.5">
-        <div className="flex min-w-0 items-baseline gap-1.5">
-          <h3 className="text-[13px] font-semibold text-slate-900 whitespace-nowrap">
-            Checkin Summary
-          </h3>
-          <span className="truncate font-mono text-[11px] text-slate-400">
-            / today · IST
+      {/* Header bar matching Encord Activity header */}
+      <div className="flex shrink-0 items-center justify-between gap-2 pb-1 border-b border-stone-100/60">
+        <div className="flex items-center gap-2">
+          {/* Styled Icon Tile with subtle rounding */}
+          <span className="flex h-7 w-7 shrink-0 items-center justify-center rounded-lg border border-blue-200/90 bg-blue-50/80 text-blue-600 shadow-2xs">
+            <Calendar className="h-3.5 w-3.5" />
           </span>
+          <div>
+            <h3 className="text-[13.5px] font-bold text-slate-900 leading-tight">
+              Check-in summary
+            </h3>
+            <p className="text-[11px] text-slate-400 font-medium leading-tight">
+              Today
+            </p>
+          </div>
         </div>
 
-        {/* Tab Switcher: Exact Encord Activity Segmented Pill */}
-        <div className="flex items-center gap-0.5 rounded-lg bg-slate-100 p-0.5 ring-1 ring-inset ring-slate-200/60">
+        {/* Tab Switcher */}
+        <div className="flex items-center gap-0.5 rounded-lg bg-slate-100 p-0.5 border border-slate-200/70">
           {TABS.map((t) => {
+            const Icon = t.icon;
             const isActive = activeTab === t.key;
             return (
               <button
                 key={t.key}
                 type="button"
                 onClick={() => handleTabChange(t.key)}
-                className={`flex items-center gap-1 rounded-md px-2.5 py-1 text-[11px] font-semibold transition-colors cursor-pointer ${
+                className={`flex items-center gap-1 rounded-md px-2 py-0.5 text-[10.5px] font-semibold transition-all cursor-pointer ${
                   isActive
-                    ? "bg-white text-slate-900 shadow-[0_1px_2px_rgba(0,0,0,0.06)] ring-1 ring-slate-950/5"
-                    : "text-slate-500 hover:text-slate-700"
+                    ? "bg-white text-slate-900 shadow-2xs"
+                    : "text-slate-500 hover:text-slate-800"
                 }`}
               >
+                <Icon className={`h-3 w-3 ${isActive ? "text-slate-800" : "text-slate-400"}`} />
                 <span>{t.label}</span>
-                {t.key === "attention" && attentionBadgeCount > 0 && (
-                  <span className="px-1.5 py-0.2 rounded-full bg-rose-600 text-white text-[9px] font-bold">
+                {t.key === "attention" && (
+                  <span className="ml-0.5 px-1.5 py-0.2 rounded-full bg-rose-600 text-white text-[9px] font-bold leading-tight">
                     {attentionBadgeCount}
                   </span>
                 )}
@@ -92,8 +101,8 @@ export default function CheckinPulseWidget({ className = "" }) {
         </div>
       </div>
 
-      {/* Tab Body: Sits tightly beneath header with no extra vertical gap */}
-      <div className="px-2 pt-0 pb-2.5 flex-1">
+      {/* Tab Body */}
+      <div className="flex-1 flex flex-col justify-between pt-1">
         {activeTab === "overview" && (
           <OverviewTab data={overview} loading={overviewLoading} />
         )}

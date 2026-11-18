@@ -68,7 +68,6 @@ const EmployeeLayout = () => {
         usePageStateStore.getState().clearAll();
         useScrollStore.setState({ memory: {}, scrollPositions: {} });
 
-        localStorage.removeItem("token");
         localStorage.removeItem("user");
         localStorage.removeItem("role");
         queryClient.clear();

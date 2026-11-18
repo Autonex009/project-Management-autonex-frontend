@@ -55,6 +55,7 @@ import {
   Trophy,
   Target,
   Plus,
+  Info,
 } from "lucide-react";
 
 import {
@@ -420,6 +421,14 @@ const EmployeeDashboard = () => {
     severity: "medium",
   });
   const [noteFormError, setNoteFormError] = useState("");
+  const [showProratedInfo, setShowProratedInfo] = useState(false);
+
+  useEffect(() => {
+    if (!showProratedInfo) return;
+    const handleOutsideClick = () => setShowProratedInfo(false);
+    window.addEventListener("click", handleOutsideClick);
+    return () => window.removeEventListener("click", handleOutsideClick);
+  }, [showProratedInfo]);
 
   const handleOpenAttendanceModal = (tabKey) => {
     setModalSelectedMonth(new Date());
@@ -430,8 +439,8 @@ const EmployeeDashboard = () => {
   const userRole = localStorage.getItem("role") || localUser.role || "employee";
   const isAdmin = userRole === "admin";
   const isAdminOrHr = userRole === "admin" || userRole === "hr";
-  const employeeId = params.id || localUser.employee_id || localUser.id || 1;
-  const isSelf = !params.id || String(params.id) === String(localUser.employee_id || localUser.id);
+  const employeeId = params.id || localUser.employee_id || 1;
+  const isSelf = !params.id || String(params.id) === String(localUser.employee_id);
   const isPortalView = location.pathname.startsWith("/admin") || location.pathname.startsWith("/pm");
   const showBackButton = isPortalView && (!!params.id || !isSelf);
 
@@ -471,7 +480,7 @@ const EmployeeDashboard = () => {
     enabled: canLoadDashboard,
   });
 
-  const loggedInEmpId = Number(localUser.employee_id || localUser.id || account?.employee_id);
+  const loggedInEmpId = Number(localUser.employee_id || account?.employee_id);
   const isTeamLeadOrPm = userRole === "pm" || userRole === "team_lead";
 
   const canViewNotes = isAdminOrHr || isTeamLeadOrPm || isSelf;
@@ -650,6 +659,10 @@ const EmployeeDashboard = () => {
     const joiningDate = rawJoiningDate
       ? format(parseISO(String(rawJoiningDate).split("T")[0]), "dd MMM yyyy")
       : "-";
+    const rawFullTimeDate = employee?.converted_to_fulltime_at || null;
+    const fullTimeDate = rawFullTimeDate
+      ? format(parseISO(String(rawFullTimeDate).split("T")[0]), "dd MMM yyyy")
+      : "-";
     const tenure = rawJoiningDate ? calculateTenure(rawJoiningDate) : "—";
 
     const badge =
@@ -681,6 +694,7 @@ const EmployeeDashboard = () => {
       status,
       avatarUrl,
       joiningDate,
+      fullTimeDate,
       tenure,
       badge,
       initials,
@@ -1040,13 +1054,13 @@ const EmployeeDashboard = () => {
 
     const paidQuota = serverBalances?.paid?.quota ?? (internOrContractor
       ? INTERN_MONTHLY_PAID_QUOTA
-      : ANNUAL_LEAVE_QUOTA?.paid || 22);
+      : ANNUAL_LEAVE_QUOTA?.paid || 12);
     const paidUsed = serverBalances?.paid?.used ?? (internOrContractor ? paidUsedThisMonth : usedYear.paid);
     const paidRemaining = serverBalances?.paid?.remaining ?? Math.max(paidQuota - paidUsed, 0);
 
     const casualQuota = serverBalances?.casual_sick?.quota ?? (internOrContractor
       ? 0
-      : ANNUAL_LEAVE_QUOTA?.casual_sick || 10);
+      : ANNUAL_LEAVE_QUOTA?.casual_sick || 6);
     const casualUsed = serverBalances?.casual_sick?.used ?? usedYear.casual_sick;
     const casualRemaining = serverBalances?.casual_sick?.remaining ?? Math.max(casualQuota - casualUsed, 0);
 
@@ -1102,7 +1116,7 @@ const EmployeeDashboard = () => {
       currentLeave,
       isInternOrContractor: internOrContractor,
     };
-  }, [allLeaves, myWfh, internOrContractor, currentYear, currentMonth, todayStr]);
+  }, [allLeaves, myWfh, internOrContractor, currentYear, currentMonth, todayStr, serverBalances]);
 
   // const achievementBadges = useMemo(() => {
   //   const list = Array.isArray(employeeBadges)
@@ -1643,14 +1657,43 @@ const EmployeeDashboard = () => {
                     )}
                   </span>
                 </div>
-                <div className="flex items-center gap-2 truncate">
-                  <Calendar className="w-3.5 h-3.5 text-stone-400 shrink-0" />
-                  <span className="text-stone-500">
-                    DOJ:{" "}
-                    <span className="text-stone-700 font-semibold">
-                      {profile.joiningDate || "-"}
+                <div className="flex items-center gap-3.5 flex-wrap">
+                  {/* DOJ with Light-Mode Hover Tooltip */}
+                  <div className="group relative flex items-center gap-2 cursor-help select-none">
+                    <Calendar className="w-3.5 h-3.5 text-stone-400 shrink-0" />
+                    <span className="text-stone-500">
+                      DOJ:{" "}
+                      <span className="text-stone-700 font-semibold">
+                        {profile.joiningDate || "-"}
+                      </span>
                     </span>
-                  </span>
+
+                    {/* Light-Mode Hover Tooltip for DOJ */}
+                    <div className="pointer-events-none absolute bottom-full left-1/2 -translate-x-1/2 mb-1.5 hidden group-hover:flex flex-col items-center z-50 transition-all">
+                      <div className="bg-white text-stone-800 border border-stone-200/90 shadow-md rounded-lg py-1 px-2.5 text-[11px] font-semibold whitespace-nowrap">
+                        Date of Joining
+                      </div>
+                      <div className="w-2 h-2 bg-white border-r border-b border-stone-200 rotate-45 -mt-1 shadow-2xs" />
+                    </div>
+                  </div>
+
+                  {/* DOF with Light-Mode Hover Tooltip */}
+                  <div className="group relative flex items-center gap-1.5 cursor-help select-none">
+                    <span className="text-stone-500">
+                      DOF:{" "}
+                      <span className="text-stone-700 font-semibold">
+                        {profile.fullTimeDate || "-"}
+                      </span>
+                    </span>
+
+                    {/* Light-Mode Hover Tooltip for DOF */}
+                    <div className="pointer-events-none absolute bottom-full left-1/2 -translate-x-1/2 mb-1.5 hidden group-hover:flex flex-col items-center z-50 transition-all">
+                      <div className="bg-white text-stone-800 border border-stone-200/90 shadow-md rounded-lg py-1 px-2.5 text-[11px] font-semibold whitespace-nowrap">
+                        Date of Full Time
+                      </div>
+                      <div className="w-2 h-2 bg-white border-r border-b border-stone-200 rotate-45 -mt-1 shadow-2xs" />
+                    </div>
+                  </div>
                 </div>
               </div>
             </div>
@@ -1668,7 +1711,7 @@ const EmployeeDashboard = () => {
                     key={label}
                     onClick={() => handleOpenAttendanceModal(tabKey)}
                     title={`Click to view ${label} records`}
-                    className="flex flex-col items-center gap-0.5 border border-stone-200/90 rounded-xl pt-2 pb-1.5 px-2 bg-white shadow-2xs hover:shadow-xs hover:border-stone-300 transition-all cursor-pointer select-none"
+                    className="relative flex flex-col items-center gap-0.5 border border-stone-200/90 rounded-xl pt-2 pb-1.5 px-2 bg-white shadow-2xs hover:shadow-xs hover:border-stone-300 transition-all cursor-pointer select-none"
                   >
                     <div
                       className={`w-6 h-6 rounded-full flex items-center justify-center shrink-0 ${
@@ -1686,9 +1729,90 @@ const EmployeeDashboard = () => {
                           </span>
                         )}
                       </div>
-                      <span className="text-[9px] font-bold text-stone-400 mt-0.5 block uppercase tracking-wider truncate">
-                        {label}
-                      </span>
+                      <div className="flex items-center justify-center gap-1 mt-0.5">
+                        <span className="text-[9px] font-bold text-stone-400 uppercase tracking-wider">
+                          {label}
+                        </span>
+
+                        {label === "Paid" && (
+                          <div
+                            className="group/prorated relative inline-flex items-center"
+                            onClick={(e) => {
+                              e.stopPropagation();
+                              setShowProratedInfo((prev) => !prev);
+                            }}
+                          >
+                            <span
+                              className="w-3.5 h-3.5 rounded-full bg-indigo-50 hover:bg-indigo-100 text-indigo-500 hover:text-indigo-700 flex items-center justify-center transition-all cursor-pointer"
+                              title="Prorated Leaves Policy"
+                            >
+                              <Info className="w-2.5 h-2.5" />
+                            </span>
+
+                            {/* Light-Mode Hover / Click Popover */}
+                            <div
+                              className={`pointer-events-auto absolute bottom-full left-1/2 -translate-x-1/2 mb-2 ${
+                                showProratedInfo ? "flex" : "hidden group-hover/prorated:flex"
+                              } flex-col items-center z-50 transition-all w-64`}
+                              onClick={(e) => e.stopPropagation()}
+                            >
+                              <div className="bg-white text-stone-800 border border-stone-200/90 shadow-xl rounded-xl p-3 text-left w-full">
+                                {/* Header */}
+                                <div className="flex items-center justify-between pb-1.5 mb-2 border-b border-stone-100">
+                                  <div className="flex items-center gap-1.5">
+                                    <div className="w-4 h-4 rounded-full bg-indigo-50 text-indigo-600 flex items-center justify-center shrink-0">
+                                      <Info className="w-2.5 h-2.5" />
+                                    </div>
+                                    <span className="font-bold text-[12px] text-stone-900">
+                                      Prorated Paid Leaves
+                                    </span>
+                                  </div>
+                                  <button
+                                    type="button"
+                                    onClick={(e) => {
+                                      e.stopPropagation();
+                                      setShowProratedInfo(false);
+                                    }}
+                                    className="text-stone-400 hover:text-stone-600 p-0.5 rounded"
+                                    title="Close"
+                                  >
+                                    <X className="w-3 h-3" />
+                                  </button>
+                                </div>
+
+                                {/* Plain English explanation */}
+                                <p className="text-[11px] text-stone-600 leading-relaxed">
+                                  You receive <strong className="text-stone-900 font-semibold">1 paid leave per month</strong> for the remaining months of {currentYear}
+                                  {profile.fullTimeDate && profile.fullTimeDate !== "-"
+                                    ? ` from your full-time date (${profile.fullTimeDate})`
+                                    : profile.joiningDate && profile.joiningDate !== "-"
+                                    ? ` from your joining date (${profile.joiningDate})`
+                                    : ""}.
+                                </p>
+
+                                {/* Current Quota Badge */}
+                                <div className="my-2 px-2.5 py-1.5 bg-indigo-50/70 border border-indigo-100 rounded-lg flex items-center justify-between text-[11px]">
+                                  <span className="text-stone-600 font-medium">{currentYear} Paid Quota:</span>
+                                  <span className="font-bold text-indigo-700 bg-white px-2 py-0.5 rounded border border-indigo-200 shadow-2xs">
+                                    {quota} {quota === 1 ? "Day" : "Days"}
+                                  </span>
+                                </div>
+
+                                {/* New Leave Policy Notice */}
+                                <div className="mt-2 pt-2 border-t border-stone-100 flex items-start gap-1.5 text-[10.5px] text-emerald-800 bg-emerald-50/70 p-2 rounded-lg border border-emerald-100">
+                                  <Sparkles className="w-3.5 h-3.5 text-emerald-600 shrink-0 mt-0.5" />
+                                  <span className="leading-snug">
+                                    Leaves will reset to <strong className="text-emerald-950 font-bold">15 on January 1</strong> as per the new leave policy for full-timers.
+                                  </span>
+                                </div>
+                              </div>
+
+                              {/* Caret Arrow pointing down */}
+                              <div className="w-2.5 h-2.5 bg-white border-r border-b border-stone-200 rotate-45 -mt-1.5 shadow-2xs" />
+                            </div>
+                          </div>
+                        )}
+                      </div>
                     </div>
                   </div>
                 ))}

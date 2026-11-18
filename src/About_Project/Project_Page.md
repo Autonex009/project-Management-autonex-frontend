@@ -1,4 +1,4 @@
-# Frontend Project Page Architecture & Issues
+![alt text](image.png)# Frontend Project Page Architecture & Issues
 
 ## Overview
 The `ProjectsPage.jsx` component is the main hub for displaying, filtering, creating, and editing projects in the Autonex PM Portal. It serves multiple user roles (Admin, Project Manager, Team Lead) and is currently one of the largest and most complex files in the frontend repository (at over 2,800 lines of code).

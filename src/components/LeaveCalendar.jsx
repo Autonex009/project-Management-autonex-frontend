@@ -195,11 +195,10 @@ export default function LeaveCalendar({
       storedRole === "hr" ||
       isUserTeamLead);
 
-  const employeeId = user?.employee_id || user?.id;
+  const employeeId = user?.employee_id;
 
   const isSelfEvent = (ev) => {
     if (!ev) return false;
-    if (isSelfView) return true;
     if (
       employeeId != null &&
       (ev.employee_id === employeeId ||
@@ -215,6 +214,7 @@ export default function LeaveCalendar({
     ) {
       return true;
     }
+    if (isSelfView && !ev.employee_id) return true;
     return false;
   };
 
@@ -328,6 +328,7 @@ export default function LeaveCalendar({
       recordLeaveApplication({ ...variables, ...res });
       queryClient.invalidateQueries({ queryKey: ["leave-calendar", monthStr] });
       queryClient.invalidateQueries({ queryKey: ["my-leaves", employeeId] });
+      queryClient.invalidateQueries({ queryKey: ["dashboard-kpis"] });
       setSelectedStart(null);
       setSelectedEnd(null);
       setLeaveType("");
@@ -355,6 +356,7 @@ export default function LeaveCalendar({
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ["leave-calendar", monthStr] });
       queryClient.invalidateQueries({ queryKey: ["my-wfh", employeeId] });
+      queryClient.invalidateQueries({ queryKey: ["dashboard-kpis"] });
       setSelectedStart(null);
       setSelectedEnd(null);
       setLeaveType("");
@@ -377,6 +379,7 @@ export default function LeaveCalendar({
       queryClient.invalidateQueries({ queryKey: ["leave-calendar"] });
       queryClient.invalidateQueries({ queryKey: ["leaves"] });
       queryClient.invalidateQueries({ queryKey: ["my-leaves"] });
+      queryClient.invalidateQueries({ queryKey: ["dashboard-kpis"] });
       toast.success("Leave approved");
     },
     onError: (err) =>
@@ -389,6 +392,7 @@ export default function LeaveCalendar({
       queryClient.invalidateQueries({ queryKey: ["leave-calendar"] });
       queryClient.invalidateQueries({ queryKey: ["leaves"] });
       queryClient.invalidateQueries({ queryKey: ["my-leaves"] });
+      queryClient.invalidateQueries({ queryKey: ["dashboard-kpis"] });
       toast.success("Leave rejected");
     },
     onError: (err) =>
@@ -401,6 +405,7 @@ export default function LeaveCalendar({
       queryClient.invalidateQueries({ queryKey: ["leave-calendar"] });
       queryClient.invalidateQueries({ queryKey: ["wfh"] });
       queryClient.invalidateQueries({ queryKey: ["my-wfh"] });
+      queryClient.invalidateQueries({ queryKey: ["dashboard-kpis"] });
       toast.success("WFH approved");
     },
     onError: (err) =>
@@ -413,6 +418,7 @@ export default function LeaveCalendar({
       queryClient.invalidateQueries({ queryKey: ["leave-calendar"] });
       queryClient.invalidateQueries({ queryKey: ["wfh"] });
       queryClient.invalidateQueries({ queryKey: ["my-wfh"] });
+      queryClient.invalidateQueries({ queryKey: ["dashboard-kpis"] });
       toast.success("WFH rejected");
     },
     onError: (err) =>
@@ -426,6 +432,7 @@ export default function LeaveCalendar({
       queryClient.invalidateQueries({ queryKey: ["leaves"] });
       queryClient.invalidateQueries({ queryKey: ["my-leaves"] });
       queryClient.invalidateQueries({ queryKey: ["leave-balances"] });
+      queryClient.invalidateQueries({ queryKey: ["dashboard-kpis"] });
       toast.success("Leave request cancelled successfully");
       setDeleteConfirmTarget(null);
     },
@@ -440,6 +447,7 @@ export default function LeaveCalendar({
       queryClient.invalidateQueries({ queryKey: ["leave-calendar"] });
       queryClient.invalidateQueries({ queryKey: ["wfh"] });
       queryClient.invalidateQueries({ queryKey: ["my-wfh"] });
+      queryClient.invalidateQueries({ queryKey: ["dashboard-kpis"] });
       toast.success("WFH request cancelled successfully");
       setDeleteConfirmTarget(null);
     },

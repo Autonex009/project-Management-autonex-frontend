@@ -9,14 +9,7 @@ if (!apiBaseUrl.includes("localhost") && apiBaseUrl.startsWith("http://")) {
 }
 
 const getAuthHeaders = (extraHeaders = {}) => {
-  const headers = { ...extraHeaders };
-  if (typeof window !== "undefined") {
-    const token = localStorage.getItem("token");
-    if (token) {
-      headers["Authorization"] = `Bearer ${token}`;
-    }
-  }
-  return headers;
+  return { ...extraHeaders };
 };
 
 /**
