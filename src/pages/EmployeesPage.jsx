@@ -1298,6 +1298,7 @@ function EmployeeActionMenu({
   statusParam,
   setRestoreTarget,
   handleConvertToFulltime,
+  onEditEmployee,
   setEditingEmployee,
   setFormDesignation,
   setFormEmployeeType,
@@ -1368,11 +1369,15 @@ function EmployeeActionMenu({
               <button
                 onClick={() => {
                   setIsOpen(false);
-                  setEditingEmployee(row);
-                  setFormDesignation(row.designation || "Annotator/ Reviewer");
-                  setFormEmployeeType(row.employee_type || "Full-time");
-                  setFormWorkModel(row.work_model || "WFO");
-                  setIsModalOpen(true);
+                  if (onEditEmployee) {
+                    onEditEmployee(row);
+                  } else {
+                    setEditingEmployee(row);
+                    setFormDesignation(row.designation || "Annotator/ Reviewer");
+                    setFormEmployeeType(row.employee_type || "Full-time");
+                    setFormWorkModel(row.work_model || "WFO");
+                    setIsModalOpen(true);
+                  }
                 }}
                 className="w-full text-left px-3 py-2 text-slate-700 hover:bg-slate-50 hover:text-indigo-600 flex items-center gap-2 transition-colors"
               >
@@ -1762,7 +1767,9 @@ const EmployeesPage = () => {
   const createMutation = useMutation({
     mutationFn: employeeApi.create,
     onSuccess: (res) => {
+      queryClient.invalidateQueries({ queryKey: ["employees-paginated"] });
       queryClient.invalidateQueries({ queryKey: ["employees"] });
+      queryClient.invalidateQueries({ queryKey: ["employee-stats"] });
       queryClient.invalidateQueries({ queryKey: ["skills"] }); // Refresh skills in case new ones were added
       queryClient.invalidateQueries({ queryKey: ["dashboard-kpis"] });
       setIsModalOpen(false);
@@ -1789,7 +1796,31 @@ const EmployeesPage = () => {
       return res;
     },
     onSuccess: (res, variables) => {
+      // 1. Surgical In-Memory Cache Surgery (Law 3): Immediately update the employee in all active paginated queries in RAM
+      queryClient.setQueriesData({ queryKey: ["employees-paginated"] }, (old) => {
+        if (!old || !old.items) return old;
+        return {
+          ...old,
+          items: old.items.map((emp) =>
+            emp.id === res.id
+              ? {
+                  ...emp,
+                  ...res,
+                  assigned_projects: emp.assigned_projects || res.assigned_projects,
+                  managers: emp.managers || res.managers,
+                }
+              : emp
+          ),
+        };
+      });
+
+      // 2. Sync canonical employee-profile key
+      queryClient.setQueryData(["employee-profile", res.id], res);
+
+      // 3. Mark queries stale for background synchronization
+      queryClient.invalidateQueries({ queryKey: ["employees-paginated"] });
       queryClient.invalidateQueries({ queryKey: ["employees"] });
+      queryClient.invalidateQueries({ queryKey: ["employee-stats"] });
       queryClient.invalidateQueries({ queryKey: ["all-employees-kpis"] });
       queryClient.invalidateQueries({ queryKey: ["allocations"] });
       queryClient.invalidateQueries({ queryKey: ["skills"] });
@@ -1821,7 +1852,17 @@ const EmployeesPage = () => {
       return res;
     },
     onSuccess: (_, id) => {
+      queryClient.setQueriesData({ queryKey: ["employees-paginated"] }, (old) => {
+        if (!old || !old.items) return old;
+        return {
+          ...old,
+          items: old.items.filter((emp) => emp.id !== id),
+          total: Math.max(0, (old.total || 0) - 1),
+        };
+      });
+      queryClient.invalidateQueries({ queryKey: ["employees-paginated"] });
       queryClient.invalidateQueries({ queryKey: ["employees"] });
+      queryClient.invalidateQueries({ queryKey: ["employee-stats"] });
       queryClient.invalidateQueries({ queryKey: ["all-employees-kpis"] });
       queryClient.invalidateQueries({ queryKey: ["allocations"] });
       queryClient.invalidateQueries({ queryKey: ["dashboard-kpis"] });
@@ -1835,7 +1876,17 @@ const EmployeesPage = () => {
   const restoreMutation = useMutation({
     mutationFn: employeeApi.restore,
     onSuccess: (_, id) => {
+      queryClient.setQueriesData({ queryKey: ["employees-paginated"] }, (old) => {
+        if (!old || !old.items) return old;
+        return {
+          ...old,
+          items: old.items.filter((emp) => emp.id !== id),
+          total: Math.max(0, (old.total || 0) - 1),
+        };
+      });
+      queryClient.invalidateQueries({ queryKey: ["employees-paginated"] });
       queryClient.invalidateQueries({ queryKey: ["employees"] });
+      queryClient.invalidateQueries({ queryKey: ["employee-stats"] });
       queryClient.invalidateQueries({ queryKey: ["all-employees-kpis"] });
       queryClient.invalidateQueries({ queryKey: ["allocations"] });
       queryClient.invalidateQueries({ queryKey: ["dashboard-kpis"] });
@@ -1850,7 +1901,20 @@ const EmployeesPage = () => {
     mutationFn: ({ id, converted_by }) =>
       employeeApi.convertToFulltime(id, { converted_by }),
     onSuccess: (emp) => {
+      queryClient.setQueriesData({ queryKey: ["employees-paginated"] }, (old) => {
+        if (!old || !old.items) return old;
+        return {
+          ...old,
+          items: old.items.map((e) =>
+            e.id === emp.id
+              ? { ...e, ...emp, employee_type: "Full-time" }
+              : e
+          ),
+        };
+      });
+      queryClient.invalidateQueries({ queryKey: ["employees-paginated"] });
       queryClient.invalidateQueries({ queryKey: ["employees"] });
+      queryClient.invalidateQueries({ queryKey: ["employee-stats"] });
       queryClient.invalidateQueries({ queryKey: ["all-employees-kpis"] });
       queryClient.invalidateQueries({ queryKey: ["dashboard-kpis"] });
       queryClient.invalidateQueries({ queryKey: ["leave-balances"] });
@@ -1868,6 +1932,28 @@ const EmployeesPage = () => {
 
   const handleConvertToFulltime = (employee) => {
     setConvertToFulltimeTarget(employee);
+  };
+
+  const handleOpenEditModal = async (employeeRow) => {
+    setEditingEmployee(employeeRow);
+    setFormDesignation(employeeRow.designation || "Annotator/ Reviewer");
+    setFormEmployeeType(employeeRow.employee_type || "Full-time");
+    setFormWorkModel(employeeRow.work_model || "WFO");
+    setIsModalOpen(true);
+
+    try {
+      const fresh = await employeeApi.getOne(employeeRow.id);
+      if (fresh) {
+        setEditingEmployee((curr) =>
+          curr && curr.id === employeeRow.id ? { ...curr, ...fresh } : curr
+        );
+        setFormDesignation(fresh.designation || employeeRow.designation || "Annotator/ Reviewer");
+        setFormEmployeeType(fresh.employee_type || employeeRow.employee_type || "Full-time");
+        setFormWorkModel(fresh.work_model || employeeRow.work_model || "WFO");
+      }
+    } catch {
+      // Fallback silently to existing row data
+    }
   };
 
   const closeEmployeeModal = () => {
@@ -2997,6 +3083,7 @@ const EmployeesPage = () => {
                     statusParam={statusParam}
                     setRestoreTarget={setRestoreTarget}
                     handleConvertToFulltime={handleConvertToFulltime}
+                    onEditEmployee={handleOpenEditModal}
                     setEditingEmployee={setEditingEmployee}
                     setFormDesignation={setFormDesignation}
                     setFormEmployeeType={setFormEmployeeType}
@@ -3100,7 +3187,7 @@ const EmployeesPage = () => {
           </h2>
         </Modal.Header>
         <form
-          key={editingEmployee?.id || "new"}
+          key={`${editingEmployee?.id || "new"}-${editingEmployee?.converted_to_fulltime_at || ""}-${editingEmployee?.date_of_joining || ""}-${editingEmployee?.updated_at || ""}`}
           onSubmit={handleSubmit}
           className="flex-1 flex flex-col min-h-0"
           id="employee-form"
@@ -3231,7 +3318,7 @@ const EmployeesPage = () => {
                   name="date_of_joining"
                   defaultValue={
                     editingEmployee?.date_of_joining
-                      ? String(editingEmployee.date_of_joining).split("T")[0]
+                      ? String(editingEmployee.date_of_joining).split(/[T\s]/)[0]
                       : ""
                   }
                   className="input"
@@ -3249,7 +3336,7 @@ const EmployeesPage = () => {
                     name="converted_to_fulltime_at"
                     defaultValue={
                       editingEmployee?.converted_to_fulltime_at
-                        ? String(editingEmployee.converted_to_fulltime_at).split("T")[0]
+                        ? String(editingEmployee.converted_to_fulltime_at).split(/[T\s]/)[0]
                         : ""
                     }
                     className="input"
