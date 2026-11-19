@@ -92,7 +92,7 @@ export default function OnboardingPipelineCard({
       </div>
 
       {/* Candidates List */}
-      <div className="my-2 space-y-1 max-h-36 overflow-y-auto pr-0.5" style={{ scrollbarWidth: "thin" }}>
+      <div className="my-2 space-y-1 max-h-36 overflow-y-auto pr-0.5 slick-scrollbar">
         {activeList.length === 0 ? (
           <div className="py-5 text-center text-[11px] text-slate-400">
             {tab === "today" ? "No evaluations due today" : "No overdue evaluations"}

@@ -407,8 +407,8 @@ export default function NeedsActionCard({
         </div>
       </div>
 
-      {/* Review List with Tiny Custom Scrollbar (flexes naturally to fill card height) */}
-      <div className="space-y-1.5 flex-1 min-h-0 overflow-y-auto pr-1 [scrollbar-width:thin] [scrollbar-color:#cbd5e1_transparent] [&::-webkit-scrollbar]:w-1.5 [&::-webkit-scrollbar-track]:bg-transparent [&::-webkit-scrollbar-thumb]:rounded-full [&::-webkit-scrollbar-thumb]:bg-slate-200 hover:[&::-webkit-scrollbar-thumb]:bg-slate-300">
+      {/* Review List: Exactly 4 items visible, rest on internal scroll */}
+      <div className="space-y-1.5 flex-1 min-h-0 max-h-[282px] overflow-y-auto pr-1 slick-scrollbar">
         {currentTabItems.length === 0 ? (
           <div className="py-8 text-center text-xs text-slate-400 font-medium">
             No pending items to review

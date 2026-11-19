@@ -5,6 +5,7 @@ import { authApi } from "../services/api";
 import { useBreadcrumbTrail } from "../hooks/useBreadcrumbTrail";
 import { usePageDetailTitle } from "../utils/pageDetailTitle";
 import EmployeeSidebar from "./EmployeeSidebar";
+import PMSidebar from "./PMSidebar";
 import AppShellLayout from "../layouts/AppShellLayout";
 import CandidateConfirmationPage from "../pages/hr/CandidateConfirmationPage";
 import usePageStateStore from "../store/usePageStateStore";
@@ -163,8 +164,8 @@ const EmployeeLayout = () => {
     <>
       <CandidateConfirmationPage />
       <AppShellLayout
-        storageKeyPrefix="employee"
-        SidebarComponent={EmployeeSidebar}
+        storageKeyPrefix={isPm ? "pm" : "employee"}
+        SidebarComponent={isPm ? PMSidebar : EmployeeSidebar}
         sidebarProps={{
           user,
           account,

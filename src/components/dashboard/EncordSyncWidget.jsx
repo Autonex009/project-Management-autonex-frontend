@@ -128,7 +128,7 @@ export default function EncordSyncWidget({ employeeId }) {
             </button>
           </div>
           
-          <div className="max-h-48 overflow-y-auto space-y-2 pr-1 custom-scrollbar">
+          <div className="max-h-48 overflow-y-auto space-y-2 pr-1 slick-scrollbar">
             {logs.length === 0 ? (
               <p className="text-[10px] text-stone-400 text-center py-2">No sync logs found.</p>
             ) : (

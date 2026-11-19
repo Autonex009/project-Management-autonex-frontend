@@ -20,7 +20,7 @@ export default function OverviewTab({ data, loading }) {
     active: 375,
     on_leave: 12,
     yet_to_check_in: 34,
-    late: 19,
+    late: 0,
   };
 
   const floor = data?.floor_breakdown || {
@@ -49,7 +49,7 @@ export default function OverviewTab({ data, loading }) {
   };
 
   const pct = attendance.effective_percentage || 87.7;
-  const lateCount = attendance.late ?? 19;
+  const lateCount = attendance.late ?? 0;
   const onLeaveCount = attendance.on_leave ?? 12;
   const pendingCount = attendance.yet_to_check_in ?? 34;
   const checkedInCount = attendance.checked_in ?? 329;
@@ -166,41 +166,176 @@ export default function OverviewTab({ data, loading }) {
 
             {/* Attendance Count & 3 Badges */}
             <div className="min-w-0">
-              <div className="flex items-baseline gap-1.5 flex-wrap">
-                <span className="text-2xl sm:text-[26px] font-bold font-mono tracking-tight text-slate-900 leading-none">
-                  {checkedInCount}
-                </span>
-                <span className="text-xs sm:text-[13px] font-semibold font-mono text-slate-400">
-                  / {totalExpected}
-                </span>
-                <span className="text-[11.5px] text-slate-500 font-medium">
-                  checked in
-                </span>
+              <div className="relative group/checkin inline-block cursor-pointer">
+                <div className="flex items-baseline gap-1.5 flex-wrap">
+                  <span className="text-2xl sm:text-[26px] font-bold font-mono tracking-tight text-slate-900 leading-none">
+                    {checkedInCount}
+                  </span>
+                  <span className="text-xs sm:text-[13px] font-semibold font-mono text-slate-400">
+                    / {totalExpected}
+                  </span>
+                  <span className="text-[11.5px] text-slate-500 font-medium">
+                    checked in
+                  </span>
+                </div>
+
+                {/* Checked In Breakdown Popover */}
+                <div className="absolute left-0 top-full mt-1.5 z-50 hidden group-hover/checkin:flex flex-col gap-1.5 w-60 rounded-xl border border-stone-200 bg-white p-2.5 shadow-xl pointer-events-none transition-all text-left">
+                  <div className="text-[10px] font-mono uppercase tracking-wider text-slate-400 border-b border-stone-100 pb-1 flex justify-between items-center font-bold">
+                    <span>Attendance Details</span>
+                    <span className="text-blue-600 font-mono">{pct}% Rate</span>
+                  </div>
+                  <div className="space-y-1 text-[11px]">
+                    <div className="flex items-center justify-between">
+                      <span className="inline-flex items-center gap-1.5 text-indigo-700 font-medium">
+                        <span className="w-1.5 h-1.5 rounded-full bg-indigo-600" />
+                        Office (WFO)
+                      </span>
+                      <span className="font-bold text-slate-900 font-mono">
+                        {(floor.floor_7 || 0) + (floor.floor_9 || 0) + (floor.floor_15 || 0) + (floor.floor_17 || 0)}
+                      </span>
+                    </div>
+                    <div className="flex items-center justify-between">
+                      <span className="inline-flex items-center gap-1.5 text-amber-700 font-medium">
+                        <span className="w-1.5 h-1.5 rounded-full bg-amber-500" />
+                        Remote (WFH)
+                      </span>
+                      <span className="font-bold text-slate-900 font-mono">
+                        {floor.wfh || 0}
+                      </span>
+                    </div>
+                    <div className="border-t border-stone-100 pt-1 flex items-center justify-between text-slate-500 text-[10.5px]">
+                      <span>Active Headcount:</span>
+                      <span className="font-mono font-semibold text-slate-700">{attendance.active || totalExpected}</span>
+                    </div>
+                  </div>
+                </div>
               </div>
 
               {/* 3 Status Badges: on leave, pending, late */}
               <div className="flex items-center gap-1.5 pt-2 flex-wrap">
-                <span
-                  onMouseEnter={() => setHoveredKey("leave")}
-                  onMouseLeave={() => setHoveredKey(null)}
-                  className={`inline-flex items-center gap-1.5 rounded-lg border border-amber-200/90 bg-amber-50/80 px-2 py-0.5 text-[10.5px] font-semibold text-amber-800 transition-all cursor-pointer ${
-                    hoveredKey === "leave" ? "ring-1 ring-amber-400 bg-amber-100" : ""
-                  }`}
-                >
-                  <Briefcase className="h-3 w-3 text-amber-600" />
-                  <span>{onLeaveCount} on leave</span>
-                </span>
+                {/* On Leave badge with rich hover breakdown popover */}
+                <div className="relative group/leave inline-block">
+                  <span
+                    onMouseEnter={() => setHoveredKey("leave")}
+                    onMouseLeave={() => setHoveredKey(null)}
+                    className={`inline-flex items-center gap-1.5 rounded-lg border border-amber-200/90 bg-amber-50/80 px-2 py-0.5 text-[10.5px] font-semibold text-amber-800 transition-all cursor-pointer ${
+                      hoveredKey === "leave" ? "ring-1 ring-amber-400 bg-amber-100" : ""
+                    }`}
+                  >
+                    <Briefcase className="h-3 w-3 text-amber-600" />
+                    <span>{onLeaveCount} on leave</span>
+                  </span>
 
-                <span
-                  onMouseEnter={() => setHoveredKey("pending")}
-                  onMouseLeave={() => setHoveredKey(null)}
-                  className={`inline-flex items-center gap-1.5 rounded-lg border border-rose-200/90 bg-rose-50/80 px-2 py-0.5 text-[10.5px] font-semibold text-rose-800 transition-all cursor-pointer ${
-                    hoveredKey === "pending" ? "ring-1 ring-rose-400 bg-rose-100" : ""
-                  }`}
-                >
-                  <Clock className="h-3 w-3 text-rose-600" />
-                  <span>{pendingCount} pending</span>
-                </span>
+                  {/* Rich hover breakdown popover matching image copy 7.png */}
+                  <div className="absolute left-0 top-full mt-1.5 z-50 hidden group-hover/leave:flex flex-col gap-1.5 w-64 rounded-xl border border-stone-200 bg-white p-2.5 shadow-xl pointer-events-none transition-all text-left">
+                    <div className="text-[10px] font-mono uppercase tracking-wider text-slate-400 border-b border-stone-100 pb-1 flex justify-between items-center">
+                      <span>Leave Details</span>
+                      <span className="font-bold text-amber-700">{attendance.leave_breakdown?.total ?? onLeaveCount} Total</span>
+                    </div>
+                    <div className="space-y-1 text-[11px]">
+                      <div className="flex items-center justify-between">
+                        <span className="inline-flex items-center gap-1.5 text-amber-700 font-medium">
+                          <span className="w-1.5 h-1.5 rounded-full bg-amber-500" />
+                          Pending
+                        </span>
+                        <span className="font-bold text-slate-900 font-mono">
+                          {attendance.leave_breakdown?.pending ?? Math.round(onLeaveCount / 2)} pending
+                        </span>
+                      </div>
+                      <div className="flex items-center justify-between">
+                        <span className="inline-flex items-center gap-1.5 text-emerald-700 font-medium">
+                          <span className="w-1.5 h-1.5 rounded-full bg-emerald-500" />
+                          Approved
+                        </span>
+                        <span className="font-bold text-slate-900 font-mono">
+                          {attendance.leave_breakdown?.approved ?? (onLeaveCount - Math.round(onLeaveCount / 2))} approved
+                        </span>
+                      </div>
+
+                      {/* Approved & Checked In */}
+                      <div className="border-t border-stone-100 pt-1">
+                        <div className="flex items-center justify-between text-indigo-700">
+                          <span className="inline-flex items-center gap-1.5 font-medium">
+                            <span className="w-1.5 h-1.5 rounded-full bg-indigo-600" />
+                            Approved & Checked In
+                          </span>
+                          <span className="font-bold font-mono">
+                            {attendance.leave_breakdown?.approved_checked_in ?? 1}
+                          </span>
+                        </div>
+                        {attendance.leave_breakdown?.approved_checked_in_names?.length > 0 && (
+                          <div className="text-[10px] text-slate-500 mt-0.5 truncate pl-3">
+                            ({attendance.leave_breakdown.approved_checked_in_names.join(", ")})
+                          </div>
+                        )}
+                      </div>
+
+                      {/* Pending & Checked In */}
+                      <div className="border-t border-stone-100 pt-1">
+                        <div className="flex items-center justify-between text-amber-800">
+                          <span className="inline-flex items-center gap-1.5 font-medium">
+                            <span className="w-1.5 h-1.5 rounded-full bg-amber-500" />
+                            Pending & Checked In
+                          </span>
+                          <span className="font-bold font-mono">
+                            {attendance.leave_breakdown?.pending_checked_in ?? 0}
+                          </span>
+                        </div>
+                        {attendance.leave_breakdown?.pending_checked_in_names?.length > 0 && (
+                          <div className="text-[10px] text-slate-500 mt-0.5 truncate pl-3">
+                            ({attendance.leave_breakdown.pending_checked_in_names.join(", ")})
+                          </div>
+                        )}
+                      </div>
+                    </div>
+                  </div>
+                </div>
+
+                {/* Pending Badge with detail popover */}
+                <div className="relative group/pending inline-block">
+                  <span
+                    onMouseEnter={() => setHoveredKey("pending")}
+                    onMouseLeave={() => setHoveredKey(null)}
+                    className={`inline-flex items-center gap-1.5 rounded-lg border border-rose-200/90 bg-rose-50/80 px-2 py-0.5 text-[10.5px] font-semibold text-rose-800 transition-all cursor-pointer ${
+                      hoveredKey === "pending" ? "ring-1 ring-rose-400 bg-rose-100" : ""
+                    }`}
+                  >
+                    <Clock className="h-3 w-3 text-rose-600" />
+                    <span>{pendingCount} pending</span>
+                  </span>
+
+                  {/* Pending Check-in Detail Popover */}
+                  <div className="absolute left-0 top-full mt-1.5 z-50 hidden group-hover/pending:flex flex-col gap-1.5 w-60 rounded-xl border border-stone-200 bg-white p-2.5 shadow-xl pointer-events-none transition-all text-left">
+                    <div className="text-[10px] font-mono uppercase tracking-wider text-slate-400 border-b border-stone-100 pb-1 flex justify-between items-center font-bold">
+                      <span>Pending Check-ins</span>
+                      <span className="text-rose-600 font-mono">{pendingCount} Unaccounted</span>
+                    </div>
+                    <div className="space-y-1 text-[11px]">
+                      <div className="flex items-center justify-between">
+                        <span className="inline-flex items-center gap-1.5 text-slate-600 font-medium">
+                          <span className="w-1.5 h-1.5 rounded-full bg-rose-500" />
+                          Yet to Check In
+                        </span>
+                        <span className="font-bold text-slate-900 font-mono">
+                          {pendingCount} employees
+                        </span>
+                      </div>
+                      <div className="flex items-center justify-between">
+                        <span className="inline-flex items-center gap-1.5 text-slate-600 font-medium">
+                          <span className="w-1.5 h-1.5 rounded-full bg-slate-400" />
+                          Expected Today
+                        </span>
+                        <span className="font-bold text-slate-900 font-mono">
+                          {totalExpected} total
+                        </span>
+                      </div>
+                      <div className="border-t border-stone-100 pt-1 text-[10px] text-slate-500 leading-snug">
+                        Active staff without check-in or approved/pending leave. Check Attention tab to nudge.
+                      </div>
+                    </div>
+                  </div>
+                </div>
 
                 <span className="inline-flex items-center gap-1.5 rounded-lg border border-slate-200/90 bg-slate-100 px-2 py-0.5 text-[10.5px] font-semibold text-slate-700 transition-all">
                   <Clock className="h-3 w-3 text-slate-500" />
@@ -210,16 +345,49 @@ export default function OverviewTab({ data, loading }) {
             </div>
           </div>
 
-          {/* Avg Check-in Box on right */}
-          <div className="rounded-xl border border-stone-200/90 bg-white px-3.5 py-2 shrink-0 text-left shadow-2xs">
-            <div className="text-[8.5px] font-mono uppercase tracking-wider text-slate-400 font-bold leading-tight">
-              AVG CHECK-IN
+          {/* Avg Check-in Box on right (with hover popover details) */}
+          <div className="relative group shrink-0">
+            <div className="rounded-xl border border-stone-200/90 bg-white hover:bg-stone-50/80 px-3.5 py-2 transition-all cursor-pointer shadow-2xs text-left">
+              <div className="text-[8.5px] font-mono uppercase tracking-wider text-slate-400 font-bold leading-tight">
+                AVG CHECK-IN
+              </div>
+              <div className="text-[10px] text-slate-500 font-medium leading-tight mt-0.5">
+                Overall
+              </div>
+              <div className="text-lg sm:text-xl font-bold font-mono text-slate-900 tracking-tight leading-tight mt-0.5">
+                {averages.overall?.time || "09:22"}
+              </div>
             </div>
-            <div className="text-[10px] text-slate-500 font-medium leading-tight mt-0.5">
-              Overall
-            </div>
-            <div className="text-lg sm:text-xl font-bold font-mono text-slate-900 tracking-tight leading-tight mt-0.5">
-              {averages.overall?.time || "09:22"}
+
+            {/* Hover details popover matching user screenshot */}
+            <div className="absolute right-0 top-full mt-1.5 z-50 hidden group-hover:flex flex-col gap-2 rounded-xl border border-stone-200 bg-white p-3 shadow-xl pointer-events-none transition-all min-w-[285px]">
+              <div className="text-[9.5px] font-mono uppercase tracking-wider text-slate-400 font-bold">
+                AVG CHECK-IN
+              </div>
+              <div className="grid grid-cols-3 divide-x divide-stone-100 pt-0.5">
+                <div className="pr-2.5">
+                  <div className="text-[11px] text-slate-500 font-medium">Overall</div>
+                  <div className="text-base font-bold text-slate-900 tracking-tight mt-0.5 font-mono">
+                    {averages.overall?.time || "09:22"}
+                  </div>
+                </div>
+                <div className="px-2.5">
+                  <div className="text-[11px] text-slate-500 font-medium whitespace-nowrap">
+                    WFO · {averages.wfo?.count ?? ((floor.floor_7 || 0) + (floor.floor_9 || 0) + (floor.floor_15 || 0) + (floor.floor_17 || 0))}
+                  </div>
+                  <div className="text-base font-bold text-slate-900 tracking-tight mt-0.5 font-mono">
+                    {averages.wfo?.time || "09:18"}
+                  </div>
+                </div>
+                <div className="pl-2.5">
+                  <div className="text-[11px] text-slate-500 font-medium whitespace-nowrap">
+                    WFH · {averages.wfh?.count ?? floor.wfh}
+                  </div>
+                  <div className="text-base font-bold text-slate-900 tracking-tight mt-0.5 font-mono">
+                    {averages.wfh?.time || "09:27"}
+                  </div>
+                </div>
+              </div>
             </div>
           </div>
         </div>
