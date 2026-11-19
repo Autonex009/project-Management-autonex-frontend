@@ -170,7 +170,7 @@ export default function AttentionTab() {
             </div>
 
             {/* List: 4 items visible, rest on internal scroll */}
-            <div className="space-y-1.5 max-h-[225px] overflow-y-auto pr-1">
+            <div className="space-y-1.5 max-h-[225px] overflow-y-auto pr-1 slick-scrollbar">
               {unaccounted.employees.map((emp) => {
                 const isNudged = nudgedEmpIds.has(emp.id) || Boolean(emp.is_nudged_today);
                 const hasSlack = Boolean(emp.slack_user_id);
@@ -290,7 +290,7 @@ export default function AttentionTab() {
           </div>
 
           {/* List of employees in this streak: 4 items visible, rest on internal scroll */}
-          <div className="space-y-1.5 max-h-[175px] overflow-y-auto pr-1">
+          <div className="space-y-1.5 max-h-[175px] overflow-y-auto pr-1 slick-scrollbar">
             {(selectedStreakGroup?.items || []).map((emp) => (
               <div
                 key={emp.id}
@@ -343,7 +343,7 @@ export default function AttentionTab() {
             </span>
           </div>
 
-          <div className="space-y-1.5 max-h-[225px] overflow-y-auto pr-1">
+          <div className="space-y-1.5 max-h-[225px] overflow-y-auto pr-1 slick-scrollbar">
             {habitual.employees.map((emp) => (
               <div
                 key={emp.id}
