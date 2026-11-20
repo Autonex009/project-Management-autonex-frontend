@@ -1,4 +1,4 @@
-import React from "react";
+import React, { useState } from "react";
 
 const LABELS = {
   1: "Poor",
@@ -8,36 +8,61 @@ const LABELS = {
   5: "Outstanding",
 };
 
-// Reusable 1–5 star rating. readOnly renders static stars.
+// Reusable 1–5 star rating with interactive hover preview. readOnly renders static stars.
 const StarRating = ({
   value,
   onChange,
   readOnly = false,
   showLabel = true,
   size = "text-2xl",
-}) => (
-  <div className="flex items-center gap-1">
-    {[1, 2, 3, 4, 5].map((star) => (
-      <button
-        key={star}
-        type="button"
-        disabled={readOnly}
-        title={LABELS[star]}
-        onClick={() =>
-          !readOnly && onChange && onChange(star === value ? null : star)
-        }
-        className={`${size} leading-none transition-transform ${readOnly ? "cursor-default" : "cursor-pointer hover:scale-110"} ${star <= (value || 0) ? "text-amber-400" : "text-slate-200"}`}
+}) => {
+  const [hover, setHover] = useState(null);
+  const activeRating = hover ?? value;
+
+  return (
+    <div className="flex items-center gap-2">
+      <div
+        className="flex items-center gap-0.5"
+        onMouseLeave={() => !readOnly && setHover(null)}
       >
-        ★
-      </button>
-    ))}
-    {showLabel && (
-      <span className="ml-2 text-xs font-medium text-slate-400">
-        {value ? LABELS[value] : "Not rated"}
-      </span>
-    )}
-  </div>
-);
+        {[1, 2, 3, 4, 5].map((star) => (
+          <button
+            key={star}
+            type="button"
+            disabled={readOnly}
+            title={LABELS[star]}
+            onMouseEnter={() => !readOnly && setHover(star)}
+            onClick={() =>
+              !readOnly && onChange && onChange(star === value ? null : star)
+            }
+            className={`${size} leading-none transition-all duration-150 select-none ${
+              readOnly
+                ? "cursor-default"
+                : "cursor-pointer hover:scale-120 active:scale-95"
+            } ${
+              star <= (activeRating || 0)
+                ? "text-amber-400 drop-shadow-[0_1px_2px_rgba(251,191,36,0.35)]"
+                : "text-slate-200 hover:text-amber-200"
+            }`}
+          >
+            ★
+          </button>
+        ))}
+      </div>
+      {showLabel && (
+        <span
+          className={`min-w-[125px] text-xs px-2.5 py-0.5 rounded-full text-center transition-all ${
+            activeRating
+              ? "bg-amber-50 text-amber-700 font-semibold border border-amber-200/80 shadow-xs"
+              : "text-slate-400 bg-slate-100/60 font-normal"
+          }`}
+        >
+          {activeRating ? LABELS[activeRating] : "Not rated"}
+        </span>
+      )}
+    </div>
+  );
+};
 
 export const RATING_LABELS = LABELS;
 
@@ -57,7 +82,7 @@ export const currentPeriod = () => {
   const parts = Object.fromEntries(
     formatter.formatToParts(new Date()).map((p) => [p.type, p.value]),
   );
-  
+
   return `${parts.year}-${parts.month}`;
 };
 
