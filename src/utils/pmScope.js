@@ -50,12 +50,11 @@ export function getPmVisibleOrgs(
 
 export function getPmSubProjects(
   subProjects = [],
-  parentProjects = [],
+  _parentProjects = [],
   pmEmployeeId,
   allocations = [],
 ) {
   if (!pmEmployeeId) return [];
-  const projectIds = getPmProjectIds(parentProjects, pmEmployeeId);
   const allocatedSubProjectIds = new Set(
     allocations
       .filter((allocation) => allocation.employee_id === pmEmployeeId)
@@ -69,16 +68,8 @@ export function getPmSubProjects(
     const directlyAssigned = projectPms.includes(pmEmployeeId);
     const directlyAllocated = allocatedSubProjectIds.has(subProject.id);
 
-    // Organization-level inheritance applies ONLY to projects that have no explicit
-    // project-level PM. Once a project lists its own PM(s), it is scoped to them — so
-    // when several PMs share an organization (e.g. "AMAZON") each sees only the
-    // projects they own, while unowned/legacy projects still surface to the org's PMs.
-    const hasProjectPm = projectPms.length > 0;
-    const orgFallback =
-      !hasProjectPm &&
-      subProject.main_project_id &&
-      projectIds.has(subProject.main_project_id);
-
-    return directlyAssigned || directlyAllocated || orgFallback;
+    // Sole source of truth: direct assignment on project.assigned_employee_ids or active allocation.
+    // Never fall back to main projects / parent projects.
+    return directlyAssigned || directlyAllocated;
   });
 }

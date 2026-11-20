@@ -217,13 +217,15 @@ const AllocationPopover = ({
     const pmIdSet = new Set((project?.assigned_employee_ids || []).map(String));
     const rows = filtered.map((a) => {
       const empIdStr = String(a.employee_id);
+      const emp = employeeIndex.get(empIdStr);
+      const desig = (emp?.designation || "").toLowerCase().trim();
       return {
         key: `alloc-${a.id}`,
         alloc: a,
-        emp: employeeIndex.get(empIdStr),
+        emp,
         former: formerIndex.get(empIdStr),
-        isPm: pmIdSet.has(empIdStr) || pmIds.includes(empIdStr) || (a.role_tags || []).includes("Manager"),
-        isLead: (a.role_tags || []).includes("Team Lead") || leadIds.includes(empIdStr),
+        isPm: pmIdSet.has(empIdStr) || pmIds.includes(empIdStr) || (a.role_tags || []).includes("Manager") || ["project manager", "program manager", "pm"].includes(desig),
+        isLead: (a.role_tags || []).includes("Team Lead") || leadIds.includes(empIdStr) || desig.includes("team lead"),
         isStale: isStaleAllocation(a, employeeIndex),
       };
     });
@@ -404,9 +406,6 @@ const AllocationPopover = ({
                     former?.email || former?.designation || former?.role;
                   const role =
                     emp?.designation || emp?.role || emp?.job_title;
-                  const tags = Array.isArray(alloc?.role_tags)
-                    ? alloc.role_tags
-                    : [];
                   const isOnLeave = emp?.isOnLeave || (emp && onLeaveEmployeeIds?.has?.(emp.id));
                   const location = emp?.location || (emp ? locationByEmployeeId?.get?.(emp.id) : undefined);
                   return (
@@ -452,22 +451,6 @@ const AllocationPopover = ({
                               <span className="w-1.5 h-1.5 rounded-full bg-amber-500" />
                               On leave
                             </span>
-                          ) : location === "WFH" ? (
-                            <span
-                              className="inline-flex items-center gap-1 rounded-full bg-violet-50 px-1.5 py-0.5 text-[10px] font-semibold text-violet-700 shrink-0"
-                              title="Working from home today"
-                            >
-                              <Home className="w-3 h-3" />
-                              WFH
-                            </span>
-                          ) : location === "WFO" ? (
-                            <span
-                              className="inline-flex items-center gap-1 rounded-full bg-slate-100 px-1.5 py-0.5 text-[10px] font-semibold text-slate-600 shrink-0"
-                              title="Working from office today"
-                            >
-                              <Building2 className="w-3 h-3" />
-                              WFO
-                            </span>
                           ) : null}
                           {rowsForPerson > 1 && (
                             <span
@@ -498,29 +481,32 @@ const AllocationPopover = ({
                             </span>
                           )}
                         </div>
-                        {tags.length > 0 && (
-                          <div className="flex flex-wrap gap-1 mt-1">
-                            {tags.slice(0, 3).map((t) => (
-                              <span
-                                key={t}
-                                className="px-1.5 py-0.5 text-[10px] font-medium bg-indigo-50 text-indigo-600 rounded"
-                              >
-                                {t}
-                              </span>
-                            ))}
-                            {tags.length > 3 && (
-                              <span className="text-[10px] text-slate-400">
-                                +{tags.length - 3}
-                              </span>
-                            )}
-                          </div>
-                        )}
                       </div>
-                      {alloc?.total_daily_hours && !isStale ? (
-                        <span className="text-[11px] font-semibold text-slate-500 bg-slate-100 rounded px-1.5 py-0.5 shrink-0">
-                          {alloc.total_daily_hours}h
-                        </span>
-                      ) : null}
+                      <div className="flex items-center gap-1.5 shrink-0 ml-auto pl-2">
+                        {!isStale && !isOnLeave && location === "WFH" && (
+                          <span
+                            className="inline-flex items-center gap-1 rounded-full bg-violet-50 px-1.5 py-0.5 text-[10px] font-semibold text-violet-700 shrink-0"
+                            title="Working from home today"
+                          >
+                            <Home className="w-3 h-3" />
+                            WFH
+                          </span>
+                        )}
+                        {!isStale && !isOnLeave && location === "WFO" && (
+                          <span
+                            className="inline-flex items-center gap-1 rounded-full bg-slate-100 px-1.5 py-0.5 text-[10px] font-semibold text-slate-600 shrink-0"
+                            title="Working from office today"
+                          >
+                            <Building2 className="w-3 h-3" />
+                            WFO
+                          </span>
+                        )}
+                        {alloc?.total_daily_hours && !isStale ? (
+                          <span className="text-[11px] font-semibold text-slate-500 bg-slate-100 rounded px-1.5 py-0.5 shrink-0">
+                            {alloc.total_daily_hours}h
+                          </span>
+                        ) : null}
+                      </div>
                     </li>
                   );
                 })}
