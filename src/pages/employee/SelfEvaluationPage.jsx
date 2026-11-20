@@ -10,6 +10,7 @@ import {
   Lock,
   History as HistoryIcon,
   X,
+  Sparkles,
 } from "lucide-react";
 import toast from "react-hot-toast";
 import StarRating, {
@@ -17,7 +18,7 @@ import StarRating, {
   formatPeriod,
   shiftPeriod,
 } from "../../components/perf/StarRating";
-import { PERF_PARAMETERS, averageOf } from "../../components/perf/perfParams";
+import { PERF_PARAMETERS, averageOf, weightedAverageOf } from "../../components/perf/perfParams";
 import { StatusPill, fmtDate, RatingCell, MonthStepper } from "../../components/perf/perfTableCells";
 import EvaluationDetail from "../../components/perf/EvaluationDetail";
 import ConfirmDialog from "../../components/ui/ConfirmDialog";
@@ -41,6 +42,37 @@ const getISTDate = () => {
   };
 };
 
+const CATEGORY_THEMES = {
+  "Productivity": {
+    badge: "bg-blue-50 text-blue-700 border-blue-200/80",
+    dot: "bg-blue-500",
+  },
+  "Accuracy & Quality": {
+    badge: "bg-emerald-50 text-emerald-700 border-emerald-200/80",
+    dot: "bg-emerald-500",
+  },
+  "Diligence": {
+    badge: "bg-purple-50 text-purple-700 border-purple-200/80",
+    dot: "bg-purple-500",
+  },
+  "Professional Discipline": {
+    badge: "bg-amber-50 text-amber-700 border-amber-200/80",
+    dot: "bg-amber-500",
+  },
+  "Knowledge & Understanding": {
+    badge: "bg-cyan-50 text-cyan-700 border-cyan-200/80",
+    dot: "bg-cyan-500",
+  },
+  "Learning & Application": {
+    badge: "bg-sky-50 text-sky-700 border-sky-200/80",
+    dot: "bg-sky-500",
+  },
+  "Communication & Engagement": {
+    badge: "bg-rose-50 text-rose-700 border-rose-200/80",
+    dot: "bg-rose-500",
+  },
+};
+
 const ProjectEvalPanel = ({
   project,
   employeeId,
@@ -60,7 +92,9 @@ const ProjectEvalPanel = ({
 
   // existing evaluation for the selected period (locked once submitted)
   const currentEval = existing.find((e) => e.period === period) || null;
-  const liveAverage = averageOf(PERF_PARAMETERS.map((p) => ratings[p.name]));
+  const liveAverage = weightedAverageOf(ratings) ?? averageOf(PERF_PARAMETERS.map((p) => ratings[p.name]));
+  const ratedCount = PERF_PARAMETERS.filter((p) => ratings[p.name] != null).length;
+  const isComplete = ratedCount === PERF_PARAMETERS.length;
 
   const storedUser = JSON.parse(localStorage.getItem("user") || "{}");
   const userRole = localStorage.getItem("role") || storedUser.role || "employee";
@@ -167,25 +201,6 @@ const ProjectEvalPanel = ({
 
       {expanded && (
         <div className="border-t border-slate-100 p-5">
-          {/* Month + status header */}
-          <div className="mb-5 flex flex-wrap items-end justify-between gap-4">
-
-            {!currentEval && isSubmissionAllowed && (
-              <div className="text-right">
-                <p className="text-xs font-semibold uppercase tracking-wide text-slate-400">
-                  Average
-                </p>
-                <p className="text-lg font-bold text-amber-500">
-                  {liveAverage != null ? liveAverage.toFixed(1) : "—"}
-                  <span className="text-sm font-medium text-slate-400">
-                    {" "}
-                    / 5
-                  </span>
-                </p>
-              </div>
-            )}
-          </div>
-
           {currentEval ? (
             <div className="space-y-4">
               <p className="rounded-xl bg-amber-50 px-3 py-2 text-xs font-medium text-amber-700">
@@ -210,63 +225,191 @@ const ProjectEvalPanel = ({
               </p>
             </div>
           ) : (
-            <div className="space-y-4">
-              <div className="rounded-xl bg-amber-50/80 border border-amber-200/80 p-3 text-xs text-amber-800">
-                {isLateSubmission ? (
-                  <><strong>Late Submission Window:</strong> You are completing your missing September evaluation.</>
-                ) : (
-                  <><strong>Self-Evaluation Window Open:</strong> Submissions close automatically on the 24th. Complete your evaluation to remain eligible for the monthly bonus.</>
-                )}
-              </div>
-              <form onSubmit={handleSubmit} className="space-y-3">
-              {PERF_PARAMETERS.map((p) => (
-                <div
-                  key={formatDisplayName(p.name)}
-                  className="flex flex-col gap-2 rounded-2xl border border-slate-200 bg-white p-4 sm:flex-row sm:items-center sm:justify-between"
-                >
-                  <div className="min-w-0 pr-4">
-                    <p className="font-semibold text-slate-900">{formatDisplayName(p.name)}</p>
-                    <p className="mt-0.5 text-sm text-slate-400">
-                      {p.description}
+            <div className="space-y-5">
+              {/* Header Scorecard & Progress Banner (Light Theme) */}
+              <div className="overflow-hidden rounded-2xl border border-slate-200/90 bg-gradient-to-br from-slate-50 via-white to-indigo-50/20 p-5 shadow-xs">
+                <div className="flex flex-col gap-4 sm:flex-row sm:items-center sm:justify-between">
+                  <div>
+                    <div className="flex items-center gap-2">
+                      <span className="inline-flex items-center gap-1 rounded-full bg-emerald-50 px-2.5 py-0.5 text-xs font-semibold text-emerald-700 border border-emerald-200/80">
+                        <Sparkles className="h-3 w-3 text-emerald-600" /> Monthly Review
+                      </span>
+                      <span className="text-xs font-medium text-slate-500">
+                        {formatPeriod(period)}
+                      </span>
+                    </div>
+                    <h3 className="mt-1.5 text-lg font-bold text-slate-900 tracking-tight">
+                      Performance Self-Evaluation
+                    </h3>
+                    <p className="mt-0.5 text-xs text-slate-500">
+                      Rate your performance across the 7 core competencies below. Submissions close on the 24th.
                     </p>
                   </div>
-                  <div className="shrink-0">
-                    <StarRating
-                      value={ratings[p.name] || null}
-                      onChange={(v) =>
-                        setRatings((m) => ({ ...m, [p.name]: v }))
-                      }
+
+                  <div className="flex items-center gap-5 self-start sm:self-auto rounded-xl bg-white border border-slate-200/80 px-4 py-2.5 shadow-xs">
+                    <div>
+                      <p className="text-[10px] font-semibold uppercase tracking-wider text-slate-400">
+                        Progress
+                      </p>
+                      <p className="mt-0.5 text-sm font-bold text-slate-800">
+                        <span className={isComplete ? "text-emerald-600" : "text-amber-600"}>
+                          {ratedCount}
+                        </span>
+                        <span className="text-xs font-normal text-slate-400"> / {PERF_PARAMETERS.length}</span>
+                      </p>
+                    </div>
+                    <div className="h-7 w-px bg-slate-200" />
+                    <div>
+                      <p className="text-[10px] font-semibold uppercase tracking-wider text-slate-400">
+                        Live Rating
+                      </p>
+                      <p className="mt-0.5 text-lg font-black text-amber-600 tabular-nums">
+                        {liveAverage != null ? liveAverage.toFixed(2) : "—"}
+                        <span className="text-xs font-normal text-slate-400"> / 5.0</span>
+                      </p>
+                    </div>
+                  </div>
+                </div>
+
+                {/* Progress track */}
+                <div className="mt-4">
+                  <div className="h-1.5 w-full overflow-hidden rounded-full bg-slate-100 border border-slate-200/50">
+                    <div
+                      className="h-full bg-gradient-to-r from-amber-400 via-indigo-500 to-emerald-500 transition-all duration-300 ease-out"
+                      style={{ width: `${(ratedCount / PERF_PARAMETERS.length) * 100}%` }}
                     />
                   </div>
                 </div>
-              ))}
-
-              <div className="pt-1">
-                <label className="mb-1.5 block text-xs font-semibold uppercase tracking-wide text-slate-500">
-                  Overall Comment (optional)
-                </label>
-                <textarea
-                  rows={3}
-                  value={comment}
-                  onChange={(e) => setComment(e.target.value)}
-                  placeholder="Add any overall remarks…"
-                  className="w-full resize-none rounded-xl border border-slate-200 bg-white px-3 py-2.5 text-sm text-slate-800 placeholder:text-slate-300 focus:border-emerald-400 focus:outline-none focus:ring-2 focus:ring-emerald-100"
-                />
               </div>
 
-              <div className="flex items-center justify-end border-t border-slate-100 pt-4">
-                <button
-                  type="submit"
-                  disabled={submitMutation.isPending}
-                  className="rounded-xl bg-emerald-600 px-5 py-2.5 text-sm font-medium text-white transition-colors hover:bg-emerald-700 disabled:opacity-50"
-                >
-                  {submitMutation.isPending ? "Submitting…" : "Submit Review"}
-                </button>
+              {/* Informational callout */}
+              <div className="flex items-start gap-2.5 rounded-xl bg-amber-50/80 border border-amber-200/80 px-4 py-3 text-xs text-amber-800">
+                <Sparkles className="h-4 w-4 shrink-0 text-amber-600 mt-0.5" />
+                <div>
+                  <span className="font-semibold">Self-Evaluation Window Open:</span>{" "}
+                  Submissions close automatically on the 24th. Completing your evaluation across all 7 criteria is required to remain eligible for the monthly bonus.
+                </div>
               </div>
-              <p className="text-center text-xs text-slate-400">
-                Once submitted, the review is locked and cannot be edited.
-              </p>
-            </form>
+
+              {/* Form with 7 Competency Cards */}
+              <form onSubmit={handleSubmit} className="space-y-3">
+                <div className="space-y-2.5">
+                  {PERF_PARAMETERS.map((p, idx) => {
+                    const isRated = ratings[p.name] != null;
+                    const theme = CATEGORY_THEMES[p.category] || {
+                      badge: "bg-slate-100 text-slate-700 border-slate-200",
+                      dot: "bg-slate-400",
+                    };
+
+                    return (
+                      <div
+                        key={p.name}
+                        className={`group rounded-2xl border transition-all duration-200 ${
+                          isRated
+                            ? "border-emerald-200/80 bg-white shadow-xs hover:border-emerald-300"
+                            : "border-slate-200/90 bg-white hover:border-slate-300 hover:shadow-xs"
+                        }`}
+                      >
+                        <div className="flex flex-col gap-3 p-4 sm:flex-row sm:items-center sm:justify-between">
+                          <div className="min-w-0 flex-1 pr-3">
+                            <div className="flex flex-wrap items-center gap-2">
+                              <span className="text-[11px] font-bold text-slate-400 tracking-wider">
+                                {String(idx + 1).padStart(2, "0")}
+                              </span>
+                              {p.category && (
+                                <span
+                                  className={`inline-flex items-center gap-1.5 rounded-md px-2 py-0.5 text-[11px] font-semibold border ${theme.badge}`}
+                                >
+                                  <span className={`h-1.5 w-1.5 rounded-full ${theme.dot}`} />
+                                  {p.category}
+                                </span>
+                              )}
+                              <h4 className="text-sm font-bold text-slate-800 tracking-tight">
+                                {p.name}
+                              </h4>
+                              {isRated && (
+                                <span className="inline-flex items-center gap-0.5 text-[11px] font-medium text-emerald-600">
+                                  <CheckCircle2 className="h-3.5 w-3.5" />
+                                </span>
+                              )}
+                            </div>
+                            <p className="mt-1 text-xs text-slate-500 leading-relaxed max-w-2xl">
+                              {p.description}
+                            </p>
+                          </div>
+
+                          <div className="shrink-0 self-end sm:self-center pt-1 sm:pt-0">
+                            <StarRating
+                              value={ratings[p.name] || null}
+                              onChange={(v) =>
+                                setRatings((m) => ({ ...m, [p.name]: v }))
+                              }
+                            />
+                          </div>
+                        </div>
+                      </div>
+                    );
+                  })}
+                </div>
+
+                {/* Overall Remarks Box */}
+                <div className="rounded-2xl border border-slate-200/90 bg-slate-50/50 p-4 transition-colors focus-within:border-indigo-300 focus-within:bg-white focus-within:ring-2 focus-within:ring-indigo-100/60">
+                  <div className="flex items-center justify-between mb-2">
+                    <label className="text-xs font-bold text-slate-700 flex items-center gap-1.5 uppercase tracking-wide">
+                      Overall Remarks <span className="text-[10px] text-slate-400 font-normal lowercase">(optional)</span>
+                    </label>
+                    <span className="text-[11px] text-slate-400">
+                      {comment.length} characters
+                    </span>
+                  </div>
+                  <textarea
+                    rows={3}
+                    value={comment}
+                    onChange={(e) => setComment(e.target.value)}
+                    placeholder="Share any highlights, completed milestones, or blockers encountered this month…"
+                    className="w-full resize-none border-0 bg-transparent p-0 text-sm text-slate-800 placeholder:text-slate-400 focus:outline-none focus:ring-0"
+                  />
+                </div>
+
+                {/* Bottom Action / Submission Bar */}
+                <div className="flex flex-col gap-3 rounded-2xl border border-slate-200/90 bg-white p-4 shadow-xs sm:flex-row sm:items-center sm:justify-between">
+                  <div>
+                    <div className="flex items-center gap-2">
+                      <span className="text-xs text-slate-500 font-medium">Calculated Score:</span>
+                      <span className="text-sm font-bold text-slate-800 tabular-nums">
+                        {liveAverage != null ? `${liveAverage.toFixed(2)} / 5.0` : "—"}
+                      </span>
+                    </div>
+                    <p className="text-xs text-slate-400 mt-0.5">
+                      {isComplete
+                        ? "All 7 criteria evaluated. Click submit to finalize."
+                        : `${PERF_PARAMETERS.length - ratedCount} parameter${PERF_PARAMETERS.length - ratedCount > 1 ? "s" : ""} left to rate.`}
+                    </p>
+                  </div>
+
+                  <button
+                    type="submit"
+                    disabled={submitMutation.isPending || !isComplete}
+                    className={`inline-flex items-center justify-center gap-2 rounded-xl px-6 py-2.5 text-sm font-semibold text-white shadow-xs transition-all ${
+                      isComplete && !submitMutation.isPending
+                        ? "bg-emerald-600 hover:bg-emerald-700 hover:shadow-sm active:scale-98 cursor-pointer"
+                        : "bg-slate-300 cursor-not-allowed opacity-75"
+                    }`}
+                  >
+                    {submitMutation.isPending ? (
+                      "Submitting…"
+                    ) : (
+                      <>
+                        <span>Submit Self-Evaluation</span>
+                        <CheckCircle2 className="h-4 w-4" />
+                      </>
+                    )}
+                  </button>
+                </div>
+                <p className="text-center text-xs text-slate-400 pt-1">
+                  Once submitted, the evaluation is locked and cannot be edited.
+                </p>
+              </form>
             </div>
           )}
         </div>
