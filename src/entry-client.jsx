@@ -32,6 +32,32 @@ setTimeout(() => {
   sessionStorage.removeItem("vite_chunk_reload_attempted");
 }, 10000);
 
+// Background deployment detector: auto-refresh active tabs when a new build is deployed
+if (typeof window !== "undefined" && typeof __APP_VERSION__ !== "undefined") {
+  const checkNewDeployment = async () => {
+    try {
+      const res = await fetch("/version.json", { cache: "no-store" });
+      if (res.ok) {
+        const data = await res.json();
+        if (data?.version && data.version !== "dev" && data.version !== __APP_VERSION__) {
+          console.log("[Auto-Update] New version detected:", data.version, "Current:", __APP_VERSION__);
+          window.location.reload();
+        }
+      }
+    } catch {}
+  };
+
+  // Check whenever employee switches back to this browser tab
+  document.addEventListener("visibilitychange", () => {
+    if (document.visibilityState === "visible") {
+      checkNewDeployment();
+    }
+  });
+
+  // Check periodically every 2 minutes
+  setInterval(checkNewDeployment, 120000);
+}
+
 // hydrateRoot (not createRoot): the server already sent real markup, so we
 // attach event listeners to the existing DOM instead of re-rendering from
 // scratch. BrowserRouter lives here (not in App) so the same App component
