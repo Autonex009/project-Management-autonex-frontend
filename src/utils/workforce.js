@@ -211,22 +211,6 @@ export const buildAssignedProjectsMap = ({
     add(alloc.employee_id, alloc.sub_project_name || alloc.project_name),
   );
 
-  const pmIdsOfMain = (mp) =>
-    mp?.program_manager_ids?.length
-      ? mp.program_manager_ids
-      : mp?.program_manager_id
-        ? [mp.program_manager_id]
-        : [];
-
-  mainProjects.forEach((mp) => {
-    if (!mp?.id) return;
-    const pmIds = pmIdsOfMain(mp);
-    if (pmIds.length === 0) return;
-    subProjects
-      .filter((sp) => String(sp.main_project_id) === String(mp.id))
-      .forEach((sp) => pmIds.forEach((pmId) => add(pmId, sp.name)));
-  });
-
   subProjects.forEach((sp) => {
     const pmIds = sp?.assigned_employee_ids?.length
       ? sp.assigned_employee_ids

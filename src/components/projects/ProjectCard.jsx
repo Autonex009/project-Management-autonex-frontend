@@ -24,6 +24,7 @@ import { format } from "date-fns";
 import { formatDisplayName } from "../../utils/displayName";
 import Dropdown from "../ui/Dropdown";
 import AllocationPopover from "../AllocationPopover";
+import DynamicTooltip from "../ui/DynamicTooltip";
 import { 
   STATUS_CONFIG, 
   ARCHIVED_STATUSES, 
@@ -102,20 +103,21 @@ const CARD_ACCENTS = [
   "from-cyan-500 to-sky-500",
 ];
 
-// Truncated text that reveals its full value in a light (white) tooltip on hover.
+// Truncated text that reveals its full value in a dynamic floating tooltip on hover.
 /** "Eknath Niraj Agrawal, Kisan Kumar Jena" -> "Eknath Agrawal, Kisan Jena". */
 const shortenNames = (names = []) =>
   names.map((n) => formatDisplayName(n) || n).filter(Boolean).join(", ") || "—";
 
 // `title` lets the hover card carry something the label does not — for people,
 // the full stored name behind a first-and-last-only label.
-const TruncTip = ({ text, title, className = "" }) => (
-  <div className="group/tip relative min-w-0">
-    <div className={`truncate ${className}`}>{text}</div>
-    <span className="pointer-events-none absolute left-0 top-full z-30 mt-1 hidden w-max max-w-[240px] whitespace-normal break-words rounded-lg border border-slate-200 bg-white px-2.5 py-1.5 text-[11px] font-medium text-slate-600 shadow-lg group-hover/tip:block">
-      {title || text}
-    </span>
-  </div>
+// Uses DynamicTooltip with auto-flipping, boundary clamping, and suppression when not truncated.
+const TruncTip = ({ text, title, className = "", placement = "top" }) => (
+  <DynamicTooltip
+    text={text}
+    tooltip={title}
+    className={className}
+    placement={placement}
+  />
 );
 
 // A single project card. It shows the project at a glance; editing happens
@@ -212,14 +214,15 @@ const ProjectCard = ({
                 className="w-full rounded-md border border-slate-200 px-2 py-1 text-[15px] font-bold text-slate-900 focus:border-indigo-400 focus:outline-none focus:ring-2 focus:ring-indigo-100"
               />
             ) : (
-              <div className="group/tip relative">
+              <DynamicTooltip
+                text={project.name}
+                placement="top"
+                className="line-clamp-2 text-[15px] font-bold leading-snug text-slate-900"
+              >
                 <h3 className="line-clamp-2 text-[15px] font-bold leading-snug text-slate-900">
                   {project.name}
                 </h3>
-                <span className="pointer-events-none absolute left-0 top-full z-30 mt-1 hidden w-max max-w-[240px] whitespace-normal break-words rounded-lg border border-slate-200 bg-white px-2.5 py-1.5 text-[11px] font-medium text-slate-600 shadow-lg group-hover/tip:block">
-                  {project.name}
-                </span>
-              </div>
+              </DynamicTooltip>
             )}
             <p className="mt-0.5 truncate text-[13px] font-medium text-slate-600">
               {parentProject?.client || "—"}
@@ -324,7 +327,25 @@ const ProjectCard = ({
         <CardField label="Project Manager">
           <TruncTip
             text={shortenNames(pmNames)}
-            title={pmNames.join(", ")}
+            title={
+              pmNames.length > 1 ? (
+                <div className="space-y-1">
+                  <div className="text-[10px] font-bold uppercase tracking-wider text-indigo-500">
+                    Project Managers ({pmNames.length})
+                  </div>
+                  <div className="space-y-0.5 text-xs font-semibold text-slate-700">
+                    {pmNames.map((n, i) => (
+                      <div key={i} className="flex items-center gap-1.5 whitespace-nowrap">
+                        <span className="h-1.5 w-1.5 rounded-full bg-indigo-400" />
+                        <span>{formatDisplayName(n)}</span>
+                      </div>
+                    ))}
+                  </div>
+                </div>
+              ) : (
+                pmNames.join(", ")
+              )
+            }
             className="text-sm font-semibold text-slate-800"
           />
         </CardField>
@@ -332,7 +353,25 @@ const ProjectCard = ({
         <CardField label="Team lead">
           <TruncTip
             text={shortenNames(teamLeadNames)}
-            title={teamLeadNames.join(", ")}
+            title={
+              teamLeadNames.length > 1 ? (
+                <div className="space-y-1">
+                  <div className="text-[10px] font-bold uppercase tracking-wider text-emerald-600">
+                    Team Leads ({teamLeadNames.length})
+                  </div>
+                  <div className="space-y-0.5 text-xs font-semibold text-slate-700">
+                    {teamLeadNames.map((n, i) => (
+                      <div key={i} className="flex items-center gap-1.5 whitespace-nowrap">
+                        <span className="h-1.5 w-1.5 rounded-full bg-emerald-400" />
+                        <span>{formatDisplayName(n)}</span>
+                      </div>
+                    ))}
+                  </div>
+                </div>
+              ) : (
+                teamLeadNames.join(", ")
+              )
+            }
             className="text-sm font-semibold text-slate-800"
           />
         </CardField>
