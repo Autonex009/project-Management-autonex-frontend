@@ -3,7 +3,7 @@ import { useMutation, useQueryClient } from "@tanstack/react-query";
 import { CheckCircle2, Pencil, Trash2, Gift } from "lucide-react";
 import toast from "react-hot-toast";
 import StarRating, { formatPeriod } from "./StarRating";
-import { averageOf, normalizeParamValues } from "./perfParams";
+import { averageOf, weightedAverageOf, normalizeParamValues } from "./perfParams";
 import EvaluationDetail from "./EvaluationDetail";
 import ConfirmDialog from "../ui/ConfirmDialog";
 import { perfEvalApi } from "../../services/api";
@@ -20,6 +20,7 @@ const EvalReviewCard = ({ evaluation, personName, reviewerId }) => {
 
   const [rows, setRows] = useState(() =>
     normalizeParamValues(evaluation.parameter_values).map((p) => ({
+      category: p.category,
       name: p.name,
       employee_rating: p.employee_rating,
       pm_rating: p.pm_rating ?? p.employee_rating ?? null,
@@ -32,7 +33,7 @@ const EvalReviewCard = ({ evaluation, personName, reviewerId }) => {
 
   const setRow = (name, patch) =>
     setRows((rs) => rs.map((r) => (r.name === name ? { ...r, ...patch } : r)));
-  const pmAvg = averageOf(rows.map((r) => r.pm_rating));
+  const pmAvg = weightedAverageOf(rows, "pm_rating") ?? averageOf(rows.map((r) => r.pm_rating));
 
   const invalidate = () =>
     queryClient.invalidateQueries({ queryKey: ["perf-evals"] });
@@ -133,7 +134,12 @@ const EvalReviewCard = ({ evaluation, personName, reviewerId }) => {
               className="rounded-lg border border-slate-200 bg-slate-50/60 px-3 py-2"
             >
               <div className="flex flex-wrap items-center justify-between gap-x-4 gap-y-1.5">
-                <div className="flex min-w-0 items-center gap-2">
+                <div className="flex min-w-0 flex-wrap items-center gap-2">
+                  {r.category && (
+                    <span className="shrink-0 rounded bg-indigo-50 px-2 py-0.5 text-[11px] font-semibold text-indigo-700">
+                      {r.category}
+                    </span>
+                  )}
                   <span className="truncate text-sm font-medium text-slate-800">
                     {r.name}
                   </span>

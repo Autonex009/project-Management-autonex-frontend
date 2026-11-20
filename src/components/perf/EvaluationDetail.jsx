@@ -1,10 +1,9 @@
 import React from "react";
 import StarRating, { formatPeriod } from "./StarRating";
-import { averageOf, normalizeParamValues } from "./perfParams";
+import { averageOf, weightedAverageOf, normalizeParamValues } from "./perfParams";
 import { CheckCircle2, XCircle, Gift } from "lucide-react";
-import { formatDisplayName } from "../../utils/displayName";
 
-// Read-only rendering of a monthly performance evaluation (new star-rating shape).
+// Read-only rendering of a monthly performance evaluation.
 // Shows the employee's self-rating per parameter and, once the PM has reviewed,
 // the PM's rating, an approved/rejected badge, and per-parameter feedback.
 const EvaluationDetail = ({ evaluation, showBonus }) => {
@@ -16,9 +15,12 @@ const EvaluationDetail = ({ evaluation, showBonus }) => {
   const reviewed = evaluation.status === "reviewed";
   const empAvg =
     evaluation.employee_overall_rating ??
+    weightedAverageOf(params, "employee_rating") ??
     averageOf(params.map((p) => p.employee_rating));
   const pmAvg =
-    evaluation.overall_rating ?? averageOf(params.map((p) => p.pm_rating));
+    evaluation.overall_rating ??
+    weightedAverageOf(params, "pm_rating") ??
+    averageOf(params.map((p) => p.pm_rating));
 
   return (
     <div className="space-y-4">
@@ -29,7 +31,7 @@ const EvaluationDetail = ({ evaluation, showBonus }) => {
         <div className="flex items-center gap-4">
           <div className="text-right">
             <p className="text-[10px] font-semibold uppercase tracking-wide text-slate-400">
-              Self avg
+              Self rating
             </p>
             <p className="text-sm font-semibold text-slate-600">
               {empAvg != null ? `${empAvg.toFixed(1)} / 5` : "—"}
@@ -38,7 +40,7 @@ const EvaluationDetail = ({ evaluation, showBonus }) => {
           {reviewed && (
             <div className="text-right">
               <p className="text-[10px] font-semibold uppercase tracking-wide text-amber-500">
-                PM avg
+                PM rating
               </p>
               <p className="text-sm font-semibold text-amber-600">
                 {pmAvg != null ? `${pmAvg.toFixed(1)} / 5` : "—"}
@@ -51,13 +53,18 @@ const EvaluationDetail = ({ evaluation, showBonus }) => {
       <div className="space-y-2">
         {params.map((p) => (
           <div
-            key={formatDisplayName(p.name)}
+            key={p.name}
             className="rounded-xl border border-slate-100 bg-slate-50/70 px-3 py-2.5"
           >
             <div className="flex flex-wrap items-center justify-between gap-2">
               <div className="flex items-center gap-2">
+                {p.category && (
+                  <span className="shrink-0 rounded bg-indigo-50 px-2 py-0.5 text-[11px] font-semibold text-indigo-700">
+                    {p.category}
+                  </span>
+                )}
                 <span className="text-sm font-medium text-slate-800">
-                  {formatDisplayName(p.name)}
+                  {p.name}
                 </span>
                 {reviewed &&
                   (p.approved ? (

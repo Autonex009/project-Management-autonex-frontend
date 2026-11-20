@@ -50,10 +50,17 @@ export const RatingCell = ({ evaluation }) => {
           )}
           {params.map((p) => (
             <div
-              key={formatDisplayName(p.name)}
-              className="flex items-center justify-between gap-3"
+              key={p.name}
+              className="flex items-center justify-between gap-2"
             >
-              <span className="truncate text-xs text-slate-600">{formatDisplayName(p.name)}</span>
+              <div className="flex min-w-0 items-center gap-1.5 truncate">
+                {p.category && (
+                  <span className="shrink-0 rounded bg-indigo-50 px-1 py-0.5 text-[9px] font-semibold text-indigo-700">
+                    {p.category}
+                  </span>
+                )}
+                <span className="truncate text-xs text-slate-600">{p.name}</span>
+              </div>
               <StarRating
                 value={Math.round(
                   (reviewed ? p.pm_rating : p.employee_rating) || 0,
