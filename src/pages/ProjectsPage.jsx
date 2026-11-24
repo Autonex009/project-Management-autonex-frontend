@@ -74,6 +74,7 @@ import {
   PROJECT_TYPE_CATEGORIES,
 } from "../utils/projectConstants";
 import ProjectCard from "../components/projects/ProjectCard";
+import DynamicTooltip from "../components/ui/DynamicTooltip";
 import { TeamLeadMultiSelect, PmMultiSelect } from "../components/projects/ProjectDropdowns";
 
 
@@ -310,7 +311,8 @@ const ProjectsPage = () => {
         d.includes("project manager") ||
         d.includes("pm") ||
         d.includes("admin") ||
-        d.includes("manager")
+        d.includes("manager") ||
+        d.includes("hr")
       );
     });
   }, [employees]);
@@ -856,6 +858,7 @@ const ProjectsPage = () => {
       // Assigned PMs / Employees
       assigned_employee_ids: selectedPmIds,
       pm_id: selectedPmIds[0] || null,
+      team_lead_ids: selectedTeamLeadIds,
       // PMs and leads are added on top of this when the ratio is displayed
       // (see totalRequiredManpower) — they are not part of the stored figure.
       // Recomputed server-side by _autonex_headcount; sent so the optimistic UI
@@ -910,6 +913,7 @@ const ProjectsPage = () => {
     const filesToUpload = guidelineFiles;
     // Captured before the reset, for the same reason as the files above.
     const teamLeadsToSave = selectedTeamLeadIds;
+    const pmsToSave = selectedPmIds;
     resetModalState();
     toast.success(
       wasEditing
@@ -950,10 +954,146 @@ const ProjectsPage = () => {
       );
     }
 
+    // Zero-Network Cache Surgery: surgically patch the project in RAM across all paginated queries
+    if (wasEditing && savedProject?.id) {
+      queryClient.setQueriesData(
+        { queryKey: ["sub-projects-paginated"] },
+        (oldData) => {
+          if (!oldData || !Array.isArray(oldData.items)) return oldData;
+          return {
+            ...oldData,
+            items: oldData.items.map((item) =>
+              item.id === savedProject.id ? { ...item, ...savedProject } : item
+            ),
+          };
+        }
+      );
+
+      queryClient.setQueryData(["sub-projects-dropdown"], (oldList) => {
+        if (!Array.isArray(oldList)) return oldList;
+        return oldList.map((p) => (p.id === savedProject.id ? { ...p, ...savedProject } : p));
+      });
+
+      queryClient.setQueryData(["sub-projects", savedProject.id], savedProject);
+    }
+
+    // Zero-Network Cache Surgery: surgically update allocations in RAM (0ms visual latency)
+    if (savedProject?.id) {
+      const targetProjectId = savedProject.id;
+      const targetPmIds = new Set((pmsToSave || []).map(Number));
+      const targetLeadIds = new Set((teamLeadsToSave || []).map(Number));
+
+      queryClient.setQueryData(["allocations"], (oldList) => {
+        if (!Array.isArray(oldList)) return oldList;
+
+        const updated = oldList
+          .map((alloc) => {
+            if (alloc.sub_project_id !== targetProjectId) return alloc;
+            const empId = Number(alloc.employee_id);
+            const emp = employeeIndex.get(String(empId));
+            const isTl = isTeamLeadAllocation(alloc, emp);
+            const roleTags = Array.isArray(alloc.role_tags) ? alloc.role_tags : [];
+            const hasPmTag = roleTags.some((t) =>
+              ["PM", "Project Manager", "Program Manager"].includes(t),
+            );
+            const empDesig = (emp?.designation || "").toLowerCase();
+            const isMgrDesig =
+              empDesig.includes("program manager") ||
+              empDesig.includes("project manager") ||
+              empDesig.includes("pm") ||
+              empDesig.includes("admin") ||
+              empDesig.includes("manager") ||
+              empDesig.includes("hr");
+
+            // Removed Team Lead
+            if (isTl && !targetLeadIds.has(empId)) {
+              const remainingTags = roleTags.filter(
+                (t) => !isTeamLeadDesignation(t),
+              );
+              if (remainingTags.length === 0 && !targetPmIds.has(empId)) {
+                return null;
+              }
+              return { ...alloc, role_tags: remainingTags };
+            }
+
+            // Removed PM
+            if (!targetPmIds.has(empId) && (hasPmTag || isMgrDesig)) {
+              const remainingTags = roleTags.filter(
+                (t) =>
+                  !["PM", "Project Manager", "Program Manager"].includes(t),
+              );
+              if (remainingTags.length === 0 && !targetLeadIds.has(empId)) {
+                return null;
+              }
+              return { ...alloc, role_tags: remainingTags };
+            }
+
+            return alloc;
+          })
+          .filter(Boolean);
+
+        // Add newly assigned leads if not present
+        targetLeadIds.forEach((leadId) => {
+          const existing = updated.find(
+            (a) =>
+              a.sub_project_id === targetProjectId &&
+              Number(a.employee_id) === leadId,
+          );
+          if (existing) {
+            const existingTags = Array.isArray(existing.role_tags)
+              ? existing.role_tags
+              : [];
+            if (!existingTags.includes(TEAM_LEAD_TAG)) {
+              existing.role_tags = [...existingTags, TEAM_LEAD_TAG];
+            }
+          } else {
+            updated.push({
+              id: `alloc-tl-${targetProjectId}-${leadId}`,
+              employee_id: leadId,
+              sub_project_id: targetProjectId,
+              total_daily_hours: 8,
+              role_tags: [TEAM_LEAD_TAG],
+              is_active: true,
+            });
+          }
+        });
+
+        // Add newly assigned PMs if not present
+        targetPmIds.forEach((pmId) => {
+          const existing = updated.find(
+            (a) =>
+              a.sub_project_id === targetProjectId &&
+              Number(a.employee_id) === pmId,
+          );
+          if (!existing) {
+            updated.push({
+              id: `alloc-pm-${targetProjectId}-${pmId}`,
+              employee_id: pmId,
+              sub_project_id: targetProjectId,
+              total_daily_hours: 8,
+              role_tags: ["PM"],
+              is_active: true,
+            });
+          }
+        });
+
+        return updated;
+      });
+    }
+
     await Promise.all([
+      queryClient.invalidateQueries({
+        queryKey: ["sub-projects-paginated"],
+        refetchType: wasEditing ? "none" : "active",
+      }),
       queryClient.invalidateQueries({ queryKey: ["sub-projects"] }),
+      queryClient.invalidateQueries({ queryKey: ["sub-projects-dropdown"] }),
       queryClient.invalidateQueries({ queryKey: ["guidelines"] }),
       queryClient.invalidateQueries({ queryKey: ["allocations"] }),
+      queryClient.invalidateQueries({ queryKey: ["allocations-page"] }),
+      queryClient.invalidateQueries({
+        queryKey: ["allocations", "project-detail", savedProject?.id],
+      }),
     ]);
   };
 
@@ -1106,7 +1246,8 @@ const ProjectsPage = () => {
           d.includes("project manager") ||
           d.includes("pm") ||
           d.includes("admin") ||
-          d.includes("manager")
+          d.includes("manager") ||
+          d.includes("hr")
         );
       })
       .forEach((e) => add(e.id));
@@ -1203,7 +1344,7 @@ const ProjectsPage = () => {
 
 
   // Open the full create/edit modal, prefilled from a project. `copy` clones it.
-  const openProjectModal = (project, { copy = false } = {}) => {
+  const openProjectModal = async (project, { copy = false } = {}) => {
     setEditingCardId(null);
     setCardDraft(null);
     if (copy) {
@@ -1228,19 +1369,9 @@ const ProjectsPage = () => {
     setFormSentiment(project.sentiment || "");
     setModalInfoTab("status");
     setModalBuildTab("types");
-    // Prefill both rosters from the project. The PM list matters even though the field is
-    // hidden for a PM: submit sends `assigned_employee_ids: selectedPmIds`, so leaving
-    // stale state in place would rewrite this project's managers with the previous
-    // modal's selection.
-    //
-    // Read the project's own column rather than resolvePmIds — the resolved value can come
-    // from the organisation, and writing that back would pin an inheriting project to those
-    // people, which switches organisation-level inheritance off for it (see pmScope.js).
-    // Split the stored manager slot the same way the card does, so the modal cannot show a
-    // different set from the project it was opened on. Reading the column raw put converted
-    // managers in the Program Manager box and left Team Lead empty — and saving that would
-    // have written them straight back as managers.
-    const demoted = demotedToLeadIds(project, visibleMainProjects, employeeIndex);
+
+    // 1. Instant prefill from current data for 0ms visual open
+    const demoted = demotedToLeadIds(project, null, employeeIndex);
     const demotedSet = new Set(demoted.map(Number));
     setSelectedPmIds(
       (project.assigned_employee_ids || []).filter(
@@ -1260,6 +1391,70 @@ const ProjectsPage = () => {
       ]),
     ]);
     setIsModalOpen(true);
+
+    // 2. Live database hydration: guarantee 100% two-way sync with Allocations page
+    if (project?.id) {
+      try {
+        const [freshAllocs, freshProj] = await Promise.all([
+          allocationApi.getByProject(project.id).catch(() => null),
+          subProjectApi.getOne(project.id).catch(() => null),
+        ]);
+
+        const liveProj = freshProj || project;
+        const activeAllocs = (freshAllocs || []).filter((a) => a.is_active !== false);
+
+        const liveDemoted = demotedToLeadIds(liveProj, null, employeeIndex);
+        const liveDemotedSet = new Set(liveDemoted.map(Number));
+
+        // Detect any active PM allocations made on the allocations page
+        const allocatedPmIds = activeAllocs
+          .filter((a) => {
+            const emp = employeeIndex.get(String(a.employee_id));
+            const desig = (emp?.designation || "").toLowerCase().trim();
+            const tags = Array.isArray(a.role_tags) ? a.role_tags : [];
+            return (
+              tags.includes("Project Manager") ||
+              tags.includes("Program Manager") ||
+              tags.includes("PM") ||
+              [
+                "project manager",
+                "program manager",
+                "pm",
+                "hr",
+                "admin",
+                "administrator",
+              ].includes(desig) ||
+              desig.includes("manager") ||
+              desig.includes("admin") ||
+              desig.includes("hr")
+            );
+          })
+          .map((a) => a.employee_id);
+
+        const resolvedPmIds = [
+          ...new Set([
+            ...(liveProj.assigned_employee_ids || []),
+            ...allocatedPmIds,
+          ]),
+        ].filter((id) => !liveDemotedSet.has(Number(id)));
+
+        // Detect all active Team Lead allocations on this project
+        const liveLeadIds = [
+          ...new Set([
+            ...activeAllocs
+              .filter((a) => isTeamLeadAllocation(a, employeeIndex.get(String(a.employee_id))))
+              .map((a) => a.employee_id),
+            ...liveDemoted,
+          ]),
+        ];
+
+        setSelectedPmIds(resolvedPmIds);
+        setSelectedTeamLeadIds(liveLeadIds);
+        setEditingProject(liveProj);
+      } catch (err) {
+        console.warn("Live hydration of project edit modal:", err);
+      }
+    }
   };
 
   // Inline card editing (double-click to enter, Save/Cancel to exit)
@@ -2134,29 +2329,39 @@ const ProjectsPage = () => {
                     Program Manager
                   </label>
                   {selectedPmIds.length > 0 && (
-                    <span className="group relative inline-flex">
-                      <span className="inline-flex h-4 min-w-[16px] cursor-default items-center justify-center rounded-full bg-indigo-100 px-1 text-[10px] font-bold text-indigo-700">
+                    <DynamicTooltip
+                      placement="top"
+                      alwaysShow={true}
+                      tooltip={
+                        <div className="space-y-1 py-0.5">
+                          <div className="text-[10px] font-bold uppercase tracking-wider text-indigo-500">
+                            Assigned Managers ({selectedPmIds.length})
+                          </div>
+                          <div className="space-y-0.5">
+                            {selectedPmIds.map((id, i) => {
+                              const emp = employees.find((e) => e.id === id);
+                              return (
+                                <div
+                                  key={id}
+                                  className="flex items-center gap-1.5 whitespace-nowrap py-0.5 text-xs text-slate-700"
+                                >
+                                  <span>{formatDisplayName(emp?.name) || "Unknown"}</span>
+                                  {i === 0 && (
+                                    <span className="text-[9px] font-semibold uppercase tracking-wide text-indigo-500 bg-indigo-50 px-1 rounded">
+                                      primary
+                                    </span>
+                                  )}
+                                </div>
+                              );
+                            })}
+                          </div>
+                        </div>
+                      }
+                    >
+                      <span className="inline-flex h-4 min-w-[16px] cursor-pointer items-center justify-center rounded-full bg-indigo-100 px-1 text-[10px] font-bold text-indigo-700">
                         {selectedPmIds.length}
                       </span>
-                      <span className="pointer-events-none absolute left-0 top-full z-30 mt-1 hidden w-max max-w-[220px] rounded-lg border border-slate-200 bg-white px-2.5 py-1.5 text-[11px] font-medium text-slate-600 shadow-lg group-hover:block">
-                        {selectedPmIds.map((id, i) => {
-                          const emp = employees.find((e) => e.id === id);
-                          return (
-                            <span
-                              key={id}
-                              className="flex items-center gap-1.5 whitespace-nowrap py-0.5"
-                            >
-                              {formatDisplayName(emp?.name) || "Unknown"}
-                              {i === 0 && (
-                                <span className="text-[9px] font-semibold uppercase tracking-wide text-indigo-400">
-                                  primary
-                                </span>
-                              )}
-                            </span>
-                          );
-                        })}
-                      </span>
-                    </span>
+                    </DynamicTooltip>
                   )}
                 </div>
                 <PmMultiSelect
@@ -2174,32 +2379,39 @@ const ProjectsPage = () => {
                     Team Lead
                   </label>
                   {selectedTeamLeadIds.length > 0 && (
-                    <span className="group relative inline-flex">
-                      <span className="inline-flex h-4 min-w-[16px] cursor-default items-center justify-center rounded-full bg-emerald-100 px-1 text-[10px] font-bold text-emerald-700">
+                    <DynamicTooltip
+                      placement="top"
+                      alwaysShow={true}
+                      tooltip={
+                        <div className="space-y-1 py-0.5">
+                          <div className="text-[10px] font-bold uppercase tracking-wider text-emerald-600">
+                            Assigned Leads ({selectedTeamLeadIds.length})
+                          </div>
+                          <div className="space-y-0.5">
+                            {selectedTeamLeadIds.map((id) => {
+                              const emp = employees.find((e) => e.id === id);
+                              return (
+                                <div
+                                  key={id}
+                                  className="flex items-center gap-1.5 whitespace-nowrap py-0.5 text-xs text-slate-700"
+                                >
+                                  <span>{formatDisplayName(emp?.name) || "Unknown"}</span>
+                                  {!isTeamLeadDesignation(emp?.designation) && (
+                                    <span className="text-[9px] font-semibold uppercase tracking-wide text-amber-500 bg-amber-50 px-1 rounded">
+                                      temp
+                                    </span>
+                                  )}
+                                </div>
+                              );
+                            })}
+                          </div>
+                        </div>
+                      }
+                    >
+                      <span className="inline-flex h-4 min-w-[16px] cursor-pointer items-center justify-center rounded-full bg-emerald-100 px-1 text-[10px] font-bold text-emerald-700">
                         {selectedTeamLeadIds.length}
                       </span>
-                      <span className="pointer-events-none absolute left-0 top-full z-30 mt-1 hidden w-max max-w-[240px] rounded-lg border border-slate-200 bg-white px-2.5 py-1.5 text-[11px] font-medium text-slate-600 shadow-lg group-hover:block">
-                        {selectedTeamLeadIds.map((id) => {
-                          const emp = employees.find((e) => e.id === id);
-                          return (
-                            <span
-                              key={id}
-                              className="flex items-center gap-1.5 whitespace-nowrap py-0.5"
-                            >
-                              {formatDisplayName(emp?.name) || "Unknown"}
-                              {/* Still reachable: the picker offers Team Leads only, but a
-                                  project may already carry a program manager tagged as a
-                                  lead from the Allocations page, and prefill shows them. */}
-                              {!isTeamLeadDesignation(emp?.designation) && (
-                                <span className="text-[9px] font-semibold uppercase tracking-wide text-amber-500">
-                                  temp
-                                </span>
-                              )}
-                            </span>
-                          );
-                        })}
-                      </span>
-                    </span>
+                    </DynamicTooltip>
                   )}
                 </div>
                 <TeamLeadMultiSelect
