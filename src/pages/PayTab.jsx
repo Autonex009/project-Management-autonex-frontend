@@ -57,7 +57,7 @@ const PayTab = () => {
 
   const [savingKey, setSavingKey] = useState(null);
 
-  const { data, isLoading, isError } = useQuery({
+  const { data, isLoading, isError, refetch } = useQuery({
     queryKey: ["salary-records"],
     queryFn: () => payrollApi.getSalaryRecords(),
     staleTime: 0,
@@ -66,8 +66,9 @@ const PayTab = () => {
   const salaries = data?.salaries || [];
 
   const invalidate = () => {
-    queryClient.invalidateQueries(["salary-records"]);
-    queryClient.invalidateQueries(["payroll-preview"]);
+    queryClient.invalidateQueries({ queryKey: ["salary-records"] });
+    queryClient.invalidateQueries({ queryKey: ["payroll-preview"] });
+    refetch();
   };
 
   const updateMutation = useMutation({
@@ -110,6 +111,16 @@ const PayTab = () => {
     mutationFn: ({ id, status }) =>
       payrollApi.setSalaryRecordStatus(id, status),
     onSuccess: (_res, vars) => {
+      // Immediate in-memory cache surgery so the pill reflects the toggle instantly
+      queryClient.setQueryData(["salary-records"], (old) => {
+        if (!old?.salaries) return old;
+        return {
+          ...old,
+          salaries: old.salaries.map((s) =>
+            s.id === vars.id ? { ...s, status: vars.status } : s
+          ),
+        };
+      });
       toast.success(
         vars.status === "Active"
           ? "Marked active"
