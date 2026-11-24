@@ -44,28 +44,12 @@ export const REQUEST_ACTION_ROLES = ["admin", "hr", "pm", "team_lead"];
 export const canRoleActOnRequests = (role) =>
   REQUEST_ACTION_ROLES.includes(role);
 
-// PMs recorded at the organisation level, newest column first.
-const mainProjectPmIds = (mainProject) => {
-  if (!mainProject) return [];
-  if (mainProject.program_manager_ids?.length)
-    return mainProject.program_manager_ids;
-  if (mainProject.program_manager_id) return [mainProject.program_manager_id];
-  return [];
-};
-
-/**
- * Whoever occupies `project`'s manager slot, before designation is considered.
- *
- * Project-level assignment wins; an organisation's PMs apply only to projects that name
- * no PM of their own. That ordering is what lets several PMs share one client while each
- * owns distinct projects under it.
- */
-const assignedManagerIds = (project, mainProjects = []) => {
-  if (project?.assigned_employee_ids?.length)
-    return project.assigned_employee_ids;
-  return mainProjectPmIds(
-    mainProjects.find((p) => p.id === project?.main_project_id),
-  );
+// PMs recorded directly on the project (daily sheet).
+// Never fall back to main projects / parent projects.
+const assignedManagerIds = (project) => {
+  return Array.isArray(project?.assigned_employee_ids)
+    ? project.assigned_employee_ids
+    : [];
 };
 
 /**
@@ -77,8 +61,8 @@ const assignedManagerIds = (project, mainProjects = []) => {
  * show under Team Lead without waiting for a manual pass over every project. Mirrors
  * `_demoted_to_lead` in backend project_scope.py.
  */
-export const demotedToLeadIds = (project, mainProjects = [], employeeIndex) =>
-  assignedManagerIds(project, mainProjects).filter((id) =>
+export const demotedToLeadIds = (project, _mainProjects, employeeIndex) =>
+  assignedManagerIds(project).filter((id) =>
     isTeamLeadDesignation(employeeIndex?.get?.(String(id))?.designation),
   );
 
@@ -88,11 +72,11 @@ export const demotedToLeadIds = (project, mainProjects = [], employeeIndex) =>
  * `employeeIndex` is optional so callers without a roster to hand still resolve the raw
  * slot; pass it wherever the distinction matters.
  */
-export const resolveProjectPmIds = (project, mainProjects = [], employeeIndex) => {
-  const ids = assignedManagerIds(project, mainProjects);
+export const resolveProjectPmIds = (project, _mainProjects, employeeIndex) => {
+  const ids = assignedManagerIds(project);
   if (!employeeIndex) return ids;
   const demoted = new Set(
-    demotedToLeadIds(project, mainProjects, employeeIndex).map(Number),
+    demotedToLeadIds(project, _mainProjects, employeeIndex).map(Number),
   );
   return ids.filter((id) => !demoted.has(Number(id)));
 };
@@ -109,14 +93,14 @@ export const resolveProjectPmIds = (project, mainProjects = [], employeeIndex) =
 export const canActOnProject = (
   user = {},
   project,
-  mainProjects = [],
+  _mainProjects = [],
   leadIds = [],
 ) => {
   if (hasFullAccess(user.role)) return true;
   const employeeId = user.employee_id;
   if (!employeeId) return false;
   const actorIds = [
-    ...resolveProjectPmIds(project, mainProjects),
+    ...resolveProjectPmIds(project),
     ...leadIds,
   ].map(Number);
   return actorIds.includes(Number(employeeId));

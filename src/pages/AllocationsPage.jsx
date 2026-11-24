@@ -34,10 +34,10 @@ import Modal from "../components/ui/Modal";
 import AllocationPopover from "../components/AllocationPopover";
 import Dropdown from "../components/ui/Dropdown";
 import SearchBar from "../components/ui/SearchBar";
+import DynamicTooltip from "../components/ui/DynamicTooltip";
 import { formatDisplayName } from "../utils/displayName";
 import {
   TEAM_LEAD_TAG,
-  ROLE_TAGS,
 } from "../utils/allocationRoles";
 
 // Marks an allocation as the project's team lead. Stored inside role_tags because that is
@@ -63,7 +63,6 @@ const AllocationsPage = () => {
   const [selectedAddIds, setSelectedAddIds] = useState(new Set());
   const [addSearch, setAddSearch] = useState("");
   const [addFilterTab, setAddFilterTab] = useState("all"); // "all" | "unallocated"
-  const [addRoleTags, setAddRoleTags] = useState([]);
   const [confirmState, setConfirmState] = useState(null);
   const [showAllAllocated, setShowAllAllocated] = useState(false);
 
@@ -74,7 +73,6 @@ const AllocationsPage = () => {
     setSelectedAddIds(new Set());
     setAddSearch("");
     setAddFilterTab("all");
-    setAddRoleTags([]);
     setEditingAllocation({
       projectId: row.project_id,
       projectName: row.project_name,
@@ -92,13 +90,10 @@ const AllocationsPage = () => {
     setSelectedAddIds(new Set());
     setAddSearch("");
     setAddFilterTab("all");
-    setAddRoleTags([]);
   };
 
-  // Time division state
-  const [selectedRoleTags, setSelectedRoleTags] = useState([]);
+  // Allocation settings state
   const [isTeamLead, setIsTeamLead] = useState(false);
-  const [timeDistribution, setTimeDistribution] = useState({});
   const [totalDailyHours, setTotalDailyHours] = useState(8);
   const [employeeSearch, setEmployeeSearch] = useState("");
 
@@ -214,6 +209,9 @@ const AllocationsPage = () => {
         queryClient.invalidateQueries({ queryKey: ["allocations-page"] });
       }
       queryClient.invalidateQueries({ queryKey: ["allocations", "employee-projects"] });
+      queryClient.invalidateQueries({ queryKey: ["allocations"] });
+      queryClient.invalidateQueries({ queryKey: ["sub-projects"] });
+      queryClient.invalidateQueries({ queryKey: ["sub-projects-paginated"] });
       setIsModalOpen(false);
       toast.success("Allocation created successfully!");
     },
@@ -250,6 +248,9 @@ const AllocationsPage = () => {
         queryClient.invalidateQueries({ queryKey: ["allocations-page"] });
       }
       queryClient.invalidateQueries({ queryKey: ["allocations", "employee-projects"] });
+      queryClient.invalidateQueries({ queryKey: ["allocations"] });
+      queryClient.invalidateQueries({ queryKey: ["sub-projects"] });
+      queryClient.invalidateQueries({ queryKey: ["sub-projects-paginated"] });
       queryClient.invalidateQueries({ queryKey: ["onboarding_pipeline"] });
       queryClient.invalidateQueries({ queryKey: ["onboarding_newly_onboarded"] });
       toast.success("Allocation removed successfully!");
@@ -319,6 +320,10 @@ const AllocationsPage = () => {
         });
       }
 
+      // Invalidate projects & slim allocations cache to ensure 100% two-way sync with Project modal
+      queryClient.invalidateQueries({ queryKey: ["allocations"] });
+      queryClient.invalidateQueries({ queryKey: ["sub-projects"] });
+      queryClient.invalidateQueries({ queryKey: ["sub-projects-paginated"] });
       toast.success("Allocations added successfully!");
     },
     onError: (err) => {
@@ -375,6 +380,12 @@ const AllocationsPage = () => {
         });
       }
 
+      // Invalidate projects & slim allocations cache to ensure 100% two-way sync with Project modal
+      queryClient.invalidateQueries({ queryKey: ["allocations"] });
+      queryClient.invalidateQueries({ queryKey: ["sub-projects"] });
+      queryClient.invalidateQueries({ queryKey: ["sub-projects-paginated"] });
+      queryClient.invalidateQueries({ queryKey: ["onboarding_pipeline"] });
+      queryClient.invalidateQueries({ queryKey: ["onboarding_newly_onboarded"] });
       toast.success("Allocations removed successfully!");
     },
     onError: (err) => {
@@ -388,9 +399,7 @@ const AllocationsPage = () => {
     setIsModalOpen(false);
     setSelectedProject(null);
     setSelectedEmployees([]);
-    setSelectedRoleTags([]);
     setIsTeamLead(false);
-    setTimeDistribution({});
     setTotalDailyHours(8);
     setFilterTab("all");
     setEmployeeSearch("");
@@ -571,8 +580,8 @@ const AllocationsPage = () => {
       bulkCreateMutation.mutate({
         project_id: selectedProject.id,
         employee_ids: toCreate.map((e) => e.id),
-        role_tags: isTeamLead ? [...selectedRoleTags, TEAM_LEAD_TAG] : selectedRoleTags,
-        daily_hours: totalDailyHours,
+        role_tags: isTeamLead ? [TEAM_LEAD_TAG] : [],
+        daily_hours: totalDailyHours || 8,
       });
     }
 
@@ -1179,9 +1188,12 @@ const AllocationsPage = () => {
                                   onChange={() => { }}
                                   className="rounded border-slate-300 text-blue-600 focus:ring-blue-500 shrink-0"
                                 />
-                                <span className="text-[13px] font-semibold text-slate-900 shrink-0">
-                                  {formatDisplayName(employee.name)}
-                                </span>
+                                <DynamicTooltip
+                                  text={formatDisplayName(employee.name)}
+                                  tooltip={employee.name}
+                                  placement="top"
+                                  className="text-[13px] font-semibold text-slate-900 shrink-0"
+                                />
                                 {employee.skillMatch && (
                                   <span className="px-1.5 py-0.5 text-[10px] bg-green-100 text-green-700 rounded-full font-semibold shrink-0">
                                     Skill Match
@@ -1193,9 +1205,26 @@ const AllocationsPage = () => {
                                   </span>
                                 )}
                                 {employee.currentProjects && !employee.alreadyInProject && (
-                                  <span className="px-1.5 py-0.5 text-[10px] bg-orange-100 text-orange-700 rounded-full font-semibold shrink-0">
-                                    {employee.currentProjects.map((p) => p.project_name).join(", ")}
-                                  </span>
+                                  <DynamicTooltip
+                                    text={employee.currentProjects.map((p) => p.project_name).join(", ")}
+                                    tooltip={
+                                      <div className="space-y-1 py-0.5 text-left">
+                                        <div className="text-[10px] font-bold uppercase tracking-wider text-orange-600">
+                                          Current Projects ({employee.currentProjects.length})
+                                        </div>
+                                        <div className="space-y-0.5 text-xs text-slate-600">
+                                          {employee.currentProjects.map((p, idx) => (
+                                            <div key={idx} className="flex items-center gap-1.5 whitespace-nowrap">
+                                              <span className="h-1.5 w-1.5 rounded-full bg-orange-400" />
+                                              <span>{p.project_name}</span>
+                                            </div>
+                                          ))}
+                                        </div>
+                                      </div>
+                                    }
+                                    placement="top"
+                                    className="px-1.5 py-0.5 text-[10px] bg-orange-100 text-orange-700 rounded-full font-semibold max-w-[160px] shrink-0"
+                                  />
                                 )}
                                 <div className="ml-auto flex items-center gap-1.5 shrink-0">
                                   {employee.skills?.slice(0, 3).map((skill, idx) => (
@@ -1234,131 +1263,40 @@ const AllocationsPage = () => {
                   )}
                 </div>
 
-                {/* Time Division Section */}
+                {/* Allocation Settings */}
                 {selectedEmployees.length > 0 && (
-                  <div className="border border-gray-200 rounded-lg p-4 bg-gray-50">
-                    <h4 className="text-sm font-semibold text-gray-700 mb-3">Time Division (Optional)</h4>
-                    <p className="text-xs text-gray-500 mb-4">
-                      Configure how allocated hours are distributed across roles. If no roles are selected,
-                      employees work full hours without role distinction.
-                    </p>
-
-                    <div className="mb-4">
-                      <label className="block text-sm font-medium text-gray-700 mb-1">Total Daily Hours</label>
+                  <div className="border border-slate-200 rounded-lg p-4 bg-slate-50 space-y-4">
+                    <div>
+                      <label className="block text-sm font-medium text-slate-700 mb-1">Total Daily Hours</label>
                       <Dropdown
                         options={["", ...["4 hours", "6 hours", "8 hours", "10 hours", "12 hours"]].map((h, i) =>
                           h ? { value: (4 + i * 2).toString(), label: h } : { value: "", label: "Not specified" },
                         )}
                         value={totalDailyHours.toString()}
                         onChange={(val) => {
-                          const newHours = val === "" ? "" : parseInt(val);
-                          setTotalDailyHours(newHours);
-                          if (newHours !== "") {
-                            const currentSum = Object.values(timeDistribution).reduce((a, b) => a + b, 0);
-                            if (currentSum > newHours) setTimeDistribution({});
-                          }
+                          setTotalDailyHours(val === "" ? "" : parseInt(val));
                         }}
                         placeholder="Not specified"
                       />
                     </div>
 
-                    <div className="mb-4">
-                      <label className="block text-sm font-medium text-gray-700 mb-2">Role Tags</label>
-                      <div className="flex flex-wrap gap-3">
-                        {ROLE_TAGS.map((tag) => (
-                          <label key={tag} className="flex items-center gap-2 cursor-pointer">
-                            <input
-                              type="checkbox"
-                              checked={selectedRoleTags.includes(tag)}
-                              onChange={(e) => {
-                                if (e.target.checked) {
-                                  setSelectedRoleTags([...selectedRoleTags, tag]);
-                                  if (totalDailyHours !== "") {
-                                    const newTags = [...selectedRoleTags, tag];
-                                    const hoursPerRole = Math.floor(totalDailyHours / newTags.length);
-                                    const newDist = {};
-                                    newTags.forEach((t, idx) => {
-                                      newDist[t] = idx === 0 ? totalDailyHours - hoursPerRole * (newTags.length - 1) : hoursPerRole;
-                                    });
-                                    setTimeDistribution(newDist);
-                                  } else {
-                                    setTimeDistribution((prev) => ({ ...prev, [tag]: 0 }));
-                                  }
-                                } else {
-                                  setSelectedRoleTags(selectedRoleTags.filter((t) => t !== tag));
-                                  const newDist = { ...timeDistribution };
-                                  delete newDist[tag];
-                                  setTimeDistribution(newDist);
-                                }
-                              }}
-                              className="rounded border-gray-300 text-indigo-600 focus:ring-indigo-500"
-                            />
-                            <span className="text-sm text-gray-700">{tag}</span>
-                          </label>
-                        ))}
-                      </div>
-                    </div>
-
-                    <div className="mb-4">
+                    <div>
                       <label className="flex items-start gap-2 cursor-pointer">
                         <input
                           type="checkbox"
                           checked={isTeamLead}
                           onChange={(e) => setIsTeamLead(e.target.checked)}
-                          className="mt-0.5"
+                          className="mt-0.5 rounded border-slate-300 text-indigo-600 focus:ring-indigo-500"
                         />
-                        <span className="text-sm text-gray-700">
+                        <span className="text-sm text-slate-700 font-medium">
                           Team lead on this project
-                          <span className="block text-xs text-gray-500">
+                          <span className="block text-xs font-normal text-slate-500">
                             Applies to this project only. Leads manage it like its PM; their own requests go to
                             the PM or an admin.
                           </span>
                         </span>
                       </label>
                     </div>
-
-                    {selectedRoleTags.length > 0 && (
-                      <div className="space-y-3">
-                        <label className="block text-sm font-medium text-gray-700">Hours per Role</label>
-                        <div className="grid grid-cols-1 sm:grid-cols-3 gap-3">
-                          {selectedRoleTags.map((tag) => (
-                            <div key={tag} className="flex items-center gap-2">
-                              <span className="text-sm text-gray-600 min-w-[60px] sm:min-w-[80px]">{tag}:</span>
-                              <input
-                                type="number"
-                                min="0"
-                                max={totalDailyHours}
-                                value={timeDistribution[tag] || 0}
-                                onChange={(e) => {
-                                  const hours = parseInt(e.target.value) || 0;
-                                  setTimeDistribution({ ...timeDistribution, [tag]: Math.min(hours, totalDailyHours) });
-                                }}
-                                onWheel={(e) => e.target.blur()}
-                                className="input w-20 text-center"
-                              />
-                              <span className="text-xs text-gray-500">hrs</span>
-                            </div>
-                          ))}
-                        </div>
-
-                        {(() => {
-                          const totalAssigned = Object.values(timeDistribution).reduce((a, b) => a + b, 0);
-                          const isValid = totalAssigned === totalDailyHours;
-                          return (
-                            <div
-                              className={`mt-2 p-2 rounded text-sm ${isValid
-                                  ? "bg-green-50 text-green-700 border border-green-200"
-                                  : "bg-red-50 text-red-700 border border-red-200"
-                                }`}
-                            >
-                              {isValid
-                                ? `✓ Hours correctly distributed: ${totalAssigned}/${totalDailyHours}`
-                                : `⚠ Hours mismatch: ${totalAssigned}/${totalDailyHours} (adjust to match)`}
-                            </div>
-                          );
-                        })()}
-                      </div>
-                    )}
                   </div>
                 )}
               </>
@@ -1607,27 +1545,36 @@ const AllocationsPage = () => {
 
                               <div className="min-w-0">
                                 <div className="flex items-center gap-2">
-                                  <p
-                                    className={`text-[13px] font-semibold truncate ${
+                                  <DynamicTooltip
+                                    text={name}
+                                    tooltip={it.name}
+                                    placement="top"
+                                    className={`text-[13px] font-semibold ${
                                       it.stale ? "text-rose-700" : "text-slate-900"
                                     }`}
-                                    title={it.name}
-                                  >
-                                    {name}
-                                  </p>
+                                  />
                                   {it.stale ? (
                                     <span className="rounded-full bg-rose-100 px-1.5 py-0.5 text-[10px] font-bold text-rose-700">
                                       Archived
                                     </span>
                                   ) : (
-                                    (it.role_tags || []).map((t) => (
-                                      <span
-                                        key={t}
-                                        className="rounded-full bg-slate-100 px-1.5 py-0.2 text-[10px] font-medium text-slate-600 border border-slate-200"
-                                      >
-                                        {t}
-                                      </span>
-                                    ))
+                                    <>
+                                      {it.designation && (
+                                        <span className="rounded-full bg-slate-100 px-2 py-0.5 text-[10px] font-medium text-slate-600 border border-slate-200">
+                                          {it.designation}
+                                        </span>
+                                      )}
+                                      {((it.is_lead || (it.role_tags || []).includes("Team Lead")) && (it.designation || "").toLowerCase() !== "team lead") && (
+                                        <span className="rounded-full bg-indigo-50 px-2 py-0.5 text-[10px] font-semibold text-indigo-700 border border-indigo-200">
+                                          Team Lead
+                                        </span>
+                                      )}
+                                      {it.is_pm && (
+                                        <span className="rounded-full bg-blue-50 px-2 py-0.5 text-[10px] font-semibold text-blue-700 border border-blue-200">
+                                          PM
+                                        </span>
+                                      )}
+                                    </>
                                   )}
                                 </div>
                                 <p
@@ -1729,34 +1676,6 @@ const AllocationsPage = () => {
                   </div>
                 </div>
 
-                {/* Role Tags Bar */}
-                <div className="bg-slate-50/80 border border-slate-200 rounded-lg p-2.5 flex flex-wrap items-center gap-2 text-xs">
-                  <span className="font-semibold text-slate-600 mr-1">Role:</span>
-                  <div className="flex flex-wrap items-center gap-1.5">
-                    {ROLE_TAGS.slice(0, 4).map((tag) => {
-                      const active = addRoleTags.includes(tag);
-                      return (
-                        <button
-                          key={tag}
-                          type="button"
-                          onClick={() => {
-                            setAddRoleTags((prev) =>
-                              prev.includes(tag) ? prev.filter((t) => t !== tag) : [...prev, tag]
-                            );
-                          }}
-                          className={`px-2 py-0.5 rounded-full text-[11px] font-medium border transition-colors ${
-                            active
-                              ? "bg-indigo-600 text-white border-indigo-600"
-                              : "bg-white text-slate-600 border-slate-200 hover:bg-slate-100"
-                          }`}
-                        >
-                          {tag}
-                        </button>
-                      );
-                    })}
-                  </div>
-                </div>
-
                 {/* Candidates List with Multi-Select Checkboxes */}
                 {(() => {
                   const baseList =
@@ -1845,23 +1764,47 @@ const AllocationsPage = () => {
 
                                   <div className="min-w-0">
                                     <div className="flex items-center gap-2">
-                                      <p className="text-[13px] font-semibold text-slate-900 truncate">
-                                        {formatDisplayName(emp.name)}
-                                      </p>
+                                      <DynamicTooltip
+                                        text={formatDisplayName(emp.name)}
+                                        tooltip={emp.name}
+                                        placement="top"
+                                        className="text-[13px] font-semibold text-slate-900"
+                                      />
                                       {emp.skillMatch && (
-                                        <span className="rounded-full bg-emerald-100 text-emerald-800 px-1.5 py-0.2 text-[10px] font-semibold">
+                                        <span className="rounded-full bg-emerald-100 text-emerald-800 px-1.5 py-0.2 text-[10px] font-semibold shrink-0">
                                           Skill Match
                                         </span>
                                       )}
                                     </div>
-                                    <p className="text-xs text-slate-500 truncate">
-                                      {emp.designation || "Annotator"}
-                                      {emp.otherProjects && (
-                                        <span className="text-amber-600 ml-1.5">
-                                          · On: {emp.otherProjects.map((p) => p.project_name).join(", ")}
-                                        </span>
-                                      )}
-                                    </p>
+                                    <DynamicTooltip
+                                      text={`${emp.designation || "Annotator"}${
+                                        emp.otherProjects && emp.otherProjects.length
+                                          ? ` · On: ${emp.otherProjects.map((p) => p.project_name).join(", ")}`
+                                          : ""
+                                      }`}
+                                      tooltip={
+                                        emp.otherProjects && emp.otherProjects.length > 0 ? (
+                                          <div className="space-y-1 py-0.5 text-left">
+                                            <div className="text-[11px] font-semibold text-slate-800">
+                                              {formatDisplayName(emp.name)} ({emp.designation || "Annotator"})
+                                            </div>
+                                            <div className="text-[10px] font-bold uppercase tracking-wider text-amber-600">
+                                              Other Allocations ({emp.otherProjects.length})
+                                            </div>
+                                            <div className="space-y-0.5 text-xs text-slate-600">
+                                              {emp.otherProjects.map((p, idx) => (
+                                                <div key={idx} className="flex items-center gap-1.5 whitespace-nowrap">
+                                                  <span className="h-1.5 w-1.5 rounded-full bg-amber-400" />
+                                                  <span>{p.project_name}</span>
+                                                </div>
+                                              ))}
+                                            </div>
+                                          </div>
+                                        ) : null
+                                      }
+                                      placement="top"
+                                      className="text-xs text-slate-500"
+                                    />
                                   </div>
                                 </div>
 
@@ -1916,7 +1859,7 @@ const AllocationsPage = () => {
                       {
                         project_id: editingAllocation.projectId,
                         employee_ids: Array.from(selectedAddIds),
-                        role_tags: addRoleTags,
+                        role_tags: [],
                         daily_hours: 8.0,
                       },
                       {
