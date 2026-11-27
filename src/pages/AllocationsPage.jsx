@@ -24,6 +24,12 @@ import {
   Filter,
   Home,
   Building2,
+  Mail,
+  Clock,
+  Briefcase,
+  Check,
+  Tag,
+  CheckCircle2,
 } from "lucide-react";
 import toast from "react-hot-toast";
 import ConfirmDialog from "../components/ui/ConfirmDialog";
@@ -36,14 +42,120 @@ import Dropdown from "../components/ui/Dropdown";
 import SearchBar from "../components/ui/SearchBar";
 import DynamicTooltip from "../components/ui/DynamicTooltip";
 import { formatDisplayName } from "../utils/displayName";
-import {
-  TEAM_LEAD_TAG,
-} from "../utils/allocationRoles";
 
-// Marks an allocation as the project's team lead. Stored inside role_tags because that is
-// already per-(employee, project). Kept identical to the backend's TEAM_LEAD_TAG constant.
 
 const PAGE_SIZE = 10;
+
+// ── Allocation modal primitives ───────────────────────────────────────────
+// Slate neutrals, one indigo accent. Colour only carries meaning:
+// emerald = skill match / fully staffed, amber = short-staffed / busy elsewhere,
+// rose = archived or removal.
+const AL = {
+  label: "block text-[13px] font-medium text-slate-700 mb-2",
+  search:
+    "h-9 w-full pl-9 pr-3 rounded-lg border border-slate-200 bg-white text-[13px] text-slate-900 placeholder:text-slate-400 hover:border-slate-300 focus:outline-none focus:border-indigo-400 focus-visible:ring-2 focus-visible:ring-indigo-500/20 transition-colors",
+  check:
+    "h-4 w-4 shrink-0 rounded border-slate-300 text-indigo-600 focus:ring-indigo-500 cursor-pointer",
+  list: "rounded-lg border border-slate-200 divide-y divide-slate-100 overflow-y-auto",
+  row: (selected) =>
+    `flex items-center gap-3 px-4 min-h-[56px] py-2 cursor-pointer transition-colors ${
+      selected ? "bg-indigo-50/60" : "hover:bg-slate-50"
+    }`,
+  textBtn: "text-[13px] font-medium text-indigo-700 hover:text-indigo-900 transition-colors",
+  primary: "h-9 px-4 gap-2 rounded-lg text-[13px] font-medium shadow-none",
+};
+
+/** Required vs filled summary on one line with a quiet status marker. */
+function StaffingMeter({ required, filled, adding = 0 }) {
+  const total = filled + adding;
+  const short = Math.max(0, required - total);
+  const over = required > 0 && total > required;
+  const status =
+    required === 0
+      ? { tone: "slate", label: "No target set" }
+      : short > 0
+        ? { tone: "amber", label: `${short} more needed` }
+        : over
+          ? { tone: "amber", label: `${total - required} over target` }
+          : { tone: "emerald", label: "Fully staffed" };
+
+  return (
+    <div className="flex items-center gap-3">
+      <p className="shrink-0 text-[13px] tabular-nums text-slate-500">
+        <span className="font-medium text-slate-900">{filled}</span>
+        {adding > 0 && <span className="font-medium text-indigo-600"> +{adding}</span>}
+        <span className="text-slate-400"> / {required}</span> allocated
+      </p>
+      <Marker tone={status.tone}>{status.label}</Marker>
+    </div>
+  );
+}
+
+/** Marks the part of a string that matches the search query. */
+function Highlight({ text, query }) {
+  const q = (query || "").trim();
+  if (!q || !text) return text || null;
+  const i = String(text).toLowerCase().indexOf(q.toLowerCase());
+  if (i < 0) return text;
+  return (
+    <>
+      {text.slice(0, i)}
+      <mark className="rounded-sm bg-indigo-100 px-0.5 text-indigo-900">{text.slice(i, i + q.length)}</mark>
+      {text.slice(i + q.length)}
+    </>
+  );
+}
+
+/** Segmented filter with counts. */
+function SegmentFilter({ value, onChange, options }) {
+  return (
+    <div className="inline-flex shrink-0 items-center rounded-lg bg-slate-100 p-1" role="tablist">
+      {options.map((o) => {
+        const on = value === o.key;
+        return (
+          <button
+            key={o.key}
+            type="button"
+            role="tab"
+            aria-selected={on}
+            onClick={() => onChange(o.key)}
+            className={`inline-flex h-7 items-center gap-2 rounded-md px-3 text-[13px] whitespace-nowrap focus:outline-none focus-visible:ring-2 focus-visible:ring-indigo-500/30 transition-colors ${
+              on
+                ? "bg-white font-medium text-slate-900 shadow-[0_1px_2px_rgba(15,23,42,0.08)]"
+                : "text-slate-500 hover:text-slate-900"
+            }`}
+          >
+            {o.icon && <o.icon className={`h-4 w-4 ${on ? "text-slate-700" : "text-slate-400"}`} strokeWidth={1.5} />}
+            {o.label}
+            {o.count !== undefined && (
+              <span className={`text-[12px] tabular-nums ${on ? "text-indigo-600" : "text-slate-400"}`}>{o.count}</span>
+            )}
+          </button>
+        );
+      })}
+    </div>
+  );
+}
+
+/** Quiet text marker with a dot, used instead of filled pills. */
+function Marker({ tone = "slate", children, title }) {
+  const tones = {
+    emerald: ["bg-emerald-500", "text-emerald-700"],
+    amber: ["bg-amber-500", "text-amber-700"],
+    indigo: ["bg-indigo-500", "text-indigo-700"],
+    rose: ["bg-rose-500", "text-rose-700"],
+    slate: ["bg-slate-300", "text-slate-500"],
+  };
+  const [dot, text] = tones[tone] || tones.slate;
+  return (
+    <span title={title} className={`inline-flex shrink-0 items-center gap-1.5 text-xs ${text}`}>
+      <span className={`h-1.5 w-1.5 rounded-full ${dot}`} />
+      {children}
+    </span>
+  );
+}
+
+const plural = (n, one, many = `${one}s`) => `${n} ${n === 1 ? one : many}`;
 
 const AllocationsPage = () => {
   const location = useLocation();
@@ -53,51 +165,65 @@ const AllocationsPage = () => {
   const role = localStorage.getItem("role") || "admin";
   const isScoped = isProjectScopedRole(role);
   const prefix = isScoped ? "/pm" : "/admin";
-  const [selectedEmployees, setSelectedEmployees] = useState([]);
-  const [filterTab, setFilterTab] = useState("all");
   const [projectView, setProjectView] = useState("active"); // "active" | "archived"
-  const [editingAllocation, setEditingAllocation] = useState(null); // { projectId, projectName, projectType, required_manpower, required_expertise }
-  const [manageTab, setManageTab] = useState("current"); // "current" | "add"
+
+  // ── Unified Team Management Modal State ───────────────────
+  const [teamModalProject, setTeamModalProject] = useState(null); // { id, name, project_type, required_manpower, required_expertise }
+  const [isTeamModalOpen, setIsTeamModalOpen] = useState(false);
+  const [teamModalTab, setTeamModalTab] = useState("current"); // "current" | "add"
+  const [isSwitchingProject, setIsSwitchingProject] = useState(false);
+
+  // Filters & selection for "Add people" tab
+  const [addSearch, setAddSearch] = useState("");
+  const [addFilterTab, setAddFilterTab] = useState("all"); // "all" | "unallocated" | "allocated"
+  const [selectedDesignation, setSelectedDesignation] = useState("all");
+  const [selectedSkill, setSelectedSkill] = useState("all");
+  const [selectedAddIds, setSelectedAddIds] = useState(new Set());
+  const [addRoleTag, setAddRoleTag] = useState("");
+  const [addDailyHours, setAddDailyHours] = useState(8);
+
+  // Filters & selection for "Current team" tab
   const [manageSearch, setManageSearch] = useState("");
   const [selectedRemovalIds, setSelectedRemovalIds] = useState(new Set());
-  const [selectedAddIds, setSelectedAddIds] = useState(new Set());
-  const [addSearch, setAddSearch] = useState("");
-  const [addFilterTab, setAddFilterTab] = useState("all"); // "all" | "unallocated"
+
+  // Confirm dialog state
   const [confirmState, setConfirmState] = useState(null);
-  const [showAllAllocated, setShowAllAllocated] = useState(false);
 
-  const openManageModal = (row) => {
-    setManageTab("current");
+  const openTeamModal = (row = null, initialTab = "current") => {
+    if (row) {
+      setTeamModalProject({
+        id: row.project_id || row.id,
+        name: row.project_name || row.name,
+        project_type: row.project_type,
+        required_manpower: row.required_manpower || 0,
+        required_expertise: row.required_expertise || [],
+      });
+      setIsSwitchingProject(false);
+    } else {
+      setTeamModalProject(null);
+      setIsSwitchingProject(true);
+    }
+    setTeamModalTab(initialTab);
+    setIsTeamModalOpen(true);
+    // Reset filters and selection
     setManageSearch("");
     setSelectedRemovalIds(new Set());
-    setSelectedAddIds(new Set());
     setAddSearch("");
+    setSelectedAddIds(new Set());
     setAddFilterTab("all");
-    setEditingAllocation({
-      projectId: row.project_id,
-      projectName: row.project_name,
-      projectType: row.project_type,
-      required_manpower: row.required_manpower || 0,
-      required_expertise: row.required_expertise || [],
-    });
+    setSelectedDesignation("all");
+    setSelectedSkill("all");
+    setAddRoleTag("");
+    setAddDailyHours(8);
   };
 
-  const closeManageModal = () => {
-    setEditingAllocation(null);
-    setManageTab("current");
-    setManageSearch("");
+  const closeTeamModal = () => {
+    setIsTeamModalOpen(false);
+    setTeamModalProject(null);
+    setIsSwitchingProject(false);
     setSelectedRemovalIds(new Set());
     setSelectedAddIds(new Set());
-    setAddSearch("");
-    setAddFilterTab("all");
   };
-
-  // Allocation settings state
-  const [isTeamLead, setIsTeamLead] = useState(false);
-  const [totalDailyHours, setTotalDailyHours] = useState(8);
-  const [employeeSearch, setEmployeeSearch] = useState("");
-
-  const [isModalOpen, setIsModalOpen] = useState(false);
 
   // ── Persist search + page + scroll ─────────────────────────
   const PAGE_KEY = "allocations";
@@ -143,7 +269,7 @@ const AllocationsPage = () => {
   const { data: projects = [] } = useQuery({
     queryKey: ["sub-projects-dropdown"],
     queryFn: () => subProjectApi.getDropdown(),
-    enabled: isModalOpen || Boolean(location.state?.projectId),
+    enabled: isTeamModalOpen || Boolean(location.state?.projectId),
     staleTime: 60 * 1000,
   });
 
@@ -154,28 +280,26 @@ const AllocationsPage = () => {
     );
   }, [projects]);
 
-  // ── CHANGED: Lightweight employee roster (15 KB vs 188 KB) fetched lazily when modal is open
+  // ── Lightweight employee roster fetched lazily when modal is open
   const { data: employees = [] } = useQuery({
     queryKey: ["employees", "slim"],
     queryFn: () => employeeApi.getSlim(),
-    enabled: isModalOpen || Boolean(editingAllocation),
+    enabled: isTeamModalOpen,
     staleTime: 60 * 1000,
   });
 
   const { data: employeeProjectsMap = {} } = useQuery({
     queryKey: ["allocations", "employee-projects"],
     queryFn: allocationApi.getEmployeeProjects,
-    enabled: isModalOpen || Boolean(editingAllocation),
+    enabled: isTeamModalOpen,
   });
 
-  // ── CHANGED: full allocation detail for the CURRENTLY SELECTED project
-  // only — this replaces deriving "on this project" / edit-modal rows from
-  // a giant client-side `allocations` array. ─────────────────────────────
-  const activeDetailProjectId = selectedProject?.id ?? editingAllocation?.projectId ?? null;
+  // ── Full allocation detail for the currently selected project in team modal
+  const activeProjectId = teamModalProject?.id || null;
   const { data: projectDetail, isLoading: isDetailLoading } = useQuery({
-    queryKey: ["allocations", "project-detail", activeDetailProjectId],
-    queryFn: () => allocationApi.getProjectDetail(activeDetailProjectId),
-    enabled: !!activeDetailProjectId,
+    queryKey: ["allocations", "project-detail", activeProjectId],
+    queryFn: () => allocationApi.getProjectDetail(activeProjectId),
+    enabled: !!activeProjectId && isTeamModalOpen,
   });
 
   // ── Cache Surgery: Fetch single updated row in ~15ms and patch it into table cache in 0ms
@@ -201,7 +325,7 @@ const AllocationsPage = () => {
   const createMutation = useMutation({
     mutationFn: allocationApi.create,
     onSuccess: (_, variables) => {
-      const targetProjectId = variables?.sub_project_id || selectedProject?.id;
+      const targetProjectId = variables?.sub_project_id || activeProjectId;
       if (targetProjectId) {
         updateProjectRowSurgically(targetProjectId);
         queryClient.invalidateQueries({ queryKey: ["allocations", "project-detail", targetProjectId] });
@@ -212,7 +336,7 @@ const AllocationsPage = () => {
       queryClient.invalidateQueries({ queryKey: ["allocations"] });
       queryClient.invalidateQueries({ queryKey: ["sub-projects"] });
       queryClient.invalidateQueries({ queryKey: ["sub-projects-paginated"] });
-      setIsModalOpen(false);
+      closeTeamModal();
       toast.success("Allocation created successfully!");
     },
     onError: (err) => {
@@ -231,7 +355,7 @@ const AllocationsPage = () => {
       return allocationApi.delete(id);
     },
     onSuccess: (_, variables) => {
-      const targetProjectId = typeof variables === "object" ? variables.projectId : editingAllocation?.projectId;
+      const targetProjectId = typeof variables === "object" ? variables.projectId : activeProjectId;
       const deletedId = typeof variables === "object" ? variables.id : variables;
       if (targetProjectId) {
         if (deletedId) {
@@ -266,7 +390,7 @@ const AllocationsPage = () => {
     mutationFn: allocationApi.bulkCreate,
     onSuccess: (res, variables) => {
       const { project_id, row } = res;
-      const targetProjectId = project_id || variables?.project_id;
+      const targetProjectId = project_id || variables?.project_id || activeProjectId;
 
       // 1. In-Memory Cache Surgery for table row using returned row (0 extra network requests)
       if (row) {
@@ -340,7 +464,7 @@ const AllocationsPage = () => {
     mutationFn: allocationApi.bulkDelete,
     onSuccess: (res, variables) => {
       const { project_id, deleted_allocation_ids = [], row } = res;
-      const targetProjectId = project_id || variables?.project_id;
+      const targetProjectId = project_id || variables?.project_id || activeProjectId;
       const deletedIds = new Set(
         deleted_allocation_ids.length ? deleted_allocation_ids : (variables?.allocation_ids || [])
       );
@@ -395,25 +519,13 @@ const AllocationsPage = () => {
     },
   });
 
-  const closeCreateModal = () => {
-    setIsModalOpen(false);
-    setSelectedProject(null);
-    setSelectedEmployees([]);
-    setIsTeamLead(false);
-    setTotalDailyHours(8);
-    setFilterTab("all");
-    setEmployeeSearch("");
-    setShowAllAllocated(false);
-  };
-
   // Handle incoming project selection from Projects page
   useEffect(() => {
     if (location.state?.projectId && !hasHandledLocationProject.current && projects.length) {
       const project = projects.find((p) => p.id === location.state.projectId);
       if (project) {
         hasHandledLocationProject.current = true;
-        setSelectedProject(project);
-        setIsModalOpen(true);
+        openTeamModal(project, "add");
       }
     }
   }, [location.state, projects]);
@@ -422,200 +534,181 @@ const AllocationsPage = () => {
     setCurrentPage(1);
   }, [projectView]);
 
-  // ── Derive available / allocated-elsewhere employee lists for the modal
-  // from the lazily-fetched roster + employee-projects map + this project's
-  // own detail (instead of scanning the whole allocations array). ────────
-  const { availableEmployees, allocatedEmployeesOther } = useMemo(() => {
-    if (!selectedProject || !employees.length) {
-      return { availableEmployees: [], allocatedEmployeesOther: [] };
+  // ── Required/assigned stats for the selected team project ────────────────
+  const teamModalStats = useMemo(() => {
+    if (!activeProjectId) return { required: 0, assigned: 0 };
+    const row = rows.find((r) => r.project_id === activeProjectId);
+    const required = row
+      ? row.required_manpower
+      : teamModalProject?.required_manpower || projectDetail?.required_manpower || 0;
+    const detailItems =
+      projectDetail?.project_id === activeProjectId ? projectDetail.items || [] : [];
+    const assigned = detailItems.filter((i) => !i.stale).length;
+    return { required, assigned };
+  }, [activeProjectId, rows, teamModalProject, projectDetail]);
+
+  // ── Single Authoritative Candidate Data Derivation ───────────────────────
+  // Resolves the 26 vs 28 discrepancy by strictly excluding employees
+  // already allocated to this project from the available candidate pool.
+  const candidateData = useMemo(() => {
+    if (!activeProjectId || !employees.length) {
+      return {
+        all: [],
+        available: [],
+        allocatedOther: [],
+        designations: [],
+        skills: [],
+      };
     }
-    const allocatedToCurrentProjectIds = new Set(
-      (projectDetail?.project_id === selectedProject.id ? projectDetail.items : [])
-        .filter((it) => !it.stale)
-        .map((it) => it.employee_id),
-    );
 
-    const requiredSkills = selectedProject.required_expertise || [];
-    const matching = employees
-      .filter((emp) => emp.status !== "archived")
-      .map((emp) => {
-        const empSkills = emp.skills || [];
-        const skillMatch =
-          requiredSkills.length === 0 ||
-          requiredSkills.some((skill) =>
-            empSkills.some((empSkill) => empSkill.toLowerCase().includes(skill.toLowerCase())),
-          );
-        const alreadyInProject = allocatedToCurrentProjectIds.has(emp.id);
-        const currentProjects = (employeeProjectsMap[String(emp.id)] || []).filter(
-          (p) => p.project_id !== selectedProject.id,
-        );
-        return { ...emp, skillMatch, alreadyInProject, currentProjects: currentProjects.length ? currentProjects : null };
-      })
-      .sort((a, b) => {
-        if (a.alreadyInProject !== b.alreadyInProject) return a.alreadyInProject ? 1 : -1;
-        return b.skillMatch - a.skillMatch;
-      });
-
-    return {
-      availableEmployees: matching.filter((e) => !e.currentProjects),
-      allocatedEmployeesOther: matching.filter((e) => e.currentProjects),
-    };
-  }, [selectedProject, employees, employeeProjectsMap, projectDetail]);
-
-  // ── Derive candidate lists for the Manage Allocations "Add Members" tab ──
-  const editModalEmployees = useMemo(() => {
-    if (!editingAllocation || !employees.length) {
-      return { available: [], allocatedOther: [], all: [] };
-    }
     const currentAllocatedEmpIds = new Set(
-      (projectDetail?.project_id === editingAllocation.projectId ? projectDetail.items : [])
+      (projectDetail?.project_id === activeProjectId ? projectDetail.items || [] : [])
         .filter((it) => !it.stale)
         .map((it) => it.employee_id)
     );
 
-    const requiredSkills = editingAllocation.required_expertise || [];
+    const designationSet = new Set();
+    const skillSet = new Set();
 
-    const list = employees
+    const candidates = employees
       .filter((emp) => emp.status !== "archived")
       .map((emp) => {
-        const empSkills = emp.skills || [];
-        const skillMatch =
-          requiredSkills.length === 0 ||
-          requiredSkills.some((skill) =>
-            empSkills.some((empSkill) => (empSkill || "").toLowerCase().includes((skill || "").toLowerCase()))
-          );
+        if (emp.designation && emp.designation.trim()) {
+          designationSet.add(emp.designation.trim());
+        }
+        (emp.skills || []).forEach((s) => {
+          if (s && s.trim()) skillSet.add(s.trim());
+        });
+
         const alreadyInThisProject = currentAllocatedEmpIds.has(emp.id);
         const otherProjects = (employeeProjectsMap[String(emp.id)] || []).filter(
-          (p) => p.project_id !== editingAllocation.projectId
+          (p) => p.project_id !== activeProjectId
         );
+
         return {
           ...emp,
-          skillMatch,
           alreadyInThisProject,
           otherProjects: otherProjects.length ? otherProjects : null,
         };
       })
       .filter((e) => !e.alreadyInThisProject)
-      .sort((a, b) => {
-        if (b.skillMatch !== a.skillMatch) return b.skillMatch - a.skillMatch;
-        return (a.name || "").localeCompare(b.name || "");
-      });
+      .sort((a, b) => (a.name || "").localeCompare(b.name || ""));
+
+    const available = candidates.filter((e) => !e.otherProjects);
+    const allocatedOther = candidates.filter((e) => e.otherProjects);
 
     return {
-      all: list,
-      available: list.filter((e) => !e.otherProjects),
-      allocatedOther: list.filter((e) => e.otherProjects),
+      all: candidates,
+      available,
+      allocatedOther,
+      designations: Array.from(designationSet).sort(),
+      skills: Array.from(skillSet).sort(),
     };
-  }, [editingAllocation, employees, employeeProjectsMap, projectDetail]);
+  }, [activeProjectId, employees, employeeProjectsMap, projectDetail]);
 
-  // Pre-select already allocated employees when project detail is loaded
-  useEffect(() => {
-    if (selectedProject && projectDetail?.project_id === selectedProject.id && employees.length) {
-      const liveItems = (projectDetail.items || []).filter((it) => !it.stale);
-      const initialSelected = liveItems
-        .map((it) => {
-          const emp = employees.find((e) => e.id === it.employee_id);
-          return emp ? { ...emp, allocation_id: it.allocation_id } : null;
-        })
-        .filter(Boolean);
-      setSelectedEmployees(initialSelected);
+  // ── Candidate Filtering by Designation, Skills, Tab, and Search ──────────
+  const filteredCandidates = useMemo(() => {
+    let list =
+      addFilterTab === "unallocated"
+        ? candidateData.available
+        : addFilterTab === "allocated"
+        ? candidateData.allocatedOther
+        : candidateData.all;
+
+    // Filter by designation
+    if (selectedDesignation && selectedDesignation !== "all") {
+      list = list.filter(
+        (emp) =>
+          (emp.designation || "").trim().toLowerCase() ===
+          selectedDesignation.trim().toLowerCase()
+      );
     }
-  }, [selectedProject, projectDetail, employees]);
 
-  // Required/assigned stats for the selected project — comes straight from
-  // its row in the current page when available, else from the lazy detail
-  // fetch (covers the case where the project isn't on the visible page,
-  // e.g. selected via the "Select Project" dropdown search).
-  const selectedProjectStats = useMemo(() => {
-    if (!selectedProject) return { required: 0, assigned: 0 };
-    const row = rows.find((r) => r.project_id === selectedProject.id);
-    if (row) return { required: row.required_manpower, assigned: row.assigned_manpower };
-    return {
-      required: projectDetail?.required_manpower || 0,
-      assigned: (projectDetail?.items || []).filter((i) => !i.stale).length,
-    };
-  }, [selectedProject, rows, projectDetail]);
+    // Filter by skill
+    if (selectedSkill && selectedSkill !== "all") {
+      list = list.filter((emp) =>
+        (emp.skills || []).some(
+          (s) => (s || "").trim().toLowerCase() === selectedSkill.trim().toLowerCase()
+        )
+      );
+    }
 
-  const handleSubmit = (e) => {
-    e.preventDefault();
+    // Search by text
+    const q = addSearch.trim().toLowerCase();
+    if (q) {
+      list = list.filter(
+        (emp) =>
+          (emp.name || "").toLowerCase().includes(q) ||
+          (emp.email || "").toLowerCase().includes(q) ||
+          (emp.designation || "").toLowerCase().includes(q) ||
+          (emp.skills || []).some((s) => (s || "").toLowerCase().includes(q))
+      );
+    }
 
-    const { required, assigned: currentAllocated } = selectedProjectStats;
-    const newTotal = selectedEmployees.length;
+    return list;
+  }, [candidateData, addFilterTab, selectedDesignation, selectedSkill, addSearch]);
 
-    if (newTotal > required) {
+  const designationOptions = useMemo(
+    () => [
+      { value: "all", label: "All designations" },
+      ...candidateData.designations.map((d) => ({ value: d, label: d })),
+    ],
+    [candidateData.designations]
+  );
+
+  const skillOptions = useMemo(
+    () => [
+      { value: "all", label: "All skills" },
+      ...candidateData.skills.map((s) => ({ value: s, label: s })),
+    ],
+    [candidateData.skills]
+  );
+
+  const handleAddPeopleSubmit = () => {
+    if (!activeProjectId || selectedAddIds.size === 0) return;
+
+    const { required, assigned } = teamModalStats;
+    const countToAdd = selectedAddIds.size;
+    const newTotal = assigned + countToAdd;
+
+    if (required > 0 && newTotal > required) {
       setConfirmState({
         variant: "warning",
         title: "Over-allocation detected",
         message: `This allocation will exceed the required manpower by ${newTotal - required}. Do you want to proceed anyway?`,
         details: [
           { label: "Required manpower", value: required },
-          { label: "Currently allocated", value: currentAllocated },
-          { label: "Selected count", value: selectedEmployees.length },
+          { label: "Currently allocated", value: assigned },
+          { label: "Selected count", value: countToAdd },
           { label: "Total will be", value: newTotal, highlight: true },
         ],
         confirmText: "Proceed anyway",
         onConfirm: () => {
           setConfirmState(null);
-          performAllocation();
+          executeBulkAdd();
         },
       });
       return;
     }
 
-    performAllocation();
+    executeBulkAdd();
   };
 
-  const performAllocation = () => {
-    if (!selectedProject) return;
-
-    const originalItems = (
-      projectDetail?.project_id === selectedProject?.id ? projectDetail.items : []
-    ).filter((it) => !it.stale);
-    const originalEmpIds = new Set(originalItems.map((it) => it.employee_id));
-    const selectedEmpIds = new Set(selectedEmployees.map((e) => e.id));
-
-    // 1. Single atomic bulk create for newly checked employees (1 request, NOT N requests)
-    const toCreate = selectedEmployees.filter((emp) => !originalEmpIds.has(emp.id));
-    if (toCreate.length > 0) {
-      bulkCreateMutation.mutate({
-        project_id: selectedProject.id,
-        employee_ids: toCreate.map((e) => e.id),
-        role_tags: isTeamLead ? [TEAM_LEAD_TAG] : [],
-        daily_hours: totalDailyHours || 8,
-      });
-    }
-
-    // 2. Single atomic bulk delete for unchecked previously allocated employees (1 request, NOT N requests)
-    const toDelete = originalItems.filter((it) => !selectedEmpIds.has(it.employee_id));
-    if (toDelete.length > 0) {
-      bulkDeleteMutation.mutate({
-        project_id: selectedProject.id,
-        allocation_ids: toDelete.map((it) => it.allocation_id),
-      });
-    }
-
-    closeCreateModal();
-  };
-
-  const handleEmployeeToggle = (employee) => {
-    setSelectedEmployees((prev) => {
-      const exists = prev.find((e) => e.id === employee.id);
-      if (exists) return prev.filter((e) => e.id !== employee.id);
-      return [...prev, employee];
-    });
-  };
-
-  const handleSelectAll = () => {
-    const displayEmployees =
-      filterTab === "unallocated"
-        ? availableEmployees
-        : [...availableEmployees, ...allocatedEmployeesOther];
-
-    if (selectedEmployees.length === displayEmployees.length) {
-      setSelectedEmployees([]);
-    } else {
-      setSelectedEmployees(displayEmployees);
-    }
+  const executeBulkAdd = () => {
+    bulkCreateMutation.mutate(
+      {
+        project_id: activeProjectId,
+        employee_ids: Array.from(selectedAddIds),
+        role_tags: addRoleTag ? [addRoleTag] : [],
+        daily_hours: Number(addDailyHours) || 8.0,
+      },
+      {
+        onSuccess: () => {
+          setSelectedAddIds(new Set());
+          setTeamModalTab("current");
+        },
+      }
+    );
   };
 
   return (
@@ -663,11 +756,7 @@ const AllocationsPage = () => {
         {projectView === "active" && (
           <button
             type="button"
-            onClick={() => {
-              setSelectedProject(null);
-              setSelectedEmployees([]);
-              setIsModalOpen(true);
-            }}
+            onClick={() => openTeamModal(null, "add")}
             className="inline-flex items-center gap-1.5 h-9 px-3.5 rounded-lg bg-indigo-600 text-white text-[13px] font-semibold hover:bg-indigo-700 shadow-sm transition-colors shrink-0"
           >
             <Plus className="w-4 h-4" />
@@ -734,10 +823,7 @@ const AllocationsPage = () => {
                   )}
                 </div>
                 <button
-                  onClick={() => {
-                    setSelectedProject({ id: row.project_id, name: row.project_name });
-                    setIsModalOpen(true);
-                  }}
+                  onClick={() => openTeamModal(row, "add")}
                   className="w-8 h-8 rounded-full border border-dashed border-slate-300 text-slate-400 hover:text-indigo-600 hover:border-indigo-500 hover:bg-indigo-50/50 flex items-center justify-center transition-all shrink-0"
                   title="Add employees"
                 >
@@ -814,10 +900,7 @@ const AllocationsPage = () => {
                         </span>
                       </div>
                     }
-                    onOpenAllocations={() => {
-                      setSelectedProject({ id: row.project_id, name: row.project_name });
-                      setIsModalOpen(true);
-                    }}
+                    onOpenAllocations={() => openTeamModal(row, "current")}
                   />
                   {row.on_leave_count > 0 && (
                     <span
@@ -858,7 +941,7 @@ const AllocationsPage = () => {
             width: "w-[8%]",
             render: (_, row) => (
               <button
-                onClick={() => openManageModal(row)}
+                onClick={() => openTeamModal(row, "current")}
                 className="p-2 text-slate-500 hover:text-indigo-600 hover:bg-indigo-50 rounded-lg transition-colors"
                 title="Manage Allocations"
               >
@@ -890,735 +973,293 @@ const AllocationsPage = () => {
         }}
       />
 
-      {/* Create Allocation Modal */}
-      <Modal isOpen={isModalOpen} onClose={closeCreateModal} size="3xl" maxHeight="95vh">
-        <Modal.Header onClose={closeCreateModal} className="!py-4">
-          <h2 className="text-base font-semibold text-slate-900">Create Allocation</h2>
+      {/* ── Unified Team Management Modal ── */}
+      <Modal
+        isOpen={isTeamModalOpen}
+        onClose={closeTeamModal}
+        size="3xl"
+        maxHeight="92vh"
+        className="h-[min(86vh,720px)]"
+      >
+        <Modal.Header onClose={closeTeamModal} className="!px-4 !py-3">
+          <div className="flex items-center gap-3 pr-2">
+            <span className="flex h-9 w-9 shrink-0 items-center justify-center rounded-lg bg-slate-100 text-slate-600">
+              <Users className="h-4 w-4" strokeWidth={1.5} />
+            </span>
+            <div className="min-w-0">
+              <div className="flex items-center gap-2">
+                <h2 className="text-[15px] font-medium text-slate-900">
+                  {teamModalProject ? "Manage Team" : "Create Allocation"}
+                </h2>
+                {teamModalProject?.project_type && (
+                  <span className="inline-flex items-center rounded-md border border-slate-200/80 bg-slate-50 px-2 py-0.5 text-[12px] font-normal text-slate-600">
+                    {teamModalProject.project_type}
+                  </span>
+                )}
+              </div>
+              <p className="truncate text-[12px] text-slate-500">
+                {teamModalProject ? (
+                  <span className="font-medium text-slate-700">{teamModalProject.name}</span>
+                ) : (
+                  "Choose a project to manage staffing and allocations"
+                )}
+              </p>
+            </div>
+          </div>
         </Modal.Header>
 
-        <form onSubmit={handleSubmit} className="flex-1 flex flex-col min-h-0">
-          <Modal.Body className="space-y-3.5 !pt-3">
-            <div className="flex flex-wrap items-end gap-x-4 gap-y-2">
-              <div className="flex-1 min-w-[240px]">
-                <label className="block text-[13px] font-medium text-slate-700 mb-1">
-                  Select Project <span className="text-red-500">*</span>
-                </label>
-                <Dropdown
-                  options={selectableProjects.map((project) => {
-                    const row = rows.find((r) => r.project_id === project.id);
-                    const req = row ? row.required_manpower : project.required_manpower || 0;
-                    return { value: project.id.toString(), label: `${project.name} - Required: ${req}` };
-                  })}
-                  value={selectedProject?.id?.toString() || ""}
-                  onChange={(val) => {
-                    const project = selectableProjects.find((p) => p.id === parseInt(val));
-                    setSelectedProject(project);
-                    setSelectedEmployees([]);
-                  }}
-                  placeholder="Choose a project..."
+        {/* Project Selector (when no project is chosen, or user chooses to switch project) */}
+        {(!teamModalProject || isSwitchingProject) && (
+          <div className="border-b border-slate-100 bg-slate-50/70 px-4 py-3">
+            <div className="mb-2 flex items-center justify-between">
+              <label className="text-[13px] font-medium text-slate-700">
+                Select Project <span className="text-rose-500">*</span>
+              </label>
+              {teamModalProject && isSwitchingProject && (
+                <button
+                  type="button"
+                  onClick={() => setIsSwitchingProject(false)}
+                  className="text-[12px] text-slate-500 hover:text-slate-900 transition-colors"
+                >
+                  Cancel
+                </button>
+              )}
+            </div>
+            <Dropdown
+              searchable
+              searchPlaceholder="Search projects"
+              options={selectableProjects.map((p) => {
+                const row = rows.find((r) => r.project_id === p.id);
+                const req = row ? row.required_manpower : p.required_manpower || 0;
+                const ass = row ? row.assigned_manpower : 0;
+                return {
+                  value: p.id.toString(),
+                  label: `${p.name} · ${ass}/${req} allocated`,
+                };
+              })}
+              value={teamModalProject?.id?.toString() || ""}
+              onChange={(val) => {
+                const p = selectableProjects.find((x) => x.id === parseInt(val));
+                if (p) {
+                  setTeamModalProject({
+                    id: p.id,
+                    name: p.name,
+                    project_type: p.project_type,
+                    required_manpower: p.required_manpower || 0,
+                    required_expertise: p.required_expertise || [],
+                  });
+                  setIsSwitchingProject(false);
+                  setSelectedAddIds(new Set());
+                  setSelectedRemovalIds(new Set());
+                }
+              }}
+              placeholder="Choose a project"
+            />
+          </div>
+        )}
+
+        {/* View Tabs + Staffing Summary Bar */}
+        {teamModalProject && (
+          <div className="flex flex-wrap items-center justify-between gap-3 border-b border-slate-100 px-4 py-3">
+            <SegmentFilter
+              value={teamModalTab}
+              onChange={setTeamModalTab}
+              options={[
+                {
+                  key: "current",
+                  label: "Current team",
+                  icon: Users,
+                  count: teamModalStats.assigned,
+                },
+                {
+                  key: "add",
+                  label: "Add people",
+                  icon: UserPlus,
+                  count: candidateData.available.length,
+                },
+              ]}
+            />
+            <div className="flex flex-wrap items-center gap-4">
+              {teamModalStats.required > 0 && (
+                <StaffingMeter
+                  required={teamModalStats.required}
+                  filled={teamModalStats.assigned}
+                  adding={teamModalTab === "add" ? selectedAddIds.size : 0}
                 />
-              </div>
-              {selectedProject &&
-                (() => {
-                  const { required, assigned: filled } = selectedProjectStats;
-                  const skills = selectedProject.required_expertise || [];
-                  return (
-                    <div className="flex items-center gap-3 flex-wrap pb-0.5">
-                      <div className="flex items-center gap-1.5">
-                        <span className="text-[11px] font-medium text-slate-400 uppercase tracking-wide">
-                          Required
-                        </span>
-                        <span className="text-[13px] font-bold text-blue-700">{required}</span>
-                      </div>
-                      <div className="flex items-center gap-1.5">
-                        <span className="text-[11px] font-medium text-slate-400 uppercase tracking-wide">
-                          Allocated
-                        </span>
-                        <span
-                          className={`text-[13px] font-bold ${filled >= required ? "text-emerald-600" : "text-amber-600"}`}
-                        >
-                          {filled}/{required}
-                        </span>
-                      </div>
-                      {skills.length > 0 && (
-                        <div className="flex items-center gap-1.5 min-w-0">
-                          <span className="text-[11px] font-medium text-slate-400 uppercase tracking-wide shrink-0">
-                            Skills
-                          </span>
-                          <div className="flex flex-wrap gap-1">
-                            {skills.slice(0, 3).map((skill, idx) => (
-                              <span
-                                key={idx}
-                                className="px-1.5 py-0.5 text-[11px] font-medium bg-slate-100 text-slate-600 rounded"
-                              >
-                                {skill}
-                              </span>
-                            ))}
-                            {skills.length > 3 && (
-                              <span className="text-[11px] text-slate-400">+{skills.length - 3}</span>
-                            )}
-                          </div>
-                        </div>
-                      )}
-                    </div>
-                  );
-                })()}
-            </div>
-
-            {selectedProject && (
-              <>
-                {/* On this project — uses the lazily-fetched project detail */}
-                {(() => {
-                  const rawItems = projectDetail?.project_id === selectedProject.id ? projectDetail.items : [];
-                  const items = [...rawItems].sort((a, b) =>
-                    (formatDisplayName(a.name) || "").localeCompare(formatDisplayName(b.name) || "")
-                  );
-                  const liveEmps = items.filter((x) => !x.stale);
-                  const staleEmps = items.filter((x) => x.stale);
-                  const distinctCount = new Set(liveEmps.map((x) => x.employee_id)).size;
-
-                  return (
-                    <div className="bg-blue-50/60 border border-blue-100 rounded-lg p-3">
-                      <div className="flex items-center justify-between mb-2">
-                        <span className="text-[11px] font-semibold text-blue-900/80 uppercase tracking-wide">
-                          On this project
-                        </span>
-                        <span className="flex items-center gap-2">
-                          {staleEmps.length > 0 && (
-                            <span
-                              className="inline-flex items-center gap-1 rounded-full bg-rose-100 px-1.5 py-0.5 text-[10px] font-bold text-rose-700"
-                              title="Allocations left behind by people no longer on the roster — not counted, remove them"
-                            >
-                              <UserX className="w-3 h-3" />
-                              {staleEmps.length} archived
-                            </span>
-                          )}
-                          <span className="text-[11px] text-blue-900/60">
-                            {distinctCount} employee{distinctCount === 1 ? "" : "s"}
-                          </span>
-                        </span>
-                      </div>
-                      {items.length === 0 ? (
-                        <p className="text-xs text-slate-500 italic">No one allocated yet</p>
-                      ) : (
-                        <div className="flex flex-wrap gap-1.5">
-                          {(showAllAllocated ? items : [...liveEmps.slice(0, 3), ...staleEmps]).map((it) => {
-                            const name = formatDisplayName(it.name);
-                            const initials =
-                              (name || "").trim().split(/\s+/).map((p) => p.charAt(0).toUpperCase()).slice(0, 2).join("") || "?";
-                            const isRemoving =
-                              deleteMutation.isPending && deleteMutation.variables === it.allocation_id;
-                            return (
-                              <div
-                                key={it.allocation_id}
-                                title={
-                                  it.stale
-                                    ? `${it.name} — archived, not counted towards manpower`
-                                    : `${it.name}${it.total_daily_hours ? ` · ${it.total_daily_hours}h/day` : ""}`
-                                }
-                                className={`group inline-flex items-center gap-1.5 pl-1 pr-1 py-0.5 rounded-full shadow-sm transition-opacity ${it.stale ? "border border-rose-300 bg-rose-50" : "border border-slate-200 bg-white"
-                                  } ${isRemoving ? "opacity-50" : ""}`}
-                              >
-                                <span
-                                  className={`w-5 h-5 rounded-full text-[10px] font-semibold flex items-center justify-center ${it.stale ? "bg-rose-200 text-rose-700" : "bg-indigo-500 text-white"
-                                    }`}
-                                >
-                                  {it.stale ? <UserX className="w-3 h-3" /> : initials}
-                                </span>
-                                <span
-                                  className={`text-xs max-w-[120px] truncate ${it.stale ? "font-medium text-rose-700" : "text-slate-700"}`}
-                                >
-                                  {name}
-                                </span>
-                                {it.stale && (
-                                  <span className="text-[9px] font-bold uppercase tracking-wide text-rose-500">
-                                    archived
-                                  </span>
-                                )}
-                                <button
-                                  type="button"
-                                  disabled={isRemoving}
-                                  onClick={(e) => {
-                                    e.preventDefault();
-                                    e.stopPropagation();
-                                    const isTrainingProject = (selectedProject?.project_type || "").toLowerCase() === "training"
-                                      || (selectedProject?.name || "").toLowerCase().includes("week 1 training")
-                                      || (it.role_tags || []).includes("Trainee");
-                                    setConfirmState({
-                                      variant: "danger",
-                                      title: it.stale
-                                        ? "Remove stale allocation"
-                                        : isTrainingProject
-                                        ? "Cancel Training & Remove Trainee"
-                                        : "Remove team member",
-                                      message: it.stale
-                                        ? `${name} is no longer on the roster. Remove their leftover allocation from "${selectedProject.name}"?`
-                                        : isTrainingProject
-                                        ? `⚠️ Warning: ${name} is currently in the 5-Day Onboarding Training pipeline. Removing them from this project will cancel their active onboarding pipeline and return them to the Unassigned / Idle pool. Are you sure you want to remove them?`
-                                        : `Remove ${name} from "${selectedProject.name}"?`,
-                                      confirmText: isTrainingProject ? "Yes, Cancel & Remove" : "Remove",
-                                      onConfirm: () => {
-                                        deleteMutation.mutate(it.allocation_id);
-                                        setConfirmState(null);
-                                      },
-                                    });
-                                  }}
-                                  className={`ml-0.5 w-4 h-4 rounded-full flex items-center justify-center transition-colors disabled:cursor-not-allowed ${it.stale
-                                      ? "text-rose-500 hover:text-white hover:bg-rose-500"
-                                      : "text-slate-400 hover:text-white hover:bg-rose-500"
-                                    }`}
-                                  title={`Remove ${name}`}
-                                >
-                                  <X className="w-3 h-3" />
-                                </button>
-                              </div>
-                            );
-                          })}
-                          {liveEmps.length > 3 && (
-                            <button
-                              type="button"
-                              onClick={() => setShowAllAllocated((v) => !v)}
-                              className="inline-flex items-center px-2.5 py-1 rounded-full border border-blue-200 bg-white text-[11px] font-semibold text-blue-600 hover:bg-blue-50 transition-colors shrink-0"
-                            >
-                              {showAllAllocated ? "Show less" : "click here to see more"}
-                            </button>
-                          )}
-                        </div>
-                      )}
-                    </div>
-                  );
-                })()}
-
-                {/* Employee Selection */}
-                <div>
-                  <div className="flex items-center justify-between mb-2.5">
-                    <label className="block text-[13px] font-medium text-slate-700">
-                      Allocate Employees <span className="text-red-500">*</span>
-                    </label>
-                    <button
-                      type="button"
-                      onClick={handleSelectAll}
-                      className="flex items-center gap-1 text-[13px] font-medium text-blue-600 hover:text-blue-800"
-                    >
-                      <CheckSquare className="w-3.5 h-3.5" />
-                      {selectedEmployees.length ===
-                        (filterTab === "unallocated"
-                          ? availableEmployees
-                          : [...availableEmployees, ...allocatedEmployeesOther]
-                        ).length
-                        ? "Deselect All"
-                        : "Select All"}
-                    </button>
-                  </div>
-
-                  <div className="flex items-center gap-2 mb-2.5">
-                    <div className="inline-flex items-center rounded-lg border border-slate-200 bg-slate-50 p-0.5 shrink-0">
-                      {[
-                        { key: "all", label: `All (${availableEmployees.length + allocatedEmployeesOther.length})` },
-                        { key: "unallocated", label: `Available (${availableEmployees.length})` },
-                      ].map((t) => (
-                        <button
-                          key={t.key}
-                          type="button"
-                          onClick={() => setFilterTab(t.key)}
-                          className={`px-3 py-1.5 text-[13px] font-semibold rounded-md transition-all whitespace-nowrap ${filterTab === t.key
-                              ? "bg-white text-slate-900 shadow-sm ring-1 ring-slate-200/70"
-                              : "text-slate-500 hover:text-slate-800"
-                            }`}
-                        >
-                          {t.label}
-                        </button>
-                      ))}
-                    </div>
-                    <div className="relative flex-1 min-w-0">
-                      <Search className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-slate-400 pointer-events-none" />
-                      <input
-                        type="text"
-                        value={employeeSearch}
-                        onChange={(e) => setEmployeeSearch(e.target.value)}
-                        placeholder="Search employees by name or email..."
-                        className="h-9 w-full pl-9 pr-3 rounded-lg border-2 border-slate-300 bg-white text-[13px] text-slate-700 placeholder:text-slate-400 focus:outline-none focus:ring-2 focus:ring-indigo-100 focus:border-indigo-400 transition-all"
-                      />
-                    </div>
-                    <button
-                      type="button"
-                      title="Filters (coming soon)"
-                      className="h-9 w-9 shrink-0 inline-flex items-center justify-center rounded-lg border border-slate-200 bg-white text-slate-500 hover:bg-slate-50 transition-colors"
-                    >
-                      <Filter className="w-4 h-4" />
-                    </button>
-                  </div>
-
-                  {(() => {
-                    const allTabEmployees =
-                      filterTab === "unallocated" ? availableEmployees : [...availableEmployees, ...allocatedEmployeesOther];
-                    const q = employeeSearch.trim().toLowerCase();
-                    const displayEmployees = q
-                      ? allTabEmployees.filter(
-                        (emp) => emp.name.toLowerCase().includes(q) || (emp.email || "").toLowerCase().includes(q),
-                      )
-                      : allTabEmployees;
-
-                    if (displayEmployees.length === 0) {
-                      return (
-                        <div className="border border-gray-200 rounded-md p-8 text-center">
-                          <p className="text-gray-500">
-                            {filterTab === "unallocated"
-                              ? "No unallocated employees with matching skills"
-                              : "No employees available with matching skills"}
-                          </p>
-                        </div>
-                      );
-                    }
-
-                    return (
-                      <div className="border border-slate-200 rounded-lg max-h-72 overflow-y-auto divide-y divide-slate-100">
-                        {displayEmployees.map((employee) => {
-                          const isSelected = !!selectedEmployees.find((e) => e.id === employee.id);
-                          return (
-                            <div
-                              key={employee.id}
-                              onClick={() => handleEmployeeToggle(employee)}
-                              className={`px-3 py-2.5 cursor-pointer hover:bg-slate-50 ${isSelected ? "bg-blue-50/70" : ""}`}
-                            >
-                              <div className="flex items-center gap-2.5 min-w-0">
-                                <input
-                                  type="checkbox"
-                                  checked={isSelected}
-                                  onChange={() => { }}
-                                  className="rounded border-slate-300 text-blue-600 focus:ring-blue-500 shrink-0"
-                                />
-                                <DynamicTooltip
-                                  text={formatDisplayName(employee.name)}
-                                  tooltip={employee.name}
-                                  placement="top"
-                                  className="text-[13px] font-semibold text-slate-900 shrink-0"
-                                />
-                                {employee.skillMatch && (
-                                  <span className="px-1.5 py-0.5 text-[10px] bg-green-100 text-green-700 rounded-full font-semibold shrink-0">
-                                    Skill Match
-                                  </span>
-                                )}
-                                {employee.alreadyInProject && (
-                                  <span className="px-1.5 py-0.5 text-[10px] bg-blue-100 text-blue-700 rounded-full font-semibold shrink-0">
-                                    In This Project
-                                  </span>
-                                )}
-                                {employee.currentProjects && !employee.alreadyInProject && (
-                                  <DynamicTooltip
-                                    text={employee.currentProjects.map((p) => p.project_name).join(", ")}
-                                    tooltip={
-                                      <div className="space-y-1 py-0.5 text-left">
-                                        <div className="text-[10px] font-bold uppercase tracking-wider text-orange-600">
-                                          Current Projects ({employee.currentProjects.length})
-                                        </div>
-                                        <div className="space-y-0.5 text-xs text-slate-600">
-                                          {employee.currentProjects.map((p, idx) => (
-                                            <div key={idx} className="flex items-center gap-1.5 whitespace-nowrap">
-                                              <span className="h-1.5 w-1.5 rounded-full bg-orange-400" />
-                                              <span>{p.project_name}</span>
-                                            </div>
-                                          ))}
-                                        </div>
-                                      </div>
-                                    }
-                                    placement="top"
-                                    className="px-1.5 py-0.5 text-[10px] bg-orange-100 text-orange-700 rounded-full font-semibold max-w-[160px] shrink-0"
-                                  />
-                                )}
-                                <div className="ml-auto flex items-center gap-1.5 shrink-0">
-                                  {employee.skills?.slice(0, 3).map((skill, idx) => (
-                                    <span key={idx} className="px-1.5 py-0.5 text-[10px] bg-slate-100 text-slate-600 rounded">
-                                      {skill}
-                                    </span>
-                                  ))}
-                                  {employee.skills?.length > 3 && (
-                                    <span className="text-[10px] text-slate-400">+{employee.skills.length - 3}</span>
-                                  )}
-                                  {isSelected && (
-                                    <svg className="w-5 h-5 text-blue-600" fill="currentColor" viewBox="0 0 20 20">
-                                      <path
-                                        fillRule="evenodd"
-                                        d="M10 18a8 8 0 100-16 8 8 0 000 16zm3.707-9.293a1 1 0 00-1.414-1.414L9 10.586 7.707 9.293a1 1 0 00-1.414 1.414l2 2a1 1 0 001.414 0l4-4z"
-                                        clipRule="evenodd"
-                                      />
-                                    </svg>
-                                  )}
-                                </div>
-                              </div>
-                            </div>
-                          );
-                        })}
-                      </div>
-                    );
-                  })()}
-
-                  {selectedEmployees.length > 0 && (
-                    <div className="mt-2 p-3 bg-green-50 border border-green-200 rounded-md">
-                      <p className="text-sm text-green-800">
-                        <strong>{selectedEmployees.length}</strong> employee
-                        {selectedEmployees.length !== 1 ? "s" : ""} selected
-                      </p>
-                    </div>
-                  )}
-                </div>
-
-                {/* Allocation Settings */}
-                {selectedEmployees.length > 0 && (
-                  <div className="border border-slate-200 rounded-lg p-4 bg-slate-50 space-y-4">
-                    <div>
-                      <label className="block text-sm font-medium text-slate-700 mb-1">Total Daily Hours</label>
-                      <Dropdown
-                        options={["", ...["4 hours", "6 hours", "8 hours", "10 hours", "12 hours"]].map((h, i) =>
-                          h ? { value: (4 + i * 2).toString(), label: h } : { value: "", label: "Not specified" },
-                        )}
-                        value={totalDailyHours.toString()}
-                        onChange={(val) => {
-                          setTotalDailyHours(val === "" ? "" : parseInt(val));
-                        }}
-                        placeholder="Not specified"
-                      />
-                    </div>
-
-                    <div>
-                      <label className="flex items-start gap-2 cursor-pointer">
-                        <input
-                          type="checkbox"
-                          checked={isTeamLead}
-                          onChange={(e) => setIsTeamLead(e.target.checked)}
-                          className="mt-0.5 rounded border-slate-300 text-indigo-600 focus:ring-indigo-500"
-                        />
-                        <span className="text-sm text-slate-700 font-medium">
-                          Team lead on this project
-                          <span className="block text-xs font-normal text-slate-500">
-                            Applies to this project only. Leads manage it like its PM; their own requests go to
-                            the PM or an admin.
-                          </span>
-                        </span>
-                      </label>
-                    </div>
-                  </div>
-                )}
-              </>
-            )}
-          </Modal.Body>
-          <Modal.Footer>
-            <Button type="button" variant="cancel" size="sm" onClick={closeCreateModal}>
-              Cancel
-            </Button>
-            <Button
-              type="submit"
-              size="sm"
-              disabled={!selectedProject || selectedEmployees.length === 0 || bulkCreateMutation.isPending || bulkDeleteMutation.isPending}
-              isLoading={bulkCreateMutation.isPending || bulkDeleteMutation.isPending}
-            >
-              {!(bulkCreateMutation.isPending || bulkDeleteMutation.isPending) &&
-                `Allocate ${selectedEmployees.length} Employee${selectedEmployees.length !== 1 ? "s" : ""}`}
-            </Button>
-          </Modal.Footer>
-        </form>
-      </Modal>
-
-      {/* Redesigned Manage Allocations Modal — Two Tabs: Current Team & Add Members */}
-      {editingAllocation && (
-        <Modal isOpen onClose={closeManageModal} size="3xl" maxHeight="95vh">
-          <Modal.Header onClose={closeManageModal} className="!py-3.5 border-b border-slate-200">
-            <div className="flex flex-col gap-2 w-full pr-6">
-              <div className="flex items-center justify-between">
-                <h2 className="text-base font-semibold text-slate-900 flex items-center gap-2">
-                  <span>Manage Allocations</span>
-                  <span className="text-slate-400 font-normal">·</span>
-                  <span className="text-indigo-600">{editingAllocation.projectName}</span>
-                </h2>
-                {editingAllocation.required_manpower > 0 && (
-                  <span className="text-xs font-medium px-2.5 py-0.5 rounded-full bg-slate-100 text-slate-600 border border-slate-200">
-                    Required: {editingAllocation.required_manpower}
-                  </span>
-                )}
-              </div>
-
-              {/* Two Tab Navigation */}
-              <div className="flex items-center gap-2 pt-1">
+              )}
+              {selectableProjects.length > 1 && !isSwitchingProject && (
                 <button
                   type="button"
-                  onClick={() => setManageTab("current")}
-                  className={`flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-xs font-semibold transition-all ${
-                    manageTab === "current"
-                      ? "bg-indigo-50 text-indigo-700 border border-indigo-200 shadow-sm"
-                      : "text-slate-600 hover:text-slate-900 hover:bg-slate-100"
-                  }`}
+                  onClick={() => setIsSwitchingProject(true)}
+                  className="text-[13px] font-medium text-slate-500 hover:text-indigo-600 focus:outline-none focus-visible:ring-2 focus-visible:ring-indigo-500/30 rounded px-1 -mx-1 transition-colors"
                 >
-                  <Users className="w-3.5 h-3.5" />
-                  <span>Current Team</span>
-                  <span className="ml-1 px-1.5 py-0.2 rounded-full text-[10px] bg-indigo-200/70 text-indigo-900">
-                    {projectDetail?.project_id === editingAllocation.projectId
-                      ? (projectDetail.items || []).filter((it) => !it.stale).length
-                      : 0}
-                  </span>
+                  Switch project
                 </button>
-
-                <button
-                  type="button"
-                  onClick={() => setManageTab("add")}
-                  className={`flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-xs font-semibold transition-all ${
-                    manageTab === "add"
-                      ? "bg-indigo-50 text-indigo-700 border border-indigo-200 shadow-sm"
-                      : "text-slate-600 hover:text-slate-900 hover:bg-slate-100"
-                  }`}
-                >
-                  <UserPlus className="w-3.5 h-3.5" />
-                  <span>Add Members</span>
-                  <span className="ml-1 px-1.5 py-0.2 rounded-full text-[10px] bg-slate-200 text-slate-700">
-                    {editModalEmployees.all.length}
-                  </span>
-                </button>
-              </div>
+              )}
             </div>
-          </Modal.Header>
+          </div>
+        )}
 
-          <Modal.Body className="space-y-3.5 !pt-3 !pb-4">
-            {isDetailLoading ? (
-              <div className="flex flex-col items-center justify-center py-16 text-slate-400">
-                <div className="w-8 h-8 border-2 border-indigo-600 border-t-transparent rounded-full animate-spin mb-3" />
-                <p className="text-xs font-medium text-slate-500">Loading project allocations...</p>
+        <Modal.Body className="flex min-h-0 flex-col !overflow-hidden !p-4">
+          {!teamModalProject ? (
+            <div className="flex flex-col items-center justify-center py-12 text-center">
+              <div className="mb-3 flex h-12 w-12 items-center justify-center rounded-full bg-slate-100 text-slate-400">
+                <Users className="h-6 w-6" strokeWidth={1.5} />
               </div>
-            ) : manageTab === "current" ? (
-              /* ================= TAB 1: CURRENT TEAM ================= */
-              <div className="space-y-3">
-                {/* Search Bar & Multi-Select Action Bar */}
-                <div className="flex flex-col sm:flex-row items-stretch sm:items-center justify-between gap-2">
-                  <div className="relative flex-1">
-                    <Search className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-slate-400 pointer-events-none" />
+              <h3 className="text-sm font-semibold text-slate-900">No project selected</h3>
+              <p className="mt-1 max-w-sm text-[13px] text-slate-500">
+                Please select a project from the dropdown above to view its team and allocate members.
+              </p>
+            </div>
+          ) : isDetailLoading ? (
+            <div className="flex flex-col items-center justify-center py-16">
+              <div className="mb-3 h-6 w-6 animate-spin rounded-full border-2 border-indigo-600 border-t-transparent" />
+              <p className="text-[13px] text-slate-500">Loading project team...</p>
+            </div>
+          ) : teamModalTab === "current" ? (
+            /* ── Current Team View ── */
+            (() => {
+              const detailReady = projectDetail?.project_id === activeProjectId;
+              const teamItems = detailReady ? projectDetail.items || [] : [];
+              const staleItems = teamItems.filter((it) => it.stale);
+
+              const q = manageSearch.trim().toLowerCase();
+              const filteredItems = q
+                ? teamItems.filter(
+                    (it) =>
+                      (it.name || "").toLowerCase().includes(q) ||
+                      (it.email || "").toLowerCase().includes(q) ||
+                      (it.designation || "").toLowerCase().includes(q)
+                  )
+                : teamItems;
+
+              const allSelected =
+                filteredItems.length > 0 &&
+                filteredItems.every((it) => selectedRemovalIds.has(it.allocation_id));
+              const someSelected = filteredItems.some((it) =>
+                selectedRemovalIds.has(it.allocation_id)
+              );
+
+              const toggleAll = () =>
+                setSelectedRemovalIds((prev) => {
+                  const next = new Set(prev);
+                  if (allSelected) filteredItems.forEach((it) => next.delete(it.allocation_id));
+                  else filteredItems.forEach((it) => next.add(it.allocation_id));
+                  return next;
+                });
+
+              return (
+                <div className="flex min-h-0 flex-1 flex-col gap-3">
+                  <div className="relative">
+                    <Search
+                      className="pointer-events-none absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-slate-400"
+                      strokeWidth={1.5}
+                    />
                     <input
                       type="text"
                       value={manageSearch}
                       onChange={(e) => setManageSearch(e.target.value)}
-                      placeholder="Search allocated team members..."
-                      className="h-9 w-full pl-9 pr-3 rounded-lg border-2 border-slate-300 bg-white text-[13px] text-slate-700 placeholder:text-slate-400 focus:outline-none focus:ring-2 focus:ring-indigo-100 focus:border-indigo-400 transition-all"
+                      placeholder="Search team members"
+                      className={AL.search}
                     />
                   </div>
 
-                  {(() => {
-                    const allItems = projectDetail?.project_id === editingAllocation.projectId ? projectDetail.items : [];
-                    const q = manageSearch.trim().toLowerCase();
-                    const filtered = q
-                      ? allItems.filter(
-                          (it) =>
-                            (it.name || "").toLowerCase().includes(q) ||
-                            (it.email || "").toLowerCase().includes(q)
-                        )
-                      : allItems;
-
-                    const allSelected = filtered.length > 0 && filtered.every((it) => selectedRemovalIds.has(it.allocation_id));
-
-                    return (
-                      <div className="flex items-center gap-2 shrink-0">
-                        {filtered.length > 0 && (
-                          <button
-                            type="button"
-                            onClick={() => {
-                              setSelectedRemovalIds((prev) => {
-                                const next = new Set(prev);
-                                if (allSelected) {
-                                  filtered.forEach((it) => next.delete(it.allocation_id));
-                                } else {
-                                  filtered.forEach((it) => next.add(it.allocation_id));
-                                }
-                                return next;
-                              });
-                            }}
-                            className="flex items-center gap-1.5 px-2.5 py-1.5 rounded-lg border border-slate-200 bg-slate-50 hover:bg-slate-100 text-xs font-medium text-slate-700 transition-colors"
-                          >
-                            <CheckSquare className="w-3.5 h-3.5 text-indigo-600" />
-                            <span>{allSelected ? "Deselect All" : "Select All"}</span>
-                          </button>
-                        )}
-
-                        {selectedRemovalIds.size > 0 && (
-                          <button
-                            type="button"
-                            disabled={bulkDeleteMutation.isPending}
-                            onClick={() => {
-                              setConfirmState({
-                                variant: "danger",
-                                title: `Remove ${selectedRemovalIds.size} team member(s)`,
-                                message: `Are you sure you want to remove the ${selectedRemovalIds.size} selected employee(s) from "${editingAllocation.projectName}"?`,
-                                confirmText: `Yes, Remove (${selectedRemovalIds.size})`,
-                                onConfirm: () => {
-                                  bulkDeleteMutation.mutate(
-                                    {
-                                      project_id: editingAllocation.projectId,
-                                      allocation_ids: Array.from(selectedRemovalIds),
-                                    },
-                                    {
-                                      onSuccess: () => {
-                                        setSelectedRemovalIds(new Set());
-                                        setConfirmState(null);
-                                      },
-                                    }
-                                  );
+                  {staleItems.length > 0 && (
+                    <div className="flex items-center justify-between rounded-lg border border-rose-200 bg-rose-50/50 px-4 py-3">
+                      <div className="flex items-center gap-2 text-[12px] text-rose-700">
+                        <AlertTriangle className="h-4 w-4 text-rose-600 shrink-0" strokeWidth={1.5} />
+                        <span>
+                          <span className="font-medium tabular-nums">{staleItems.length}</span> archived team member(s) left on this project
+                        </span>
+                      </div>
+                      <button
+                        type="button"
+                        onClick={() => {
+                          setConfirmState({
+                            variant: "danger",
+                            title: "Clean up archived allocations",
+                            message: `Remove all ${staleItems.length} leftover allocations from former staff on "${teamModalProject.name}"?`,
+                            confirmText: "Clean up all",
+                            onConfirm: () => {
+                              bulkDeleteMutation.mutate(
+                                {
+                                  project_id: activeProjectId,
+                                  allocation_ids: staleItems.map((x) => x.allocation_id),
                                 },
-                              });
-                            }}
-                            className="flex items-center gap-1.5 px-3 py-1.5 rounded-lg bg-rose-600 hover:bg-rose-700 text-white text-xs font-semibold shadow-sm transition-colors"
-                          >
-                            <Trash2 className="w-3.5 h-3.5" />
-                            <span>Remove Selected ({selectedRemovalIds.size})</span>
-                          </button>
-                        )}
-                      </div>
-                    );
-                  })()}
-                </div>
+                                {
+                                  onSuccess: () => setConfirmState(null),
+                                }
+                              );
+                            },
+                          });
+                        }}
+                        className="text-[12px] font-medium text-rose-700 hover:text-rose-900 underline"
+                      >
+                        Clean up
+                      </button>
+                    </div>
+                  )}
 
-                {/* Team Members List */}
-                {(() => {
-                  const allItems = projectDetail?.project_id === editingAllocation.projectId ? projectDetail.items : [];
-                  const q = manageSearch.trim().toLowerCase();
-                  const filteredItems = q
-                    ? allItems.filter(
-                        (it) =>
-                          (it.name || "").toLowerCase().includes(q) ||
-                          (it.email || "").toLowerCase().includes(q)
-                      )
-                    : allItems;
-
-                  if (filteredItems.length === 0) {
-                    return (
-                      <div className="border border-slate-200 rounded-lg p-8 text-center bg-slate-50/50">
-                        <Users className="w-8 h-8 text-slate-300 mx-auto mb-2" />
-                        <p className="text-xs font-medium text-slate-600">
-                          {q ? "No team members match your search." : "No team members currently allocated to this project."}
-                        </p>
-                        <button
+                  {filteredItems.length === 0 ? (
+                    <div className="rounded-lg border border-slate-200 px-6 py-10 text-center">
+                      <p className="text-[14px] text-slate-700">
+                        {q
+                          ? "No team member matches that search"
+                          : "No one is allocated to this project yet"}
+                      </p>
+                      {!q && (
+                        <Button
                           type="button"
-                          onClick={() => setManageTab("add")}
-                          className="mt-3 inline-flex items-center gap-1.5 px-3 py-1.5 rounded-lg bg-indigo-600 text-white text-xs font-semibold hover:bg-indigo-700 transition-colors"
+                          onClick={() => setTeamModalTab("add")}
+                          className={`${AL.primary} mt-3`}
                         >
-                          <UserPlus className="w-3.5 h-3.5" />
-                          <span>Add Team Members</span>
-                        </button>
-                      </div>
-                    );
-                  }
-
-                  return (
-                    <div className="space-y-2 max-h-[52vh] overflow-y-auto pr-1">
-                      {filteredItems.map((it) => {
-                        const name = formatDisplayName(it.name);
-                        const isSelected = selectedRemovalIds.has(it.allocation_id);
-                        return (
-                          <div
-                            key={it.allocation_id}
-                            className={`flex items-center justify-between p-3 border rounded-lg transition-all ${
-                              isSelected
-                                ? "border-rose-300 bg-rose-50/70 shadow-sm"
-                                : it.stale
-                                ? "border-rose-200 bg-rose-50/40"
-                                : "border-slate-200 bg-white hover:bg-slate-50/80"
-                            }`}
-                          >
-                            <div className="flex items-center gap-3 min-w-0">
-                              <input
-                                type="checkbox"
-                                checked={isSelected}
-                                onChange={(e) => {
-                                  setSelectedRemovalIds((prev) => {
-                                    const next = new Set(prev);
-                                    if (e.target.checked) next.add(it.allocation_id);
-                                    else next.delete(it.allocation_id);
-                                    return next;
-                                  });
-                                }}
-                                className="w-4 h-4 rounded text-rose-600 border-slate-300 focus:ring-rose-500 cursor-pointer shrink-0"
-                              />
-
-                              <div
-                                className={`w-9 h-9 rounded-full flex items-center justify-center text-xs font-semibold shrink-0 ${
-                                  it.stale
-                                    ? "bg-rose-200 text-rose-700"
-                                    : "bg-indigo-600 text-white"
-                                }`}
-                              >
-                                {it.stale ? <UserX className="w-4 h-4" /> : name.charAt(0).toUpperCase()}
-                              </div>
-
-                              <div className="min-w-0">
-                                <div className="flex items-center gap-2">
-                                  <DynamicTooltip
-                                    text={name}
-                                    tooltip={it.name}
-                                    placement="top"
-                                    className={`text-[13px] font-semibold ${
-                                      it.stale ? "text-rose-700" : "text-slate-900"
-                                    }`}
-                                  />
-                                  {it.stale ? (
-                                    <span className="rounded-full bg-rose-100 px-1.5 py-0.5 text-[10px] font-bold text-rose-700">
-                                      Archived
-                                    </span>
-                                  ) : (
-                                    <>
-                                      {it.designation && (
-                                        <span className="rounded-full bg-slate-100 px-2 py-0.5 text-[10px] font-medium text-slate-600 border border-slate-200">
-                                          {it.designation}
-                                        </span>
-                                      )}
-                                      {((it.is_lead || (it.role_tags || []).includes("Team Lead")) && (it.designation || "").toLowerCase() !== "team lead") && (
-                                        <span className="rounded-full bg-indigo-50 px-2 py-0.5 text-[10px] font-semibold text-indigo-700 border border-indigo-200">
-                                          Team Lead
-                                        </span>
-                                      )}
-                                      {it.is_pm && (
-                                        <span className="rounded-full bg-blue-50 px-2 py-0.5 text-[10px] font-semibold text-blue-700 border border-blue-200">
-                                          PM
-                                        </span>
-                                      )}
-                                    </>
-                                  )}
-                                </div>
-                                <p
-                                  className={`text-xs truncate ${
-                                    it.stale ? "text-rose-500/90" : "text-slate-500"
-                                  }`}
-                                >
-                                  {it.stale
-                                    ? `${it.email ? `${it.email} · ` : ""}no longer on the roster — safe to remove`
-                                    : it.email || ""}
-                                </p>
-                              </div>
-                            </div>
-
+                          <UserPlus className="h-4 w-4" strokeWidth={1.5} /> Add people
+                        </Button>
+                      )}
+                    </div>
+                  ) : (
+                    <div className="flex min-h-0 flex-1 flex-col rounded-lg border border-slate-200">
+                      <div
+                        className={`flex h-10 shrink-0 items-center gap-3 border-b px-4 transition-colors ${
+                          selectedRemovalIds.size > 0
+                            ? "border-rose-100 bg-rose-50/60"
+                            : "border-slate-100 bg-slate-50/60"
+                        }`}
+                      >
+                        <input
+                          type="checkbox"
+                          checked={allSelected}
+                          ref={(el) => {
+                            if (el) el.indeterminate = someSelected && !allSelected;
+                          }}
+                          onChange={toggleAll}
+                          aria-label="Select everyone shown"
+                          className="h-4 w-4 shrink-0 cursor-pointer rounded border-slate-300 text-rose-600 focus:ring-rose-500"
+                        />
+                        {selectedRemovalIds.size > 0 ? (
+                          <>
+                            <span className="text-[13px] font-medium tabular-nums text-rose-700">
+                              {selectedRemovalIds.size} selected
+                            </span>
                             <button
                               type="button"
+                              disabled={bulkDeleteMutation.isPending}
                               onClick={() => {
-                                const isTrainingProject =
-                                  (editingAllocation?.projectType || "").toLowerCase() === "training" ||
-                                  (editingAllocation?.projectName || "").toLowerCase().includes("week 1 training") ||
-                                  (it.role_tags || []).includes("Trainee");
+                                const n = selectedRemovalIds.size;
                                 setConfirmState({
                                   variant: "danger",
-                                  title: it.stale
-                                    ? "Remove stale allocation"
-                                    : isTrainingProject
-                                    ? "Cancel Training & Remove Trainee"
-                                    : "Remove team member",
-                                  message: it.stale
-                                    ? `${name} is no longer on the roster. Remove their leftover allocation from "${editingAllocation.projectName}"?`
-                                    : isTrainingProject
-                                    ? `⚠️ Warning: ${name} is currently in the 5-Day Onboarding Training pipeline. Removing them from this project will cancel their active onboarding pipeline and return them to the Unassigned / Idle pool. Are you sure you want to remove them?`
-                                    : `Remove ${name} from "${editingAllocation.projectName}"?`,
-                                  confirmText: isTrainingProject ? "Yes, Cancel & Remove" : "Remove",
+                                  title: `Remove ${plural(n, "person", "people")}`,
+                                  message: `Remove the ${plural(n, "selected person", "selected people")} from "${teamModalProject.name}"?`,
+                                  confirmText: `Remove ${n}`,
                                   onConfirm: () => {
-                                    deleteMutation.mutate(
-                                      { id: it.allocation_id, projectId: editingAllocation.projectId },
+                                    bulkDeleteMutation.mutate(
+                                      {
+                                        project_id: activeProjectId,
+                                        allocation_ids: Array.from(selectedRemovalIds),
+                                      },
                                       {
                                         onSuccess: () => {
-                                          setSelectedRemovalIds((prev) => {
-                                            const next = new Set(prev);
-                                            next.delete(it.allocation_id);
-                                            return next;
-                                          });
+                                          setSelectedRemovalIds(new Set());
                                           setConfirmState(null);
                                         },
                                       }
@@ -1626,260 +1267,468 @@ const AllocationsPage = () => {
                                   },
                                 });
                               }}
-                              className="p-1.5 text-rose-500 hover:text-white hover:bg-rose-500 rounded-lg transition-colors shrink-0 ml-2"
-                              title="Remove allocation"
+                              className="ml-auto inline-flex h-7 items-center gap-1.5 rounded-md bg-rose-600 px-3 text-[13px] font-medium text-white hover:bg-rose-700 transition-colors disabled:opacity-60"
                             >
-                              <UserMinus className="w-4 h-4" />
+                              <Trash2 className="h-4 w-4" strokeWidth={1.5} />
+                              Remove
                             </button>
-                          </div>
-                        );
-                      })}
-                    </div>
-                  );
-                })()}
-              </div>
-            ) : (
-              /* ================= TAB 2: ADD MEMBERS ================= */
-              <div className="space-y-3">
-                {/* Search & Filter Tabs */}
-                <div className="flex flex-col sm:flex-row items-stretch sm:items-center justify-between gap-2">
-                  <div className="relative flex-1">
-                    <Search className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-slate-400 pointer-events-none" />
-                    <input
-                      type="text"
-                      value={addSearch}
-                      onChange={(e) => setAddSearch(e.target.value)}
-                      placeholder="Search available candidates by name, designation, or skills..."
-                      className="h-9 w-full pl-9 pr-3 rounded-lg border-2 border-slate-300 bg-white text-[13px] text-slate-700 placeholder:text-slate-400 focus:outline-none focus:ring-2 focus:ring-indigo-100 focus:border-indigo-400 transition-all"
-                    />
-                  </div>
-
-                  <div className="inline-flex items-center rounded-lg border border-slate-200 bg-slate-50 p-0.5 shrink-0">
-                    {[
-                      { key: "all", label: `All (${editModalEmployees.all.length})` },
-                      { key: "unallocated", label: `Available (${editModalEmployees.available.length})` },
-                      { key: "allocated", label: `Elsewhere (${editModalEmployees.allocatedOther.length})` },
-                    ].map((tab) => (
-                      <button
-                        key={tab.key}
-                        type="button"
-                        onClick={() => setAddFilterTab(tab.key)}
-                        className={`px-2.5 py-1 text-xs font-medium rounded-md transition-all ${
-                          addFilterTab === tab.key
-                            ? "bg-white text-indigo-700 shadow-sm"
-                            : "text-slate-600 hover:text-slate-900"
-                        }`}
-                      >
-                        {tab.label}
-                      </button>
-                    ))}
-                  </div>
-                </div>
-
-                {/* Candidates List with Multi-Select Checkboxes */}
-                {(() => {
-                  const baseList =
-                    addFilterTab === "unallocated"
-                      ? editModalEmployees.available
-                      : addFilterTab === "allocated"
-                      ? editModalEmployees.allocatedOther
-                      : editModalEmployees.all;
-
-                  const q = addSearch.trim().toLowerCase();
-                  const filtered = q
-                    ? baseList.filter(
-                        (emp) =>
-                          (emp.name || "").toLowerCase().includes(q) ||
-                          (emp.designation || "").toLowerCase().includes(q) ||
-                          (emp.skills || []).some((s) => (s || "").toLowerCase().includes(q))
-                      )
-                    : baseList;
-
-                  const allSelected = filtered.length > 0 && filtered.every((e) => selectedAddIds.has(e.id));
-
-                  return (
-                    <div className="space-y-2">
-                      <div className="flex items-center justify-between text-xs text-slate-500 px-1">
-                        <span>Showing {filtered.length} candidates</span>
-                        {filtered.length > 0 && (
-                          <button
-                            type="button"
-                            onClick={() => {
-                              setSelectedAddIds((prev) => {
-                                const next = new Set(prev);
-                                if (allSelected) {
-                                  filtered.forEach((e) => next.delete(e.id));
-                                } else {
-                                  filtered.forEach((e) => next.add(e.id));
-                                }
-                                return next;
-                              });
-                            }}
-                            className="font-medium text-indigo-600 hover:text-indigo-800"
-                          >
-                            {allSelected ? "Deselect All" : "Select All"}
-                          </button>
+                          </>
+                        ) : (
+                          <>
+                            <span className="text-[12px] tabular-nums text-slate-500">
+                              {plural(filteredItems.length, "member")}
+                            </span>
+                            {staleItems.length > 0 && (
+                              <span className="ml-auto">
+                                <Marker tone="rose">{staleItems.length} archived to clean up</Marker>
+                              </span>
+                            )}
+                          </>
                         )}
                       </div>
 
-                      {filtered.length === 0 ? (
-                        <div className="border border-slate-200 rounded-lg p-6 text-center bg-slate-50/50">
-                          <p className="text-xs text-slate-500">No candidates found matching your filter.</p>
-                        </div>
-                      ) : (
-                        <div className="space-y-2 max-h-[44vh] overflow-y-auto pr-1">
-                          {filtered.map((emp) => {
-                            const isSelected = selectedAddIds.has(emp.id);
-                            return (
-                              <div
-                                key={emp.id}
-                                onClick={() => {
-                                  setSelectedAddIds((prev) => {
-                                    const next = new Set(prev);
-                                    if (isSelected) next.delete(emp.id);
-                                    else next.add(emp.id);
-                                    return next;
-                                  });
-                                }}
-                                className={`flex items-center justify-between p-3 border rounded-lg cursor-pointer transition-all ${
-                                  isSelected
-                                    ? "border-indigo-400 bg-indigo-50/60 shadow-sm"
-                                    : "border-slate-200 bg-white hover:bg-slate-50/80"
-                                }`}
-                              >
-                                <div className="flex items-center gap-3 min-w-0">
-                                  <input
-                                    type="checkbox"
-                                    checked={isSelected}
-                                    onChange={() => {}} // handled by row onClick
-                                    className="w-4 h-4 rounded text-indigo-600 border-slate-300 focus:ring-indigo-500 cursor-pointer shrink-0"
-                                  />
+                      <div className="min-h-0 flex-1 divide-y divide-slate-100 overflow-y-auto">
+                        {filteredItems.map((it) => {
+                          const name = formatDisplayName(it.name);
+                          const isSelected = selectedRemovalIds.has(it.allocation_id);
+                          const toggle = () =>
+                            setSelectedRemovalIds((prev) => {
+                              const next = new Set(prev);
+                              if (next.has(it.allocation_id)) next.delete(it.allocation_id);
+                              else next.add(it.allocation_id);
+                              return next;
+                            });
+                          const isLead =
+                            (it.is_lead || (it.role_tags || []).includes("Team Lead")) &&
+                            (it.designation || "").toLowerCase() !== "team lead";
 
-                                  <UserAvatar
-                                    src={emp.avatar_url}
-                                    name={emp.name}
-                                    size="sm"
-                                    className="shrink-0"
-                                  />
+                          return (
+                            <div
+                              key={it.allocation_id}
+                              onClick={toggle}
+                              className={`group flex min-h-[56px] cursor-pointer items-center gap-3 px-4 py-2 transition-colors ${
+                                isSelected
+                                  ? "bg-rose-50/50"
+                                  : it.stale
+                                  ? "bg-rose-50/30"
+                                  : "hover:bg-slate-50"
+                              }`}
+                            >
+                              <input
+                                type="checkbox"
+                                checked={isSelected}
+                                onChange={() => {}}
+                                aria-label={`Select ${name}`}
+                                className="h-4 w-4 shrink-0 cursor-pointer rounded border-slate-300 text-rose-600 focus:ring-rose-500"
+                              />
+                              {it.stale ? (
+                                <span className="flex h-7 w-7 shrink-0 items-center justify-center rounded-full bg-rose-100 text-rose-600">
+                                  <UserX className="h-4 w-4" strokeWidth={1.5} />
+                                </span>
+                              ) : (
+                                <UserAvatar src={it.avatar_url} name={it.name} size="sm" className="shrink-0" />
+                              )}
 
-                                  <div className="min-w-0">
-                                    <div className="flex items-center gap-2">
-                                      <DynamicTooltip
-                                        text={formatDisplayName(emp.name)}
-                                        tooltip={emp.name}
-                                        placement="top"
-                                        className="text-[13px] font-semibold text-slate-900"
-                                      />
-                                      {emp.skillMatch && (
-                                        <span className="rounded-full bg-emerald-100 text-emerald-800 px-1.5 py-0.2 text-[10px] font-semibold shrink-0">
-                                          Skill Match
-                                        </span>
-                                      )}
-                                    </div>
-                                    <DynamicTooltip
-                                      text={`${emp.designation || "Annotator"}${
-                                        emp.otherProjects && emp.otherProjects.length
-                                          ? ` · On: ${emp.otherProjects.map((p) => p.project_name).join(", ")}`
-                                          : ""
-                                      }`}
-                                      tooltip={
-                                        emp.otherProjects && emp.otherProjects.length > 0 ? (
-                                          <div className="space-y-1 py-0.5 text-left">
-                                            <div className="text-[11px] font-semibold text-slate-800">
-                                              {formatDisplayName(emp.name)} ({emp.designation || "Annotator"})
-                                            </div>
-                                            <div className="text-[10px] font-bold uppercase tracking-wider text-amber-600">
-                                              Other Allocations ({emp.otherProjects.length})
-                                            </div>
-                                            <div className="space-y-0.5 text-xs text-slate-600">
-                                              {emp.otherProjects.map((p, idx) => (
-                                                <div key={idx} className="flex items-center gap-1.5 whitespace-nowrap">
-                                                  <span className="h-1.5 w-1.5 rounded-full bg-amber-400" />
-                                                  <span>{p.project_name}</span>
-                                                </div>
-                                              ))}
-                                            </div>
-                                          </div>
-                                        ) : null
-                                      }
-                                      placement="top"
-                                      className="text-xs text-slate-500"
-                                    />
-                                  </div>
-                                </div>
-
-                                <div className="shrink-0 pl-2">
+                              <div className="min-w-0 flex-1">
+                                <div className="flex min-w-0 items-center gap-2">
                                   <span
-                                    className={`inline-flex items-center px-2 py-0.5 rounded text-[11px] font-medium ${
-                                      isSelected
-                                        ? "bg-indigo-600 text-white"
-                                        : "bg-slate-100 text-slate-700"
+                                    title={it.name}
+                                    className={`truncate text-[14px] font-medium ${
+                                      it.stale ? "text-rose-700" : "text-slate-900"
                                     }`}
                                   >
-                                    {isSelected ? "Selected" : "+ Select"}
+                                    <Highlight text={name} query={manageSearch} />
                                   </span>
+                                  {it.designation && (
+                                    <span className="inline-flex items-center rounded-md bg-slate-100 px-2 py-0.5 text-[12px] font-normal text-slate-600">
+                                      <Highlight text={it.designation} query={manageSearch} />
+                                    </span>
+                                  )}
+                                  {it.stale ? (
+                                    <Marker tone="rose">Archived</Marker>
+                                  ) : (
+                                    <>
+                                      {it.is_pm && <Marker tone="indigo">PM</Marker>}
+                                      {isLead && <Marker tone="indigo">Team lead</Marker>}
+                                    </>
+                                  )}
                                 </div>
+                                {it.stale ? (
+                                  <p className="mt-0.5 truncate text-[12px] text-rose-600/80">
+                                    {it.email ? `${it.email} · ` : ""}no longer on the roster, safe to remove
+                                  </p>
+                                ) : (
+                                  <div className="mt-0.5 flex min-w-0 items-center gap-3 text-[12px] text-slate-500">
+                                    {it.email && (
+                                      <span className="min-w-0 truncate">
+                                        <Highlight text={it.email} query={manageSearch} />
+                                      </span>
+                                    )}
+                                    {it.total_daily_hours ? (
+                                      <span className="inline-flex shrink-0 items-center gap-1 tabular-nums text-slate-500">
+                                        <Clock className="h-3.5 w-3.5 text-slate-400" strokeWidth={1.5} />
+                                        <span className="font-medium text-slate-700">{it.total_daily_hours}h/day</span>
+                                      </span>
+                                    ) : null}
+                                    {(it.role_tags || []).length > 0 && (
+                                      <span className="inline-flex min-w-0 items-center gap-1">
+                                        <Tag className="h-3.5 w-3.5 shrink-0 text-slate-400" strokeWidth={1.5} />
+                                        <span className="truncate">{(it.role_tags || []).join(", ")}</span>
+                                      </span>
+                                    )}
+                                  </div>
+                                )}
                               </div>
-                            );
-                          })}
-                        </div>
+
+                              <button
+                                type="button"
+                                onClick={(e) => {
+                                  e.stopPropagation();
+                                  const isTrainingProject =
+                                    (teamModalProject?.project_type || "").toLowerCase() === "training" ||
+                                    (teamModalProject?.name || "").toLowerCase().includes("week 1 training") ||
+                                    (it.role_tags || []).includes("Trainee");
+                                  setConfirmState({
+                                    variant: "danger",
+                                    title: it.stale
+                                      ? "Remove archived allocation"
+                                      : isTrainingProject
+                                      ? "Cancel training and remove trainee"
+                                      : "Remove team member",
+                                    message: it.stale
+                                      ? `${name} is no longer on the roster. Remove their leftover allocation from "${teamModalProject.name}"?`
+                                      : isTrainingProject
+                                      ? `${name} is in the 5-day onboarding training. Removing them cancels that training and returns them to the unassigned pool.`
+                                      : `Remove ${name} from "${teamModalProject.name}"?`,
+                                    confirmText: isTrainingProject ? "Cancel training and remove" : "Remove",
+                                    onConfirm: () => {
+                                      deleteMutation.mutate(
+                                        { id: it.allocation_id, projectId: activeProjectId },
+                                        {
+                                          onSuccess: () => {
+                                            setSelectedRemovalIds((prev) => {
+                                              const next = new Set(prev);
+                                              next.delete(it.allocation_id);
+                                              return next;
+                                            });
+                                            setConfirmState(null);
+                                          },
+                                        }
+                                      );
+                                    },
+                                  });
+                                }}
+                                className="inline-flex h-8 shrink-0 items-center gap-1.5 rounded-lg px-2.5 text-[13px] text-slate-500 opacity-100 transition-colors hover:bg-rose-50 hover:text-rose-600 focus:outline-none focus-visible:ring-2 focus-visible:ring-rose-500/30 sm:opacity-0 sm:group-hover:opacity-100 focus:opacity-100"
+                                title="Remove from project"
+                                aria-label={`Remove ${name} from project`}
+                              >
+                                <UserMinus className="h-4 w-4" strokeWidth={1.5} />
+                                <span className="hidden sm:inline">Remove</span>
+                              </button>
+                            </div>
+                          );
+                        })}
+                      </div>
+                    </div>
+                  )}
+                </div>
+              );
+            })()
+          ) : (
+            /* ── Add People View ── */
+            (() => {
+              const allSelected =
+                filteredCandidates.length > 0 &&
+                filteredCandidates.every((e) => selectedAddIds.has(e.id));
+              const someSelected = filteredCandidates.some((e) => selectedAddIds.has(e.id));
+              const requiredSkills = (teamModalProject?.required_expertise || []).map((x) =>
+                String(x).trim().toLowerCase()
+              );
+              const hasActiveFilters =
+                addSearch.trim() !== "" ||
+                selectedDesignation !== "all" ||
+                selectedSkill !== "all" ||
+                addFilterTab !== "all";
+
+              return (
+                <div className="flex min-h-0 flex-1 flex-col gap-3">
+                  {/* Filter Bar Row 1: Search + Availability Tabs */}
+                  <div className="flex flex-col gap-2 sm:flex-row sm:items-center">
+                    <div className="relative min-w-0 flex-1">
+                      <Search
+                        className="pointer-events-none absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-slate-400"
+                        strokeWidth={1.5}
+                      />
+                      <input
+                        type="text"
+                        value={addSearch}
+                        onChange={(e) => setAddSearch(e.target.value)}
+                        placeholder="Search candidates"
+                        className={AL.search}
+                      />
+                    </div>
+                    <SegmentFilter
+                      value={addFilterTab}
+                      onChange={setAddFilterTab}
+                      options={[
+                        { key: "all", label: "All", count: candidateData.all.length },
+                        { key: "unallocated", label: "Available", count: candidateData.available.length },
+                        { key: "allocated", label: "Elsewhere", count: candidateData.allocatedOther.length },
+                      ]}
+                    />
+                  </div>
+
+                  {/* Filter Bar Row 2: Designation Filter + Skill Filter + Reset Button */}
+                  <div className="flex flex-wrap items-center gap-2">
+                    <div className="w-48">
+                      <Dropdown
+                        options={designationOptions}
+                        value={selectedDesignation}
+                        onChange={setSelectedDesignation}
+                        placeholder="All designations"
+                        searchable
+                        searchPlaceholder="Filter designation"
+                      />
+                    </div>
+                    <div className="w-48">
+                      <Dropdown
+                        options={skillOptions}
+                        value={selectedSkill}
+                        onChange={setSelectedSkill}
+                        placeholder="All skills"
+                        searchable
+                        searchPlaceholder="Filter skills"
+                      />
+                    </div>
+                    {hasActiveFilters && (
+                      <>
+                        <button
+                          type="button"
+                          onClick={() => {
+                            setAddSearch("");
+                            setSelectedDesignation("all");
+                            setSelectedSkill("all");
+                            setAddFilterTab("all");
+                          }}
+                          className="h-8 px-3 text-[12px] font-medium text-slate-600 hover:text-slate-900 bg-slate-100 hover:bg-slate-200 rounded-lg transition-colors"
+                        >
+                          Reset filters
+                        </button>
+                        <span className="ml-auto text-[12px] text-slate-500 tabular-nums">
+                          {filteredCandidates.length} of {candidateData.all.length} matching
+                        </span>
+                      </>
+                    )}
+                  </div>
+
+                  {filteredCandidates.length === 0 ? (
+                    <div className="rounded-lg border border-slate-200 px-6 py-10 text-center">
+                      <p className="text-[14px] text-slate-700">No candidates match the selected filters</p>
+                      {hasActiveFilters && (
+                        <button
+                          type="button"
+                          onClick={() => {
+                            setAddSearch("");
+                            setSelectedDesignation("all");
+                            setSelectedSkill("all");
+                            setAddFilterTab("all");
+                          }}
+                          className={`mt-2 ${AL.textBtn}`}
+                        >
+                          Clear all filters
+                        </button>
                       )}
                     </div>
-                  );
-                })()}
+                  ) : (
+                    <div className="flex min-h-0 flex-1 flex-col rounded-lg border border-slate-200">
+                      <div className="flex h-10 shrink-0 items-center gap-3 border-b border-slate-100 bg-slate-50/60 px-4">
+                        <input
+                          type="checkbox"
+                          checked={allSelected}
+                          ref={(el) => {
+                            if (el) el.indeterminate = someSelected && !allSelected;
+                          }}
+                          onChange={() =>
+                            setSelectedAddIds((prev) => {
+                              const next = new Set(prev);
+                              if (allSelected) filteredCandidates.forEach((e) => next.delete(e.id));
+                              else filteredCandidates.forEach((e) => next.add(e.id));
+                              return next;
+                            })
+                          }
+                          aria-label="Select everyone shown"
+                          className={AL.check}
+                        />
+                        <span className="text-[12px] tabular-nums text-slate-500">
+                          {selectedAddIds.size > 0
+                            ? `${selectedAddIds.size} of ${filteredCandidates.length} selected`
+                            : plural(filteredCandidates.length, "candidate")}
+                        </span>
+                      </div>
+
+                      <div className="min-h-0 flex-1 divide-y divide-slate-100 overflow-y-auto">
+                        {filteredCandidates.map((emp) => {
+                          const isSelected = selectedAddIds.has(emp.id);
+                          const others = emp.otherProjects || [];
+                          return (
+                            <div
+                              key={emp.id}
+                              onClick={() => {
+                                setSelectedAddIds((prev) => {
+                                  const next = new Set(prev);
+                                  if (isSelected) next.delete(emp.id);
+                                  else next.add(emp.id);
+                                  return next;
+                                });
+                              }}
+                              className={AL.row(isSelected)}
+                            >
+                              <input
+                                type="checkbox"
+                                checked={isSelected}
+                                onChange={() => {}}
+                                aria-label={`Select ${emp.name}`}
+                                className={AL.check}
+                              />
+                              <UserAvatar src={emp.avatar_url} name={emp.name} size="sm" className="shrink-0" />
+                              <div className="min-w-0 flex-1">
+                                <div className="flex min-w-0 items-center gap-2">
+                                  <span title={emp.name} className="truncate text-[14px] font-medium text-slate-900">
+                                    <Highlight text={formatDisplayName(emp.name)} query={addSearch} />
+                                  </span>
+                                  {emp.designation && (
+                                    <span className="inline-flex items-center rounded-md bg-slate-100 px-2 py-0.5 text-[12px] font-normal text-slate-600">
+                                      {emp.designation}
+                                    </span>
+                                  )}
+                                  {others.length > 0 ? (
+                                    <DynamicTooltip
+                                      alwaysShow={true}
+                                      placement="top"
+                                      className="shrink-0"
+                                      tooltip={
+                                        <div className="space-y-1 py-0.5 text-left">
+                                          {others.map((p, idx) => (
+                                            <div key={idx} className="whitespace-nowrap text-[12px] text-slate-700">
+                                              {p.project_name}
+                                            </div>
+                                          ))}
+                                        </div>
+                                      }
+                                    >
+                                      <Marker tone="amber">{`On ${plural(others.length, "project")}`}</Marker>
+                                    </DynamicTooltip>
+                                  ) : (
+                                    <Marker tone="emerald">Available</Marker>
+                                  )}
+                                </div>
+                                <div className="mt-0.5 flex min-w-0 items-center gap-3 text-[12px] text-slate-500">
+                                  {emp.email && (
+                                    <span className="min-w-0 truncate">
+                                      <Highlight text={emp.email} query={addSearch} />
+                                    </span>
+                                  )}
+                                  {emp.skills?.length > 0 && (
+                                    <div className="flex shrink-0 items-center gap-1">
+                                      {emp.skills.slice(0, 3).map((sk, idx) => {
+                                        const hit = requiredSkills.includes(String(sk).trim().toLowerCase());
+                                        return (
+                                          <span
+                                            key={idx}
+                                            title={hit ? "Matches a required skill" : undefined}
+                                            className={`inline-flex items-center gap-1 rounded-md px-2 py-0.5 text-[12px] ${
+                                              hit
+                                                ? "bg-emerald-50 font-medium text-emerald-700"
+                                                : "bg-slate-100 text-slate-600"
+                                            }`}
+                                          >
+                                            {hit && <Check className="h-3.5 w-3.5" strokeWidth={1.5} />}
+                                            <Highlight text={sk} query={addSearch} />
+                                          </span>
+                                        );
+                                      })}
+                                      {emp.skills.length > 3 && (
+                                        <span className="text-[12px] tabular-nums text-slate-400">+{emp.skills.length - 3}</span>
+                                      )}
+                                    </div>
+                                  )}
+                                </div>
+                              </div>
+                            </div>
+                          );
+                        })}
+                      </div>
+                    </div>
+                  )}
+                </div>
+              );
+            })()
+          )}
+        </Modal.Body>
+
+        <Modal.Footer className="!justify-between !px-4 !py-3">
+          <div className="flex items-center gap-3">
+            {teamModalTab === "add" && selectedAddIds.size > 0 ? (
+              <div className="flex flex-wrap items-center gap-3">
+                <span className="text-[13px] font-medium tabular-nums text-slate-700">
+                  {plural(selectedAddIds.size, "person", "people")} selected
+                </span>
+                <div className="w-36">
+                  <Dropdown
+                    options={[
+                      { value: "", label: "Default Role" },
+                      { value: "Annotator", label: "Annotator" },
+                      { value: "Reviewer", label: "Reviewer" },
+                      { value: "Quality Analyst", label: "Quality Analyst" },
+                      { value: "Team Lead", label: "Team Lead" },
+                      { value: "Trainee", label: "Trainee" },
+                    ]}
+                    value={addRoleTag}
+                    onChange={setAddRoleTag}
+                    placeholder="Assign Role"
+                  />
+                </div>
+                <div className="flex items-center gap-1 text-[12px] text-slate-600">
+                  <input
+                    type="number"
+                    min={1}
+                    max={24}
+                    value={addDailyHours}
+                    onChange={(e) => setAddDailyHours(Math.max(1, parseInt(e.target.value) || 8))}
+                    className="h-9 w-14 rounded-lg border border-slate-200 px-2 text-center text-[13px] tabular-nums text-slate-900 focus:border-indigo-400 focus:outline-none"
+                  />
+                  <span>h/day</span>
+                </div>
               </div>
+            ) : (
+              <span className="text-[13px] tabular-nums text-slate-500">
+                {teamModalProject && teamModalStats.assigned > 0
+                  ? plural(teamModalStats.assigned, "active member")
+                  : ""}
+              </span>
             )}
-          </Modal.Body>
+          </div>
 
-          <Modal.Footer className="flex items-center justify-between border-t border-slate-200 !py-3">
-            <span className="text-xs text-slate-500">
-              {manageTab === "current"
-                ? `${selectedRemovalIds.size} selected for removal`
-                : `${selectedAddIds.size} candidate(s) selected`}
-            </span>
+          <div className="flex items-center gap-2">
+            <Button type="button" variant="cancel" onClick={closeTeamModal}>
+              {teamModalTab === "add" && selectedAddIds.size > 0 ? "Cancel" : "Done"}
+            </Button>
 
-            <div className="flex items-center gap-2">
+            {teamModalTab === "add" && selectedAddIds.size > 0 && (
               <Button
                 type="button"
-                variant="cancel"
-                size="sm"
-                onClick={closeManageModal}
+                disabled={bulkCreateMutation.isPending}
+                isLoading={bulkCreateMutation.isPending}
+                onClick={handleAddPeopleSubmit}
+                className={AL.primary}
               >
-                Done
+                {!bulkCreateMutation.isPending &&
+                  `Add ${plural(selectedAddIds.size, "person", "people")} to team`}
               </Button>
-
-              {manageTab === "add" && selectedAddIds.size > 0 && (
-                <Button
-                  type="button"
-                  variant="primary"
-                  size="sm"
-                  disabled={bulkCreateMutation.isPending}
-                  onClick={() => {
-                    bulkCreateMutation.mutate(
-                      {
-                        project_id: editingAllocation.projectId,
-                        employee_ids: Array.from(selectedAddIds),
-                        role_tags: [],
-                        daily_hours: 8.0,
-                      },
-                      {
-                        onSuccess: () => {
-                          setSelectedAddIds(new Set());
-                          setManageTab("current");
-                        },
-                      }
-                    );
-                  }}
-                  className="bg-indigo-600 hover:bg-indigo-700 text-white font-semibold"
-                >
-                  <UserPlus className="w-3.5 h-3.5 mr-1" />
-                  Add Selected ({selectedAddIds.size})
-                </Button>
-              )}
-            </div>
-          </Modal.Footer>
-        </Modal>
-      )}
+            )}
+          </div>
+        </Modal.Footer>
+      </Modal>
 
       <ConfirmDialog
         isOpen={!!confirmState}

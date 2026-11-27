@@ -487,28 +487,6 @@ const AllocationModalV2 = ({
             </div>
           </div>
 
-          {/* Daily Hours */}
-          <div>
-            <label className="block text-sm font-medium text-gray-700 mb-1">
-              Total Daily Hours (1-12)
-            </label>
-            <input
-              type="number"
-              min="1"
-              max="12"
-              value={formData.total_daily_hours}
-              onChange={(e) =>
-                setFormData((prev) => ({
-                  ...prev,
-                  total_daily_hours: parseInt(e.target.value) || 8,
-                }))
-              }
-              className="w-32 px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500"
-            />
-            <p className="mt-1 text-xs text-gray-500">
-              Hours per day for this allocation
-            </p>
-          </div>
 
           {/* Role Tagging */}
           {!hideRoleTags && (

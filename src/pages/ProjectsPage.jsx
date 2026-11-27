@@ -29,6 +29,7 @@ import {
   PauseCircle,
   CheckCircle2,
   XCircle,
+  Info,
 } from "lucide-react";
 import { Link } from "react-router-dom";
 import toast from "react-hot-toast";
@@ -75,8 +76,93 @@ import {
 } from "../utils/projectConstants";
 import ProjectCard from "../components/projects/ProjectCard";
 import DynamicTooltip from "../components/ui/DynamicTooltip";
+import DatePicker from "../components/ui/DatePicker";
 import { TeamLeadMultiSelect, PmMultiSelect } from "../components/projects/ProjectDropdowns";
 
+
+// ── Project form primitives ───────────────────────────────────────────────
+// Slate neutrals, one indigo accent, colour only where it carries meaning.
+const PF = {
+  label: "mb-1.5 block text-[13px] font-medium text-slate-700",
+  hint: "mt-1.5 text-xs text-slate-500",
+  req: "text-rose-500",
+  input:
+    "w-full h-9 rounded-lg border border-slate-200 bg-white px-3 text-sm text-slate-900 placeholder:text-slate-400 transition-colors hover:border-slate-300 focus:border-indigo-400 focus:outline-none focus:ring-2 focus:ring-indigo-500/15",
+  number:
+    "tabular-nums [appearance:textfield] [&::-webkit-outer-spin-button]:appearance-none [&::-webkit-inner-spin-button]:appearance-none",
+  suffix:
+    "pointer-events-none absolute right-3 top-1/2 -translate-y-1/2 text-xs text-slate-400",
+  // Brings the shared pickers (Dropdown, PM / lead selects) to the same 36px control height.
+  control:
+    "[&_.cursor-text]:min-h-9 [&_button.justify-between]:min-h-9",
+};
+
+/** A form section: title and one-line purpose on the left, fields on the right. */
+function FormSection({ title, hint, aside, children }) {
+  return (
+    <section className="grid grid-cols-1 gap-4 py-6 md:grid-cols-[168px_minmax(0,1fr)] md:gap-8">
+      <div>
+        <h3 className="text-sm font-medium text-slate-900">{title}</h3>
+        {hint && <p className="mt-1 text-xs leading-relaxed text-slate-500">{hint}</p>}
+        {aside && <div className="mt-2">{aside}</div>}
+      </div>
+      <div className="min-w-0">{children}</div>
+    </section>
+  );
+}
+
+/** Single-choice segmented control with a meaning-carrying dot per option. */
+function Segmented({ value, onChange, options }) {
+  return (
+    <div role="radiogroup" className="inline-flex max-w-full flex-wrap gap-1 rounded-lg bg-slate-100 p-1">
+      {options.map((opt) => {
+        const on = value === opt.value;
+        return (
+          <button
+            key={opt.value || "none"}
+            type="button"
+            role="radio"
+            aria-checked={on}
+            onClick={() => onChange(opt.value)}
+            className={`inline-flex h-8 items-center gap-2 rounded-md px-3 text-[13px] whitespace-nowrap transition-colors ${
+              on
+                ? "bg-white font-medium text-slate-900 shadow-[0_1px_2px_rgba(15,23,42,0.08)]"
+                : "text-slate-500 hover:text-slate-900"
+            }`}
+          >
+            <span className={`h-2 w-2 rounded-full ${opt.dot} ${on ? "" : "opacity-60"}`} />
+            {opt.label}
+          </button>
+        );
+      })}
+    </div>
+  );
+}
+
+/** Start date through the app's DatePicker; still submits `start_date` and stays required. */
+function StartDateField({ defaultValue }) {
+  const [value, setValue] = useState(defaultValue || "");
+  return (
+    <div className="relative [&_button]:min-h-9">
+      <DatePicker
+        name="start_date"
+        value={value}
+        onChange={(e) => setValue(e.target.value)}
+        accentColor="indigo"
+        placeholder="Choose a date"
+      />
+      {/* Keeps the browser's required check, which a hidden input skips */}
+      <input
+        tabIndex={-1}
+        aria-hidden="true"
+        required
+        value={value}
+        onChange={() => {}}
+        className="pointer-events-none absolute bottom-0 left-4 h-px w-px opacity-0"
+      />
+    </div>
+  );
+}
 
 const ProjectsPage = () => {
   const queryClient = useQueryClient();
@@ -2243,349 +2329,394 @@ const ProjectsPage = () => {
         maxHeight="92vh"
       >
         <Modal.Compact.Header onClose={resetModalState}>
-          <div className="flex items-center gap-3">
-            <div className="flex h-9 w-9 shrink-0 items-center justify-center rounded-xl bg-indigo-50 text-indigo-600">
-              <FileText className="h-5 w-5" />
-            </div>
-            <div>
-              <h2 className="text-base font-bold text-slate-900">
-                {editingProject
-                  ? "Edit Project"
-                  : copyingProject
-                    ? "Copy Project"
-                    : "Create New Project"}
-              </h2>
-              <p className="text-xs text-slate-500">
-                Update project details and team allocation.
-              </p>
-            </div>
-          </div>
+          <h2 className="text-base font-medium text-slate-900">
+            {editingProject
+              ? "Edit project"
+              : copyingProject
+                ? "Copy project"
+                : "New project"}
+          </h2>
+          <p className="mt-0.5 truncate text-[13px] text-slate-500">
+            {editingProject
+              ? [editingProject.name, formOrg].filter(Boolean).join(" · ")
+              : copyingProject
+                ? `Copying ${copyingProject.name}`
+                : "Set up the project, its people and its team"}
+          </p>
         </Modal.Compact.Header>
         <form
           onSubmit={handleSubmit}
           className="flex-1 flex flex-col min-h-0"
           id="project-form"
         >
-          <Modal.Compact.Body className="space-y-4">
-            {/* Row 1: Project Name / Organisation Name / Program Manager */}
-            <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-3">
-              <div>
-                <label className="block text-xs font-semibold text-slate-600 mb-1">
-                  Project Name <span className="text-red-500">*</span>
-                </label>
-                <input
-                  type="text"
-                  name="name"
-                  required
-                  defaultValue={(editingProject || copyingProject)?.name}
-                  className="w-full rounded-lg border border-slate-200 bg-white px-3 py-1.5 text-sm text-slate-700 placeholder:text-slate-400 transition-colors hover:border-slate-300 focus:border-indigo-400 focus:outline-none focus:ring-2 focus:ring-indigo-100"
-                  placeholder="Enter project name"
-                />
-              </div>
+          <Modal.Compact.Body className="!px-6 !py-0">
+            <div className="divide-y divide-slate-100">
+              {/* ── Project ─────────────────────────────── */}
+              <FormSection title="Project" hint="Name, client and where the data lives">
+                <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+                  <div>
+                    <label className={PF.label}>
+                      Name <span className={PF.req}>*</span>
+                    </label>
+                    <input
+                      type="text"
+                      name="name"
+                      required
+                      defaultValue={(editingProject || copyingProject)?.name}
+                      className={PF.input}
+                      placeholder="Gen2 import v1"
+                    />
+                  </div>
 
-              <div>
-                <label className="block text-xs font-semibold text-slate-600 mb-1">
-                  Organisation Name <span className="text-red-500">*</span>
-                </label>
-                <input
-                  type="hidden"
-                  name="main_project_id"
-                  value={
-                    filterMainProjectId && !editingProject && !copyingProject
-                      ? filterMainProjectId
-                      : formMainProjectId
-                  }
-                />
-                <Dropdown
-                  editable={true}
-                  options={allOrganizations.map((org) => ({
-                    value: org,
-                    label: org,
-                  }))}
-                  value={formOrg}
-                  onChange={(val) => {
-                    setFormOrg(val);
-                    const projs = parentProjects.filter(
-                      (p) => clientOf(p) === val,
-                    );
-                    setFormMainProjectId(
-                      projs.length ? String(projs[projs.length - 1].id) : "",
-                    );
-                  }}
-                  placeholder="Select or type an organization"
-                  disabled={
-                    !!filterMainProjectId && !editingProject && !copyingProject
-                  }
-                />
-              </div>
+                  <div className={PF.control}>
+                    <label className={PF.label}>
+                      Organisation <span className={PF.req}>*</span>
+                    </label>
+                    <input
+                      type="hidden"
+                      name="main_project_id"
+                      value={
+                        filterMainProjectId && !editingProject && !copyingProject
+                          ? filterMainProjectId
+                          : formMainProjectId
+                      }
+                    />
+                    <Dropdown
+                      editable={true}
+                      options={allOrganizations.map((org) => ({
+                        value: org,
+                        label: org,
+                      }))}
+                      value={formOrg}
+                      onChange={(val) => {
+                        setFormOrg(val);
+                        const projs = parentProjects.filter(
+                          (p) => clientOf(p) === val,
+                        );
+                        setFormMainProjectId(
+                          projs.length ? String(projs[projs.length - 1].id) : "",
+                        );
+                      }}
+                      placeholder="Choose or type a name"
+                      disabled={
+                        !!filterMainProjectId && !editingProject && !copyingProject
+                      }
+                    />
+                  </div>
 
+                  <div>
+                    <label className={PF.label}>
+                      Start date <span className={PF.req}>*</span>
+                    </label>
+                    <StartDateField
+                      defaultValue={(editingProject || copyingProject)?.start_date}
+                    />
+                  </div>
+
+                  <div>
+                    <label className={PF.label}>Encord project ID</label>
+                    <input
+                      type="text"
+                      name="encord_project_hash"
+                      defaultValue={
+                        (editingProject || copyingProject)?.encord_project_hash || ""
+                      }
+                      className={`${PF.input} tabular-nums`}
+                      placeholder="Paste the project hash"
+                    />
+                    <p className={PF.hint}>Turns on analytics for this project</p>
+                  </div>
+                </div>
+              </FormSection>
+
+              {/* ── Status ──────────────────────────────── */}
+              <FormSection title="Status" hint="Where the project stands and how the client feels">
+                {/* Submitted through these hidden inputs */}
+                <input type="hidden" name="project_status" value={formProjectStatus} />
+                <input type="hidden" name="sentiment" value={formSentiment} />
+
+                <div className="space-y-4">
+                  <div>
+                    <span className={PF.label}>Stage</span>
+                    <Segmented
+                      value={formProjectStatus}
+                      onChange={setFormProjectStatus}
+                      options={[
+                        { value: "poc", label: "POC", dot: "bg-sky-500" },
+                        { value: "active", label: "In progress", dot: "bg-indigo-500" },
+                        { value: "on-hold", label: "On hold", dot: "bg-amber-500" },
+                        { value: "completed", label: "Completed", dot: "bg-emerald-500" },
+                        { value: "cancelled", label: "Cancelled", dot: "bg-slate-400" },
+                      ]}
+                    />
+                  </div>
+
+                  <div className="grid grid-cols-1 sm:grid-cols-[minmax(0,1fr)_176px] gap-4">
+                    <div>
+                      <span className={PF.label}>Client sentiment</span>
+                      <Segmented
+                        value={formSentiment}
+                        onChange={setFormSentiment}
+                        options={[
+                          { value: "", label: "Not set", dot: "bg-slate-300" },
+                          { value: "GOOD", label: "Good", dot: "bg-emerald-500" },
+                          { value: "AVG", label: "Average", dot: "bg-amber-500" },
+                          { value: "Poor", label: "Poor", dot: "bg-rose-500" },
+                        ]}
+                      />
+                    </div>
+
+                    <div className={PF.control}>
+                      <div className="mb-1.5 flex items-center justify-between">
+                        <div className="flex items-center gap-1.5">
+                          <label className="text-[13px] font-medium text-slate-700">Priority</label>
+                          <DynamicTooltip
+                            placement="top"
+                            alwaysShow={true}
+                            maxWidth={290}
+                            tooltip={
+                              <div className="space-y-2 py-0.5 text-left">
+                                <div className="border-b border-slate-100 pb-1.5">
+                                  <div className="text-xs font-semibold text-slate-800">Priority calculation</div>
+                                  <div className="text-[11px] text-slate-500">
+                                    Derived from total team size (annotators + reviewers + leads)
+                                  </div>
+                                </div>
+
+                                <div className="space-y-1 font-normal">
+                                  <div
+                                    className={`flex items-center justify-between gap-3 rounded px-1.5 py-0.5 text-[11px] transition-colors ${
+                                      prioritySuggestion === "P0" ? "bg-slate-100/90 font-medium text-slate-900" : "text-slate-600"
+                                    }`}
+                                  >
+                                    <div className="flex items-center gap-1.5">
+                                      <span className="font-semibold text-rose-600">P0</span>
+                                      <span>Critical / High headcount</span>
+                                    </div>
+                                    <span className="tabular-nums text-slate-500">≥ 5 members</span>
+                                  </div>
+
+                                  <div
+                                    className={`flex items-center justify-between gap-3 rounded px-1.5 py-0.5 text-[11px] transition-colors ${
+                                      prioritySuggestion === "P1" ? "bg-slate-100/90 font-medium text-slate-900" : "text-slate-600"
+                                    }`}
+                                  >
+                                    <div className="flex items-center gap-1.5">
+                                      <span className="font-semibold text-indigo-600">P1</span>
+                                      <span>Standard delivery</span>
+                                    </div>
+                                    <span className="tabular-nums text-slate-500">1–4 members</span>
+                                  </div>
+
+                                  <div
+                                    className={`flex items-center justify-between gap-3 rounded px-1.5 py-0.5 text-[11px] transition-colors ${
+                                      prioritySuggestion === "P2" ? "bg-slate-100/90 font-medium text-slate-900" : "text-slate-600"
+                                    }`}
+                                  >
+                                    <div className="flex items-center gap-1.5">
+                                      <span className="font-semibold text-amber-600">P2</span>
+                                      <span>Leads only</span>
+                                    </div>
+                                    <span className="text-slate-500">0 annotators/rev</span>
+                                  </div>
+
+                                  <div
+                                    className={`flex items-center justify-between gap-3 rounded px-1.5 py-0.5 text-[11px] transition-colors ${
+                                      prioritySuggestion === "P3" ? "bg-slate-100/90 font-medium text-slate-900" : "text-slate-600"
+                                    }`}
+                                  >
+                                    <div className="flex items-center gap-1.5">
+                                      <span className="font-semibold text-slate-500">P3</span>
+                                      <span>Unassigned</span>
+                                    </div>
+                                    <span className="tabular-nums text-slate-500">0 members</span>
+                                  </div>
+                                </div>
+
+                                <div className="border-t border-slate-100 pt-1.5 text-[10.5px] text-slate-500">
+                                  Current: <span className="tabular-nums font-medium text-slate-700">{(formAutonexAnnotators || 0) + (formAutonexReviewers || 0) + selectedTeamLeadIds.length}</span> members ({(formAutonexAnnotators || 0)} ann, {(formAutonexReviewers || 0)} rev, {selectedTeamLeadIds.length} leads) → Suggesting <span className="font-semibold text-indigo-700">{prioritySuggestion}</span>
+                                </div>
+                              </div>
+                            }
+                          >
+                            <button
+                              type="button"
+                              className="inline-flex items-center justify-center rounded text-slate-400 hover:text-slate-600 focus:outline-none focus:ring-1 focus:ring-indigo-400/50 transition-colors"
+                              aria-label="How priority is calculated"
+                            >
+                              <Info className="h-3.5 w-3.5" />
+                            </button>
+                          </DynamicTooltip>
+                        </div>
+                      </div>
+                      <Dropdown
+                        value={formPriority}
+                        onChange={setFormPriority}
+                        options={[
+                          { value: "auto", label: `Auto (${prioritySuggestion})` },
+                          { value: "P0", label: "P0" },
+                          { value: "P1", label: "P1" },
+                          { value: "P2", label: "P2" },
+                          { value: "P3", label: "P3" },
+                          { value: "medium", label: "Medium (legacy)" },
+                        ]}
+                        className="w-full"
+                        optionsClassName="w-full"
+                      />
+                      <p className={PF.hint}>
+                        Suggested <span className="font-medium text-indigo-700">{prioritySuggestion}</span> from team size
+                      </p>
+                    </div>
+                  </div>
+                </div>
+              </FormSection>
+
+              {/* ── People ──────────────────────────────── */}
               {/* Shown to PMs as well as admins: a project takes several managers, so a PM
                   needs this to add a co-manager to their own. They are still auto-assigned
                   on create (api/projects.py) and PmMultiSelect refuses to let them remove
                   themselves, so neither route can leave them without their own project. */}
-              <div>
-                <div className="mb-1 flex items-center gap-1.5">
-                  <label className="block text-xs font-semibold text-slate-600">
-                    Program Manager
-                  </label>
-                  {selectedPmIds.length > 0 && (
-                    <DynamicTooltip
-                      placement="top"
-                      alwaysShow={true}
-                      tooltip={
-                        <div className="space-y-1 py-0.5">
-                          <div className="text-[10px] font-bold uppercase tracking-wider text-indigo-500">
-                            Assigned Managers ({selectedPmIds.length})
-                          </div>
-                          <div className="space-y-0.5">
-                            {selectedPmIds.map((id, i) => {
-                              const emp = employees.find((e) => e.id === id);
-                              return (
-                                <div
-                                  key={id}
-                                  className="flex items-center gap-1.5 whitespace-nowrap py-0.5 text-xs text-slate-700"
-                                >
-                                  <span>{formatDisplayName(emp?.name) || "Unknown"}</span>
-                                  {i === 0 && (
-                                    <span className="text-[9px] font-semibold uppercase tracking-wide text-indigo-500 bg-indigo-50 px-1 rounded">
-                                      primary
-                                    </span>
-                                  )}
-                                </div>
-                              );
-                            })}
-                          </div>
-                        </div>
-                      }
-                    >
-                      <span className="inline-flex h-4 min-w-[16px] cursor-pointer items-center justify-center rounded-full bg-indigo-100 px-1 text-[10px] font-bold text-indigo-700">
-                        {selectedPmIds.length}
-                      </span>
-                    </DynamicTooltip>
-                  )}
-                </div>
-                <PmMultiSelect
-                  employees={pmEmployees}
-                  value={selectedPmIds}
-                  onChange={setSelectedPmIds}
-                  isPm={isPm}
-                  pmEmployeeId={pmEmployeeId}
-                />
-              </div>
-
-              <div>
-                <div className="mb-1 flex items-center gap-1.5">
-                  <label className="block text-xs font-semibold text-slate-600">
-                    Team Lead
-                  </label>
-                  {selectedTeamLeadIds.length > 0 && (
-                    <DynamicTooltip
-                      placement="top"
-                      alwaysShow={true}
-                      tooltip={
-                        <div className="space-y-1 py-0.5">
-                          <div className="text-[10px] font-bold uppercase tracking-wider text-emerald-600">
-                            Assigned Leads ({selectedTeamLeadIds.length})
-                          </div>
-                          <div className="space-y-0.5">
-                            {selectedTeamLeadIds.map((id) => {
-                              const emp = employees.find((e) => e.id === id);
-                              return (
-                                <div
-                                  key={id}
-                                  className="flex items-center gap-1.5 whitespace-nowrap py-0.5 text-xs text-slate-700"
-                                >
-                                  <span>{formatDisplayName(emp?.name) || "Unknown"}</span>
-                                  {!isTeamLeadDesignation(emp?.designation) && (
-                                    <span className="text-[9px] font-semibold uppercase tracking-wide text-amber-500 bg-amber-50 px-1 rounded">
-                                      temp
-                                    </span>
-                                  )}
-                                </div>
-                              );
-                            })}
-                          </div>
-                        </div>
-                      }
-                    >
-                      <span className="inline-flex h-4 min-w-[16px] cursor-pointer items-center justify-center rounded-full bg-emerald-100 px-1 text-[10px] font-bold text-emerald-700">
-                        {selectedTeamLeadIds.length}
-                      </span>
-                    </DynamicTooltip>
-                  )}
-                </div>
-                <TeamLeadMultiSelect
-                  employees={teamLeadEmployees}
-                  value={selectedTeamLeadIds}
-                  onChange={setSelectedTeamLeadIds}
-                  excludeIds={selectedPmIds}
-                  lockedId={isTeamLeadRole ? pmEmployeeId : null}
-                />
-              </div>
-
-              <div>
-                <label className="block text-[11px] font-semibold text-slate-600 mb-1">
-                  Priority <span className="font-normal text-slate-400">(Sugg: {prioritySuggestion})</span>
-                </label>
-                <Dropdown
-                  value={formPriority}
-                  onChange={setFormPriority}
-                  options={[
-                    { value: "auto", label: `Auto (${prioritySuggestion})` },
-                    { value: "P0", label: "P0" },
-                    { value: "P1", label: "P1" },
-                    { value: "P2", label: "P2" },
-                    { value: "P3", label: "P3" },
-                    { value: "medium", label: "Medium (Legacy)" }
-                  ]}
-                  className="w-full min-h-[42px]"
-                  optionsClassName="w-full"
-                />
-              </div>
-            </div>
-
-            {/* Status / Client Sentiment tabs + timings / gearing / date / guidelines */}
-            <div className="grid grid-cols-1 lg:grid-cols-2 gap-4">
-              {/* Left: tabbed Status | Client Sentiment card */}
-              <div className="rounded-xl border border-slate-200 p-3">
-                <div className="mb-3 flex items-center gap-4 border-b border-slate-200">
-                  <button
-                    type="button"
-                    onClick={() => setModalInfoTab("status")}
-                    className={`-mb-px flex items-center gap-1.5 border-b-2 pb-2 text-[13px] font-semibold transition-colors ${modalInfoTab === "status" ? "border-indigo-600 text-slate-900" : "border-transparent text-slate-400 hover:text-slate-600"}`}
-                  >
-                    <Clock className="h-3.5 w-3.5" /> Status
-                  </button>
-                  <button
-                    type="button"
-                    onClick={() => setModalInfoTab("sentiment")}
-                    className={`-mb-px flex items-center gap-1.5 border-b-2 pb-2 text-[13px] font-semibold transition-colors ${modalInfoTab === "sentiment" ? "border-indigo-600 text-slate-900" : "border-transparent text-slate-400 hover:text-slate-600"}`}
-                  >
-                    <Smile className="h-3.5 w-3.5" /> Client Sentiment
-                  </button>
-                </div>
-
-                {/* Values are submitted via these hidden inputs regardless of the active tab */}
-                <input
-                  type="hidden"
-                  name="project_status"
-                  value={formProjectStatus}
-                />
-                <input type="hidden" name="sentiment" value={formSentiment} />
-
-                {modalInfoTab === "status" ? (
-                  <div className="grid grid-cols-2 gap-1.5">
-                    {[
-                      { value: "poc", label: "POC" },
-                      { value: "on-hold", label: "On Hold" },
-                      { value: "active", label: "In Progress" },
-                      { value: "completed", label: "Completed" },
-                      { value: "cancelled", label: "Cancelled" },
-                    ].map((opt) => {
-                      const on = formProjectStatus === opt.value;
-                      return (
-                        <button
-                          key={opt.value}
-                          type="button"
-                          onClick={() => setFormProjectStatus(opt.value)}
-                          className={`flex w-full items-center gap-2 rounded-lg border px-3 py-2 text-sm transition-colors ${on ? "border-indigo-300 bg-indigo-50 font-medium text-indigo-700" : "border-slate-200 bg-white text-slate-600 hover:bg-slate-50"}`}
+              <FormSection title="People" hint="Who manages and leads the work">
+                <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+                  <div className={PF.control}>
+                    <div className="mb-1.5 flex items-center justify-between">
+                      <label className="text-[13px] font-medium text-slate-700">Program managers</label>
+                      {selectedPmIds.length > 0 && (
+                        <DynamicTooltip
+                          placement="top"
+                          alwaysShow={true}
+                          tooltip={
+                            <div className="space-y-1 py-0.5">
+                              {selectedPmIds.map((id, i) => {
+                                const emp = employees.find((e) => e.id === id);
+                                return (
+                                  <div key={id} className="flex items-center gap-2 whitespace-nowrap text-xs text-slate-700">
+                                    <span>{formatDisplayName(emp?.name) || "Unknown"}</span>
+                                    {i === 0 && <span className="text-slate-400">Primary</span>}
+                                  </div>
+                                );
+                              })}
+                            </div>
+                          }
                         >
-                          <span
-                            className={`h-1.5 w-1.5 rounded-full ${on ? "bg-indigo-500" : "bg-slate-300"}`}
-                          />
-                          {opt.label}
-                        </button>
-                      );
-                    })}
-                  </div>
-                ) : (
-                  <div className="grid grid-cols-2 gap-1.5">
-                    {[
-                      { value: "", label: "Not set", dot: "bg-slate-300" },
-                      { value: "GOOD", label: "Good", dot: "bg-emerald-500" },
-                      { value: "AVG", label: "Avg", dot: "bg-amber-500" },
-                      { value: "Poor", label: "Poor", dot: "bg-red-500" },
-                    ].map((opt) => {
-                      const on = formSentiment === opt.value;
-                      return (
-                        <button
-                          key={opt.value || "none"}
-                          type="button"
-                          onClick={() => setFormSentiment(opt.value)}
-                          className={`flex w-full items-center gap-2 rounded-lg border px-3 py-2 text-sm transition-colors ${on ? "border-indigo-300 bg-indigo-50 font-medium text-indigo-700" : "border-slate-200 bg-white text-slate-600 hover:bg-slate-50"}`}
-                        >
-                          <span
-                            className={`h-1.5 w-1.5 rounded-full ${opt.dot}`}
-                          />
-                          {opt.label}
-                        </button>
-                      );
-                    })}
-                  </div>
-                )}
-              </div>
-
-              {/* Right: timings, gearing / date, guidelines */}
-              <div className="space-y-3">
-                <div className="grid grid-cols-2 gap-3">
-                  <div>
-                    <label className="block text-xs font-semibold text-slate-600 mb-1">
-                      Annotation Time / Task (min){" "}
-                      <span className="text-red-500">*</span>
-                    </label>
-                    <input
-                      type="number"
-                      name="estimated_time_per_task"
-                      required
-                      min="0.1"
-                      step="0.1"
-                      defaultValue={
-                        (editingProject || copyingProject)
-                          ?.estimated_time_per_task
-                          ? parseFloat(
-                            (
-                              (editingProject || copyingProject)
-                                .estimated_time_per_task * 60
-                            ).toFixed(1),
-                          )
-                          : ""
-                      }
-                      onWheel={(e) => e.target.blur()}
-                      className="input [appearance:textfield] [&::-webkit-outer-spin-button]:appearance-none [&::-webkit-inner-spin-button]:appearance-none"
-                      placeholder="30"
+                          <span className="cursor-default text-xs tabular-nums text-slate-500">
+                            {selectedPmIds.length} selected
+                          </span>
+                        </DynamicTooltip>
+                      )}
+                    </div>
+                    <PmMultiSelect
+                      employees={pmEmployees}
+                      value={selectedPmIds}
+                      onChange={setSelectedPmIds}
+                      isPm={isPm}
+                      pmEmployeeId={pmEmployeeId}
                     />
                   </div>
-                  <div>
-                    <label className="block text-xs font-semibold text-slate-600 mb-1">
-                      Reviewer Time / Task (min)
-                    </label>
-                    <input
-                      type="number"
-                      name="review_time_per_task"
-                      min="0.1"
-                      step="0.1"
-                      defaultValue={
-                        (editingProject || copyingProject)?.review_time_per_task
-                          ? parseFloat(
-                            (
-                              (editingProject || copyingProject)
-                                .review_time_per_task * 60
-                            ).toFixed(1),
-                          )
-                          : ""
-                      }
-                      onWheel={(e) => e.target.blur()}
-                      className="input [appearance:textfield] [&::-webkit-outer-spin-button]:appearance-none [&::-webkit-inner-spin-button]:appearance-none"
-                      placeholder="15"
+
+                  <div className={PF.control}>
+                    <div className="mb-1.5 flex items-center justify-between">
+                      <label className="text-[13px] font-medium text-slate-700">Team leads</label>
+                      {selectedTeamLeadIds.length > 0 ? (
+                        <DynamicTooltip
+                          placement="top"
+                          alwaysShow={true}
+                          tooltip={
+                            <div className="space-y-1 py-0.5">
+                              {selectedTeamLeadIds.map((id) => {
+                                const emp = employees.find((e) => e.id === id);
+                                return (
+                                  <div key={id} className="flex items-center gap-2 whitespace-nowrap text-xs text-slate-700">
+                                    <span>{formatDisplayName(emp?.name) || "Unknown"}</span>
+                                    {!isTeamLeadDesignation(emp?.designation) && (
+                                      <span className="text-amber-600">Temporary</span>
+                                    )}
+                                  </div>
+                                );
+                              })}
+                            </div>
+                          }
+                        >
+                          <span className="cursor-default text-xs tabular-nums text-slate-500">
+                            {selectedTeamLeadIds.length} selected
+                          </span>
+                        </DynamicTooltip>
+                      ) : (
+                        <span className="inline-flex items-center gap-1.5 text-xs text-amber-700">
+                          <span className="h-1.5 w-1.5 rounded-full bg-amber-500" />
+                          No lead yet
+                        </span>
+                      )}
+                    </div>
+                    <TeamLeadMultiSelect
+                      employees={teamLeadEmployees}
+                      value={selectedTeamLeadIds}
+                      onChange={setSelectedTeamLeadIds}
+                      excludeIds={selectedPmIds}
+                      lockedId={isTeamLeadRole ? pmEmployeeId : null}
                     />
                   </div>
                 </div>
+              </FormSection>
 
-                <div className="grid grid-cols-2 gap-3">
-                  <div className="flex items-center gap-2">
-                    <label className="whitespace-nowrap text-xs font-semibold text-slate-600">
-                      Gearing Ratio:
+              {/* ── Effort ──────────────────────────────── */}
+              <FormSection title="Effort" hint="Time per task and the gearing ratio">
+                <div className="grid grid-cols-1 sm:grid-cols-3 gap-4">
+                  <div>
+                    <label className={PF.label}>
+                      Annotation <span className={PF.req}>*</span>
                     </label>
+                    <div className="relative">
+                      <input
+                        type="number"
+                        name="estimated_time_per_task"
+                        required
+                        min="0.1"
+                        step="0.1"
+                        defaultValue={
+                          (editingProject || copyingProject)?.estimated_time_per_task
+                            ? parseFloat(
+                              (
+                                (editingProject || copyingProject)
+                                  .estimated_time_per_task * 60
+                              ).toFixed(1),
+                            )
+                            : ""
+                        }
+                        onWheel={(e) => e.target.blur()}
+                        className={`${PF.input} ${PF.number} pr-20`}
+                        placeholder="30"
+                      />
+                      <span className={PF.suffix}>min / task</span>
+                    </div>
+                  </div>
+                  <div>
+                    <label className={PF.label}>Review</label>
+                    <div className="relative">
+                      <input
+                        type="number"
+                        name="review_time_per_task"
+                        min="0.1"
+                        step="0.1"
+                        defaultValue={
+                          (editingProject || copyingProject)?.review_time_per_task
+                            ? parseFloat(
+                              (
+                                (editingProject || copyingProject)
+                                  .review_time_per_task * 60
+                              ).toFixed(1),
+                            )
+                            : ""
+                        }
+                        onWheel={(e) => e.target.blur()}
+                        className={`${PF.input} ${PF.number} pr-20`}
+                        placeholder="15"
+                      />
+                      <span className={PF.suffix}>min / task</span>
+                    </div>
+                  </div>
+                  <div>
+                    <label className={PF.label}>Gearing ratio</label>
                     <input
                       type="number"
                       name="gearing_ratio"
@@ -2595,227 +2726,69 @@ const ProjectsPage = () => {
                         (editingProject || copyingProject)?.gearing_ratio ?? ""
                       }
                       onWheel={(e) => e.target.blur()}
-                      className="input flex-1 [appearance:textfield] [&::-webkit-outer-spin-button]:appearance-none [&::-webkit-inner-spin-button]:appearance-none"
-                      placeholder="e.g. 3.1"
-                    />
-                  </div>
-                  <div className="flex items-center gap-2">
-                    <label className="whitespace-nowrap text-xs font-semibold text-slate-600">
-                      Date:
-                    </label>
-                    <input
-                      type="date"
-                      name="start_date"
-                      required
-                      defaultValue={
-                        (editingProject || copyingProject)?.start_date
-                      }
-                      className="input flex-1"
+                      className={`${PF.input} ${PF.number}`}
+                      placeholder="3.1"
                     />
                   </div>
                 </div>
+              </FormSection>
 
-                <div>
-                  <label className="block text-xs font-semibold text-slate-600 mb-1">
-                    Project Guidelines
-                  </label>
-                  <div
-                    onDragOver={(e) => {
-                      e.preventDefault();
-                      setIsDragActive(true);
-                    }}
-                    onDragLeave={(e) => {
-                      e.preventDefault();
-                      setIsDragActive(false);
-                    }}
-                    onDrop={(e) => {
-                      e.preventDefault();
-                      setIsDragActive(false);
-                      addGuidelineFiles(e.dataTransfer.files);
-                    }}
-                    onClick={() => fileInputRef.current?.click()}
-                    className={`flex items-center justify-center gap-2 rounded-lg border border-dashed px-3 py-2.5 text-center cursor-pointer transition-colors ${isDragActive ? "border-indigo-500 bg-indigo-50" : "border-slate-300 bg-slate-50 hover:border-indigo-400 hover:bg-indigo-50/60"}`}
-                  >
-                    <input
-                      ref={fileInputRef}
-                      type="file"
-                      multiple
-                      className="hidden"
-                      onChange={(e) => {
-                        addGuidelineFiles(e.target.files);
-                        e.target.value = "";
-                      }}
-                    />
-                    <UploadCloud className="h-4 w-4 text-indigo-500" />
-                    <p className="text-xs font-medium text-slate-600">
-                      Drag documents here or click to browse
-                    </p>
-                  </div>
-                  {guidelineFiles.length > 0 && (
-                    <div className="mt-2 space-y-1.5">
-                      {guidelineFiles.map((file) => (
-                        <div
-                          key={`${file.name}-${file.size}-${file.lastModified}`}
-                          className="flex items-center justify-between rounded-lg border border-slate-200 bg-white px-3 py-1.5"
-                        >
-                          <div className="flex items-center gap-2 min-w-0">
-                            <FileText className="h-4 w-4 shrink-0 text-indigo-500" />
-                            <p className="truncate text-xs font-medium text-slate-700">
-                              {file.name}
-                            </p>
-                          </div>
-                          <button
-                            type="button"
-                            onClick={(e) => {
-                              e.stopPropagation();
-                              removeGuidelineFile(file);
-                            }}
-                            className="text-xs text-red-500 hover:text-red-600"
-                          >
-                            Remove
-                          </button>
-                        </div>
-                      ))}
-                    </div>
-                  )}
-                </div>
-              </div>
-            </div>
-
-            {/* Encord Project ID (full width) */}
-            <div>
-              <label className="block text-xs font-semibold text-slate-600 mb-1">
-                Encord Project ID
-              </label>
-              <input
-                type="text"
-                name="encord_project_hash"
-                defaultValue={
-                  (editingProject || copyingProject)?.encord_project_hash || ""
+              {/* ── Project type ────────────────────────── */}
+              <FormSection
+                title="Project type"
+                hint="Pick a subtype in each category that applies"
+                aside={
+                  <span className="text-xs tabular-nums text-slate-500">
+                    {Object.keys(projectTypes).length} of {PROJECT_TYPE_CATEGORIES.length} set
+                  </span>
                 }
-                className="input font-mono text-sm"
-                placeholder="Encord project hash (enables analytics for this project)"
-              />
-            </div>
-
-            {/* Project Types | Team Composition tabbed card. Both panels stay
- mounted (inactive one hidden via CSS) so the team-count inputs are
- always present in the submitted FormData. */}
-            <div className="rounded-xl border border-slate-200">
-              <div className="flex items-center gap-4 border-b border-slate-200 px-3 pt-2">
-                <button
-                  type="button"
-                  onClick={() => setModalBuildTab("types")}
-                  className={`-mb-px border-b-2 pb-2 text-[13px] font-semibold transition-colors ${modalBuildTab === "types" ? "border-indigo-600 text-slate-900" : "border-transparent text-slate-400 hover:text-slate-600"}`}
-                >
-                  Project Types
-                </button>
-                <button
-                  type="button"
-                  onClick={() => setModalBuildTab("team")}
-                  className={`-mb-px border-b-2 pb-2 text-[13px] font-semibold transition-colors ${modalBuildTab === "team" ? "border-indigo-600 text-slate-900" : "border-transparent text-slate-400 hover:text-slate-600"}`}
-                >
-                  Team Composition
-                </button>
-              </div>
-
-              <div className="p-3">
-                {/* Project Types */}
-                <div className={modalBuildTab === "types" ? "" : "hidden"}>
-                  <div className="flex flex-wrap gap-2">
-                    {PROJECT_TYPE_CATEGORIES.map((cat) => {
-                      const isActive = activeTypeTab === cat.key;
-                      const chosen = projectTypes[cat.key];
-                      return (
-                        <button
-                          key={cat.key}
-                          type="button"
-                          onClick={() => {
-                            setActiveTypeTab(cat.key);
-                            setTypeTabTouched(true);
-                          }}
-                          className={`inline-flex items-center gap-1.5 rounded-lg px-3 py-1.5 text-xs font-medium transition-colors ${isActive ? "bg-indigo-600 text-white" : "border border-slate-200 bg-white text-slate-600 hover:bg-slate-50"}`}
-                        >
+              >
+                <div className="overflow-visible rounded-lg border border-slate-200 divide-y divide-slate-100">
+                  {PROJECT_TYPE_CATEGORIES.map((cat) => {
+                    const chosen = projectTypes[cat.key];
+                    return (
+                      <div
+                        key={cat.key}
+                        className="grid grid-cols-1 sm:grid-cols-[minmax(0,1fr)_260px] items-center gap-2 px-3 py-2"
+                      >
+                        <span className="flex items-center gap-2 text-sm text-slate-700">
+                          <span className={`h-1.5 w-1.5 rounded-full ${chosen ? "bg-indigo-500" : "bg-slate-200"}`} />
                           {cat.label || cat.key}
-                          {chosen && (
-                            <span
-                              className={`rounded-full px-1.5 py-0.5 text-[10px] ${isActive ? "bg-white/20 text-white" : "bg-indigo-50 text-indigo-600"}`}
-                            >
-                              1
-                            </span>
-                          )}
-                        </button>
-                      );
-                    })}
-                  </div>
-
-                  {PROJECT_TYPE_CATEGORIES.filter(
-                    (c) => c.key === activeTypeTab,
-                  ).map((cat) => (
-                    <div key={cat.key} className="mt-3">
-                      <label className="mb-1 block text-[11px] font-medium text-slate-500">
-                        {cat.label || cat.key} — Subtype
-                      </label>
-                      <Dropdown
-                        defaultOpen={typeTabTouched}
-                        options={[
-                          { value: "", label: "Not set" },
-                          ...cat.subtypes.map((s) => ({ value: s, label: s })),
-                        ]}
-                        value={projectTypes[cat.key] || ""}
-                        onChange={(val) =>
-                          setProjectTypes((prev) => {
-                            const next = { ...prev };
-                            if (val) next[cat.key] = val;
-                            else delete next[cat.key];
-                            return next;
-                          })
-                        }
-                        placeholder="Select a subtype"
-                      />
-                    </div>
-                  ))}
-
-                  {Object.keys(projectTypes).length > 0 && (
-                    <div className="mt-3 flex flex-wrap gap-1.5">
-                      {Object.entries(projectTypes).map(([cat, sub]) => (
-                        <span
-                          key={cat}
-                          className="inline-flex items-center gap-1 rounded-full bg-indigo-50 px-2.5 py-1 text-xs font-medium text-indigo-700"
-                        >
-                          <span className="text-indigo-400">
-                            {typeLabel(cat)}:
-                          </span>{" "}
-                          {sub}
-                          <button
-                            type="button"
-                            onClick={() =>
+                        </span>
+                        <div className={PF.control}>
+                          <Dropdown
+                            options={[
+                              { value: "", label: "Not set" },
+                              ...cat.subtypes.map((s) => ({ value: s, label: s })),
+                            ]}
+                            value={chosen || ""}
+                            onChange={(val) =>
                               setProjectTypes((prev) => {
-                                const n = { ...prev };
-                                delete n[cat];
-                                return n;
+                                const next = { ...prev };
+                                if (val) next[cat.key] = val;
+                                else delete next[cat.key];
+                                return next;
                               })
                             }
-                            className="text-indigo-400 hover:text-indigo-700"
-                          >
-                            <X className="h-3 w-3" />
-                          </button>
-                        </span>
-                      ))}
-                    </div>
-                  )}
+                            placeholder="Not set"
+                            className="w-full"
+                          />
+                        </div>
+                      </div>
+                    );
+                  })}
                 </div>
+              </FormSection>
 
-                {/* Team Composition */}
-                <div className={modalBuildTab === "team" ? "" : "hidden"}>
-                  <div className="mb-3">
-                    <label className="block text-[11px] font-medium text-slate-500 mb-1">
-                      Workforce Vendors
-                    </label>
+              {/* ── Team ────────────────────────────────── */}
+              <FormSection title="Team" hint="Vendors and headcount by role">
+                <div className="space-y-4">
+                  <div className={PF.control}>
+                    <label className={PF.label}>Workforce vendors</label>
                     <Dropdown
                       editable={true}
                       allowCreate={true}
-                      placeholder="Select or create a vendor"
+                      placeholder="Choose or add a vendor"
                       value=""
                       options={vendorsData
                         .filter((v) => !selectedVendors.includes(v.name))
@@ -2838,19 +2811,20 @@ const ProjectsPage = () => {
                         {selectedVendors.map((name) => (
                           <span
                             key={name}
-                            className="inline-flex items-center gap-1 rounded-full bg-indigo-50 px-2.5 py-1 text-xs font-medium text-indigo-700"
+                            className="inline-flex h-7 items-center gap-1.5 rounded-md border border-slate-200 bg-white pl-2.5 pr-1.5 text-[13px] text-slate-700"
                           >
                             {name}
                             <button
                               type="button"
+                              aria-label={`Remove ${name}`}
                               onClick={() =>
                                 setSelectedVendors((prev) =>
                                   prev.filter((v) => v !== name),
                                 )
                               }
-                              className="text-indigo-400 hover:text-indigo-700"
+                              className="rounded p-0.5 text-slate-400 hover:bg-slate-100 hover:text-slate-700 transition-colors"
                             >
-                              <X className="h-3 w-3" />
+                              <X className="h-3.5 w-3.5" />
                             </button>
                           </span>
                         ))}
@@ -2858,11 +2832,11 @@ const ProjectsPage = () => {
                     )}
                   </div>
 
-                  <div className="grid grid-cols-2 sm:grid-cols-4 gap-2">
+                  <div className="grid grid-cols-2 sm:grid-cols-4 gap-x-4 gap-y-4">
                     {[
-                      ["annotators_total", "Total Annotators"],
-                      ["autonex_annotators", "Autonex Annotators"],
-                      ["autonex_reviewers", "Autonex Reviewers"],
+                      ["annotators_total", "Total annotators"],
+                      ["autonex_annotators", "Autonex annotators"],
+                      ["autonex_reviewers", "Autonex reviewers"],
                       ["others_count", "Others"],
                       // Only for development projects: they are staffed with
                       // engineers, not annotators, so the field would be dead
@@ -2876,9 +2850,7 @@ const ProjectsPage = () => {
                           field === "autonex_reviewers";
                         return (
                           <div key={field}>
-                            <label className="block text-[11px] font-medium text-slate-500 mb-1 truncate">
-                              {label}
-                            </label>
+                            <label className={`${PF.label} truncate`}>{label}</label>
                             <input
                               type="number"
                               name={field}
@@ -2904,7 +2876,7 @@ const ProjectsPage = () => {
                                     (editingProject || copyingProject)?.[field] ?? "",
                                 })}
                               onWheel={(e) => e.target.blur()}
-                              className="input"
+                              className={`${PF.input} ${PF.number}`}
                               placeholder="0"
                             />
                           </div>
@@ -2914,18 +2886,17 @@ const ProjectsPage = () => {
                         editable numbers that could disagree with the people actually
                         chosen — a project could name three leads and claim one. */}
                     {[
-                      ["Team Managers", selectedPmIds.length],
-                      ["Team Leads", selectedTeamLeadIds.length],
-                    ].map(([label, value]) => (
+                      ["Managers", selectedPmIds.length, "Program managers"],
+                      ["Team leads", selectedTeamLeadIds.length, "Team leads"],
+                    ].map(([label, value, source]) => (
                       <div key={label}>
-                        <label className="mb-1 block truncate text-[11px] font-medium text-slate-500">
-                          {label}
-                        </label>
+                        <span className={`${PF.label} truncate`}>{label}</span>
                         <div
-                          className="input flex cursor-default items-center bg-slate-50 text-slate-500"
-                          title={`From the ${label === "Team Leads" ? "Team Lead" : "Program Manager"} field above`}
+                          className="flex h-9 items-center justify-between rounded-lg bg-slate-50 px-3 text-sm tabular-nums text-slate-700"
+                          title={`Counted from ${source} above`}
                         >
                           {value}
+                          <span className="text-xs text-slate-400">auto</span>
                         </div>
                       </div>
                     ))}
@@ -2934,12 +2905,82 @@ const ProjectsPage = () => {
                   {/* Mirrors api/projects.py `_autonex_headcount`. "Total
                       Annotators" is informational and deliberately not in the sum
                       — it counts the vendor's people as well as ours. */}
-                  <p className="mt-2 text-[11px] text-slate-400">
-                    {`Required headcount = Autonex Annotators + Autonex Reviewers + Others + Team Leads + Team Managers${isDevelopmentSelected ? " + Developers" : ""
-                      }. Leads and managers are counted from the fields above, not typed.`}
+                  <p className="text-xs leading-relaxed text-slate-500">
+                    Required headcount counts Autonex annotators, reviewers, others, team leads and managers
+                    {isDevelopmentSelected ? ", and developers" : ""}. Total annotators is for reference and
+                    includes vendor staff.
                   </p>
                 </div>
-              </div>
+              </FormSection>
+
+              {/* ── Guidelines ──────────────────────────── */}
+              <FormSection title="Guidelines" hint="Documents the team works from">
+                <div
+                  role="button"
+                  tabIndex={0}
+                  onKeyDown={(e) => {
+                    if (e.key === "Enter" || e.key === " ") {
+                      e.preventDefault();
+                      fileInputRef.current?.click();
+                    }
+                  }}
+                  onDragOver={(e) => {
+                    e.preventDefault();
+                    setIsDragActive(true);
+                  }}
+                  onDragLeave={(e) => {
+                    e.preventDefault();
+                    setIsDragActive(false);
+                  }}
+                  onDrop={(e) => {
+                    e.preventDefault();
+                    setIsDragActive(false);
+                    addGuidelineFiles(e.dataTransfer.files);
+                  }}
+                  onClick={() => fileInputRef.current?.click()}
+                  className={`flex h-16 items-center justify-center gap-2 rounded-lg border border-dashed text-center cursor-pointer transition-colors focus:outline-none focus-visible:ring-2 focus-visible:ring-indigo-500/20 ${isDragActive ? "border-indigo-500 bg-indigo-50/60" : "border-slate-300 hover:border-slate-400 hover:bg-slate-50"}`}
+                >
+                  <input
+                    ref={fileInputRef}
+                    type="file"
+                    multiple
+                    className="hidden"
+                    onChange={(e) => {
+                      addGuidelineFiles(e.target.files);
+                      e.target.value = "";
+                    }}
+                  />
+                  <UploadCloud className="h-4 w-4 text-slate-400" strokeWidth={1.5} />
+                  <p className="text-[13px] text-slate-600">
+                    Drop files here or <span className="font-medium text-indigo-700">browse</span>
+                  </p>
+                </div>
+                {guidelineFiles.length > 0 && (
+                  <ul className="mt-2 divide-y divide-slate-100 rounded-lg border border-slate-200">
+                    {guidelineFiles.map((file) => (
+                      <li
+                        key={`${file.name}-${file.size}-${file.lastModified}`}
+                        className="flex h-10 items-center justify-between gap-3 px-3"
+                      >
+                        <div className="flex min-w-0 items-center gap-2">
+                          <FileText className="h-4 w-4 shrink-0 text-slate-400" strokeWidth={1.5} />
+                          <p className="truncate text-[13px] text-slate-700">{file.name}</p>
+                        </div>
+                        <button
+                          type="button"
+                          onClick={(e) => {
+                            e.stopPropagation();
+                            removeGuidelineFile(file);
+                          }}
+                          className="shrink-0 rounded-md px-2 py-1 text-xs text-slate-500 hover:bg-rose-50 hover:text-rose-600 transition-colors"
+                        >
+                          Remove
+                        </button>
+                      </li>
+                    ))}
+                  </ul>
+                )}
+              </FormSection>
             </div>
           </Modal.Compact.Body>
           <Modal.Compact.Footer>
@@ -2949,11 +2990,12 @@ const ProjectsPage = () => {
             <Button
               type="submit"
               form="project-form"
+              className="h-9 px-4 rounded-lg text-sm font-medium shadow-none"
               disabled={createMutation.isPending || updateMutation.isPending}
               isLoading={createMutation.isPending || updateMutation.isPending}
             >
               {!(createMutation.isPending || updateMutation.isPending) &&
-                (editingProject ? "Update Project" : "Create Project")}
+                (editingProject ? "Save changes" : copyingProject ? "Create copy" : "Create project")}
             </Button>
           </Modal.Compact.Footer>
         </form>
