@@ -18,6 +18,7 @@ import {
   Sparkles,
   FileSpreadsheet,
   Settings,
+  Award,
 } from "lucide-react";
 
 /**
@@ -66,9 +67,10 @@ export const adminNavigationGroups = [
   },
   {
     id: "onboarding",
-    title: "Onboarding",
+    title: "Training & Evaluation",
     items: [
-      { name: "Training Modules", href: "/admin/modules", icon: GraduationCap },
+      { name: "Training and Development", href: "/admin/modules", icon: GraduationCap },
+      { name: "Overall Reports", href: "/admin/training-reports", icon: Award },
       { name: "Newly Onboarded", href: "/admin/newly-onboarded", icon: Sparkles },
       { name: "Progress Reports", href: "/admin/onboarding-reports", icon: FileSpreadsheet },
     ],
@@ -78,5 +80,7 @@ export const adminNavigationGroups = [
 // Flat export of all navigation items for backwards compatibility and route resolution
 export const navigation = [
   ...adminNavigationGroups.flatMap((group) => group.items),
+  { name: "Assessments", href: "/admin/assessments", icon: ShieldCheck },
+  { name: "Training Modules", href: "/admin/training-modules", icon: BookOpen },
   { name: "Company Settings", href: "/admin/company-settings", icon: Settings },
 ];

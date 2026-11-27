@@ -407,8 +407,11 @@ export default function NeedsActionCard({
         </div>
       </div>
 
-      {/* Review List: Exactly 4 items visible, rest on internal scroll */}
-      <div className="space-y-1.5 flex-1 min-h-0 max-h-[282px] overflow-y-auto pr-1 slick-scrollbar">
+      {/* Review List: 4 items + below gap utilized, rest on internal scroll */}
+      <div
+        className="space-y-1.5 flex-1 min-h-0 max-h-[265px] overflow-y-auto pr-1 slick-scrollbar"
+        style={{ maxHeight: "265px" }}
+      >
         {currentTabItems.length === 0 ? (
           <div className="py-8 text-center text-xs text-slate-400 font-medium">
             No pending items to review
@@ -442,7 +445,7 @@ export default function NeedsActionCard({
                     <ItemIcon className="h-3.5 w-3.5" />
                   </span>
                   <div className="min-w-0 flex-1">
-                    <div className="flex items-center gap-1.5 flex-wrap">
+                    <div className="flex items-center gap-1.5 flex-nowrap min-w-0">
                       <p
                         className="text-[12.5px] font-semibold text-slate-800 truncate"
                         title={item.name}

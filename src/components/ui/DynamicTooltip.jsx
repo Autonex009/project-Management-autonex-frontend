@@ -138,6 +138,8 @@ export default function DynamicTooltip({
         ref={triggerRef}
         onMouseEnter={handleMouseEnter}
         onMouseLeave={handleMouseLeave}
+        onFocus={handleMouseEnter}
+        onBlur={handleMouseLeave}
         className={`min-w-0 ${children ? "inline-flex" : "truncate"} ${className}`}
       >
         {children || displayText}

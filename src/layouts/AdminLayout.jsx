@@ -10,8 +10,11 @@ import usePageStateStore from "../store/usePageStateStore";
 import useScrollStore from "../store/useScrollStore";
 
 const ADMIN_ROUTE_LABELS = {
-  "/admin/modules": "Training Modules",
+  "/admin/modules": "Training and Development",
+  "/admin/training-modules": "Training and Development",
   "/admin/modules/new": "New Module",
+  "/admin/assessments": "Training and Development",
+  "/admin/training-reports": "Overall Reports",
   "/admin/onboarding-reports": "Progress Reports",
   "/admin/newly-onboarded": "Newly Onboarded",
   "/admin/change-log": "Audit Log",
