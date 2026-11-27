@@ -26,16 +26,12 @@ import Dropdown from "../../components/ui/Dropdown";
 import Modal from "../../components/ui/Modal";
 import Table from "../../components/ui/Table";
 import ConfirmDialog from "../../components/ui/ConfirmDialog";
+import DynamicTooltip from "../../components/ui/DynamicTooltip";
 
-// Truncated text that reveals its full value in a light (white) tooltip on hover
-// (replaces the browser's dark native title tooltip).
+// Truncated text that reveals its full value in a dynamic floating tooltip on hover
+// (auto-flips top/bottom, clamps to viewport, and only shows when text is actually truncated).
 const TruncTip = ({ text, className = "" }) => (
-  <span className="group/tip relative block min-w-0 flex-1">
-    <span className={`block truncate ${className}`}>{text}</span>
-    <span className="pointer-events-none absolute left-0 top-full z-30 mt-1 hidden w-max max-w-[280px] whitespace-normal break-words rounded-lg border border-slate-200 bg-white px-2.5 py-1.5 text-[11px] font-medium text-slate-600 shadow-lg group-hover/tip:block">
-      {text}
-    </span>
-  </span>
+  <DynamicTooltip text={text} className={`block ${className}`} placement="top" />
 );
 
 const PAGE_SIZE = 12;

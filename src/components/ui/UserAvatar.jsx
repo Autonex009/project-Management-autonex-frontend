@@ -81,6 +81,8 @@ export default function UserAvatar({
         src={resolvedUrl}
         alt={name}
         referrerPolicy="no-referrer"
+        loading="lazy"
+        decoding="async"
         onError={() => setHasError(true)}
         className={`${currentSizeClass} ${rounded} object-cover flex-shrink-0 ring-1 ring-slate-200 ${imgClassName} ${className}`}
       />
