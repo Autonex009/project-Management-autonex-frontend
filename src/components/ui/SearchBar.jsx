@@ -1,7 +1,7 @@
 import { Search, X } from "lucide-react";
 
 const SIZES = {
-  sm: "py-1.5 text-sm rounded-lg",
+  sm: "h-9 py-0 text-sm rounded-lg",
   md: "py-2 text-sm rounded-xl",
 };
 

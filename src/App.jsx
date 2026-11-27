@@ -82,10 +82,21 @@ const OnboardingDashboard = lazy(
   () => import("./pages/employee/OnboardingDashboard"),
 );
 const ModuleView = lazy(() => import("./pages/employee/ModuleView"));
+const CandidateExamPage = lazy(
+  () => import("./pages/employee/CandidateExamPage"),
+);
+const EmployeeAssessmentsPage = lazy(
+  () => import("./pages/employee/EmployeeAssessmentsPage"),
+);
+const PMTrainingDevelopmentPage = lazy(
+  () => import("./pages/pm/PMTrainingDevelopmentPage"),
+);
 const NewlyOnboardedPage = lazy(() => import("./pages/NewlyOnboardedPage"));
 const PMMentorshipPage = lazy(() => import("./pages/pm/PMMentorshipPage"));
 // const PMOnboardingDashboard = lazy(() => import('./pages/pm/PMOnboardingDashboard'));
 const AdminModulesList = lazy(() => import("./pages/admin/AdminModulesList"));
+const AdminAssessmentsPage = lazy(() => import("./pages/admin/AdminAssessmentsPage"));
+const AdminOverallReportsPage = lazy(() => import("./pages/admin/AdminOverallReportsPage"));
 const AdminModulesBuilder = lazy(
   () => import("./pages/admin/AdminModulesBuilder"),
 );
@@ -263,7 +274,11 @@ function App() {
                 <Route path="referrals" element={<ReferralsPage />} />
                 <Route path="guidelines" element={<GuidelinesPage />} />
                 <Route path="modules" element={<AdminModulesList />} />
+                <Route path="training-modules" element={<AdminModulesList />} />
+                <Route path="training-development" element={<AdminModulesList />} />
                 <Route path="modules/new" element={<AdminModulesBuilder />} />
+                <Route path="assessments" element={<AdminAssessmentsPage />} />
+                <Route path="training-reports" element={<AdminOverallReportsPage />} />
                 {/* <Route path="onboarding-team" element={<AdminTeamPage />} /> */}
                 <Route path="onboarding-reports" element={<AdminReportsPage />} />
                 <Route path="newly-onboarded" element={<NewlyOnboardedPage />} />
@@ -330,6 +345,7 @@ function App() {
                 <Route path="company-info" element={<CompanyInfoPage />} />
                 <Route path="onboarding" element={<OnboardingDashboard />} />
                 <Route path="onboarding/:moduleId" element={<ModuleView />} />
+                <Route path="assessments" element={<EmployeeAssessmentsPage />} />
                 <Route
                   path="lunch-menu"
                   element={
@@ -381,6 +397,10 @@ function App() {
                 <Route path="onboarding/:moduleId" element={<ModuleView />} />
                 <Route path="onboarding-mentor" element={<PMMentorshipPage />} />
                 <Route
+                  path="training-development"
+                  element={<PMTrainingDevelopmentPage />}
+                />
+                <Route
                   path="lunch-menu"
                   element={
                     <CanteenManagerRoute>
@@ -394,6 +414,16 @@ function App() {
                 />
                 <Route path="profile" element={<ProfilePage />} />
               </Route>
+
+              {/* Protected Candidate Proctored Assessment Room */}
+              <Route
+                path="/assessments/:enrollmentId/take"
+                element={
+                  <ProtectedRoute allowedRoles={["employee", "pm", "team_lead", "hr", "admin"]}>
+                    <CandidateExamPage />
+                  </ProtectedRoute>
+                }
+              />
 
               {/* Catch all */}
               <Route path="*" element={<Navigate to="/login/admin" replace />} />

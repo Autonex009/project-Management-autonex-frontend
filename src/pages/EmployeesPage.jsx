@@ -597,13 +597,15 @@ function DocsSummaryCell({ employeeId, onOpen }) {
   const total = data?.total ?? 6;
   return (
     <button
+      type="button"
       onClick={onOpen}
-      className="p-1.5 text-slate-400 hover:text-indigo-600 hover:bg-indigo-50 rounded transition-colors relative"
+      className="inline-flex items-center justify-center w-8 h-8 text-slate-400 hover:text-slate-700 hover:bg-slate-100 rounded-lg focus:outline-none focus-visible:ring-2 focus-visible:ring-indigo-500/30 transition-colors relative"
       title={`${present}/${total} Documents`}
+      aria-label={`${present} of ${total} documents`}
     >
-      <FileText className="w-5 h-5" />
+      <FileText className="w-4 h-4" strokeWidth={1.5} />
       {present < total && (
-        <span className="absolute top-1 right-1 w-2 h-2 bg-amber-500 border border-white rounded-full"></span>
+        <span className="absolute top-1.5 right-1.5 w-1.5 h-1.5 bg-amber-500 rounded-full" />
       )}
     </button>
   );
@@ -1340,33 +1342,36 @@ function EmployeeActionMenu({
           e.stopPropagation();
           setIsOpen((prev) => !prev);
         }}
-        className={`p-1.5 rounded-lg text-slate-400 hover:text-slate-700 hover:bg-slate-100 transition-colors ${isOpen ? "bg-slate-100 text-slate-700 " : ""
+        className={`inline-flex items-center justify-center w-8 h-8 rounded-lg text-slate-400 hover:text-slate-700 hover:bg-slate-100 focus:outline-none focus-visible:ring-2 focus-visible:ring-indigo-500/30 transition-colors ${isOpen ? "bg-slate-100 text-slate-700" : ""
           }`}
-        title="More Actions"
+        title="More actions"
+        aria-label="More actions"
       >
-        <MoreVertical className="w-4 h-4" />
+        <MoreVertical className="w-4 h-4" strokeWidth={1.5} />
       </button>
 
       {isOpen && (
         <div
-          className={`absolute right-0 ${positionClass} z-50 w-44 bg-white rounded-xl shadow-xl border border-slate-200/80 py-1 text-xs font-medium focus:outline-none`}
+          className={`absolute right-0 ${positionClass} z-50 w-44 bg-white rounded-xl shadow-[0_8px_24px_rgba(15,23,42,0.08)] border border-slate-200/80 py-1 text-[13px] font-normal focus:outline-none`}
           onClick={(e) => e.stopPropagation()}
         >
           {statusParam === "archived" ? (
             <button
+              type="button"
               onClick={() => {
                 setIsOpen(false);
                 setRestoreTarget(row);
               }}
               disabled={restorePending}
-              className="w-full text-left px-3 py-2 text-slate-700 hover:bg-indigo-50 hover:text-indigo-600 flex items-center gap-2 transition-colors disabled:opacity-50"
+              className="w-full text-left px-3 py-2 text-slate-700 hover:bg-slate-50 hover:text-slate-900 flex items-center gap-2 transition-colors disabled:opacity-50"
             >
-              <RotateCcw className="w-3.5 h-3.5 text-indigo-500" />
-              <span>Restore Employee</span>
+              <RotateCcw className="w-4 h-4 text-slate-400" strokeWidth={1.5} />
+              <span>Restore employee</span>
             </button>
           ) : (
             <>
               <button
+                type="button"
                 onClick={() => {
                   setIsOpen(false);
                   if (onEditEmployee) {
@@ -1379,37 +1384,39 @@ function EmployeeActionMenu({
                     setIsModalOpen(true);
                   }
                 }}
-                className="w-full text-left px-3 py-2 text-slate-700 hover:bg-slate-50 hover:text-indigo-600 flex items-center gap-2 transition-colors"
+                className="w-full text-left px-3 py-2 text-slate-700 hover:bg-slate-50 hover:text-slate-900 flex items-center gap-2 transition-colors"
               >
-                <Edit className="w-3.5 h-3.5 text-slate-400" />
-                <span>Edit Profile</span>
+                <Edit className="w-4 h-4 text-slate-400" strokeWidth={1.5} />
+                <span>Edit profile</span>
               </button>
 
               {row.employee_type === "Intern" && (
                 <button
+                  type="button"
                   onClick={() => {
                     setIsOpen(false);
                     handleConvertToFulltime(row);
                   }}
                   disabled={convertPending}
-                  className="w-full text-left px-3 py-2 text-slate-700 hover:bg-emerald-50 hover:text-emerald-600 flex items-center gap-2 transition-colors disabled:opacity-50"
+                  className="w-full text-left px-3 py-2 text-slate-700 hover:bg-slate-50 hover:text-slate-900 flex items-center gap-2 transition-colors disabled:opacity-50"
                 >
-                  <ArrowUpCircle className="w-3.5 h-3.5 text-emerald-500" />
-                  <span>Promote to Full-time</span>
+                  <ArrowUpCircle className="w-4 h-4 text-slate-400" strokeWidth={1.5} />
+                  <span>Promote to full-time</span>
                 </button>
               )}
 
-              <div className="my-1 border-t border-slate-100 " />
+              <div className="my-1 border-t border-slate-100" />
 
               <button
+                type="button"
                 onClick={() => {
                   setIsOpen(false);
                   setArchiveTarget(row);
                 }}
                 disabled={archivePending}
-                className="w-full text-left px-3 py-2 text-rose-600 hover:bg-rose-50 flex items-center gap-2 transition-colors disabled:opacity-50"
+                className="w-full text-left px-3 py-2 text-rose-600 hover:bg-rose-50/70 flex items-center gap-2 transition-colors disabled:opacity-50"
               >
-                <Trash2 className="w-3.5 h-3.5 text-rose-500" />
+                <Trash2 className="w-4 h-4 text-rose-500" strokeWidth={1.5} />
                 <span>Archive</span>
               </button>
             </>
@@ -2129,6 +2136,20 @@ const EmployeesPage = () => {
     shouldSearchServer && sortedEmployees.length === 0 && serverMatches.length > 0;
   const displayedEmployees = usingServerResults ? serverMatches : sortedEmployees;
 
+  const getRowPopoverPosition = (row) => {
+    const pageIndex = employees.indexOf(row);
+    const isNearTop = pageIndex < 4;
+    return isNearTop ? "top-full mt-2" : "bottom-full mb-2";
+  };
+
+  const isRowNearBottom = (row) => {
+    const pageIndex = employees.indexOf(row);
+    const totalVisible = employees.length;
+    return totalVisible <= 2
+      ? pageIndex === totalVisible - 1
+      : pageIndex >= totalVisible - 2;
+  };
+
   // useEffect(() => {
   //   setCurrentPage(1);
   // }, [
@@ -2646,6 +2667,9 @@ const EmployeesPage = () => {
       <Table
         variant="untitled"
         allowOverflow
+        cellPadding="px-4 py-2"
+        rowHeight="h-14"
+        className="!border-slate-200/80 !shadow-[0_1px_2px_rgba(15,23,42,0.04)]"
         loading={isFetching || skillsLoading}
         skeletonRows={10}
         columns={[
@@ -2655,65 +2679,59 @@ const EmployeesPage = () => {
               <button
                 type="button"
                 onClick={cycleNameSort}
-                className="inline-flex items-center gap-1 hover:text-slate-900"
+                className="inline-flex items-center gap-1 rounded-md px-1 -mx-1 py-0.5 text-slate-600 hover:text-slate-900 focus:outline-none focus-visible:ring-2 focus-visible:ring-indigo-500/30 transition-colors"
               >
                 Employee
                 {sortBy === "name-asc" ? (
-                  <ArrowUp className="w-3.5 h-3.5 text-indigo-600" />
+                  <ArrowUp className="w-4 h-4 text-indigo-600" strokeWidth={1.5} />
                 ) : sortBy === "name-desc" ? (
-                  <ArrowDown className="w-3.5 h-3.5 text-indigo-600" />
+                  <ArrowDown className="w-4 h-4 text-indigo-600" strokeWidth={1.5} />
                 ) : (
-                  <ArrowUpDown className="w-3.5 h-3.5 text-slate-400" />
+                  <ArrowUpDown className="w-4 h-4 text-slate-400" strokeWidth={1.5} />
                 )}
               </button>
             ),
-            width: "w-[17%]",
+            width: isHrOps ? "w-[20%]" : "w-[22%]",
             render: (value, row) => {
-              const visibleRows = displayedEmployees.slice(
-                (currentPage - 1) * PAGE_SIZE,
-                currentPage * PAGE_SIZE,
-              );
-              const pageIndex = visibleRows.indexOf(row);
-              const isNearTop = pageIndex < 4;
-              const positionClass = isNearTop
-                ? "top-full mt-1.5"
-                : "bottom-full mb-1.5";
+              const positionClass = getRowPopoverPosition(row);
               // Display only: middle names dropped and CAPS-LOCK names cased, so
               // the column reads evenly. The stored name is untouched — the hover
               // card below still shows it in full, and search/sort use it.
               const shortName = formatDisplayName(value) || value;
               return (
-                <div className="flex items-center gap-3">
+                <div className="flex items-center gap-3 min-w-0">
                   <UserAvatar
                     src={row.avatar_url}
                     name={value || "?"}
                     size="md"
                   />
-                  <div className="group relative min-w-0">
+                  <div className="group relative min-w-0 flex-1">
                     <Link
                       to={`/admin/employees/${row.id}`}
-                      className="text-[13.5px] font-semibold text-slate-900 truncate leading-tight hover:text-indigo-600 hover:underline cursor-pointer"
+                      className="block text-[14px] font-medium text-slate-900 truncate leading-5 hover:text-indigo-600 hover:underline focus:outline-none focus-visible:ring-2 focus-visible:ring-indigo-500/30 rounded-sm transition-colors"
                       title={value}
                     >
                       {shortName}
                     </Link>
-                    <div
-                      onClick={(e) => {
-                        e.stopPropagation();
-                        if (row.email) {
+                    {row.email && (
+                      <button
+                        type="button"
+                        onClick={(e) => {
+                          e.stopPropagation();
                           navigator.clipboard.writeText(row.email);
                           toast.success("Email copied to clipboard");
-                        }
-                      }}
-                      className="text-[12px] text-slate-400 cursor-pointer hover:text-indigo-600 transition-colors leading-tight mt-0.5 min-w-0"
-                    >
-                      <span className="pointer-events-none block truncate">{row.email}</span>
-                    </div>
+                        }}
+                        className="block max-w-full text-left text-[12px] font-normal text-slate-500 hover:text-indigo-600 focus:outline-none focus-visible:ring-2 focus-visible:ring-indigo-500/30 rounded-sm transition-colors leading-4 mt-0.5 truncate cursor-pointer"
+                        title={`Copy ${row.email}`}
+                      >
+                        {row.email}
+                      </button>
+                    )}
                     {/* Light hover card — full name + email */}
                     <div
-                      className={`absolute left-0 ${positionClass} hidden group-hover:block z-40 p-2.5 bg-white rounded-xl shadow-xl border border-slate-200 min-w-[180px] max-w-[280px] pointer-events-none`}
+                      className={`absolute left-0 ${positionClass} hidden group-hover:block z-40 p-3 bg-white rounded-xl shadow-[0_8px_24px_rgba(15,23,42,0.08)] border border-slate-200/80 min-w-[200px] max-w-[280px] pointer-events-none`}
                     >
-                      <div className="text-[13px] font-semibold text-slate-800 break-words">
+                      <div className="text-[13px] font-medium text-slate-900 break-words">
                         {value}
                       </div>
                       <div className="text-[12px] text-slate-500 break-words mt-0.5">
@@ -2722,7 +2740,7 @@ const EmployeesPage = () => {
                       {/* Encord ID is searchable, so it is worth being able to
                           read the value a search matched on. */}
                       {row.encord_id && (
-                        <div className="text-[11.5px] text-slate-400 break-words mt-1 pt-1 border-t border-slate-100">
+                        <div className="text-[12px] font-mono text-slate-500 break-words mt-2 pt-2 border-t border-slate-100">
                           Encord: {String(row.encord_id).trim()}
                         </div>
                       )}
@@ -2735,9 +2753,12 @@ const EmployeesPage = () => {
           {
             key: "designation",
             label: "Designation",
-            width: "w-[13%]",
+            width: isHrOps ? "w-[12%]" : "w-[13%]",
             render: (value) => (
-              <span className="pointer-events-none text-[13px] font-medium text-slate-600 whitespace-nowrap truncate max-w-[140px] inline-block align-middle">
+              <span
+                className="block truncate text-[13px] font-normal text-slate-600"
+                title={value || undefined}
+              >
                 {value || "—"}
               </span>
             ),
@@ -2746,7 +2767,7 @@ const EmployeesPage = () => {
             key: "employee_type",
             label: "Type",
             align: "left",
-            width: "w-[7%]",
+            width: "w-[8%]",
             render: (value, row) => {
               const valStr = String(value || "")
                 .toLowerCase()
@@ -2759,62 +2780,37 @@ const EmployeesPage = () => {
                 valStr.includes("contractor") || valStr.includes("part time");
               const hasPromotion = Boolean(row.converted_to_fulltime_at);
 
-              let textColorClass = "text-slate-600 font-medium";
-              let glowClass = "";
+              const dotClass = isFulltime
+                ? "bg-emerald-500"
+                : isIntern
+                  ? "bg-amber-500"
+                  : isContract
+                    ? "bg-sky-500"
+                    : "bg-slate-300";
 
-              if (isFulltime) {
-                textColorClass = "text-emerald-600 font-semibold";
-                if (hasPromotion)
-                  glowClass = "drop-shadow-[0_0_6px_rgba(16,185,129,0.75)]";
-              } else if (isIntern) {
-                textColorClass = "text-amber-600 font-semibold";
-                if (hasPromotion)
-                  glowClass = "drop-shadow-[0_0_6px_rgba(245,158,11,0.75)]";
-              } else if (isContract) {
-                textColorClass = "text-sky-500 font-semibold";
-                if (hasPromotion)
-                  glowClass = "drop-shadow-[0_0_6px_rgba(56,189,248,0.75)]";
-              }
-
-              const visibleRows = displayedEmployees.slice(
-                (currentPage - 1) * PAGE_SIZE,
-                currentPage * PAGE_SIZE,
-              );
-              const pageIndex = visibleRows.indexOf(row);
-              const isNearTop = pageIndex < 4;
-              const positionClass = isNearTop
-                ? "top-full mt-1.5"
-                : "bottom-full mb-1.5";
+              const positionClass = getRowPopoverPosition(row);
 
               return (
-                <div className="group relative flex items-center gap-1.5 whitespace-nowrap cursor-pointer">
-                  <span
-                    className={`text-[13px] ${textColorClass} ${glowClass} transition-all duration-200`}
-                  >
+                <div className="group relative inline-flex items-center gap-2 whitespace-nowrap cursor-default">
+                  <span className={`w-1.5 h-1.5 rounded-full shrink-0 ${dotClass}`} />
+                  <span className="text-[13px] font-normal text-slate-700">
                     {value || "—"}
                   </span>
 
                   {hasPromotion && (
-                    <span className="relative flex h-1.5 w-1.5">
-                      <span className="animate-ping absolute inline-flex h-full w-full rounded-full bg-emerald-400 opacity-75"></span>
-                      <span className="relative inline-flex rounded-full h-1.5 w-1.5 bg-emerald-500"></span>
-                    </span>
-                  )}
-
-                  {hasPromotion && (
                     <div
-                      className={`absolute left-0 ${positionClass} hidden group-hover:flex flex-col gap-1.5 z-30 p-2.5 bg-white text-slate-700 rounded-xl shadow-xl border border-slate-200 min-w-[190px] max-w-[250px] pointer-events-none whitespace-normal`}
+                      className={`absolute left-0 ${positionClass} hidden group-hover:flex flex-col gap-1 z-30 p-3 bg-white text-slate-700 rounded-xl shadow-[0_8px_24px_rgba(15,23,42,0.08)] border border-slate-200/80 min-w-[200px] max-w-[260px] pointer-events-none whitespace-normal`}
                     >
-                      <div className="text-[11px] font-semibold text-slate-400 uppercase tracking-wider">
-                        Promotion Details
+                      <div className="text-[12px] font-medium text-slate-500">
+                        Promotion details
                       </div>
-                      <div className="text-xs text-slate-600 leading-relaxed">
+                      <div className="text-[12px] text-slate-600 leading-5">
                         Promoted from{" "}
-                        <span className="font-semibold text-emerald-600">
+                        <span className="font-medium text-slate-900">
                           {row.previous_employee_type || "Intern"}
                         </span>{" "}
                         on{" "}
-                        <span className="font-semibold text-slate-900">
+                        <span className="font-medium text-slate-900 tabular-nums">
                           {formatDateDeterministic(
                             row.converted_to_fulltime_at,
                           )}
@@ -2830,16 +2826,16 @@ const EmployeesPage = () => {
             key: "date_of_joining",
             label: "Date of Joining",
             align: "left",
-            width: "w-[11%]",
+            width: "w-[10%]",
             render: (_, row) => {
               const dateVal = row.date_of_joining;
               if (!dateVal) {
                 return (
-                  <span className="text-[13px] text-slate-400 font-medium">—</span>
+                  <span className="text-[13px] text-slate-400">—</span>
                 );
               }
               return (
-                <span className="text-[13px] font-medium text-slate-700 whitespace-nowrap">
+                <span className="text-[13px] font-normal text-slate-700 tabular-nums whitespace-nowrap">
                   {formatDateDeterministic(dateVal)}
                 </span>
               );
@@ -2849,9 +2845,9 @@ const EmployeesPage = () => {
             key: "work_model",
             label: "Work Model",
             align: "left",
-            width: "w-[8%]",
+            width: "w-[7%]",
             render: (value, row) => (
-              <span className="text-[13px] font-medium text-slate-600 whitespace-nowrap">
+              <span className="text-[13px] font-normal text-slate-600 whitespace-nowrap">
                 {row.work_model || value || "WFO"}
               </span>
             ),
@@ -2860,58 +2856,59 @@ const EmployeesPage = () => {
             key: "reporting_manager",
             label: "Reporting Manager",
             align: "left",
-            width: "w-[13%]",
+            width: isHrOps ? "w-[12%]" : "w-[13%]",
             render: (_, row) => {
               const managers = row.managers || [];
               if (managers.length === 0) {
                 return (
-                  <span className="text-[13px] text-slate-400 font-medium">
-                    —
-                  </span>
+                  <span className="text-[13px] text-slate-400">—</span>
                 );
               }
 
-              const visibleRows = displayedEmployees.slice(
-                (currentPage - 1) * PAGE_SIZE,
-                currentPage * PAGE_SIZE,
-              );
-              const pageIndex = visibleRows.indexOf(row);
-              const isNearTop = pageIndex < 4;
-              const positionClass = isNearTop
-                ? "top-full mt-1.5"
-                : "bottom-full mb-1.5";
+              const positionClass = getRowPopoverPosition(row);
+              const primaryManager = formatDisplayName(managers[0]) || managers[0];
+              const extraManagers = managers.length - 1;
 
               return (
                 <div
-                  className="group relative flex items-center gap-1 flex-nowrap whitespace-nowrap cursor-default"
+                  className="group relative flex items-center gap-2 min-w-0 cursor-default"
                   title={managers.join(", ")}
                 >
-                  <span className="pointer-events-none text-[13px] font-medium text-slate-700 truncate max-w-[170px] inline-block">
-                    {managers.map((m) => formatDisplayName(m) || m).join(", ")}
+                  <span className="text-[13px] font-normal text-slate-700 truncate">
+                    {primaryManager}
                   </span>
+                  {extraManagers > 0 && (
+                    <span className="inline-flex items-center justify-center shrink-0 h-5 min-w-5 rounded-md bg-slate-100 px-1.5 text-[11px] font-medium text-slate-600 tabular-nums">
+                      +{extraManagers}
+                    </span>
+                  )}
 
-                  {(managers.length > 1 ||
+                  {(extraManagers > 0 ||
                     (managers[0] || "").length > 18 ||
                     formatDisplayName(managers[0]) !== managers[0]) && (
-                      <div
-                        className={`absolute left-0 ${positionClass} hidden group-hover:flex flex-col gap-1.5 z-30 p-2.5 bg-white text-slate-700 rounded-xl shadow-xl border border-slate-200 min-w-[180px] max-w-[260px] pointer-events-none`}
-                      >
-                        <div className="text-xs font-semibold text-slate-400 uppercase tracking-wider">
-                          Reporting Manager{managers.length > 1 ? "s" : ""} (
-                          {managers.length})
-                        </div>
-                        <div className="flex flex-wrap gap-1">
-                          {managers.map((name, idx) => (
-                            <span
-                              key={idx}
-                              className="inline-flex items-center px-2 py-0.5 rounded-md text-xs font-medium bg-indigo-50 text-indigo-700 border border-indigo-200"
-                            >
-                              {name}
-                            </span>
-                          ))}
-                        </div>
+                    <div
+                      className={`absolute left-0 ${positionClass} hidden group-hover:flex flex-col gap-2 z-30 p-3 bg-white text-slate-700 rounded-xl shadow-[0_8px_24px_rgba(15,23,42,0.08)] border border-slate-200/80 min-w-[200px] max-w-[280px] pointer-events-none whitespace-normal`}
+                    >
+                      <div className="flex items-center justify-between text-[12px] font-medium text-slate-500 pb-2 border-b border-slate-100">
+                        <span>
+                          Reporting manager{managers.length > 1 ? "s" : ""}
+                        </span>
+                        <span className="rounded-md bg-slate-100 px-1.5 py-0.5 text-[11px] font-medium text-slate-600 tabular-nums">
+                          {managers.length}
+                        </span>
                       </div>
-                    )}
+                      <div className="flex flex-wrap gap-1">
+                        {managers.map((name, idx) => (
+                          <span
+                            key={idx}
+                            className="inline-flex items-center px-2 py-0.5 rounded-md text-[12px] font-medium bg-slate-50 text-slate-700 border border-slate-200/80"
+                          >
+                            {name}
+                          </span>
+                        ))}
+                      </div>
+                    </div>
+                  )}
                 </div>
               );
             },
@@ -2919,7 +2916,7 @@ const EmployeesPage = () => {
           {
             key: "today_checkin",
             label: "Today's Check-in",
-            width: "w-[14%]",
+            width: "w-[12%]",
             render: (_, row) => {
               const checkedInAt = row.today_checked_in_at;
               const floor = row.today_office_floor;
@@ -2927,14 +2924,14 @@ const EmployeesPage = () => {
 
               if (row.is_on_leave) {
                 return (
-                  <span className="inline-flex items-center gap-1 rounded-full bg-amber-50 px-2 py-0.5 text-[11px] font-medium text-amber-700 whitespace-nowrap">
+                  <span className="inline-flex items-center rounded-md border border-amber-200/80 bg-amber-50/80 px-2 py-0.5 text-[12px] font-medium text-amber-800 whitespace-nowrap">
                     On Leave
                   </span>
                 );
               }
               if (!checkedInAt) {
                 return (
-                  <span className="text-[13px] text-slate-400 font-medium">—</span>
+                  <span className="text-[13px] text-slate-400">—</span>
                 );
               }
 
@@ -2950,26 +2947,20 @@ const EmployeesPage = () => {
                 /* keep fallback */
               }
 
-              // Clean single-line format
               const secondary =
                 workMode === "WFO" && floor
                   ? `Floor ${floor}`
                   : workMode || null;
 
               return (
-                <div className="flex items-center gap-1.5 min-w-0 whitespace-nowrap">
-                  <span className="text-[13px] font-semibold text-slate-800 tabular-nums">
+                <div className="flex items-center gap-1 min-w-0 whitespace-nowrap">
+                  <span className="text-[13px] font-medium text-slate-900 tabular-nums">
                     {timeStr}
                   </span>
                   {secondary && (
                     <>
-                      <span className="text-slate-300">·</span>
-                      <span
-                        className={`text-[12px] font-medium ${workMode === "WFO" && floor
-                            ? "text-indigo-600"
-                            : "text-slate-500"
-                          }`}
-                      >
+                      <span className="text-slate-300" aria-hidden="true">·</span>
+                      <span className="text-[12px] font-normal text-slate-500 truncate">
                         {secondary}
                       </span>
                     </>
@@ -2981,61 +2972,51 @@ const EmployeesPage = () => {
           {
             key: "assigned_projects",
             label: "Assigned Projects",
-            width: "w-[14%]",
+            width: isHrOps ? "w-[9%]" : "w-[10%]",
             render: (_, row) => {
               if ((row.status || "").toLowerCase() === "inactive") {
                 return (
-                  <span className="text-[13px] text-slate-400 font-medium">
-                    —
-                  </span>
+                  <span className="text-[13px] text-slate-400">—</span>
                 );
               }
               const list = row.assigned_projects || [];
               if (list.length === 0) {
                 return (
-                  <span className="inline-flex items-center gap-1.5 rounded-md border border-amber-200 bg-amber-50 px-2 py-0.5 text-[12px] font-medium text-amber-700">
+                  <span className="inline-flex items-center gap-2 rounded-md border border-amber-200/80 bg-amber-50/80 px-2 py-0.5 text-[12px] font-medium text-amber-800">
                     <span className="w-1.5 h-1.5 rounded-full bg-amber-500" />
                     Idle
                   </span>
                 );
               }
-              const visibleRows = displayedEmployees.slice(
-                (currentPage - 1) * PAGE_SIZE,
-                currentPage * PAGE_SIZE,
-              );
-              const pageIndex = visibleRows.indexOf(row);
-              const isNearTop = pageIndex < 4;
-              const positionClass = isNearTop
-                ? "top-full mt-1.5"
-                : "bottom-full mb-1.5";
+              const positionClass = getRowPopoverPosition(row);
               const extra = list.length - 1;
 
               return (
-                <div className="group relative flex items-center gap-1 flex-nowrap whitespace-nowrap cursor-default">
-                  <span className="pointer-events-none min-w-0 truncate max-w-[170px] inline-block rounded-md border border-slate-200 bg-slate-50 px-2 py-0.5 text-[12px] font-medium text-slate-700">
+                <div className="group relative flex items-center gap-1 min-w-0 cursor-default">
+                  <span className="min-w-0 truncate inline-block rounded-md border border-slate-200/80 bg-slate-50 px-2 py-0.5 text-[12px] font-medium text-slate-700">
                     {list[0]}
                   </span>
                   {extra > 0 && (
-                    <span className="inline-flex items-center justify-center flex-shrink-0 h-5 min-w-5 rounded-full bg-slate-100 px-1 text-[10px] font-semibold text-slate-500">
+                    <span className="inline-flex items-center justify-center shrink-0 h-5 min-w-5 rounded-md bg-slate-100 px-1.5 text-[11px] font-medium text-slate-600 tabular-nums">
                       +{extra}
                     </span>
                   )}
 
-                  {(extra > 0 || (list[0] || "").length > 20) && (
+                  {(extra > 0 || (list[0] || "").length > 16) && (
                     <div
-                      className={`absolute right-0 ${positionClass} hidden group-hover:flex flex-col gap-1.5 z-40 p-3 bg-white text-slate-700 rounded-xl shadow-xl border border-slate-200 min-w-[220px] max-w-[300px] pointer-events-none whitespace-normal`}
+                      className={`absolute right-0 ${positionClass} hidden group-hover:flex flex-col gap-2 z-40 p-3 bg-white text-slate-700 rounded-xl shadow-[0_8px_24px_rgba(15,23,42,0.08)] border border-slate-200/80 min-w-[220px] max-w-[300px] pointer-events-none whitespace-normal`}
                     >
-                      <div className="text-[11px] font-bold text-slate-400 uppercase tracking-wider pb-1 border-b border-slate-100 flex items-center justify-between">
-                        <span>Assigned Projects</span>
-                        <span className="rounded-full bg-slate-100 px-1.5 py-0.5 text-[10px] font-semibold text-slate-600">
+                      <div className="text-[12px] font-medium text-slate-500 pb-2 border-b border-slate-100 flex items-center justify-between">
+                        <span>Assigned projects</span>
+                        <span className="rounded-md bg-slate-100 px-1.5 py-0.5 text-[11px] font-medium text-slate-600 tabular-nums">
                           {list.length}
                         </span>
                       </div>
-                      <div className="flex flex-wrap gap-1 mt-1">
+                      <div className="flex flex-wrap gap-1">
                         {list.map((name, idx) => (
                           <span
                             key={idx}
-                            className="inline-flex items-center px-2 py-1 rounded-md text-xs font-medium bg-indigo-50 text-indigo-700 border border-indigo-200 break-words max-w-full"
+                            className="inline-flex items-center px-2 py-0.5 rounded-md text-[12px] font-medium bg-slate-50 text-slate-700 border border-slate-200/80 break-words max-w-full"
                           >
                             {name}
                           </span>
@@ -3063,41 +3044,28 @@ const EmployeesPage = () => {
             key: "actions",
             label: "Actions",
             align: "center",
-            width: "w-[6%]",
-            render: (_, row) => {
-              const visibleRows = displayedEmployees.slice(
-                (currentPage - 1) * PAGE_SIZE,
-                currentPage * PAGE_SIZE,
-              );
-              const pageIndex = visibleRows.indexOf(row);
-              const totalVisible = visibleRows.length;
-              const isNearBottom =
-                totalVisible <= 2
-                  ? pageIndex === totalVisible - 1
-                  : pageIndex >= totalVisible - 2;
-
-              return (
-                <div className="flex items-center justify-center">
-                  <EmployeeActionMenu
-                    row={row}
-                    statusParam={statusParam}
-                    setRestoreTarget={setRestoreTarget}
-                    handleConvertToFulltime={handleConvertToFulltime}
-                    onEditEmployee={handleOpenEditModal}
-                    setEditingEmployee={setEditingEmployee}
-                    setFormDesignation={setFormDesignation}
-                    setFormEmployeeType={setFormEmployeeType}
-                    setFormWorkModel={setFormWorkModel}
-                    setIsModalOpen={setIsModalOpen}
-                    setArchiveTarget={setArchiveTarget}
-                    convertPending={convertMutation.isPending}
-                    restorePending={restoreMutation.isPending}
-                    archivePending={archiveMutation.isPending}
-                    isNearBottom={isNearBottom}
-                  />
-                </div>
-              );
-            },
+            width: "w-[5%]",
+            render: (_, row) => (
+              <div className="flex items-center justify-center">
+                <EmployeeActionMenu
+                  row={row}
+                  statusParam={statusParam}
+                  setRestoreTarget={setRestoreTarget}
+                  handleConvertToFulltime={handleConvertToFulltime}
+                  onEditEmployee={handleOpenEditModal}
+                  setEditingEmployee={setEditingEmployee}
+                  setFormDesignation={setFormDesignation}
+                  setFormEmployeeType={setFormEmployeeType}
+                  setFormWorkModel={setFormWorkModel}
+                  setIsModalOpen={setIsModalOpen}
+                  setArchiveTarget={setArchiveTarget}
+                  convertPending={convertMutation.isPending}
+                  restorePending={restoreMutation.isPending}
+                  archivePending={archiveMutation.isPending}
+                  isNearBottom={isRowNearBottom(row)}
+                />
+              </div>
+            ),
           },
         ].filter(Boolean)}
         data={employees}

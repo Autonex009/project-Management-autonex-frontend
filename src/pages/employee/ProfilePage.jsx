@@ -1,95 +1,109 @@
-import React, { useState, useRef, useEffect } from "react";
+import React, { useState, useRef, useEffect, useMemo } from "react";
 import { Link } from "react-router-dom";
 import toast from "react-hot-toast";
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
-import Button from "../../components/ui/Button";
 import UserAvatar from "../../components/ui/UserAvatar";
 import { authApi, employeeApi, skillsApi } from "../../services/api";
 import {
-  Award,
-  BadgeCheck,
-  Briefcase,
-  Calendar,
   Check,
-  CreditCard,
   ChevronDown,
-  Clock3,
-  Hash,
   Lock,
-  Mail,
   Pencil,
-  Phone,
-  ShieldCheck,
-  UserRound,
   X,
   Camera,
   Trash2,
   Loader2,
   MessageSquare,
-  Sparkles,
-  Building2,
-  Save,
+  ArrowUpRight,
+  BadgeCheck,
+  Mail,
+  Hash,
+  Palette,
+  User,
+  Phone,
+  Calendar,
+  CalendarClock,
+  CalendarDays,
+  CreditCard,
+  Fingerprint,
+  Briefcase,
+  Clock,
+  ShieldCheck,
+  Award,
 } from "lucide-react";
-import { format, parseISO } from "date-fns";
+import { format, parseISO, differenceInCalendarMonths } from "date-fns";
+import { COVERS, COVER_TABS, COVER_KEY, DEFAULT_COVER_ID } from "../../config/profileCovers";
 
-/* ── Inline Field Item ───────────────────────────────────────────── */
-const CompactField = ({
-  icon: Icon,
-  label,
-  value,
-  color = "emerald",
-  onClick,
-  editable = false,
-  isLocked = false,
-  lockReason,
-  className = "",
-}) => {
-  const colors = {
-    emerald: "bg-emerald-50 text-emerald-600 border-emerald-100",
-    blue: "bg-blue-50 text-blue-600 border-blue-100",
-    violet: "bg-violet-50 text-violet-600 border-violet-100",
-    slate: "bg-slate-100 text-slate-600 border-slate-200",
-    amber: "bg-amber-50 text-amber-600 border-amber-100",
-  };
+/* ── Shared styles ───────────────────────────────────────────────── */
+const inputCls =
+  "h-8 w-full rounded-md border border-slate-300 bg-white px-2.5 text-[13px] text-slate-900 outline-none transition-colors placeholder:text-slate-400 focus:border-blue-600 focus:ring-2 focus:ring-blue-600/15 disabled:bg-slate-50 disabled:text-slate-400";
+const btnPrimary =
+  "inline-flex h-8 items-center justify-center gap-1.5 rounded-md bg-slate-900 px-3 text-[13px] font-medium text-white transition-colors hover:bg-slate-800 disabled:cursor-not-allowed disabled:opacity-50 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-blue-600/40";
+const btnSecondary =
+  "inline-flex h-8 items-center justify-center gap-1.5 rounded-md border border-slate-300 bg-white px-3 text-[13px] font-medium text-slate-700 transition-colors hover:bg-slate-50 disabled:cursor-not-allowed disabled:opacity-50 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-blue-600/40";
+const hairline = "border-slate-900/[0.08]";
 
-  const isClickable = (editable || isLocked) && typeof onClick === "function";
-
-  return (
-    <div
-      onClick={isClickable ? onClick : undefined}
-      title={isLocked ? lockReason : editable ? `Click to edit ${label}` : undefined}
-      className={`group relative flex items-center gap-3 rounded-xl border border-slate-200/80 bg-slate-50/50 p-3 transition-all ${
-        editable
-          ? "cursor-pointer hover:bg-emerald-50/20 hover:border-emerald-300 hover:shadow-xs"
-          : isLocked
-          ? "cursor-pointer hover:border-amber-200 hover:bg-amber-50/20"
-          : "hover:bg-white hover:border-slate-300 hover:shadow-xs"
-      } ${className}`}
-    >
-      <div className={`rounded-lg border p-2 shrink-0 ${colors[color] || colors.emerald}`}>
-        <Icon className="h-4 w-4" />
-      </div>
-      <div className="min-w-0 flex-1">
-        <p className="text-[10px] font-bold uppercase tracking-wider text-slate-400 group-hover:text-slate-600 transition-colors">
-          {label}
-        </p>
-        <p className="break-all text-xs font-semibold text-slate-800">
-          {value || "—"}
-        </p>
-      </div>
-
-      {editable && (
-        <span className="opacity-0 group-hover:opacity-100 transition-opacity flex items-center gap-1 text-[10px] font-bold text-emerald-600 bg-emerald-50/80 border border-emerald-200/70 rounded-md px-1.5 py-0.5 shrink-0 shadow-2xs">
-          <Pencil className="h-2.5 w-2.5" />
-          <span>Edit</span>
-        </span>
-      )}
-    </div>
-  );
+/* ── Icon tones: one soft hue per kind of information ────────────── */
+const TONES = {
+  blue: { icon: "text-blue-600", tile: "bg-blue-50 text-blue-600" },
+  emerald: { icon: "text-emerald-600", tile: "bg-emerald-50 text-emerald-600" },
+  violet: { icon: "text-violet-600", tile: "bg-violet-50 text-violet-600" },
+  amber: { icon: "text-amber-600", tile: "bg-amber-50 text-amber-600" },
+  rose: { icon: "text-rose-600", tile: "bg-rose-50 text-rose-600" },
+  sky: { icon: "text-sky-600", tile: "bg-sky-50 text-sky-600" },
+  fuchsia: { icon: "text-fuchsia-600", tile: "bg-fuchsia-50 text-fuchsia-600" },
 };
 
-/* ── Editable Email Inline Card ─────────────────────────────────── */
-const EmailCard = ({
+/* ── Field tile: tinted icon + label over value ──────────────────── */
+const Field = ({
+  label,
+  icon: Icon,
+  tone = "blue",
+  children,
+  hint,
+  onClick,
+  editable = false,
+  title,
+  className = "",
+}) => (
+  <div
+    onClick={onClick}
+    title={title}
+    className={`group relative flex items-center gap-3 rounded-lg border border-slate-900/[0.07] bg-slate-50/70 px-3 py-2 ${
+      editable
+        ? "cursor-pointer transition-colors hover:border-slate-300 hover:bg-white"
+        : ""
+    } ${className}`}
+  >
+    {Icon && (
+      <span
+        className={`flex h-8 w-8 shrink-0 items-center justify-center rounded-md ${TONES[tone].tile}`}
+      >
+        <Icon className="h-4 w-4" />
+      </span>
+    )}
+    <div className="min-w-0 flex-1">
+      <p className="text-xs text-slate-500">{label}</p>
+      <div className="flex min-h-6 items-center gap-2 text-sm text-slate-900">
+        {children}
+      </div>
+      {hint && <p className="mt-0.5 text-xs text-slate-500">{hint}</p>}
+    </div>
+    {editable && (
+      <Pencil className="h-3.5 w-3.5 shrink-0 text-slate-400 opacity-0 transition-opacity group-hover:opacity-100" />
+    )}
+  </div>
+);
+
+const Value = ({ value, empty = "Not set" }) =>
+  value ? (
+    <span className="min-w-0 break-words">{value}</span>
+  ) : (
+    <span className="text-slate-400">{empty}</span>
+  );
+
+/* ── Editable email row (OTP flow) ───────────────────────────────── */
+const EmailRow = ({
   value,
   isEditing,
   onRequestOTP,
@@ -157,7 +171,7 @@ const EmailCard = ({
       onVerifyOTP(otp, () => {
         setStep(1);
         setOtp("");
-        setSuccessMsg("Email successfully updated!");
+        setSuccessMsg("Email updated");
         setTimeout(() => setSuccessMsg(""), 3000);
       });
     }
@@ -171,79 +185,108 @@ const EmailCard = ({
 
   if (!isEditing) {
     return (
-      <CompactField
+      <Field
+        className="sm:col-span-2"
         icon={Mail}
-        label="Login Email"
-        value={value}
+        tone="violet"
+        label="Login email"
         editable={editable}
-        onClick={onStartEdit}
-      />
+        onClick={editable ? onStartEdit : undefined}
+        title={editable ? "Edit login email" : undefined}
+      >
+        <Value value={value} />
+      </Field>
     );
   }
 
+  const feedback = error ? (
+    <span className="text-red-600">{error}</span>
+  ) : successMsg ? (
+    <span className="text-emerald-700">{successMsg}</span>
+  ) : step === 2 ? (
+    <span className="tabular-nums">
+      {timeLeft > 0 ? `Code expires in ${formatTime(timeLeft)}` : "Code expired"}
+    </span>
+  ) : (
+    "Changing your login email needs a verification code"
+  );
+
   return (
-    <div className="rounded-xl border-2 border-emerald-400 bg-emerald-50/30 p-2.5 flex flex-col justify-center">
-      <div className="flex items-center justify-between mb-1">
-        <p className="text-[10px] font-bold uppercase tracking-wider text-emerald-700">
-          {step === 1 ? "Login Email" : "Verify OTP"}
-        </p>
-        {step === 2 && (
-          <button type="button" onClick={() => { setStep(1); onDismissError(); }} className="text-slate-400 hover:text-slate-600">
-            <X className="h-3.5 w-3.5" />
-          </button>
-        )}
-      </div>
-      
+    <Field
+      className="sm:col-span-2"
+      icon={Mail}
+      tone="violet"
+      label={step === 1 ? "Login email" : "Verification code"}
+      hint={feedback}
+    >
       {step === 1 ? (
-        <form onSubmit={handleRequest} className="flex items-center gap-1.5">
+        <form onSubmit={handleRequest} className="flex w-full items-center gap-2">
           <input
             ref={inputRef}
             type="email"
             value={draft}
             onChange={(e) => setDraft(e.target.value)}
-            placeholder="new@example.com"
-            className="w-full rounded-lg border border-slate-200 bg-white px-2 py-1 text-xs outline-none focus:border-emerald-500"
+            placeholder="name@company.com"
+            className={inputCls}
           />
-          <Button variant="success" size="sm" type="submit" disabled={!canRequest} isLoading={isRequesting} className="px-2.5 py-1 text-[10px] h-auto whitespace-nowrap">
-            Send OTP
-          </Button>
+          <button
+            type="submit"
+            disabled={!canRequest}
+            className={`${btnSecondary} shrink-0`}
+          >
+            {isRequesting && <Loader2 className="h-3.5 w-3.5 animate-spin" />}
+            Send code
+          </button>
         </form>
       ) : (
-        <form onSubmit={handleVerify} className="flex flex-col gap-1.5">
-          <div className="flex items-center gap-1.5">
-            <input
-              type="text"
-              autoFocus
-              maxLength={6}
-              value={otp}
-              onChange={(e) => setOtp(e.target.value.replace(/[^0-9]/g, ""))}
-              placeholder="000000"
-              className="w-full rounded-lg border border-slate-200 bg-white px-2 py-1 text-xs tracking-widest text-center outline-none focus:border-emerald-500"
-              disabled={timeLeft === 0}
-            />
-            <Button variant="success" size="sm" type="submit" disabled={!canVerify || timeLeft === 0} isLoading={isVerifying} className="px-2.5 py-1 text-[10px] h-auto whitespace-nowrap">
+        <form onSubmit={handleVerify} className="flex w-full items-center gap-2">
+          <input
+            type="text"
+            autoFocus
+            inputMode="numeric"
+            maxLength={6}
+            value={otp}
+            onChange={(e) => setOtp(e.target.value.replace(/[^0-9]/g, ""))}
+            placeholder="000000"
+            className={`${inputCls} font-mono tracking-[0.3em] tabular-nums`}
+            disabled={timeLeft === 0}
+          />
+          {timeLeft === 0 ? (
+            <button
+              type="button"
+              onClick={() => setStep(1)}
+              className={`${btnSecondary} shrink-0`}
+            >
+              Resend
+            </button>
+          ) : (
+            <button
+              type="submit"
+              disabled={!canVerify}
+              className={`${btnSecondary} shrink-0`}
+            >
+              {isVerifying && <Loader2 className="h-3.5 w-3.5 animate-spin" />}
               Verify
-            </Button>
-          </div>
-          <div className="flex items-center justify-between">
-            <p className="text-[9px] font-medium text-slate-500">
-              {timeLeft > 0 ? `Expires in ${formatTime(timeLeft)}` : "Expired."}
-            </p>
-            {timeLeft === 0 && (
-              <button type="button" onClick={() => setStep(1)} className="text-[9px] font-bold text-emerald-600 hover:text-emerald-700 underline">
-                Resend
-              </button>
-            )}
-          </div>
+            </button>
+          )}
+          <button
+            type="button"
+            onClick={() => {
+              setStep(1);
+              onDismissError();
+            }}
+            title="Back"
+            className="flex h-8 w-8 shrink-0 items-center justify-center rounded-md text-slate-400 transition-colors hover:bg-slate-100 hover:text-slate-700"
+          >
+            <X className="h-4 w-4" />
+          </button>
         </form>
       )}
-      {error && <p className="mt-1 text-[9px] font-medium text-rose-600 leading-tight">{error}</p>}
-      {successMsg && <p className="mt-1 text-[9px] font-medium text-emerald-600 leading-tight">{successMsg}</p>}
-    </div>
+    </Field>
   );
 };
 
-/* ── Skills Multi-Select Inline Component ────────────────────────── */
+/* ── Skills multi-select ─────────────────────────────────────────── */
 const SkillsMultiSelect = ({ selected, onChange, options, isLoading }) => {
   const [open, setOpen] = useState(false);
   const ref = useRef(null);
@@ -266,37 +309,46 @@ const SkillsMultiSelect = ({ selected, onChange, options, isLoading }) => {
 
   return (
     <div ref={ref} className="relative w-full">
-      <div className="mb-2 flex flex-wrap gap-1.5">
-        {selected.map((skill) => (
-          <span
-            key={skill}
-            className="inline-flex items-center gap-1 rounded-md border border-emerald-200 bg-emerald-50 px-2 py-0.5 text-xs font-semibold text-emerald-800"
-          >
-            {skill}
-            <button
-              type="button"
-              onClick={() => toggle(skill)}
-              className="rounded text-emerald-600 hover:bg-emerald-200 hover:text-emerald-900"
+      {selected.length > 0 && (
+        <div className="mb-3 flex flex-wrap gap-2">
+          {selected.map((skill) => (
+            <span
+              key={skill}
+              className="inline-flex h-7 items-center gap-1 rounded-md bg-slate-100 pl-2.5 pr-1 text-[13px] text-slate-800"
             >
-              <X className="h-3 w-3" />
-            </button>
-          </span>
-        ))}
-      </div>
+              {skill}
+              <button
+                type="button"
+                onClick={() => toggle(skill)}
+                title={`Remove ${skill}`}
+                className="flex h-5 w-5 items-center justify-center rounded text-slate-500 transition-colors hover:bg-slate-200 hover:text-slate-900"
+              >
+                <X className="h-3 w-3" />
+              </button>
+            </span>
+          ))}
+        </div>
+      )}
 
       <button
         type="button"
         onClick={() => setOpen((v) => !v)}
-        className="flex w-full items-center justify-between rounded-lg border border-slate-200 bg-white px-3 py-1.5 text-xs font-medium text-slate-700 hover:border-emerald-300 focus:outline-none"
+        className="flex h-8 w-full items-center justify-between rounded-md border border-slate-300 bg-white px-2.5 text-[13px] text-slate-400 transition-colors hover:border-slate-400 focus:border-blue-600 focus:outline-none focus:ring-2 focus:ring-blue-600/15"
       >
-        <span className="text-slate-400">Add or remove skills…</span>
-        <ChevronDown className={`h-3.5 w-3.5 text-slate-400 transition-transform ${open ? "rotate-180" : ""}`} />
+        <span>Add or remove skills</span>
+        <ChevronDown
+          className={`h-4 w-4 transition-transform ${open ? "rotate-180" : ""}`}
+        />
       </button>
 
       {open && (
-        <div className="absolute left-0 right-0 z-30 mt-1 max-h-48 overflow-y-auto rounded-xl border border-slate-200 bg-white py-1 shadow-lg">
+        <div
+          className={`absolute left-0 right-0 z-30 mt-1 max-h-56 overflow-y-auto rounded-lg border ${hairline} bg-white py-1 shadow-lg`}
+        >
           {isLoading ? (
-            <div className="p-3 text-center text-xs text-slate-400">Loading skills…</div>
+            <div className="p-3 text-center text-[13px] text-slate-400">
+              Loading skills
+            </div>
           ) : (
             options.map((skill) => {
               const isSelected = selected.includes(skill.name);
@@ -305,17 +357,21 @@ const SkillsMultiSelect = ({ selected, onChange, options, isLoading }) => {
                   key={skill.id}
                   type="button"
                   onClick={() => toggle(skill.name)}
-                  className={`flex w-full items-center gap-2 px-3 py-1.5 text-left text-xs transition-colors ${
-                    isSelected ? "bg-emerald-50 font-semibold text-emerald-800" : "hover:bg-slate-50 text-slate-700"
+                  className={`flex h-8 w-full items-center gap-2 px-3 text-left text-[13px] transition-colors ${
+                    isSelected
+                      ? "bg-slate-50 text-slate-900"
+                      : "text-slate-700 hover:bg-slate-50"
                   }`}
                 >
-                  <div
-                    className={`flex h-3.5 w-3.5 items-center justify-center rounded border ${
-                      isSelected ? "border-emerald-600 bg-emerald-600 text-white" : "border-slate-300"
+                  <span
+                    className={`flex h-4 w-4 items-center justify-center rounded border ${
+                      isSelected
+                        ? "border-slate-900 bg-slate-900 text-white"
+                        : "border-slate-300"
                     }`}
                   >
-                    {isSelected && <Check className="h-2.5 w-2.5" />}
-                  </div>
+                    {isSelected && <Check className="h-3 w-3" />}
+                  </span>
                   {skill.name}
                 </button>
               );
@@ -328,8 +384,36 @@ const SkillsMultiSelect = ({ selected, onChange, options, isLoading }) => {
 };
 
 /* ══════════════════════════════════════════════════════════════════
- MAIN HIGH-DENSITY PROFILE PAGE
+ PROFILE PAGE
  ══════════════════════════════════════════════════════════════════ */
+const formatPhoneNumber = (phone) => {
+  if (!phone) return "";
+  const str = String(phone).trim();
+  if (!str) return "";
+
+  if (str.startsWith("+91") || str.startsWith("+ 91")) {
+    return str;
+  }
+
+  const cleanDigits = str.replace(/\D/g, "");
+  if (cleanDigits.length === 12 && cleanDigits.startsWith("91")) {
+    return `+91 ${cleanDigits.slice(2)}`;
+  }
+
+  if (cleanDigits.length === 10) {
+    return `+91 ${cleanDigits}`;
+  }
+
+  if (str.startsWith("91")) {
+    return `+${str}`;
+  }
+
+  return `+91 ${str}`;
+};
+
+const fmtDate = (value) =>
+  value ? format(parseISO(String(value).split("T")[0]), "dd MMM yyyy") : null;
+
 const ProfilePage = () => {
   const queryClient = useQueryClient();
   const localUser = JSON.parse(localStorage.getItem("user") || "{}");
@@ -355,30 +439,45 @@ const ProfilePage = () => {
 
   const isLoading = accountLoading || employeeLoading;
 
-const formatPhoneNumber = (phone) => {
-  if (!phone) return "";
-  const str = String(phone).trim();
-  if (!str) return "";
+  /* ── Cover (per-viewer preference, stored locally) ─────────── */
+  const [coverId, setCoverId] = useState(() => {
+    try {
+      return localStorage.getItem(COVER_KEY) || DEFAULT_COVER_ID;
+    } catch {
+      return DEFAULT_COVER_ID;
+    }
+  });
+  const [coverOpen, setCoverOpen] = useState(false);
+  const [coverTab, setCoverTab] = useState("all");
+  const visibleCovers = useMemo(
+    () => (coverTab === "all" ? COVERS : COVERS.filter((c) => c.cat === coverTab)),
+    [coverTab]
+  );
+  const coverMenuRef = useRef(null);
+  const activeCover = COVERS.find((c) => c.id === coverId) ||
+    COVERS.find((c) => c.id === DEFAULT_COVER_ID) ||
+    COVERS[0];
 
-  if (str.startsWith("+91") || str.startsWith("+ 91")) {
-    return str;
-  }
+  const chooseCover = (id) => {
+    setCoverId(id);
+    setCoverOpen(false);
+    try {
+      localStorage.setItem(COVER_KEY, id);
+    } catch {
+      /* storage unavailable, keep the choice for this session only */
+    }
+  };
 
-  const cleanDigits = str.replace(/\D/g, "");
-  if (cleanDigits.length === 12 && cleanDigits.startsWith("91")) {
-    return `+91 ${cleanDigits.slice(2)}`;
-  }
-
-  if (cleanDigits.length === 10) {
-    return `+91 ${cleanDigits}`;
-  }
-
-  if (str.startsWith("91")) {
-    return `+${str}`;
-  }
-
-  return `+91 ${str}`;
-};
+  useEffect(() => {
+    if (!coverOpen) return;
+    const handler = (e) => {
+      if (coverMenuRef.current && !coverMenuRef.current.contains(e.target)) {
+        setCoverOpen(false);
+      }
+    };
+    document.addEventListener("mousedown", handler);
+    return () => document.removeEventListener("mousedown", handler);
+  }, [coverOpen]);
 
   /* ── Merged Profile State ───────────────────────────────────── */
   const mergedProfile = {
@@ -480,7 +579,7 @@ const formatPhoneNumber = (phone) => {
   const saveMutation = useMutation({
     mutationFn: (data) => employeeApi.update(employeeId, data),
     onSuccess: (updatedEmployee) => {
-      // In-memory RAM patch: 0ms instant UI update, 0 network refetches
+      // In-memory patch: instant UI update, no network refetch
       queryClient.setQueryData(["employee-profile", employeeId], (old) => ({
         ...old,
         ...updatedEmployee,
@@ -498,10 +597,10 @@ const formatPhoneNumber = (phone) => {
       });
       queryClient.invalidateQueries({ queryKey: ["employees"] });
       setIsEditing(false);
-      toast.success("Profile details saved successfully!");
+      toast.success("Profile saved");
     },
     onError: (err) => {
-      const errorMsg = err?.response?.data?.detail || "Failed to save changes.";
+      const errorMsg = err?.response?.data?.detail || "Could not save changes";
       toast.error(errorMsg);
     },
   });
@@ -516,8 +615,7 @@ const formatPhoneNumber = (phone) => {
       razorpay_email: editRazorpayEmail?.trim() ? editRazorpayEmail.trim().toLowerCase() : null,
     };
 
-    // If Date of Joining is NOT locked and was entered, include it
-    // If it IS locked, omitting it avoids triggering the backend's "Date of joining is locked" rejection
+    // A locked joining date is omitted so the backend does not reject the update
     if (!isDojLocked && editDateOfJoining?.trim()) {
       payload.date_of_joining = editDateOfJoining.trim();
     }
@@ -532,10 +630,10 @@ const formatPhoneNumber = (phone) => {
     mutationFn: (newEmail) => employeeApi.requestEmailChange(employeeId, newEmail),
     onSuccess: () => {
       setEmailError("");
-      toast.success("Verification OTP sent to your new email!");
+      toast.success("Verification code sent to your new email");
     },
     onError: (err) => {
-      const msg = err?.response?.data?.detail || "Could not send OTP.";
+      const msg = err?.response?.data?.detail || "Could not send the code";
       setEmailError(msg);
       toast.error(msg);
     },
@@ -547,10 +645,10 @@ const formatPhoneNumber = (phone) => {
       queryClient.invalidateQueries({ queryKey: ["auth-me"] });
       queryClient.invalidateQueries({ queryKey: ["employee-profile", employeeId] });
       setEmailError("");
-      toast.success("Login email verified and updated!");
+      toast.success("Login email updated");
     },
     onError: (err) => {
-      const msg = err?.response?.data?.detail || "Invalid or expired OTP.";
+      const msg = err?.response?.data?.detail || "Invalid or expired code";
       setEmailError(msg);
       toast.error(msg);
     },
@@ -573,14 +671,14 @@ const formatPhoneNumber = (phone) => {
     queryClient.invalidateQueries({ queryKey: ["auth-me"] });
     queryClient.invalidateQueries({ queryKey: ["employees"] });
     setAvatarError("");
-    toast.success(typeof msg === "string" ? msg : "Profile photo updated!");
+    toast.success(typeof msg === "string" ? msg : "Photo updated");
   };
 
   const uploadAvatarMutation = useMutation({
     mutationFn: (formData) => employeeApi.uploadAvatar(employeeId, formData),
-    onSuccess: () => onAvatarSuccess("Profile photo uploaded!"),
+    onSuccess: () => onAvatarSuccess("Photo uploaded"),
     onError: (err) => {
-      const msg = err?.response?.data?.detail || "Upload failed.";
+      const msg = err?.response?.data?.detail || "Upload failed";
       setAvatarError(msg);
       toast.error(msg);
     },
@@ -588,9 +686,9 @@ const formatPhoneNumber = (phone) => {
 
   const slackAvatarMutation = useMutation({
     mutationFn: () => employeeApi.setAvatarFromSlack(employeeId),
-    onSuccess: () => onAvatarSuccess("Synced profile photo from Slack!"),
+    onSuccess: () => onAvatarSuccess("Photo synced from Slack"),
     onError: (err) => {
-      const msg = err?.response?.data?.detail || "Slack sync failed.";
+      const msg = err?.response?.data?.detail || "Slack sync failed";
       setAvatarError(msg);
       toast.error(msg);
     },
@@ -598,9 +696,9 @@ const formatPhoneNumber = (phone) => {
 
   const deleteAvatarMutation = useMutation({
     mutationFn: () => employeeApi.deleteAvatar(employeeId),
-    onSuccess: () => onAvatarSuccess("Profile photo removed!"),
+    onSuccess: () => onAvatarSuccess("Photo removed"),
     onError: (err) => {
-      const msg = err?.response?.data?.detail || "Delete failed.";
+      const msg = err?.response?.data?.detail || "Could not remove photo";
       setAvatarError(msg);
       toast.error(msg);
     },
@@ -610,8 +708,8 @@ const formatPhoneNumber = (phone) => {
     const file = e.target.files?.[0];
     if (!file) return;
     if (file.size > 5 * 1024 * 1024) {
-      setAvatarError("Max size 5 MB.");
-      toast.error("Max avatar file size is 5 MB.");
+      setAvatarError("Max size 5 MB");
+      toast.error("Max photo size is 5 MB");
       return;
     }
     const formData = new FormData();
@@ -625,526 +723,592 @@ const formatPhoneNumber = (phone) => {
     slackAvatarMutation.isPending ||
     deleteAvatarMutation.isPending;
 
+  /* ── Derived view values ───────────────────────────────────── */
+  const canEdit = !!employeeId;
+  const startEdit = (field) => (canEdit ? () => enterEditMode(field) : undefined);
+
+  const dashboardHref =
+    mergedProfile.role === "admin"
+      ? `/admin/employees/${employeeId}`
+      : mergedProfile.role === "pm"
+        ? `/pm/my-team/${employeeId}`
+        : "/employee/dashboard";
+
+  const status = (mergedProfile.status || "Active").toString();
+  const statusIsActive = status.toLowerCase() === "active";
+
+  const editActions = !canEdit ? (
+    <span className="text-xs text-slate-400">Read only</span>
+  ) : !isEditing ? (
+    <button type="button" onClick={() => enterEditMode()} className={btnPrimary}>
+      <Pencil className="h-3.5 w-3.5" />
+      Edit
+    </button>
+  ) : (
+    <div className="flex items-center gap-2">
+      <button type="button" onClick={cancelEdit} className={btnSecondary}>
+        Cancel
+      </button>
+      <button
+        type="button"
+        onClick={handleSave}
+        disabled={saveMutation.isPending}
+        className={btnPrimary}
+      >
+        {saveMutation.isPending && <Loader2 className="h-3.5 w-3.5 animate-spin" />}
+        Save
+      </button>
+    </div>
+  );
+
+  const tenure = (() => {
+    if (!mergedProfile.dateOfJoining)
+      return { value: "—", sub: "Joining date not set" };
+    const joined = parseISO(String(mergedProfile.dateOfJoining).split("T")[0]);
+    const months = Math.max(0, differenceInCalendarMonths(new Date(), joined));
+    const y = Math.floor(months / 12);
+    const m = months % 12;
+    const value = y > 0 ? `${y}y ${m}m` : months > 0 ? `${months} mo` : "New";
+    return { value, sub: `Since ${format(joined, "dd MMM yyyy")}` };
+  })();
+
+  const stats = [
+    {
+      label: "Tenure",
+      value: tenure.value,
+      sub: tenure.sub,
+      icon: CalendarClock,
+      tone: "amber",
+    },
+    {
+      label: "Employee type",
+      value: mergedProfile.employeeType || "\u2014",
+      sub: mergedProfile.designation || "Team member",
+      icon: Briefcase,
+      tone: "blue",
+    },
+    {
+      label: "Daily capacity",
+      value: mergedProfile.workingHours ? `${mergedProfile.workingHours}h` : "\u2014",
+      sub: "Per day",
+      icon: Clock,
+      tone: "emerald",
+    },
+    {
+      label: "Weekly capacity",
+      value: mergedProfile.weeklyAvailability ? `${mergedProfile.weeklyAvailability}h` : "\u2014",
+      sub: "Per week",
+      icon: CalendarDays,
+      tone: "violet",
+    },
+  ];
+
+  if (isLoading) {
+    return (
+      <div className="flex flex-col items-center justify-center py-24">
+        <Loader2 className="h-5 w-5 animate-spin text-slate-400" />
+        <p className="mt-3 text-[13px] text-slate-500">Loading profile</p>
+      </div>
+    );
+  }
+
   return (
-    <div className="mx-auto max-w-6xl space-y-4 pb-6">
-      {isLoading ? (
-        <div className="flex flex-col items-center justify-center py-20">
-          <Loader2 className="h-8 w-8 animate-spin text-emerald-600" />
-          <p className="mt-2 text-xs font-semibold text-slate-400">Loading Profile Details...</p>
-        </div>
-      ) : (
-        <>
-          {/* ════════════════════════════════════════════════════════
-             TOP HERO BANNER & PROFILE CARD HEADER
-             ════════════════════════════════════════════════════════ */}
-          <div className="overflow-hidden rounded-3xl border border-slate-200/80 bg-white shadow-xs">
-            {/* Header Cover Art Accent */}
-            <div className="h-28 bg-gradient-to-r from-[#0b6f4a] via-[#0d7b52] to-[#0f8a5a] px-6 pt-4 text-white">
-              <div className="flex justify-between items-start">
-                <span className="inline-flex items-center gap-1.5 rounded-full bg-black/20 px-3 py-1 text-[11px] font-semibold text-emerald-100 backdrop-blur-md">
-                  <Building2 className="h-3.5 w-3.5" /> AutoNex AI 360
-                </span>
-              </div>
-            </div>
+    <div className="-mx-4 -my-3 px-3 py-3 sm:-mx-6">
+      <style>{`main{scrollbar-width:none}main::-webkit-scrollbar{display:none}`}</style>
+      <input
+        ref={fileInputRef}
+        type="file"
+        accept="image/png,image/jpeg,image/gif,image/webp"
+        className="hidden"
+        onChange={handleAvatarFile}
+      />
+      <div className="mx-auto w-full max-w-[1400px] space-y-3">
 
-            {/* Profile Avatar & Info Overlay Header */}
-            <div className="px-6 pb-6 pt-0">
-              <div className="flex flex-col sm:flex-row items-center sm:items-end gap-5 -mt-14">
-                
-                {/* ENLARGED PROFILE IMAGE CONTAINER */}
-                <div className="relative h-44 w-44 sm:h-52 sm:w-52 shrink-0 rounded-2xl border-4 border-white bg-slate-100 shadow-md ring-1 ring-slate-200 group overflow-hidden">
-                  <input
-                    ref={fileInputRef}
-                    type="file"
-                    accept="image/png,image/jpeg,image/gif,image/webp"
-                    className="hidden"
-                    onChange={handleAvatarFile}
-                  />
-
-                  {/* Profile Image View */}
-                  <UserAvatar
-                    src={mergedProfile.avatarUrl}
-                    name={mergedProfile.name}
-                    className="h-full w-full object-cover"
-                    fallbackClassName="bg-emerald-700 text-white font-black text-6xl h-full w-full flex items-center justify-center"
-                    imgClassName="h-full w-full object-cover"
-                  />
-
-                  {/* Quick Change Overlay Button */}
-                  <button
-                    type="button"
-                    onClick={() => fileInputRef.current?.click()}
-                    disabled={avatarBusy || !employeeId}
-                    title={!employeeId ? "Linked employee record required" : "Change Photo"}
-                    className="absolute inset-0 z-10 flex flex-col items-center justify-center bg-slate-900/65 text-white opacity-0 transition-opacity duration-200 group-hover:opacity-100 disabled:cursor-not-allowed"
-                  >
-                    {avatarBusy ? (
-                      <Loader2 className="h-8 w-8 animate-spin" />
-                    ) : (
-                      <>
-                        <Camera className="h-7 w-7" />
-                        <span className="mt-1.5 text-xs font-bold uppercase tracking-wider">
-                          Change Photo
-                        </span>
-                      </>
-                    )}
-                  </button>
-                </div>
-
-                {/* Main Hero Header Info */}
-                <div className="flex-1 text-center sm:text-left min-w-0 mb-1">
-                  <div className="flex flex-col sm:flex-row sm:items-center gap-2 justify-between">
-                    <div className="min-w-0 flex-1">
-                      {isEditing ? (
-                        <div className="space-y-1 max-w-sm">
-                          <label className="text-[10px] font-bold uppercase tracking-wider text-emerald-700 block">
-                            Full Name
-                          </label>
-                          <input
-                            type="text"
-                            value={editName}
-                            onChange={(e) => setEditName(e.target.value)}
-                            placeholder="Enter full name"
-                            className="w-full rounded-xl border-2 border-emerald-400 bg-white px-3 py-1.5 text-lg font-bold text-slate-900 outline-none focus:border-emerald-600 focus:ring-2 focus:ring-emerald-500/20 shadow-xs"
-                          />
-                        </div>
-                      ) : (
-                        <h1 className="text-2xl font-black tracking-tight text-slate-900 truncate">
-                          {mergedProfile.name || "Employee Profile"}
-                        </h1>
-                      )}
-                      <p className="text-sm font-semibold text-slate-500 flex items-center justify-center sm:justify-start gap-1.5 mt-0.5">
-                        <span>{mergedProfile.designation || "Team Member"}</span>
-                        <span className="text-slate-300">•</span>
-                        <span className="text-slate-400 capitalize">{mergedProfile.role}</span>
-                      </p>
-                    </div>
-
-                    <div className="flex flex-wrap items-center justify-center sm:justify-end gap-1.5 mt-2 sm:mt-0">
-                      {employeeId && (
-                        <Link
-                          to={
-                            mergedProfile.role === "admin"
-                              ? `/admin/employees/${employeeId}`
-                              : mergedProfile.role === "pm"
-                                ? `/pm/my-team/${employeeId}`
-                                : "/employee/dashboard"
-                          }
-                          className="inline-flex items-center gap-1.5 rounded-full border border-slate-200 bg-white px-3 py-1 text-xs font-bold text-slate-700 hover:bg-slate-50 hover:border-slate-300 transition-colors shadow-xs"
-                          title="View Employee Activity Dashboard"
-                        >
-                          <Briefcase className="h-3.5 w-3.5 text-slate-500" />
-                          View Dashboard
-                        </Link>
-                      )}
-                      <span className="rounded-full border border-emerald-200 bg-emerald-50 px-3 py-1 text-xs font-bold text-emerald-700 capitalize">
-                        ● {mergedProfile.status || "Active"}
-                      </span>
-                      <span className="rounded-full border border-slate-200 bg-slate-100 px-3 py-1 text-xs font-bold text-slate-700 uppercase tracking-wider">
-                        ID: {mergedProfile.employeeId || "—"}
-                      </span>
-                    </div>
-                  </div>
-
-                  {/* Photo Action Bar */}
-                  <div className="mt-4 flex flex-wrap items-center justify-center sm:justify-start gap-2">
-                    <button
-                      type="button"
-                      onClick={() => slackAvatarMutation.mutate()}
-                      disabled={avatarBusy || !employeeId}
-                      className="inline-flex items-center gap-1.5 rounded-lg border border-violet-200 bg-violet-50/70 px-2.5 py-1 text-xs font-semibold text-violet-700 hover:bg-violet-100 transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
-                    >
-                      <MessageSquare className="h-3.5 w-3.5" /> Sync Slack Photo
-                    </button>
-                    
-                    {mergedProfile.avatarUrl && (
-                      <button
-                        type="button"
-                        onClick={() => deleteAvatarMutation.mutate()}
-                        disabled={avatarBusy || !employeeId}
-                        className="inline-flex items-center gap-1 rounded-lg border border-slate-200 bg-white px-2.5 py-1 text-xs font-semibold text-slate-500 hover:text-rose-600 hover:border-rose-200 transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
-                      >
-                        <Trash2 className="h-3.5 w-3.5" /> Remove Photo
-                      </button>
-                    )}
-                    {avatarError && (
-                      <span className="text-xs font-medium text-rose-600 ml-1">{avatarError}</span>
-                    )}
-                  </div>
-                </div>
-
-              </div>
-            </div>
+      {/* ── Cover + identity + key figures ───────────────────────── */}
+      <section className={`rounded-2xl border ${hairline} bg-white`}>
+        <div
+          className="relative h-24 rounded-t-2xl"
+          style={{ background: activeCover.css }}
+        >
+          <div className="pointer-events-none absolute inset-0 overflow-hidden rounded-t-2xl">
+            <div className="absolute -left-24 top-8 h-80 w-80 rounded-full bg-white/20" />
+            <div className="absolute -right-10 -top-16 h-56 w-56 rounded-full bg-white/10" />
           </div>
 
-          {/* ════════════════════════════════════════════════════════
-             MAIN INFORMATION GRID
-             ════════════════════════════════════════════════════════ */}
-          <div className="grid grid-cols-1 lg:grid-cols-12 gap-4">
-            
-            {/* LEFT COLUMN: Contact & System Credentials (6 Cols) */}
-            <div className="lg:col-span-6 space-y-4">
-              <div className="rounded-3xl border border-slate-200/80 bg-white p-5 shadow-xs">
-                
-                {/* Header & Edit Action Controls Right Next to Editable Details */}
-                <div className="flex items-center justify-between pb-3 border-b border-slate-100 mb-3">
-                  <div className="flex items-center gap-2">
-                    <UserRound className="h-4 w-4 text-emerald-600" />
-                    <h2 className="text-xs font-bold uppercase tracking-wider text-slate-500">
-                      Contact & Communication
-                    </h2>
-                  </div>
-
-                  {/* Contextual Action Button (Placed right where information gets updated) */}
-                  {!employeeId ? (
-                    <span className="text-[11px] font-semibold text-slate-400">
-                      System Admin
-                    </span>
-                  ) : !isEditing ? (
-                    <button
-                      type="button"
-                      onClick={enterEditMode}
-                      className="inline-flex items-center gap-1.5 rounded-lg border border-emerald-200 bg-emerald-50 px-3 py-1 text-xs font-bold text-emerald-700 hover:bg-emerald-100 transition-colors"
-                    >
-                      <Pencil className="h-3.5 w-3.5" /> Edit Information
-                    </button>
-                  ) : (
-                    <div className="flex items-center gap-2">
+          <div className="absolute bottom-3 right-3" ref={coverMenuRef}>
+            <button
+              type="button"
+              onClick={() => setCoverOpen((v) => !v)}
+              className="inline-flex h-8 items-center gap-1.5 rounded-md bg-white/80 px-3 text-[13px] font-medium text-slate-800 backdrop-blur transition-colors hover:bg-white"
+            >
+              <Palette className="h-3.5 w-3.5" />
+              Change cover
+            </button>
+            {coverOpen && (
+              <div
+                className={`absolute right-0 top-full z-30 mt-2 w-[22rem] max-w-[calc(100vw-2rem)] rounded-xl border ${hairline} bg-white p-3 shadow-lg`}
+              >
+                <div className="mb-2 flex items-center justify-between gap-2">
+                  <div className="flex items-center gap-1">
+                    {COVER_TABS.map((t) => (
                       <button
+                        key={t.id}
                         type="button"
-                        onClick={cancelEdit}
-                        className="rounded-lg border border-slate-200 bg-white px-2.5 py-1 text-xs font-semibold text-slate-600 hover:bg-slate-50 transition-colors"
+                        onClick={() => setCoverTab(t.id)}
+                        className={`h-7 rounded-md px-2.5 text-[13px] transition-colors ${
+                          coverTab === t.id
+                            ? "bg-slate-900 text-white"
+                            : "text-slate-600 hover:bg-slate-100"
+                        }`}
                       >
-                        Cancel
+                        {t.label}
                       </button>
-                      <Button
-                        variant="success"
-                        size="sm"
-                        onClick={handleSave}
-                        isLoading={saveMutation.isPending}
-                        className="inline-flex items-center gap-1"
-                      >
-                        <Save className="h-3.5 w-3.5" /> Save
-                      </Button>
-                    </div>
-                  )}
-                </div>
-
-                <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
-                  {/* Slot 1: Full Name */}
-                  {isEditing ? (
-                    <div className="rounded-xl border-2 border-emerald-400 bg-emerald-50/30 p-2.5">
-                      <p className="text-[10px] font-bold uppercase tracking-wider text-emerald-700">Full Name</p>
-                      <input
-                        ref={nameInputRef}
-                        type="text"
-                        value={editName}
-                        onChange={(e) => setEditName(e.target.value)}
-                        placeholder="Full Name"
-                        className="mt-1 w-full rounded-lg border border-slate-200 bg-white px-2.5 py-1 text-xs outline-none focus:border-emerald-500"
-                      />
-                    </div>
-                  ) : (
-                    <CompactField
-                      icon={UserRound}
-                      label="Full Name"
-                      value={mergedProfile.name}
-                      editable={!!employeeId}
-                      onClick={() => employeeId && enterEditMode("name")}
-                    />
-                  )}
-
-                  {/* Slot 2: Login Email */}
-                  <EmailCard
-                    value={mergedProfile.email}
-                    isEditing={isEditing}
-                    onRequestOTP={handleRequestOTP}
-                    onVerifyOTP={handleVerifyOTP}
-                    isRequesting={requestEmailChangeMutation.isPending}
-                    isVerifying={verifyEmailChangeMutation.isPending}
-                    error={emailError}
-                    onDismissError={() => setEmailError("")}
-                    editable={!!employeeId}
-                    onStartEdit={() => employeeId && enterEditMode("email")}
-                    inputRef={emailInputRef}
-                  />
-
-                  {/* Slot 3: Phone Number */}
-                  {isEditing ? (
-                    <div className="rounded-xl border-2 border-emerald-400 bg-emerald-50/30 p-2.5">
-                      <p className="text-[10px] font-bold uppercase tracking-wider text-emerald-700">Phone</p>
-                      <input
-                        ref={phoneInputRef}
-                        type="text"
-                        value={editPhone}
-                        onChange={(e) => setEditPhone(e.target.value)}
-                        placeholder="+91 XXXXX XXXXX"
-                        className="mt-1 w-full rounded-lg border border-slate-200 bg-white px-2.5 py-1 text-xs outline-none focus:border-emerald-500"
-                      />
-                    </div>
-                  ) : (
-                    <CompactField
-                      icon={Phone}
-                      label="Phone Number"
-                      value={mergedProfile.phone}
-                      editable={!!employeeId}
-                      onClick={() => employeeId && enterEditMode("phone")}
-                    />
-                  )}
-
-                  {/* Slot 4: Encord ID */}
-                  {isEditing ? (
-                    <div className="rounded-xl border-2 border-emerald-400 bg-emerald-50/30 p-2.5">
-                      <p className="text-[10px] font-bold uppercase tracking-wider text-emerald-700">Encord ID</p>
-                      <input
-                        ref={encordInputRef}
-                        type="text"
-                        value={editEncordId}
-                        onChange={(e) => setEditEncordId(e.target.value)}
-                        placeholder="john.encord@example.com"
-                        className="mt-1 w-full rounded-lg border border-slate-200 bg-white px-2.5 py-1 text-xs outline-none focus:border-emerald-500"
-                      />
-                    </div>
-                  ) : (
-                    <CompactField
-                      icon={Mail}
-                      label="Encord ID"
-                      value={mergedProfile.encordId}
-                      editable={!!employeeId}
-                      onClick={() => employeeId && enterEditMode("encordId")}
-                    />
-                  )}
-
-                  {/* Slot 5: Razorpay Email */}
-                  {isEditing ? (
-                    <div className="rounded-xl border-2 border-emerald-400 bg-emerald-50/30 p-2.5">
-                      <p className="text-[10px] font-bold uppercase tracking-wider text-emerald-700">Razorpay Email</p>
-                      <input
-                        ref={razorpayInputRef}
-                        type="email"
-                        value={editRazorpayEmail}
-                        onChange={(e) => setEditRazorpayEmail(e.target.value)}
-                        placeholder="john.razorpay@example.com"
-                        className="mt-1 w-full rounded-lg border border-slate-200 bg-white px-2.5 py-1 text-xs outline-none focus:border-emerald-500"
-                      />
-                    </div>
-                  ) : (
-                    <CompactField
-                      icon={CreditCard}
-                      label="Razorpay Email"
-                      value={mergedProfile.razorpayEmail}
-                      color="blue"
-                      editable={!!employeeId}
-                      onClick={() => employeeId && enterEditMode("razorpayEmail")}
-                    />
-                  )}
-
-                  {/* Slot 6: Slack Member ID */}
-                  {isEditing ? (
-                    <div className="rounded-xl border-2 border-emerald-400 bg-emerald-50/30 p-2.5">
-                      <p className="text-[10px] font-bold uppercase tracking-wider text-emerald-700">Slack ID</p>
-                      <input
-                        ref={slackInputRef}
-                        type="text"
-                        value={editSlackId}
-                        onChange={(e) => setEditSlackId(e.target.value)}
-                        placeholder="U0123ABC456"
-                        className="mt-1 w-full rounded-lg border border-slate-200 bg-white px-2.5 py-1 text-xs outline-none focus:border-emerald-500"
-                      />
-                    </div>
-                  ) : (
-                    <CompactField
-                      icon={Hash}
-                      label="Slack Member ID"
-                      value={mergedProfile.slackUserId}
-                      color="violet"
-                      editable={!!employeeId}
-                      onClick={() => employeeId && enterEditMode("slackId")}
-                    />
-                  )}
-
-                  {/* Slot 7: Date of Joining (Editable once by employee; locked to Admin/HR once populated) */}
-                  {isEditing ? (
-                    isDojLocked ? (
-                      <div className="sm:col-span-2 rounded-xl border border-slate-200 bg-slate-50 p-2.5">
-                        <div className="flex items-center justify-between">
-                          <p className="text-[10px] font-bold uppercase tracking-wider text-slate-500">
-                            Date of Joining
-                          </p>
-                          <span className="flex items-center gap-1 text-[10px] text-slate-400 font-medium">
-                            <Lock className="h-3 w-3" /> Locked
-                          </span>
-                        </div>
-                        <p className="mt-1 text-xs font-semibold text-slate-700">
-                          {format(parseISO(String(mergedProfile.dateOfJoining).split("T")[0]), "dd MMM yyyy")}
-                        </p>
-                        <p className="text-[10px] text-slate-400 mt-0.5">Contact Admin/HR to modify official joining date.</p>
-                      </div>
-                    ) : (
-                      <div className="sm:col-span-2 rounded-xl border-2 border-emerald-400 bg-emerald-50/30 p-2.5">
-                        <div className="flex items-center justify-between">
-                          <p className="text-[10px] font-bold uppercase tracking-wider text-emerald-700">
-                            Date of Joining
-                          </p>
-                          <span 
-                            className="flex items-center gap-1 text-[10px] text-rose-500 font-semibold cursor-help"
-                            title="Add date of joining that is mentioned in your joining letter"
-                          >
-                            <span className="h-3 w-3 rounded-full bg-rose-100 text-rose-600 flex items-center justify-center text-[9px] font-bold">i</span>
-                            Joining Letter
-                          </span>
-                        </div>
-                        <input
-                          ref={dojInputRef}
-                          type="date"
-                          max={new Date().toISOString().split("T")[0]}
-                          value={editDateOfJoining}
-                          onChange={(e) => setEditDateOfJoining(e.target.value)}
-                          className="mt-1 w-full rounded-lg border border-slate-200 bg-white px-2.5 py-1 text-xs outline-none focus:border-emerald-500"
-                        />
-                      </div>
-                    )
-                  ) : (
-                    <div className="relative group sm:col-span-2">
-                      <CompactField
-                        icon={Calendar}
-                        label="Date of Joining"
-                        value={
-                          mergedProfile.dateOfJoining
-                            ? format(parseISO(String(mergedProfile.dateOfJoining).split("T")[0]), "dd MMM yyyy")
-                            : "Not set"
-                        }
-                        color="emerald"
-                        editable={!isDojLocked && !!employeeId}
-                        isLocked={isDojLocked}
-                        lockReason="Official joining date is locked. Contact Admin or HR to modify."
-                        onClick={() => {
-                          if (!employeeId) return;
-                          if (isDojLocked) {
-                            toast.error("Official joining date is locked. Contact Admin or HR to modify.", { id: "doj-locked" });
-                          } else {
-                            enterEditMode("dateOfJoining");
-                          }
-                        }}
-                      />
-                      <div 
-                        className="absolute top-3 right-3 flex items-center gap-1.5"
-                        onClick={(e) => e.stopPropagation()}
-                      >
-                        {isDojLocked ? (
-                          <span
-                            className="flex items-center gap-1 text-[10px] font-semibold text-slate-400 bg-slate-100 border border-slate-200 px-2 py-0.5 rounded-md"
-                            title="Official joining date is locked. Contact Admin or HR to modify."
-                          >
-                            <Lock className="h-3 w-3 text-slate-400" />
-                            Locked
-                          </span>
-                        ) : (
-                          <span 
-                            className="h-4 w-4 rounded-full bg-rose-50 border border-rose-300 text-rose-600 hover:bg-rose-100 flex items-center justify-center text-[10px] font-extrabold shadow-xs transition-colors cursor-pointer"
-                            title="Add date of joining that is mentioned in your joining letter"
-                            onClick={() => toast("Add date of joining that is mentioned in your joining letter", { icon: "ℹ️", id: "doj-info" })}
-                          >
-                            i
-                          </span>
-                        )}
-                      </div>
-                    </div>
-                  )}
-                </div>
-              </div>
-
-              {/* Skills Section */}
-              <div className="rounded-3xl border border-slate-200/80 bg-white p-5 shadow-xs">
-                <div className="flex items-center gap-2 pb-3 border-b border-slate-100 mb-3">
-                  <Sparkles className="h-4 w-4 text-emerald-600" />
-                  <h2 className="text-xs font-bold uppercase tracking-wider text-slate-500">
-                    Skills & Competencies
-                  </h2>
-                </div>
-
-                {isEditing ? (
-                  <SkillsMultiSelect
-                    selected={editSkills}
-                    onChange={setEditSkills}
-                    options={skillsList}
-                    isLoading={skillsLoading}
-                  />
-                ) : mergedProfile.skills.length > 0 ? (
-                  <div className="flex flex-wrap gap-1.5">
-                    {mergedProfile.skills.map((skill) => (
-                      <span
-                        key={skill}
-                        className="rounded-lg border border-slate-200 bg-slate-50 px-2.5 py-1 text-xs font-semibold text-slate-700"
-                      >
-                        {skill}
-                      </span>
                     ))}
                   </div>
-                ) : (
-                  <p className="text-xs text-slate-400 italic">No skills currently assigned.</p>
-                )}
-              </div>
-            </div>
-
-            {/* RIGHT COLUMN: Employment Details & Work Capacity (6 Cols) */}
-            <div className="lg:col-span-6 space-y-4">
-              <div className="rounded-3xl border border-slate-200/80 bg-white p-5 shadow-xs h-full">
-                <div className="flex items-center gap-2 pb-3 border-b border-slate-100 mb-3">
-                  <Briefcase className="h-4 w-4 text-blue-600" />
-                  <h2 className="text-xs font-bold uppercase tracking-wider text-slate-500">
-                    Employment Details & Capacity
-                  </h2>
+                  <span className="text-xs tabular-nums text-slate-400">
+                    {visibleCovers.length}
+                  </span>
                 </div>
-
-                <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
-                  <CompactField icon={ShieldCheck} label="System Role" value={mergedProfile.role} color="blue" />
-                  <CompactField icon={Briefcase} label="Designation" value={mergedProfile.designation} color="blue" />
-                  <CompactField icon={BadgeCheck} label="Employee Type" value={mergedProfile.employeeType} />
-                  <CompactField icon={Hash} label="Employee ID" value={mergedProfile.employeeId} />
-                  <CompactField
-                    icon={Clock3}
-                    label="Daily Capacity"
-                    value={mergedProfile.workingHours ? `${mergedProfile.workingHours} hrs/day` : null}
-                  />
-                  <CompactField
-                    icon={Clock3}
-                    label="Weekly Capacity"
-                    value={mergedProfile.weeklyAvailability ? `${mergedProfile.weeklyAvailability} hrs/week` : null}
-                  />
-
-                  {/* Slot 7: PM Portal Registered Date (Fixed & Read-Only) */}
-                  <CompactField
-                    icon={ShieldCheck}
-                    label="PM Portal Registered Date"
-                    value={
-                      employee?.created_at
-                        ? format(parseISO(employee.created_at), "dd MMM yyyy")
-                        : "—"
-                    }
-                    color="slate"
-                  />
-
-                  {/* Slot 8: Promoted to Full-Time (Shown strictly for Full-timers) */}
-                  {(employee?.employee_type === "Full-time" || employee?.converted_to_fulltime_at) && (
-                    <CompactField
-                      icon={Award}
-                      label="Promoted to Full-Time"
-                      value={
-                        employee?.converted_to_fulltime_at
-                          ? format(parseISO(employee.converted_to_fulltime_at), "dd MMM yyyy")
-                          : "Direct Hire"
-                      }
-                      color="amber"
-                    />
-                  )}
+                <div className="grid max-h-64 grid-cols-5 gap-2 overflow-y-auto p-0.5">
+                  {visibleCovers.map((c) => (
+                    <button
+                      key={c.id}
+                      type="button"
+                      onClick={() => chooseCover(c.id)}
+                      title={c.name}
+                      className={`relative h-10 overflow-hidden rounded-md transition-shadow ${
+                        c.id === activeCover.id
+                          ? "ring-2 ring-slate-900 ring-offset-1"
+                          : "ring-1 ring-slate-900/10 hover:ring-slate-900/40"
+                      }`}
+                      style={{ background: c.css }}
+                    >
+                      {c.id === activeCover.id && (
+                        <span className="absolute inset-0 flex items-center justify-center bg-black/10 text-white">
+                          <Check className="h-4 w-4" />
+                        </span>
+                      )}
+                    </button>
+                  ))}
                 </div>
               </div>
-            </div>
-
+            )}
           </div>
-        </>
-      )}
+        </div>
+
+        <div className="px-4 pb-3 sm:px-5">
+          <div className="flex flex-col gap-4 sm:flex-row sm:items-end">
+            <div className="group relative -mt-16 h-32 w-32 shrink-0 overflow-hidden rounded-xl bg-slate-100 ring-4 ring-white shadow-sm">
+              <UserAvatar
+                src={mergedProfile.avatarUrl}
+                name={mergedProfile.name}
+                size="h-full w-full text-5xl"
+                rounded="rounded-none"
+                imgClassName="ring-0"
+                fallbackClassName="bg-slate-100 text-slate-500 font-medium ring-0"
+              />
+              <button
+                type="button"
+                onClick={() => fileInputRef.current?.click()}
+                disabled={avatarBusy || !employeeId}
+                title={!employeeId ? "Linked employee record required" : "Change photo"}
+                className="absolute inset-0 flex flex-col items-center justify-center gap-1 bg-slate-900/55 text-xs font-medium text-white opacity-0 transition-opacity duration-150 focus-visible:opacity-100 group-hover:opacity-100 disabled:cursor-not-allowed"
+              >
+                {avatarBusy ? (
+                  <Loader2 className="h-4 w-4 animate-spin" />
+                ) : (
+                  <>
+                    <Camera className="h-4 w-4" />
+                    Change photo
+                  </>
+                )}
+              </button>
+            </div>
+
+            <div className="min-w-0 flex-1 sm:pt-3 sm:pb-0.5">
+              <div className="flex flex-wrap items-start justify-between gap-3">
+                <div className="min-w-0">
+                  <h1 className="flex items-center gap-2 text-lg font-semibold text-slate-900">
+                    <span className="truncate">{mergedProfile.name || "Employee"}</span>
+                    {statusIsActive && (
+                      <BadgeCheck
+                        className="h-5 w-5 shrink-0 text-blue-600"
+                        aria-label="Active"
+                      />
+                    )}
+                  </h1>
+                  <p className="mt-0.5 text-sm text-slate-700">
+                    {mergedProfile.designation || "Team member"}
+                    <span className="mx-2 text-slate-300">/</span>
+                    <span className="capitalize text-slate-500">
+                      {String(mergedProfile.role).replace(/_/g, " ")}
+                    </span>
+                  </p>
+                  <div className="mt-1.5 flex flex-wrap items-center gap-x-4 gap-y-1 text-[13px] text-slate-500">
+                    {mergedProfile.email && (
+                      <span className="inline-flex items-center gap-1.5">
+                        <Mail className="h-4 w-4 text-violet-500" />
+                        {mergedProfile.email}
+                      </span>
+                    )}
+                    <span className="inline-flex items-center gap-1.5 font-mono tabular-nums">
+                      <Hash className="h-4 w-4 text-fuchsia-500" />
+                      {mergedProfile.employeeId || "—"}
+                    </span>
+                    <span className="inline-flex items-center gap-1.5 capitalize">
+                      <span
+                        className={`h-2 w-2 rounded-full ${
+                          statusIsActive ? "bg-emerald-500" : "bg-slate-400"
+                        }`}
+                      />
+                      {status}
+                    </span>
+                    {avatarError && (
+                      <span className="text-xs text-red-600">{avatarError}</span>
+                    )}
+                  </div>
+                </div>
+
+                <div className="flex flex-wrap items-center gap-2">
+                  <button
+                    type="button"
+                    onClick={() => slackAvatarMutation.mutate()}
+                    disabled={avatarBusy || !employeeId}
+                    title="Sync photo from Slack"
+                    className={btnSecondary}
+                  >
+                    <MessageSquare className="h-3.5 w-3.5 text-slate-400" />
+                    Sync with Slack
+                  </button>
+                  {mergedProfile.avatarUrl && (
+                    <button
+                      type="button"
+                      onClick={() => deleteAvatarMutation.mutate()}
+                      disabled={avatarBusy || !employeeId}
+                      title="Remove photo"
+                      className="flex h-8 w-8 items-center justify-center rounded-md border border-slate-300 bg-white text-slate-500 transition-colors hover:border-red-200 hover:bg-red-50 hover:text-red-700 disabled:cursor-not-allowed disabled:opacity-50"
+                    >
+                      <Trash2 className="h-4 w-4" />
+                    </button>
+                  )}
+                  {employeeId && !isEditing && (
+                    <Link
+                      to={dashboardHref}
+                      title="View employee activity dashboard"
+                      className={btnSecondary}
+                    >
+                      View dashboard
+                      <ArrowUpRight className="h-3.5 w-3.5 text-slate-400" />
+                    </Link>
+                  )}
+                  {editActions}
+                </div>
+              </div>
+
+            </div>
+          </div>
+        </div>
+
+        <dl className={`mt-0 grid grid-cols-2 border-t ${hairline} xl:grid-cols-4`}>
+          {stats.map((stat, i) => {
+            const Icon = stat.icon;
+            return (
+              <div
+                key={stat.label}
+                className={`flex items-center gap-3 px-5 py-2.5 ${
+                  i % 2 === 1 ? "border-l border-slate-900/[0.08]" : ""
+                } ${i > 0 ? "xl:border-l xl:border-slate-900/[0.08]" : ""} ${
+                  i >= 2 ? "border-t border-slate-900/[0.08] xl:border-t-0" : ""
+                }`}
+              >
+                <span
+                  className={`flex h-9 w-9 shrink-0 items-center justify-center rounded-lg ${TONES[stat.tone].tile}`}
+                >
+                  <Icon className="h-[18px] w-[18px]" />
+                </span>
+                <div className="min-w-0">
+                  <dd className="truncate text-lg font-semibold leading-tight tabular-nums text-slate-900">
+                    {stat.value}
+                  </dd>
+                  <dt className="truncate text-xs text-slate-500">
+                    {stat.label}
+                    <span className="text-slate-300"> / </span>
+                    {stat.sub}
+                  </dt>
+                </div>
+              </div>
+            );
+          })}
+        </dl>
+      </section>
+
+      {/* ── Details ─────────────────────────────────────────────── */}
+      <div className="grid grid-cols-1 items-start gap-3 lg:grid-cols-12">
+        <section className={`rounded-2xl border ${hairline} bg-white lg:col-span-7`}>
+          <header
+            className={`flex h-11 items-center justify-between gap-3 border-b px-5 ${hairline}`}
+          >
+            <div className="flex min-w-0 items-baseline gap-3">
+              <h2 className="text-sm font-semibold text-slate-900">Contact</h2>
+              {canEdit && !isEditing && (
+                <span className="truncate text-xs text-slate-400">Click a field to edit</span>
+              )}
+            </div>
+            {editActions}
+          </header>
+          <div className="grid grid-cols-1 gap-2 p-3 sm:grid-cols-2">
+            <Field
+              label="Full name"
+              icon={User}
+              tone="blue"
+              editable={canEdit && !isEditing}
+              onClick={!isEditing ? startEdit("name") : undefined}
+            >
+              {isEditing ? (
+                <input
+                  ref={nameInputRef}
+                  type="text"
+                  value={editName}
+                  onChange={(e) => setEditName(e.target.value)}
+                  placeholder="Full name"
+                  className={inputCls}
+                />
+              ) : (
+                <Value value={mergedProfile.name} />
+              )}
+            </Field>
+
+            <Field
+              label="Phone"
+              icon={Phone}
+              tone="emerald"
+              editable={canEdit && !isEditing}
+              onClick={!isEditing ? startEdit("phone") : undefined}
+            >
+              {isEditing ? (
+                <input
+                  ref={phoneInputRef}
+                  type="text"
+                  value={editPhone}
+                  onChange={(e) => setEditPhone(e.target.value)}
+                  placeholder="+91 98765 43210"
+                  className={inputCls}
+                />
+              ) : (
+                <span className="tabular-nums">
+                  <Value value={mergedProfile.phone} />
+                </span>
+              )}
+            </Field>
+
+            <EmailRow
+              value={mergedProfile.email}
+              isEditing={isEditing}
+              onRequestOTP={handleRequestOTP}
+              onVerifyOTP={handleVerifyOTP}
+              isRequesting={requestEmailChangeMutation.isPending}
+              isVerifying={verifyEmailChangeMutation.isPending}
+              error={emailError}
+              onDismissError={() => setEmailError("")}
+              editable={canEdit}
+              onStartEdit={() => canEdit && enterEditMode("email")}
+              inputRef={emailInputRef}
+            />
+
+            {/* Date of joining: employee can set it once, then Admin/HR only */}
+            {isEditing ? (
+              isDojLocked ? (
+                <Field
+                  label="Date of joining"
+                  icon={Calendar}
+                  tone="amber"
+                  hint="Locked. Contact Admin or HR to change it."
+                >
+                  <span className="flex items-center gap-2 tabular-nums">
+                    {fmtDate(mergedProfile.dateOfJoining)}
+                    <Lock className="h-3.5 w-3.5 text-slate-400" />
+                  </span>
+                </Field>
+              ) : (
+                <Field
+                  label="Date of joining"
+                  icon={Calendar}
+                  tone="amber"
+                  hint="Use the date in your joining letter"
+                >
+                  <input
+                    ref={dojInputRef}
+                    type="date"
+                    max={new Date().toISOString().split("T")[0]}
+                    value={editDateOfJoining}
+                    onChange={(e) => setEditDateOfJoining(e.target.value)}
+                    className={inputCls}
+                  />
+                </Field>
+              )
+            ) : (
+              <Field
+                label="Date of joining"
+                icon={Calendar}
+                tone="amber"
+                editable={canEdit && !isDojLocked}
+                title={
+                  isDojLocked
+                    ? "Official joining date is locked. Contact Admin or HR to change it."
+                    : undefined
+                }
+                onClick={
+                  isDojLocked
+                    ? () =>
+                        toast.error(
+                          "Official joining date is locked. Contact Admin or HR to change it.",
+                          { id: "doj-locked" }
+                        )
+                    : startEdit("dateOfJoining")
+                }
+              >
+                <span className="tabular-nums">
+                  <Value value={fmtDate(mergedProfile.dateOfJoining)} />
+                </span>
+                {isDojLocked && (
+                  <span className="inline-flex shrink-0 items-center gap-1 rounded bg-slate-200/70 px-1.5 py-0.5 text-xs text-slate-600">
+                    <Lock className="h-3 w-3" />
+                    Locked
+                  </span>
+                )}
+              </Field>
+            )}
+
+            <Field
+              label="Slack member ID"
+              icon={Hash}
+              tone="fuchsia"
+              editable={canEdit && !isEditing}
+              onClick={!isEditing ? startEdit("slackId") : undefined}
+            >
+              {isEditing ? (
+                <input
+                  ref={slackInputRef}
+                  type="text"
+                  value={editSlackId}
+                  onChange={(e) => setEditSlackId(e.target.value)}
+                  placeholder="U0123ABC456"
+                  className={`${inputCls} font-mono`}
+                />
+              ) : (
+                <span className="font-mono text-sm">
+                  <Value value={mergedProfile.slackUserId} />
+                </span>
+              )}
+            </Field>
+
+            <Field
+              label="Razorpay email"
+              icon={CreditCard}
+              tone="sky"
+              editable={canEdit && !isEditing}
+              onClick={!isEditing ? startEdit("razorpayEmail") : undefined}
+            >
+              {isEditing ? (
+                <input
+                  ref={razorpayInputRef}
+                  type="email"
+                  value={editRazorpayEmail}
+                  onChange={(e) => setEditRazorpayEmail(e.target.value)}
+                  placeholder="name@company.com"
+                  className={inputCls}
+                />
+              ) : (
+                <Value value={mergedProfile.razorpayEmail} />
+              )}
+            </Field>
+
+            <Field
+              label="Encord ID"
+              icon={Fingerprint}
+              tone="rose"
+              editable={canEdit && !isEditing}
+              onClick={!isEditing ? startEdit("encordId") : undefined}
+            >
+              {isEditing ? (
+                <input
+                  ref={encordInputRef}
+                  type="text"
+                  value={editEncordId}
+                  onChange={(e) => setEditEncordId(e.target.value)}
+                  placeholder="name@company.com"
+                  className={inputCls}
+                />
+              ) : (
+                <Value value={mergedProfile.encordId} />
+              )}
+            </Field>
+          </div>
+        </section>
+
+        <div className="space-y-3 lg:col-span-5">
+          <section className={`rounded-2xl border ${hairline} bg-white`}>
+            <header className={`flex h-11 items-center border-b px-5 ${hairline}`}>
+              <h2 className="text-sm font-semibold text-slate-900">Employment</h2>
+            </header>
+            <div className="grid grid-cols-2 gap-2 p-3">
+              <Field label="System role" icon={ShieldCheck} tone="blue">
+                <span className="capitalize">
+                  {String(mergedProfile.role).replace(/_/g, " ")}
+                </span>
+              </Field>
+              <Field label="Designation" icon={Briefcase} tone="violet">
+                <Value value={mergedProfile.designation} />
+              </Field>
+              <Field label="Registered" icon={CalendarDays} tone="sky">
+                <span className="tabular-nums">
+                  <Value value={fmtDate(employee?.created_at)} empty="—" />
+                </span>
+              </Field>
+              {(employee?.employee_type === "Full-time" ||
+                employee?.converted_to_fulltime_at) && (
+                <Field label="Full-time since" icon={Award} tone="amber">
+                  <span className="tabular-nums">
+                    {employee?.converted_to_fulltime_at
+                      ? fmtDate(employee.converted_to_fulltime_at)
+                      : "Direct hire"}
+                  </span>
+                </Field>
+              )}
+            </div>
+          </section>
+
+          <section className={`rounded-2xl border ${hairline} bg-white`}>
+            <header className={`flex h-11 items-center border-b px-5 ${hairline}`}>
+              <h2 className="text-sm font-semibold text-slate-900">Skills</h2>
+            </header>
+            <div className="px-5 py-4">
+              {isEditing ? (
+                <SkillsMultiSelect
+                  selected={editSkills}
+                  onChange={setEditSkills}
+                  options={skillsList}
+                  isLoading={skillsLoading}
+                />
+              ) : mergedProfile.skills.length > 0 ? (
+                <div className="flex flex-wrap gap-2">
+                  {mergedProfile.skills.map((skill) => (
+                    <span
+                      key={skill}
+                      className="inline-flex h-7 items-center rounded-md bg-slate-100 px-2.5 text-[13px] text-slate-800"
+                    >
+                      {skill}
+                    </span>
+                  ))}
+                </div>
+              ) : (
+                <p className="text-sm text-slate-400">No skills assigned</p>
+              )}
+            </div>
+          </section>
+        </div>
+      </div>
+      </div>
     </div>
   );
 };

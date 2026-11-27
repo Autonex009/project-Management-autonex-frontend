@@ -77,7 +77,9 @@ const ProtectedRoute = ({ children, allowedRoles }) => {
   }
 
   if (!isAuthenticated) {
-    const isEmployeeRoute = location.pathname.startsWith("/employee");
+    const isEmployeeRoute =
+      location.pathname.startsWith("/employee") ||
+      location.pathname.startsWith("/assessments");
     const isPMRoute = location.pathname.startsWith("/pm");
     const loginPath = isEmployeeRoute
       ? "/login/employee"
