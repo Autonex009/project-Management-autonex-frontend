@@ -988,4 +988,124 @@ export const weeklyCompensationApi = {
     api.get(`/weekly-compensation/${id}`).then((res) => res.data),
 };
 
+// === Clusters API (Shared Cohort Management) ===
+export const clusterApi = {
+  list: (includeArchived = false) =>
+    api
+      .get("/clusters", { params: { include_archived: includeArchived } })
+      .then((res) => res.data),
+  get: (id) => api.get(`/clusters/${id}`).then((res) => res.data),
+  getMembers: (id) => api.get(`/clusters/${id}/members`).then((res) => res.data),
+  getPickerOptions: () =>
+    api.get("/clusters/member-picker-options").then((res) => res.data),
+  create: (data) => api.post("/clusters", data).then((res) => res.data),
+  update: (id, data) => api.put(`/clusters/${id}`, data).then((res) => res.data),
+  addMembers: (id, employeeIds) =>
+    api
+      .post(`/clusters/${id}/members`, { employee_ids: employeeIds })
+      .then((res) => res.data),
+  removeMember: (id, employeeId) =>
+    api.delete(`/clusters/${id}/members/${employeeId}`).then((res) => res.data),
+  archive: (id) => api.delete(`/clusters/${id}`).then((res) => res.data),
+  restore: (id, data = {}) =>
+    api.post(`/clusters/${id}/restore`, data).then((res) => res.data),
+};
+
+// === Unified Assignments API ===
+export const assignmentApi = {
+  list: (params = {}) =>
+    api.get("/assignments", { params }).then((res) => res.data),
+  create: (data) => api.post("/assignments", data).then((res) => res.data),
+  deactivate: (id) =>
+    api.post(`/assignments/${id}/deactivate`).then((res) => res.data),
+  updateDeadline: (id, newDeadline) =>
+    api
+      .put(`/assignments/${id}/deadline`, { new_deadline: newDeadline })
+      .then((res) => res.data),
+};
+
+// === Proctored Assessments API ===
+export const assessmentApi = {
+  list: (params = {}) =>
+    api.get("/assessments", { params }).then((res) => res.data),
+  get: (id) => api.get(`/assessments/${id}`).then((res) => res.data),
+  getOverview: (id) =>
+    api.get(`/assessments/${id}/overview`).then((res) => res.data),
+  create: (data) => api.post("/assessments", data).then((res) => res.data),
+  update: (id, data) =>
+    api.put(`/assessments/${id}`, data).then((res) => res.data),
+  archive: (id) => api.delete(`/assessments/${id}`).then((res) => res.data),
+  restore: (id, data = {}) =>
+    api.post(`/assessments/${id}/restore`, data).then((res) => res.data),
+
+  // Admin / Evaluator Progress & Logs (Paginated + Surgical Row)
+  getAdminEnrollments: (params = {}) =>
+    api
+      .get("/assessments/admin/enrollments", {
+        params: {
+          page: params.page || 1,
+          page_size: params.pageSize || 20,
+          search: params.search || undefined,
+          status: params.status && params.status !== "all" ? params.status : undefined,
+          assessment_id: params.assessmentId || undefined,
+          cluster_id: params.clusterId || undefined,
+        },
+      })
+      .then((res) => res.data),
+  getAdminEnrollmentRow: (enrollmentId) =>
+    api
+      .get(`/assessments/admin/enrollments/${enrollmentId}/row`)
+      .then((res) => res.data),
+  // Assessments + cohorts that exist inside the caller's own visibility scope (PM / Team Lead safe)
+  getEvaluatorFilters: () =>
+    api.get("/assessments/admin/filters").then((res) => res.data),
+  getScorecard: (enrollmentId) =>
+    api
+      .get(`/assessments/enrollments/${enrollmentId}/scorecard`)
+      .then((res) => res.data),
+  grantRetest: (enrollmentId, reason) =>
+    api
+      .post(`/assessments/enrollments/${enrollmentId}/grant-retest`, { reason })
+      .then((res) => res.data),
+  extendDeadline: (enrollmentId, newDeadline, reason) =>
+    api
+      .put(`/assessments/enrollments/${enrollmentId}/extend-deadline`, {
+        new_deadline: newDeadline,
+        reason,
+      })
+      .then((res) => res.data),
+  sendReminders: (payload) =>
+    api.post("/assessments/reminders/send", payload).then((res) => res.data),
+  getRecordingPlayUrl: (attemptId) =>
+    api
+      .get(`/assessments/results/${attemptId}/recording/play-url`)
+      .then((res) => res.data),
+
+  // Candidate Sitting Lifecycle
+  getMyEnrollments: () =>
+    api.get("/assessments/my/enrollments").then((res) => res.data),
+  startOrResumeAttempt: (enrollmentId, cameraVerified = false) =>
+    api
+      .post(`/assessments/enrollments/${enrollmentId}/attempts`, {
+        camera_verified: cameraVerified,
+      })
+      .then((res) => res.data),
+  autosaveDraft: (attemptId, payload) =>
+    api
+      .put(`/assessments/attempts/${attemptId}/draft`, payload)
+      .then((res) => res.data),
+  submitAttempt: (attemptId, payload) =>
+    api
+      .post(`/assessments/attempts/${attemptId}/submit`, payload)
+      .then((res) => res.data),
+  getRecordingUploadUrl: (attemptId) =>
+    api
+      .post(`/assessments/attempts/${attemptId}/recording/upload-url`)
+      .then((res) => res.data),
+  finalizeRecording: (attemptId) =>
+    api
+      .post(`/assessments/attempts/${attemptId}/recording/finalize`)
+      .then((res) => res.data),
+};
+
 export default api;

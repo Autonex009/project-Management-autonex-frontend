@@ -104,6 +104,7 @@ const EmployeeLayout = () => {
         { to: `${prefix}/referrals`, label: "Referrals" },
         { to: `${prefix}/onboarding`, label: "My Onboarding" },
         { to: `${prefix}/onboarding-mentor`, label: "Mentorship" },
+        { to: `${prefix}/training-development`, label: "Training & Development" },
         { to: `${prefix}/profile`, label: "Profile" },
         ...(canManageCanteen ? [{ to: `${prefix}/lunch-menu`, label: "Lunch Menu" }] : []),
       ]
@@ -118,6 +119,7 @@ const EmployeeLayout = () => {
         { to: `${prefix}/referrals`, label: "Referrals" },
         { to: `${prefix}/company-info`, label: "Company Info" },
         { to: `${prefix}/onboarding`, label: "Onboarding" },
+        { to: `${prefix}/assessments`, label: "My Assessments" },
         { to: `${prefix}/profile`, label: "Profile" },
         ...(canManageCanteen ? [{ to: `${prefix}/lunch-menu`, label: "Lunch Menu" }] : []),
       ];

@@ -18,6 +18,7 @@ import {
   GraduationCap,
   Sparkles,
   Utensils,
+  Award,
 } from "lucide-react";
 
 /**
@@ -70,6 +71,7 @@ export const pmNavigationGroups = [
     items: [
       { name: "My Onboarding", href: "/pm/onboarding", icon: GraduationCap },
       { name: "Mentorship", href: "/pm/onboarding-mentor", icon: Sparkles },
+      { name: "Training & Development", href: "/pm/training-development", icon: Award },
     ],
   },
 ];
